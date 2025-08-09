@@ -45,13 +45,26 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_native_splash: ^2.4.6
 
+flutter_native_splash:
+  background_image: assets/images/logo_background.png
+  image: assets/images/MERZOX_LOGO.png
+  android_12:
+    background_image: assets/images/logo_background.png
+    image: assets/images/MERZOX_LOGO.png
+  android: true
+  ios: true
+  web: true
+  fullscreen: true
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
-
+  assets:
+    - assets/images/logo_background.png
+    - assets/images/MERZOX_LOGO.png
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
