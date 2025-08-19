@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/features/home/home_screen.dart';
 import 'package:merzox/features/onboarding/bloc/onboarding_bloc.dart';
 import 'package:merzox/features/onboarding/bloc/onboarding_event.dart';
 import 'package:merzox/features/onboarding/bloc/onboarding_state.dart';
@@ -144,11 +145,20 @@ class OnboardingScreen extends StatelessWidget {
                           shape: WidgetStateProperty.all(const CircleBorder()),
                         ),
                         onPressed: () {
-                          _pageController.nextPage(
-                            duration: const Duration(milliseconds: 200),
-                            curve: Curves.bounceInOut,
-                          );
-                          bloc.add(NextPage(state.currentPage));
+                          if (state.currentPage == 2) {
+                            bloc.add(SkipOnboarding());
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (context) => HomeScreen(isGuest: true),
+                              ),
+                            );
+                          } else {
+                            _pageController.nextPage(
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.bounceInOut,
+                            );
+                            bloc.add(NextPage(state.currentPage));
+                          }
                         },
                       ),
                     ),

@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final SharedPreferences prefs = await SharedPreferences.getInstance();
-  final bool onboardingSeen = prefs.getBool("onboarding_completed")!;
+  final bool onboardingSeen = prefs.getBool("onboarding_completed") ?? false;
   runApp(Merzox(direct: onboardingSeen));
 }
 
