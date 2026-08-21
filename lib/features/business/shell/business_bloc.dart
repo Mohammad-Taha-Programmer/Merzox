@@ -33,6 +33,20 @@ final class BusinessOrderStatusChanged extends BusinessEvent {
   const BusinessOrderStatusChanged(this.orderId, this.status);
 }
 
+/// Filling in the driver is what makes the courier card appear on the
+/// customer's tracking screen.
+final class BusinessOrderCourierAssigned extends BusinessEvent {
+  final String orderId;
+  final String name;
+  final String phone;
+
+  const BusinessOrderCourierAssigned({
+    required this.orderId,
+    required this.name,
+    this.phone = '',
+  });
+}
+
 final class BusinessProductSaved extends BusinessEvent {
   final String? productId;
   final Map<String, dynamic> values;
@@ -114,6 +128,7 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     on<BusinessRefreshed>(_onRefreshed);
     on<BusinessOrderGroupChanged>(_onOrderGroupChanged);
     on<BusinessOrderStatusChanged>(_onOrderStatusChanged);
+    on<BusinessOrderCourierAssigned>(_onOrderCourierAssigned);
     on<BusinessProductSaved>(_onProductSaved);
     on<BusinessProductDeleted>(_onProductDeleted);
     on<BusinessProfileSaved>(_onProfileSaved);
@@ -223,6 +238,40 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
           orders: list.orders,
           orderCounts: list.counts,
           dashboard: dashboard,
+          revision: state.revision + 1,
+        ),
+      );
+    } catch (error) {
+      emit(
+        state.copyWith(
+          status: BusinessStatus.failure,
+          errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onOrderCourierAssigned(
+    BusinessOrderCourierAssigned event,
+    Emitter<BusinessState> emit,
+  ) async {
+    emit(state.copyWith(status: BusinessStatus.saving));
+    try {
+      await _apiService.assignOrderCourier(
+        token: await _token(),
+        orderId: event.orderId,
+        name: event.name,
+        phone: event.phone,
+      );
+      final list = await _apiService.ownerOrders(
+        token: await _token(),
+        statusGroup: state.orderGroup,
+      );
+      emit(
+        state.copyWith(
+          status: BusinessStatus.ready,
+          orders: list.orders,
+          orderCounts: list.counts,
           revision: state.revision + 1,
         ),
       );

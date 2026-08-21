@@ -68,6 +68,14 @@ class _ProductDetailsView extends StatelessWidget {
                         padding: const EdgeInsets.only(bottom: 96),
                         children: [
                           _ImageSlider(product: product, state: state),
+                          if (state.detailsStatus ==
+                              ProductDetailsSectionStatus.failure)
+                            _ProductLoadFailure(
+                              message: state.detailsError,
+                              onRetry: () => context
+                                  .read<ProductDetailsBloc>()
+                                  .add(const ProductDetailsReloadRequested()),
+                            ),
                           _ProductHeader(product: product),
                           _Tabs(selectedIndex: state.selectedTabIndex),
                           if (state.selectedTabIndex == 0)
@@ -327,7 +335,7 @@ class _DescriptionTab extends StatelessWidget {
         children: [
           Text(
             product.description.isEmpty
-                ? 'كريم أساس سائل سهل الدمج للحصول على بشرة طبيعية خالية من اللمعان، يغطي المسام ويمنح مظهرا ناعما طوال اليوم.'
+                ? 'catalog.noProductDescription'.tr()
                 : product.description,
             textAlign: TextAlign.end,
             style: TextStyle(
@@ -338,8 +346,6 @@ class _DescriptionTab extends StatelessWidget {
           ),
           const SizedBox(height: 24),
           _QuantityRow(quantity: state.quantity),
-          const SizedBox(height: 25),
-          _DegreeSelector(selected: state.selectedDegree),
           const SizedBox(height: 28),
           _SellerDetails(business: business),
         ],
@@ -415,52 +421,6 @@ class _StepperButton extends StatelessWidget {
   }
 }
 
-class _DegreeSelector extends StatelessWidget {
-  final String selected;
-
-  const _DegreeSelector({required this.selected});
-
-  @override
-  Widget build(BuildContext context) {
-    const degrees = ['01', '02', '03'];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        const Text('درجة اللون', style: TextStyle(fontSize: 15)),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 17,
-          textDirection: TextDirection.rtl,
-          children: degrees.map((degree) {
-            final active = degree == selected;
-            return OutlinedButton(
-              onPressed: () {
-                context.read<ProductDetailsBloc>().add(
-                  ProductDetailsDegreeSelected(degree),
-                );
-              },
-              style: OutlinedButton.styleFrom(
-                fixedSize: const Size(42, 38),
-                padding: EdgeInsets.zero,
-                foregroundColor: MerzoxColors.kColor3D5A80,
-                backgroundColor: active
-                    ? MerzoxColors.kColorEEF6FB
-                    : Colors.white,
-                side: BorderSide(color: MerzoxColors.kColorB9DDF3),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(5),
-                ),
-              ),
-              child: Text(degree),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-}
-
 class _SellerDetails extends StatelessWidget {
   final HomeBusiness business;
 
@@ -487,7 +447,9 @@ class _SellerDetails extends StatelessWidget {
                 Text(business.name, style: const TextStyle(fontSize: 13)),
                 const SizedBox(height: 4),
                 Text(
-                  'رام الله، دوار المنارة',
+                  business.address.trim().isEmpty
+                      ? 'catalog.addressUnavailable'.tr()
+                      : business.address,
                   style: TextStyle(
                     fontSize: 11,
                     color: MerzoxColors.kColor767676,
@@ -542,18 +504,6 @@ class _ReviewsTabState extends State<_ReviewsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              const Text('ياسمين خالد', style: TextStyle(fontSize: 13)),
-              const SizedBox(width: 10),
-              CircleAvatar(
-                radius: 17,
-                backgroundColor: MerzoxColors.kColor98C1D9,
-              ),
-            ],
-          ),
-          const SizedBox(height: 15),
           Center(
             child: _InteractiveStars(
               value: _rating,
@@ -631,7 +581,41 @@ class _ReviewsTabState extends State<_ReviewsTab> {
             ],
           ),
           const SizedBox(height: 18),
-          ...widget.state.reviews.map(_ReviewTile.new),
+          if (widget.state.reviewsStatus == ProductDetailsSectionStatus.loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 30),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (widget.state.reviewsStatus ==
+                  ProductDetailsSectionStatus.failure &&
+              widget.state.reviews.isEmpty)
+            _ProductLoadFailure(
+              message: widget.state.reviewsError,
+              onRetry: () => context.read<ProductDetailsBloc>().add(
+                const ProductDetailsReviewsRetryRequested(),
+              ),
+            )
+          else ...[
+            if (widget.state.reviewsStatus ==
+                ProductDetailsSectionStatus.failure)
+              _ProductLoadFailure(
+                message: widget.state.reviewsError,
+                onRetry: () => context.read<ProductDetailsBloc>().add(
+                  const ProductDetailsReviewsRetryRequested(),
+                ),
+              ),
+            if (widget.state.reviews.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 28),
+                child: Text(
+                  'catalog.noReviews'.tr(),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: MerzoxColors.kColor767676),
+                ),
+              )
+            else
+              ...widget.state.reviews.map(_ReviewTile.new),
+          ],
         ],
       ),
     );
@@ -691,11 +675,43 @@ class _ReviewTile extends StatelessWidget {
                 backgroundColor: MerzoxColors.kColor98C1D9,
               ),
               const SizedBox(height: 5),
-              Text(
-                review.userName.isEmpty ? 'مستخدم Merzox' : review.userName,
-                style: const TextStyle(fontSize: 12),
-              ),
+              if (review.userName.trim().isNotEmpty)
+                Text(review.userName, style: const TextStyle(fontSize: 12)),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProductLoadFailure extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ProductLoadFailure({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    final displayMessage = message.contains('.') ? message.tr() : message;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              displayMessage.isEmpty
+                  ? 'catalog.loadError'.tr()
+                  : displayMessage,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: MerzoxColors.kColor767676),
+            ),
+          ),
+          IconButton(
+            tooltip: 'common.retry'.tr(),
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
           ),
         ],
       ),

@@ -1,20 +1,26 @@
 import 'dart:convert';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/api_service.dart';
 import '../../authentication/bloc/auth_bloc.dart';
+import '../cart_item_integrity.dart';
 import '../cart_storage_keys.dart';
 import 'cart_event.dart';
 import 'cart_state.dart';
 
 class CartBloc extends Bloc<CartEvent, CartState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
-  CartBloc({ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(const CartState()) {
+  CartBloc({
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const CartState()) {
     on<CartStarted>(_onStarted);
     on<CartItemRemoved>(_onItemRemoved);
     on<CartCheckoutRequested>(_onCheckoutRequested);
@@ -54,8 +60,9 @@ class CartBloc extends Bloc<CartEvent, CartState> {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AuthBloc.tokenKey);
-      if (token == null || token.isEmpty) {
+      final session = await _authSessionService.read();
+      final token = session.token;
+      if (token == null) {
         throw StateError('Authentication required');
       }
 
@@ -81,7 +88,6 @@ class CartBloc extends Bloc<CartEvent, CartState> {
                 (item) => OrderItemRequest(
                   productId: item.productId,
                   quantity: item.quantity,
-                  variant: item.degree,
                 ),
               )
               .toList(),
@@ -111,13 +117,23 @@ class CartBloc extends Bloc<CartEvent, CartState> {
   Future<List<CartItem>> _loadItems() async {
     final prefs = await SharedPreferences.getInstance();
     final storedItems = prefs.getStringList(CartStorageKeys.items) ?? [];
+    final parsedItems = <CartItem>[];
+    final sanitizedItems = <String>[];
 
-    return storedItems
-        .map(_tryParse)
-        .whereType<CartItem>()
-        .toList()
-        .reversed
-        .toList();
+    for (final raw in storedItems) {
+      final item = _tryParse(raw);
+      if (item == null) continue;
+
+      parsedItems.add(item);
+      sanitizedItems.add(item.raw);
+    }
+
+    if (!_sameItems(storedItems, sanitizedItems)) {
+      await prefs.setStringList(CartStorageKeys.items, sanitizedItems);
+      await prefs.remove(CartStorageKeys.checkoutId);
+    }
+
+    return parsedItems.reversed.toList();
   }
 
   CartItem? _tryParse(String raw) {
@@ -125,18 +141,54 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) return null;
 
+      final productId = (decoded['productId'] as String? ?? '').trim();
+      final businessId = (decoded['businessId'] as String? ?? '').trim();
+      final name = (decoded['name'] as String? ?? '').trim();
+      final price = (decoded['price'] as num?)?.toDouble();
+      final quantity = (decoded['quantity'] as num?)?.toInt();
+
+      if (!isMongoBackedEntityId(productId) ||
+          !isMongoBackedEntityId(businessId) ||
+          name.isEmpty ||
+          price == null ||
+          !price.isFinite ||
+          price < 0 ||
+          quantity == null ||
+          quantity < 1 ||
+          quantity > 100) {
+        return null;
+      }
+
+      final imageUrl = (decoded['imageUrl'] as String? ?? '').trim();
+      final sanitizedRaw = jsonEncode({
+        'businessId': businessId,
+        'productId': productId,
+        'name': name,
+        'price': price,
+        'imageUrl': imageUrl,
+        'quantity': quantity,
+      });
+
       return CartItem(
-        raw: raw,
-        productId: decoded['productId'] as String? ?? '',
-        businessId: decoded['businessId'] as String? ?? '',
-        name: decoded['name'] as String? ?? 'المنتج',
-        price: (decoded['price'] as num?)?.toDouble() ?? 0,
-        imageUrl: decoded['imageUrl'] as String? ?? '',
-        quantity: (decoded['quantity'] as num?)?.toInt() ?? 1,
-        degree: decoded['degree'] as String? ?? '',
+        raw: sanitizedRaw,
+        productId: productId,
+        businessId: businessId,
+        name: name,
+        price: price,
+        imageUrl: imageUrl,
+        quantity: quantity,
       );
     } catch (_) {
       return null;
     }
+  }
+
+  bool _sameItems(List<String> first, List<String> second) {
+    if (first.length != second.length) return false;
+
+    for (var index = 0; index < first.length; index += 1) {
+      if (first[index] != second[index]) return false;
+    }
+    return true;
   }
 }

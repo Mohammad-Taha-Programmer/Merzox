@@ -4,11 +4,13 @@ import { Favorite } from '../models/Favorite.js';
 import { ProductReview } from '../models/ProductReview.js';
 import { requireBoolean } from './favorite.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
+import { notifyNewReview } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 
 const validProductClassifications = new Set(['new', 'bestSelling', 'offers']);
+const validBusinessSorts = new Set(['newest', 'rating']);
 
-function paginationParams(query) {
+export function paginationParams(query) {
   const parsedPage = Number.parseInt(query.page ?? '1', 10);
   const parsedLimit = Number.parseInt(query.limit ?? '100', 10);
   const page = Number.isFinite(parsedPage) ? Math.max(parsedPage, 1) : 1;
@@ -19,18 +21,75 @@ function paginationParams(query) {
   return { page, limit, skip: (page - 1) * limit };
 }
 
-function buildBusinessFilter(query) {
-  const filter = { isActive: true };
-  const search = String(query.search ?? '').trim();
+export function discountedParam(query) {
+  const rawValue = query.discounted;
 
-  if (search) {
-    filter.$text = { $search: search };
+  if (rawValue === undefined) {
+    return false;
+  }
+
+  if (rawValue === true || rawValue === 'true') {
+    return true;
+  }
+
+  if (rawValue === false || rawValue === 'false') {
+    return false;
+  }
+
+  throw new AppError(
+    'Discounted filter must be true or false',
+    400,
+    'INVALID_DISCOUNTED_FILTER'
+  );
+}
+
+export function businessSort(query) {
+  const requestedSort = String(query.sort ?? 'newest').trim();
+
+  if (!validBusinessSorts.has(requestedSort)) {
+    throw new AppError(
+      'Business sort must be newest or rating',
+      400,
+      'INVALID_BUSINESS_SORT'
+    );
+  }
+
+  if (requestedSort === 'rating') {
+    return {
+      ratingAverage: -1,
+      ratingCount: -1,
+      subscribedAt: -1,
+      _id: -1
+    };
+  }
+
+  return { subscribedAt: -1, _id: -1 };
+}
+
+export function nearbyBusinessSort() {
+  return { distanceMeters: 1, subscribedAt: -1, _id: -1 };
+}
+
+function applyDiscountFilter(filter, query) {
+  if (discountedParam(query)) {
+    filter.discountLabel = { $exists: true, $type: 'string', $ne: '' };
   }
 
   return filter;
 }
 
-function buildNearbyBusinessFilter(query) {
+export function buildBusinessFilter(query) {
+  const filter = { isActive: true };
+  const search = String(query.search ?? '').trim().slice(0, 80);
+
+  if (search) {
+    filter.$text = { $search: search };
+  }
+
+  return applyDiscountFilter(filter, query);
+}
+
+export function buildNearbyBusinessFilter(query) {
   const filter = { isActive: true };
   const search = String(query.search ?? '').trim().slice(0, 80);
 
@@ -43,10 +102,10 @@ function buildNearbyBusinessFilter(query) {
     ];
   }
 
-  return filter;
+  return applyDiscountFilter(filter, query);
 }
 
-function nearbyParams(query) {
+export function nearbyParams(query) {
   const latitude = Number(query.lat ?? query.latitude);
   const longitude = Number(query.lng ?? query.longitude);
 
@@ -79,6 +138,7 @@ function businessListView(business) {
 export const listBusinesses = asyncHandler(async (req, res) => {
   const { page, limit, skip } = paginationParams(req.query);
   const nearby = nearbyParams(req.query);
+  const sort = businessSort(req.query);
   const filter = nearby
     ? buildNearbyBusinessFilter(req.query)
     : buildBusinessFilter(req.query);
@@ -97,7 +157,7 @@ export const listBusinesses = asyncHandler(async (req, res) => {
           query: filter
         }
       },
-      { $sort: { distanceMeters: 1, subscribedAt: -1, _id: -1 } },
+      { $sort: nearbyBusinessSort() },
       {
         $facet: {
           items: [{ $skip: skip }, { $limit: limit }],
@@ -125,7 +185,7 @@ export const listBusinesses = asyncHandler(async (req, res) => {
 
   const [items, total] = await Promise.all([
     Business.find(filter)
-      .sort({ subscribedAt: -1, _id: -1 })
+      .sort(sort)
       .skip(skip)
       .limit(limit)
       .lean(false),
@@ -304,6 +364,16 @@ export const createBusinessProductReview = asyncHandler(async (req, res) => {
   product.ratingCount = aggregate[0]?.ratingCount ?? 0;
   await business.save();
 
+  if (business.owner) {
+    await notifyNewReview({
+      ownerId: business.owner,
+      businessId: business._id,
+      reviewerName: req.user.name,
+      rating,
+      target: 'product'
+    });
+  }
+
   res.status(201).json({
     success: true,
     data: {
@@ -376,6 +446,16 @@ export const createBusinessReview = asyncHandler(async (req, res) => {
   business.ratingAverage = aggregate[0]?.ratingAverage ?? 0;
   business.ratingCount = aggregate[0]?.ratingCount ?? 0;
   await business.save();
+
+  if (business.owner) {
+    await notifyNewReview({
+      ownerId: business.owner,
+      businessId: business._id,
+      reviewerName: req.user.name,
+      rating,
+      target: 'business'
+    });
+  }
 
   res.status(201).json({
     success: true,

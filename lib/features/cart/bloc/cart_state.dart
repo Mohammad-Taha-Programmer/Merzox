@@ -8,7 +8,6 @@ final class CartItem {
   final double price;
   final String imageUrl;
   final int quantity;
-  final String degree;
 
   const CartItem({
     required this.raw,
@@ -18,7 +17,6 @@ final class CartItem {
     required this.price,
     required this.imageUrl,
     required this.quantity,
-    required this.degree,
   });
 
   double get total => price * quantity;

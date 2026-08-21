@@ -1,10 +1,14 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../services/api_service.dart';
 import '../../authentication/bloc/auth_bloc.dart';
 import '../models/business_models.dart';
+import '../orders/merchant_order_detail_page.dart';
+import '../settings/store_settings_page.dart';
 import 'business_bloc.dart';
 
 class BusinessShellPage extends StatelessWidget {
@@ -115,7 +119,13 @@ class _PageHeader extends StatelessWidget {
           ),
         ),
         IconButton(
-          onPressed: () {},
+          tooltip: 'messages.title'.tr(),
+          onPressed: () => context.push('/business/messages'),
+          icon: const Icon(Icons.chat_bubble_outline_rounded),
+        ),
+        IconButton(
+          tooltip: 'notifications.title'.tr(),
+          onPressed: () => context.push('/notifications?audience=business'),
           icon: const Icon(Icons.notifications_none_rounded),
         ),
       ],
@@ -283,8 +293,11 @@ class _Orders extends StatelessWidget {
               : ListView.builder(
                   padding: const EdgeInsets.only(bottom: 20),
                   itemCount: state.orders.length,
-                  itemBuilder: (_, index) =>
-                      _OrderTile(order: state.orders[index]),
+                  itemBuilder: (_, index) => _OrderTile(
+                    order: state.orders[index],
+                    onOpen: () =>
+                        _openOrderDetail(context, state, state.orders[index]),
+                  ),
                 ),
         ),
       ),
@@ -292,10 +305,52 @@ class _Orders extends StatelessWidget {
   );
 }
 
+/// Opens the merchant order screen, wiring its actions back to the shell's
+/// bloc so a status change refreshes the list the user returns to.
+void _openOrderDetail(
+  BuildContext context,
+  BusinessState state,
+  OwnerOrder order,
+) {
+  final bloc = context.read<BusinessBloc>();
+
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => BlocProvider.value(
+        value: bloc,
+        child: BlocBuilder<BusinessBloc, BusinessState>(
+          builder: (innerContext, innerState) {
+            final current = innerState.orders
+                .where((candidate) => candidate.id == order.id)
+                .firstOrNull;
+
+            return MerchantOrderDetailPage(
+              order: current ?? order,
+              businessName: innerState.business?.name ?? '',
+              businessAddress: innerState.business?.address ?? '',
+              isSaving: innerState.status == BusinessStatus.saving,
+              onStatusSelected: (status) =>
+                  bloc.add(BusinessOrderStatusChanged(order.id, status)),
+              onCourierAssigned: (name, phone) async => bloc.add(
+                BusinessOrderCourierAssigned(
+                  orderId: order.id,
+                  name: name,
+                  phone: phone,
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    ),
+  );
+}
+
 class _OrderTile extends StatelessWidget {
   final OwnerOrder order;
   final bool compact;
-  const _OrderTile({required this.order, this.compact = false});
+  final VoidCallback? onOpen;
+  const _OrderTile({required this.order, this.compact = false, this.onOpen});
 
   @override
   Widget build(BuildContext context) {
@@ -307,69 +362,73 @@ class _OrderTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.fromLTRB(16, 5, 16, 7),
       color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.all(13),
-        child: Row(
-          children: [
-            Container(
-              width: 46,
-              height: 46,
-              decoration: BoxDecoration(
-                color: MerzoxColors.kColorDEEEF8,
-                borderRadius: BorderRadius.circular(6),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(13),
+          child: Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: MerzoxColors.kColorDEEEF8,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Icon(Icons.receipt_long_outlined),
               ),
-              child: const Icon(Icons.receipt_long_outlined),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    order.customerName.isEmpty
-                        ? 'عميل Merzox'
-                        : order.customerName,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  Text(
-                    '#${order.publicId}',
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                  Text(
-                    '${order.items.length} منتجات • ${order.total.toStringAsFixed(0)} ₪',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: MerzoxColors.kColor767676,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.customerName.isEmpty
+                          ? 'عميل Merzox'
+                          : order.customerName,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            if (compact)
-              _StatusBadge(order.status)
-            else
-              DropdownButton<String>(
-                value: currentStatus,
-                underline: const SizedBox.shrink(),
-                items: options
-                    .map(
-                      (status) => DropdownMenuItem(
-                        value: status,
-                        child: Text(_statusLabel(status)),
+                    Text(
+                      '#${order.publicId}',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      '${order.items.length} منتجات • ${order.total.toStringAsFixed(0)} ₪',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: MerzoxColors.kColor767676,
                       ),
-                    )
-                    .toList(),
-                onChanged: options.length == 1
-                    ? null
-                    : (status) {
-                        if (status != null && status != order.status) {
-                          context.read<BusinessBloc>().add(
-                            BusinessOrderStatusChanged(order.id, status),
-                          );
-                        }
-                      },
+                    ),
+                  ],
+                ),
               ),
-          ],
+              if (compact)
+                _StatusBadge(order.status)
+              else
+                DropdownButton<String>(
+                  value: currentStatus,
+                  underline: const SizedBox.shrink(),
+                  items: options
+                      .map(
+                        (status) => DropdownMenuItem(
+                          value: status,
+                          child: Text(_statusLabel(status)),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: options.length == 1
+                      ? null
+                      : (status) {
+                          if (status != null && status != order.status) {
+                            context.read<BusinessBloc>().add(
+                              BusinessOrderStatusChanged(order.id, status),
+                            );
+                          }
+                        },
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -521,10 +580,20 @@ class _Profile extends StatelessWidget {
           child: CircleAvatar(
             radius: 42,
             backgroundColor: Colors.white,
-            child: Text(
-              business.name.isEmpty ? 'M' : business.name.characters.first,
-              style: TextStyle(fontSize: 28, color: MerzoxColors.kColor3D5A80),
-            ),
+            backgroundImage: business.logoUrl.isEmpty
+                ? null
+                : NetworkImage(business.logoUrl),
+            child: business.logoUrl.isNotEmpty
+                ? null
+                : Text(
+                    business.name.isEmpty
+                        ? 'M'
+                        : business.name.characters.first,
+                    style: TextStyle(
+                      fontSize: 28,
+                      color: MerzoxColors.kColor3D5A80,
+                    ),
+                  ),
           ),
         ),
         Padding(
@@ -561,6 +630,19 @@ class _Profile extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _openStoreSettings(context, business),
+                  icon: const Icon(Icons.settings_outlined),
+                  label: Text('storeSettings.title'.tr()),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: MerzoxColors.kColor3D5A80),
+                    foregroundColor: MerzoxColors.kColor3D5A80,
+                  ),
+                ),
+              ),
               TextButton.icon(
                 onPressed: onLogout,
                 icon: const Icon(Icons.logout_rounded),
@@ -572,6 +654,19 @@ class _Profile extends StatelessWidget {
       ],
     );
   }
+}
+
+void _openStoreSettings(BuildContext context, OwnerBusiness business) {
+  final bloc = context.read<BusinessBloc>();
+
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => BlocProvider.value(
+        value: bloc,
+        child: StoreSettingsPage(business: business),
+      ),
+    ),
+  );
 }
 
 class _ProfileLine extends StatelessWidget {

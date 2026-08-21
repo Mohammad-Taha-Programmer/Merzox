@@ -5,7 +5,9 @@
     "confirm": "Confirm",
     "retry": "Try again",
     "search": "Search",
-    "currency": "₪"
+    "currency": "₪",
+    "save": "Save",
+    "edit": "Edit"
   },
   "authGate": {
     "title": "Login required",
@@ -79,6 +81,20 @@
     "directionsError": "Could not open a maps app on this device",
     "mapData": "Map data © OpenStreetMap"
   },
+  "catalog": {
+    "loadError": "Could not load the data. Try again.",
+    "locationUnavailable": "Your location is currently unavailable. Check location services and try again.",
+    "noBusinessDescription": "This business has not added a description yet.",
+    "services": "Our services",
+    "noServices": "No services are available yet.",
+    "noProducts": "No products are available in this category.",
+    "noReviews": "There are no reviews yet.",
+    "noProductDescription": "This product does not have a description yet.",
+    "addressUnavailable": "Address unavailable",
+    "invalidCartItem": "This item cannot be added because it is not linked to an available product.",
+    "productReviewPublished": "Product review published",
+    "addedToCart": "Product added to cart"
+  },
   "aboutUs": {
     "title": "About us",
     "empty": "No information is available for this page yet",
@@ -102,5 +118,119 @@
     "storeOpened": "The app store page was opened",
     "shareError": "Could not open the sharing app. Please try again.",
     "copyError": "Could not copy the link. Please try again."
+  },
+  "messages": {
+    "title": "Messages",
+    "tabAll": "All",
+    "tabUnread": "Unread",
+    "emptyTitle": "Sorry, you have no messages",
+    "emptyHint": "Visit any store and ask about a product to start a conversation",
+    "emptyUnreadTitle": "No unread messages",
+    "emptyUnreadHint": "Everything is read. Switch to All to see earlier conversations.",
+    "noMessagesYet": "No messages yet",
+    "threadEmpty": "Start the conversation and ask about any product",
+    "composerHint": "Write your message here",
+    "contactStore": "Message the store",
+    "loadError": "Messages could not be loaded. Please try again.",
+    "guestTitle": "Please sign in",
+    "guestHint": "Sign in first to see your messages"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "emptyTitle": "No notifications",
+    "emptyHint": "Order, message, and review updates will appear here",
+    "loadError": "Notifications could not be loaded. Please try again."
+  },
+  "tracking": {
+    "title": "Order tracking",
+    "courier": "Driver",
+    "changeAddress": "Change address",
+    "addressHint": "Enter the full delivery address",
+    "addressTooShort": "The address is too short",
+    "addressUpdated": "Delivery address updated",
+    "addMore": "Add more",
+    "cancelledTitle": "Order cancelled",
+    "rateTitle": "Rate your experience",
+    "rateHint": "Was the delivery good for you? Leave a review if you like.",
+    "reviewHint": "Write your review here",
+    "reviewSaved": "Your review was saved, thank you",
+    "loadError": "Order details could not be loaded. Please try again.",
+    "trackOrder": "Track order",
+    "headline": {
+      "placed": "Order placed successfully",
+      "preparing": "Preparing your order",
+      "outForDelivery": "Your order is on the way",
+      "delivered": "Your order has arrived"
+    },
+    "steps": {
+      "placed": {
+        "title": "Order placed successfully",
+        "caption": "Your order reached the store"
+      },
+      "preparing": {
+        "title": "Preparing your order",
+        "caption": "Your order is being prepared"
+      },
+      "outForDelivery": {
+        "title": "Your order is on the way",
+        "caption": "Preparation is done and it will arrive soon"
+      },
+      "delivered": {
+        "title": "Your order was delivered",
+        "caption": "Your order arrived successfully"
+      }
+    }
+  },
+  "merchantOrder": {
+    "title": "Order details",
+    "status": "Order status",
+    "changeStatus": "Change order status",
+    "customerName": "Customer name",
+    "products": "Products ({})",
+    "productName": "Product name",
+    "lineTotal": "Total",
+    "customerAndDelivery": "Customer and delivery details",
+    "paymentMethod": "Payment method",
+    "invoice": "Invoice",
+    "invoiceNumber": "Invoice number",
+    "viewInvoice": "View invoice",
+    "itemsValue": "Items value",
+    "grandTotal": "Grand total",
+    "priceDetails": "Price details",
+    "storeAddress": "Store address",
+    "thanks": "Thank you for your purchase, have a great day",
+    "assignCourier": "Assign driver",
+    "courierName": "Driver name",
+    "courierPhone": "Driver phone",
+    "noCourier": "No driver assigned yet",
+    "statusUpdated": "Order status updated and the customer was notified",
+    "courierAssigned": "Driver assigned",
+    "statuses": {
+      "pending": "New",
+      "confirmed": "Received",
+      "preparing": "Preparing",
+      "outForDelivery": "On the way",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled"
+    },
+    "payment": {
+      "cash": "Cash on delivery",
+      "card": "Card",
+      "bankTransfer": "Bank transfer",
+      "assisted": "Purchase for someone else"
+    }
+  },
+  "storeSettings": {
+    "title": "Store settings",
+    "logo": "Store logo",
+    "logoHint": "Add a link to the store logo",
+    "description": "Store description",
+    "socialLinks": "Social media",
+    "instagram": "Instagram username or link",
+    "whatsapp": "WhatsApp number with country code",
+    "mobile": "Mobile number",
+    "facebook": "Facebook page for the store",
+    "saved": "Store settings saved"
   }
 }

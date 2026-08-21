@@ -1,7 +1,9 @@
 import 'dart:convert';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
+import 'package:merzox/features/cart/cart_item_integrity.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,19 +15,24 @@ class ProductDetailsBloc
     extends Bloc<ProductDetailsEvent, ProductDetailsState> {
   static const String cartKey = CartStorageKeys.items;
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
-  ProductDetailsBloc({ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(const ProductDetailsState()) {
+  ProductDetailsBloc({
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const ProductDetailsState()) {
     on<ProductDetailsStarted>(_onStarted);
     on<ProductDetailsImageChanged>(_onImageChanged);
     on<ProductDetailsTabChanged>(_onTabChanged);
     on<ProductDetailsQuantityIncremented>(_onQuantityIncremented);
     on<ProductDetailsQuantityDecremented>(_onQuantityDecremented);
-    on<ProductDetailsDegreeSelected>(_onDegreeSelected);
     on<ProductDetailsReviewSubmitted>(_onReviewSubmitted);
     on<ProductDetailsAddToCartPressed>(_onAddToCartPressed);
     on<ProductDetailsBuyNowPressed>(_onBuyNowPressed);
+    on<ProductDetailsReloadRequested>(_onReloadRequested);
+    on<ProductDetailsReviewsRetryRequested>(_onReviewsRetryRequested);
   }
 
   Future<void> _onStarted(
@@ -37,34 +44,64 @@ class ProductDetailsBloc
         status: ProductDetailsStatus.loading,
         businessId: event.businessId,
         product: event.initialProduct,
+        detailsStatus: ProductDetailsSectionStatus.loading,
+        reviewsStatus: ProductDetailsSectionStatus.loading,
+        detailsError: '',
+        reviewsError: '',
       ),
     );
 
-    try {
-      final product = await _apiService.businessProduct(
-        businessId: event.businessId,
-        productId: event.initialProduct.id,
-      );
-      final reviews = await _apiService.productReviews(
-        businessId: event.businessId,
-        productId: event.initialProduct.id,
-      );
-      emit(
-        state.copyWith(
-          status: ProductDetailsStatus.ready,
-          product: product,
-          reviews: reviews.isEmpty ? _fallbackProductReviews : reviews,
-        ),
-      );
-    } catch (_) {
-      emit(
-        state.copyWith(
-          status: ProductDetailsStatus.ready,
-          product: event.initialProduct,
-          reviews: _fallbackProductReviews,
-        ),
-      );
-    }
+    await _loadProductAndReviews(emit, event.initialProduct);
+  }
+
+  Future<void> _onReloadRequested(
+    ProductDetailsReloadRequested event,
+    Emitter<ProductDetailsState> emit,
+  ) async {
+    final product = state.product;
+    if (product == null) return;
+
+    emit(
+      state.copyWith(
+        detailsStatus: ProductDetailsSectionStatus.loading,
+        reviewsStatus: ProductDetailsSectionStatus.loading,
+        detailsError: '',
+        reviewsError: '',
+      ),
+    );
+    await _loadProductAndReviews(emit, product);
+  }
+
+  Future<void> _loadProductAndReviews(
+    Emitter<ProductDetailsState> emit,
+    BusinessProductApiModel knownProduct,
+  ) async {
+    final productFuture = _capture(
+      () => _apiService.businessProduct(
+        businessId: state.businessId,
+        productId: knownProduct.id,
+      ),
+    );
+    final reviewsFuture = _capture(
+      () => _apiService.productReviews(
+        businessId: state.businessId,
+        productId: knownProduct.id,
+      ),
+    );
+    final product = await productFuture;
+    final reviews = await reviewsFuture;
+
+    emit(
+      state.copyWith(
+        status: ProductDetailsStatus.ready,
+        product: product.value ?? knownProduct,
+        reviews: reviews.value ?? const [],
+        detailsStatus: product.status,
+        reviewsStatus: reviews.status,
+        detailsError: product.errorMessage,
+        reviewsError: reviews.errorMessage,
+      ),
+    );
   }
 
   void _onImageChanged(
@@ -97,13 +134,6 @@ class ProductDetailsBloc
     );
   }
 
-  void _onDegreeSelected(
-    ProductDetailsDegreeSelected event,
-    Emitter<ProductDetailsState> emit,
-  ) {
-    emit(state.copyWith(selectedDegree: event.degree));
-  }
-
   Future<void> _onReviewSubmitted(
     ProductDetailsReviewSubmitted event,
     Emitter<ProductDetailsState> emit,
@@ -111,7 +141,12 @@ class ProductDetailsBloc
     final product = state.product;
     if (product == null) return;
 
-    emit(state.copyWith(status: ProductDetailsStatus.savingReview));
+    emit(
+      state.copyWith(
+        status: ProductDetailsStatus.savingReview,
+        errorMessage: null,
+      ),
+    );
 
     try {
       final token = await _token();
@@ -122,16 +157,27 @@ class ProductDetailsBloc
         rating: event.rating,
         comment: event.comment,
       );
-      final reviews = await _apiService.productReviews(
-        businessId: state.businessId,
-        productId: product.id,
+      final reviews = await _capture(
+        () => _apiService.productReviews(
+          businessId: state.businessId,
+          productId: product.id,
+        ),
       );
+      final knownReviews =
+          reviews.value ??
+          <BusinessReviewApiModel>[
+            response.review,
+            ...state.reviews.where((review) => review.id != response.review.id),
+          ];
+
       emit(
         state.copyWith(
           status: ProductDetailsStatus.ready,
           product: response.product,
-          reviews: reviews.isEmpty ? [response.review] : reviews,
-          message: 'تم نشر تقييم المنتج',
+          reviews: knownReviews,
+          reviewsStatus: reviews.status,
+          reviewsError: reviews.errorMessage,
+          message: 'catalog.productReviewPublished',
         ),
       );
     } catch (error) {
@@ -144,12 +190,50 @@ class ProductDetailsBloc
     }
   }
 
+  Future<void> _onReviewsRetryRequested(
+    ProductDetailsReviewsRetryRequested event,
+    Emitter<ProductDetailsState> emit,
+  ) async {
+    final product = state.product;
+    if (product == null) return;
+
+    emit(
+      state.copyWith(
+        reviewsStatus: ProductDetailsSectionStatus.loading,
+        reviewsError: '',
+      ),
+    );
+    final result = await _capture(
+      () => _apiService.productReviews(
+        businessId: state.businessId,
+        productId: product.id,
+      ),
+    );
+    emit(
+      state.copyWith(
+        reviews: result.value ?? const [],
+        reviewsStatus: result.status,
+        reviewsError: result.errorMessage,
+      ),
+    );
+  }
+
   Future<void> _onAddToCartPressed(
     ProductDetailsAddToCartPressed event,
     Emitter<ProductDetailsState> emit,
   ) async {
     final product = state.product;
     if (product == null) return;
+
+    if (!_hasRealCommerceIds(product.id)) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.invalidCartItem',
+        ),
+      );
+      return;
+    }
 
     try {
       await _token();
@@ -164,7 +248,6 @@ class ProductDetailsBloc
           'price': product.price,
           'imageUrl': product.imageUrl,
           'quantity': state.quantity,
-          'degree': state.selectedDegree,
           'addedAt': DateTime.now().toIso8601String(),
         }),
       );
@@ -172,14 +255,14 @@ class ProductDetailsBloc
       emit(
         state.copyWith(
           status: ProductDetailsStatus.action,
-          message: 'تمت إضافة المنتج إلى السلة',
+          message: 'catalog.addedToCart',
         ),
       );
-    } catch (_) {
+    } catch (error) {
       emit(
         state.copyWith(
           status: ProductDetailsStatus.failure,
-          errorMessage: 'يرجى تسجيل الدخول لإضافة المنتجات إلى السلة',
+          errorMessage: ApiService.messageFromError(error),
         ),
       );
     }
@@ -190,85 +273,81 @@ class ProductDetailsBloc
     Emitter<ProductDetailsState> emit,
   ) async {
     final product = state.product;
-    if (product != null) {
-      try {
-        final token = await _token();
-        final prefs = await SharedPreferences.getInstance();
-        final address = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
-        await _apiService.createOrder(
-          token: token,
-          businessId: state.businessId,
-          deliveryAddress: address,
-          clientOrderId:
-              'buy-${DateTime.now().microsecondsSinceEpoch}-${product.id}',
-          items: [
-            OrderItemRequest(
-              productId: product.id,
-              quantity: state.quantity,
-              variant: state.selectedDegree,
-            ),
-          ],
-        );
-        emit(
-          state.copyWith(
-            status: ProductDetailsStatus.action,
-            message: 'orders.checkoutSuccess',
-          ),
-        );
-        return;
-      } catch (_) {
-        emit(
-          state.copyWith(
-            status: ProductDetailsStatus.failure,
-            errorMessage: 'orders.checkoutError',
-          ),
-        );
-        return;
-      }
+    if (product == null || !_hasRealCommerceIds(product.id)) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.invalidCartItem',
+        ),
+      );
+      return;
     }
 
     try {
-      await _token();
+      final token = await _token();
+      final prefs = await SharedPreferences.getInstance();
+      final address = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
+      await _apiService.createOrder(
+        token: token,
+        businessId: state.businessId,
+        deliveryAddress: address,
+        clientOrderId:
+            'buy-${DateTime.now().microsecondsSinceEpoch}-${product.id}',
+        items: [
+          OrderItemRequest(productId: product.id, quantity: state.quantity),
+        ],
+      );
       emit(
         state.copyWith(
           status: ProductDetailsStatus.action,
-          message: 'سيتم تجهيز صفحة إتمام الطلب في الخطوة التالية',
+          message: 'orders.checkoutSuccess',
         ),
       );
     } catch (_) {
       emit(
         state.copyWith(
           status: ProductDetailsStatus.failure,
-          errorMessage: 'يرجى تسجيل الدخول لإتمام الشراء',
+          errorMessage: 'orders.checkoutError',
         ),
       );
     }
   }
 
+  bool _hasRealCommerceIds(String productId) {
+    return isMongoBackedEntityId(state.businessId) &&
+        isMongoBackedEntityId(productId);
+  }
+
   Future<String> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AuthBloc.tokenKey);
-    if (token == null || token.isEmpty) {
+    final session = await _authSessionService.read();
+    final token = session.token;
+    if (token == null) {
       throw StateError('Authentication required');
     }
     return token;
   }
+
+  Future<_LoadResult<T>> _capture<T>(Future<T> Function() request) async {
+    try {
+      return _LoadResult.success(await request());
+    } catch (error) {
+      return _LoadResult.failure(ApiService.messageFromError(error));
+    }
+  }
 }
 
-final List<BusinessReviewApiModel> _fallbackProductReviews = List.unmodifiable([
-  BusinessReviewApiModel(
-    id: 'local-product-review-1',
-    userName: 'ياسمين خالد',
-    rating: 5,
-    comment:
-        'قمت بشراء المنتج، الخامة جيدة جدا، وأنصح بالتعامل معهم حيث أنهم يعتمدون الجودة ومنتجاتهم أيضا.',
-    createdAt: DateTime.now(),
-  ),
-  BusinessReviewApiModel(
-    id: 'local-product-review-2',
-    userName: 'محمود رمضان',
-    rating: 4,
-    comment: 'المنتج رائع وسعره مناسب. وصلتني الطلبية بحالة ممتازة.',
-    createdAt: DateTime.now(),
-  ),
-]);
+final class _LoadResult<T> {
+  final T? value;
+  final String errorMessage;
+
+  const _LoadResult._({this.value, this.errorMessage = ''});
+
+  const _LoadResult.success(T value) : this._(value: value);
+
+  const _LoadResult.failure(String errorMessage)
+    : this._(errorMessage: errorMessage);
+
+  ProductDetailsSectionStatus get status => value == null
+      ? ProductDetailsSectionStatus.failure
+      : ProductDetailsSectionStatus.ready;
+}

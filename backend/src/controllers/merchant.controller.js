@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 import { Business } from '../models/Business.js';
 import { Order } from '../models/Order.js';
 import { User } from '../models/User.js';
+import { notifyOrderStatus } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { normalizeIdentifier, normalizePhone } from '../utils/normalize.js';
@@ -197,12 +198,21 @@ export const updateMyBusiness = asyncHandler(async (req, res) => {
     'description',
     'category',
     'address',
-    'attachmentUrl'
+    'attachmentUrl',
+    'logoUrl'
   ];
 
   for (const field of fields) {
     if (req.body[field] !== undefined) {
       business[field] = String(req.body[field]).trim();
+    }
+  }
+
+  if (req.body.socialLinks !== undefined) {
+    for (const key of ['instagram', 'whatsapp', 'mobile', 'facebook']) {
+      if (req.body.socialLinks[key] !== undefined) {
+        business.socialLinks[key] = String(req.body.socialLinks[key]).trim();
+      }
     }
   }
 
@@ -400,5 +410,57 @@ export const updateMyBusinessOrderStatus = asyncHandler(async (req, res) => {
     );
   }
 
+  await notifyOrderStatus({
+    userId: updated.user,
+    order: updated,
+    status: nextStatus
+  });
+
   res.json({ success: true, data: { order: updated.toMerchantJSON() } });
+});
+
+/**
+ * Assigning a courier is what fills the driver card on the customer's tracking
+ * screen, so it is allowed from the moment the order is being prepared.
+ */
+export const updateMyBusinessOrderCourier = asyncHandler(async (req, res) => {
+  const business = await findOwnedBusiness(req);
+  if (!mongoose.isValidObjectId(req.params.orderId)) {
+    throw new AppError('Order id is invalid', 400, 'INVALID_ORDER_ID');
+  }
+
+  const order = await Order.findOneAndUpdate(
+    {
+      _id: req.params.orderId,
+      business: business._id,
+      status: { $in: ['confirmed', 'preparing', 'outForDelivery'] }
+    },
+    {
+      $set: {
+        courier: {
+          name: String(req.body.name).trim(),
+          phone: String(req.body.phone ?? '').trim(),
+          assignedAt: new Date()
+        }
+      }
+    },
+    { new: true, runValidators: true }
+  );
+
+  if (!order) {
+    const exists = await Order.exists({
+      _id: req.params.orderId,
+      business: business._id
+    });
+    if (!exists) {
+      throw new AppError('Order was not found', 404, 'ORDER_NOT_FOUND');
+    }
+    throw new AppError(
+      'A courier can no longer be assigned to this order',
+      409,
+      'ORDER_COURIER_LOCKED'
+    );
+  }
+
+  res.json({ success: true, data: { order: order.toMerchantJSON() } });
 });

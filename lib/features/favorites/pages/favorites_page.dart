@@ -44,15 +44,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
   }
 
   HomeBusiness _homeBusiness(SearchBusinessApiModel business) {
-    return HomeBusiness(
-      id: business.id,
-      name: business.name,
-      category: business.category,
-      products: business.products,
-      rating: business.rating,
-      distance: '',
-      colorValue: business.colorValue,
-    );
+    return HomeBusiness.fromApi(business);
   }
 
   Future<void> _openBusiness(SearchBusinessApiModel business) async {

@@ -13,6 +13,10 @@ import {
 } from '../controllers/business.controller.js';
 import { setBusinessFavorite } from '../controllers/favorite.controller.js';
 import {
+  getMerchantConversationUnreadCount,
+  listMerchantConversations
+} from '../controllers/message.controller.js';
+import {
   createMyBusinessProduct,
   deleteMyBusinessProduct,
   enrollBusiness,
@@ -21,6 +25,7 @@ import {
   listMyBusinessOrders,
   listMyBusinessProducts,
   updateMyBusiness,
+  updateMyBusinessOrderCourier,
   updateMyBusinessOrderStatus,
   updateMyBusinessProduct
 } from '../controllers/merchant.controller.js';
@@ -30,7 +35,8 @@ import {
   validateBusinessOrderStatus,
   validateBusinessProductCreate,
   validateBusinessProductPatch,
-  validateBusinessProfilePatch
+  validateBusinessProfilePatch,
+  validateOrderCourierPatch
 } from '../middleware/validate.js';
 
 const router = Router();
@@ -57,6 +63,25 @@ router.patch(
   requireBusinessUser,
   validateBusinessOrderStatus,
   updateMyBusinessOrderStatus
+);
+router.patch(
+  '/me/orders/:orderId/courier',
+  requireAuth,
+  requireBusinessUser,
+  validateOrderCourierPatch,
+  updateMyBusinessOrderCourier
+);
+router.get(
+  '/me/conversations/unread-count',
+  requireAuth,
+  requireBusinessUser,
+  getMerchantConversationUnreadCount
+);
+router.get(
+  '/me/conversations',
+  requireAuth,
+  requireBusinessUser,
+  listMerchantConversations
 );
 router.get('/me/products', requireAuth, requireBusinessUser, listMyBusinessProducts);
 router.post(

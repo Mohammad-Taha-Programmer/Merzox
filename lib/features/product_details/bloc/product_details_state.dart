@@ -9,6 +9,8 @@ enum ProductDetailsStatus {
   failure,
 }
 
+enum ProductDetailsSectionStatus { initial, loading, ready, failure }
+
 final class ProductDetailsState {
   final ProductDetailsStatus status;
   final String businessId;
@@ -17,7 +19,10 @@ final class ProductDetailsState {
   final int selectedImageIndex;
   final int selectedTabIndex;
   final int quantity;
-  final String selectedDegree;
+  final ProductDetailsSectionStatus detailsStatus;
+  final ProductDetailsSectionStatus reviewsStatus;
+  final String detailsError;
+  final String reviewsError;
   final String? message;
   final String? errorMessage;
 
@@ -29,7 +34,10 @@ final class ProductDetailsState {
     this.selectedImageIndex = 0,
     this.selectedTabIndex = 0,
     this.quantity = 1,
-    this.selectedDegree = '01',
+    this.detailsStatus = ProductDetailsSectionStatus.initial,
+    this.reviewsStatus = ProductDetailsSectionStatus.initial,
+    this.detailsError = '',
+    this.reviewsError = '',
     this.message,
     this.errorMessage,
   });
@@ -42,7 +50,10 @@ final class ProductDetailsState {
     int? selectedImageIndex,
     int? selectedTabIndex,
     int? quantity,
-    String? selectedDegree,
+    ProductDetailsSectionStatus? detailsStatus,
+    ProductDetailsSectionStatus? reviewsStatus,
+    String? detailsError,
+    String? reviewsError,
     String? message,
     String? errorMessage,
   }) {
@@ -54,7 +65,10 @@ final class ProductDetailsState {
       selectedImageIndex: selectedImageIndex ?? this.selectedImageIndex,
       selectedTabIndex: selectedTabIndex ?? this.selectedTabIndex,
       quantity: quantity ?? this.quantity,
-      selectedDegree: selectedDegree ?? this.selectedDegree,
+      detailsStatus: detailsStatus ?? this.detailsStatus,
+      reviewsStatus: reviewsStatus ?? this.reviewsStatus,
+      detailsError: detailsError ?? this.detailsError,
+      reviewsError: reviewsError ?? this.reviewsError,
       message: message,
       errorMessage: errorMessage,
     );

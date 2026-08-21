@@ -2,6 +2,10 @@ import mongoose from 'mongoose';
 
 import { Business } from '../models/Business.js';
 import { Order } from '../models/Order.js';
+import {
+  notifyOrderCancelledByCustomer,
+  notifyOrderPlaced
+} from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -116,6 +120,14 @@ export const createOrder = asyncHandler(async (req, res) => {
     paymentMethod: req.body.paymentMethod ?? 'cash'
   });
 
+  if (business.owner) {
+    await notifyOrderPlaced({
+      ownerId: business.owner,
+      businessId: business._id,
+      order
+    });
+  }
+
   res.status(201).json({
     success: true,
     data: { order: order.toClientJSON(), duplicated: false }
@@ -176,6 +188,41 @@ export const getMyOrder = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { order: order.toClientJSON() } });
 });
 
+/**
+ * The tracking screen lets a customer correct the delivery address, but only
+ * while the merchant has not started preparing the order.
+ */
+export const updateMyOrderAddress = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    throw new AppError('Order id is invalid', 400, 'INVALID_ORDER_ID');
+  }
+
+  const deliveryAddress = String(req.body.deliveryAddress).trim();
+  const order = await Order.findOneAndUpdate(
+    {
+      _id: req.params.id,
+      user: req.user._id,
+      status: { $in: ['pending', 'confirmed'] }
+    },
+    { $set: { deliveryAddress } },
+    { new: true, runValidators: true }
+  );
+
+  if (!order) {
+    const exists = await Order.exists({ _id: req.params.id, user: req.user._id });
+    if (!exists) {
+      throw new AppError('Order was not found', 404, 'ORDER_NOT_FOUND');
+    }
+    throw new AppError(
+      'The delivery address can no longer be changed',
+      409,
+      'ORDER_ADDRESS_LOCKED'
+    );
+  }
+
+  res.json({ success: true, data: { order: order.toClientJSON() } });
+});
+
 export const cancelMyOrder = asyncHandler(async (req, res) => {
   const reason = String(req.body.reason ?? '').trim();
   const cancelledAt = new Date();
@@ -209,6 +256,15 @@ export const cancelMyOrder = asyncHandler(async (req, res) => {
       409,
       'ORDER_NOT_CANCELLABLE'
     );
+  }
+
+  const business = await Business.findById(order.business).select('owner');
+  if (business?.owner) {
+    await notifyOrderCancelledByCustomer({
+      ownerId: business.owner,
+      businessId: order.business,
+      order
+    });
   }
 
   res.json({ success: true, data: { order: order.toClientJSON() } });

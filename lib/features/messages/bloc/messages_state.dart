@@ -1,37 +1,47 @@
-enum MessagesStatus { initial, loading, ready }
+import '../../../services/api_service.dart';
+import 'messages_event.dart';
 
-final class MessageThread {
-  final String id;
-  final String name;
-  final String lastMessage;
-  final String time;
-  final int unreadCount;
-
-  const MessageThread({
-    required this.id,
-    required this.name,
-    required this.lastMessage,
-    required this.time,
-    required this.unreadCount,
-  });
-}
+enum MessagesStatus { initial, loading, ready, loadingMore, failure }
 
 final class MessagesState {
   final MessagesStatus status;
-  final List<MessageThread> threads;
+  final MessagesFilter filter;
+  final List<ConversationApiModel> conversations;
+  final int unreadConversationCount;
+  final int page;
+  final bool hasMore;
+  final String errorMessage;
 
   const MessagesState({
     this.status = MessagesStatus.initial,
-    this.threads = const [],
+    this.filter = MessagesFilter.all,
+    this.conversations = const [],
+    this.unreadConversationCount = 0,
+    this.page = 1,
+    this.hasMore = false,
+    this.errorMessage = '',
   });
+
+  bool get isEmpty => status == MessagesStatus.ready && conversations.isEmpty;
 
   MessagesState copyWith({
     MessagesStatus? status,
-    List<MessageThread>? threads,
+    MessagesFilter? filter,
+    List<ConversationApiModel>? conversations,
+    int? unreadConversationCount,
+    int? page,
+    bool? hasMore,
+    String? errorMessage,
   }) {
     return MessagesState(
       status: status ?? this.status,
-      threads: threads ?? this.threads,
+      filter: filter ?? this.filter,
+      conversations: conversations ?? this.conversations,
+      unreadConversationCount:
+          unreadConversationCount ?? this.unreadConversationCount,
+      page: page ?? this.page,
+      hasMore: hasMore ?? this.hasMore,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }

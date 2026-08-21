@@ -33,6 +33,7 @@ test('business keeps merchant registration fields private and filters inactive p
   assert.equal(detail.attachmentUrl, undefined);
   assert.equal(detail.contacts, undefined);
   assert.deepEqual(detail.products, []);
+  assert.equal(detail.productCount, 0);
   assert.equal(owner.attachmentUrl, 'https://example.test/document.pdf');
   assert.equal(detail.viewCount, 0);
   assert.equal(product.isActive, false);

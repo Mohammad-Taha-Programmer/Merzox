@@ -113,6 +113,8 @@ class ApiService {
     int page = 1,
     int limit = 100,
     String? search,
+    String? sort,
+    bool? discounted,
     double? latitude,
     double? longitude,
     int? radiusMeters,
@@ -123,6 +125,8 @@ class ApiService {
         'page': page,
         'limit': limit,
         if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        if (sort != null && sort.trim().isNotEmpty) 'sort': sort.trim(),
+        if (discounted != null) 'discounted': discounted,
         if (latitude != null) 'lat': latitude,
         if (longitude != null) 'lng': longitude,
         if (radiusMeters != null) 'radiusMeters': radiusMeters,
@@ -131,6 +135,20 @@ class ApiService {
     final data = response.data?['data'] as Map<String, dynamic>? ?? {};
 
     return BusinessListApiResponse.fromJson(data);
+  }
+
+  Future<BusinessDetailApiModel> business({required String businessId}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/businesses/$businessId',
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+    final business = data['business'] as Map<String, dynamic>?;
+
+    if (business == null || business['id'] is! String) {
+      throw StateError('Business response did not contain a business');
+    }
+
+    return BusinessDetailApiModel.fromJson(business);
   }
 
   Future<FavoriteBusinessListApiResponse> favoriteBusinesses({
@@ -288,7 +306,11 @@ class ApiService {
       '/businesses/$businessId/products/$productId',
     );
     final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    final product = data['product'] as Map<String, dynamic>? ?? {};
+    final product = data['product'] as Map<String, dynamic>?;
+
+    if (product == null || product['id'] is! String) {
+      throw StateError('Product response did not contain a product');
+    }
 
     return BusinessProductApiModel.fromJson(product);
   }
@@ -574,6 +596,217 @@ class ApiService {
     );
   }
 
+  Future<ConversationListApiResponse> conversations({
+    required String token,
+    bool unreadOnly = false,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/conversations',
+      queryParameters: {
+        'filter': unreadOnly ? 'unread' : 'all',
+        'page': page,
+        'limit': limit,
+      },
+      options: _authOptions(token),
+    );
+
+    return ConversationListApiResponse.fromJson(
+      response.data?['data'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  Future<ConversationListApiResponse> merchantConversations({
+    required String token,
+    bool unreadOnly = false,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/businesses/me/conversations',
+      queryParameters: {
+        'filter': unreadOnly ? 'unread' : 'all',
+        'page': page,
+        'limit': limit,
+      },
+      options: _authOptions(token),
+    );
+
+    return ConversationListApiResponse.fromJson(
+      response.data?['data'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  /// Opens the thread with a business, reusing the existing one when the
+  /// customer has written to that store before.
+  Future<ConversationApiModel> openConversation({
+    required String token,
+    required String businessId,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/conversations',
+      data: {'businessId': businessId},
+      options: _authOptions(token),
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+
+    return ConversationApiModel.fromJson(
+      data['conversation'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  Future<ConversationMessagesApiResponse> conversationMessages({
+    required String token,
+    required String conversationId,
+    int page = 1,
+    int limit = 30,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/conversations/$conversationId/messages',
+      queryParameters: {'page': page, 'limit': limit},
+      options: _authOptions(token),
+    );
+
+    return ConversationMessagesApiResponse.fromJson(
+      response.data?['data'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  Future<MessageApiModel> sendMessage({
+    required String token,
+    required String conversationId,
+    required String body,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/conversations/$conversationId/messages',
+      data: {'body': body},
+      options: _authOptions(token),
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+
+    return MessageApiModel.fromJson(
+      data['message'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  Future<ConversationApiModel> markConversationRead({
+    required String token,
+    required String conversationId,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/conversations/$conversationId/read',
+      options: _authOptions(token),
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+
+    return ConversationApiModel.fromJson(
+      data['conversation'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  Future<NotificationListApiResponse> notifications({
+    required String token,
+    bool businessAudience = false,
+    bool unreadOnly = false,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/notifications',
+      queryParameters: {
+        'audience': businessAudience ? 'business' : 'customer',
+        'filter': unreadOnly ? 'unread' : 'all',
+        'page': page,
+        'limit': limit,
+      },
+      options: _authOptions(token),
+    );
+
+    return NotificationListApiResponse.fromJson(
+      response.data?['data'] as Map<String, dynamic>? ?? {},
+    );
+  }
+
+  Future<int> notificationUnreadCount({
+    required String token,
+    bool businessAudience = false,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/notifications/unread-count',
+      queryParameters: {'audience': businessAudience ? 'business' : 'customer'},
+      options: _authOptions(token),
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+
+    return (data['unreadCount'] as num?)?.toInt() ?? 0;
+  }
+
+  Future<void> markNotificationRead({
+    required String token,
+    required String notificationId,
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/notifications/$notificationId/read',
+      options: _authOptions(token),
+    );
+  }
+
+  Future<void> markAllNotificationsRead({
+    required String token,
+    bool businessAudience = false,
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/notifications/read-all',
+      data: {'audience': businessAudience ? 'business' : 'customer'},
+      options: _authOptions(token),
+    );
+  }
+
+  Future<OrderApiModel> order({
+    required String token,
+    required String orderId,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/orders/$orderId',
+      options: _authOptions(token),
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+
+    return OrderApiModel.fromJson(data['order'] as Map<String, dynamic>? ?? {});
+  }
+
+  Future<OrderApiModel> updateOrderAddress({
+    required String token,
+    required String orderId,
+    required String deliveryAddress,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/orders/$orderId/address',
+      data: {'deliveryAddress': deliveryAddress},
+      options: _authOptions(token),
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+
+    return OrderApiModel.fromJson(data['order'] as Map<String, dynamic>? ?? {});
+  }
+
+  Future<OwnerOrder> assignOrderCourier({
+    required String token,
+    required String orderId,
+    required String name,
+    String phone = '',
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/businesses/me/orders/$orderId/courier',
+      data: {'name': name, 'phone': phone},
+      options: _authOptions(token),
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+
+    return OwnerOrder.fromJson(data['order'] as Map<String, dynamic>? ?? {});
+  }
+
   static String messageFromError(Object error) {
     if (error is DioException) {
       final data = error.response?.data;
@@ -647,7 +880,7 @@ class BusinessProductApiModel {
       price: (json['price'] as num?)?.toDouble() ?? 0,
       imageUrl: imageUrls.isEmpty ? '' : imageUrls.first,
       imageUrls: imageUrls,
-      classification: json['classification'] as String? ?? 'new',
+      classification: json['classification'] as String? ?? '',
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
       ratingCount: (json['ratingCount'] as num?)?.toInt() ?? 0,
       likeCount: (json['likeCount'] as num?)?.toInt() ?? 0,
@@ -715,27 +948,41 @@ class SearchBusinessApiModel {
   final String id;
   final String publicId;
   final String name;
+  final String englishName;
   final String category;
   final List<String> products;
+  final int productCount;
   final double rating;
+  final int ratingCount;
+  final int followerCount;
+  final int viewCount;
+  final String? discount;
   final int colorValue;
   final String address;
   final int? distanceMeters;
   final double? latitude;
   final double? longitude;
+  final DateTime? subscribedAt;
 
   const SearchBusinessApiModel({
     required this.id,
     required this.publicId,
     required this.name,
+    required this.englishName,
     required this.category,
     required this.products,
+    required this.productCount,
     required this.rating,
+    required this.ratingCount,
+    required this.followerCount,
+    required this.viewCount,
+    required this.discount,
     required this.colorValue,
     required this.address,
     this.distanceMeters,
     this.latitude,
     this.longitude,
+    this.subscribedAt,
   });
 
   factory SearchBusinessApiModel.fromJson(Map<String, dynamic> json) {
@@ -747,9 +994,18 @@ class SearchBusinessApiModel {
       id: json['id'] as String? ?? '',
       publicId: json['publicId'] as String? ?? '',
       name: json['name'] as String? ?? '',
+      englishName: json['englishName'] as String? ?? '',
       category: json['category'] as String? ?? '',
       products: productsJson.whereType<String>().toList(),
+      productCount: (json['productCount'] as num?)?.toInt() ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
+      ratingCount: (json['ratingCount'] as num?)?.toInt() ?? 0,
+      followerCount: (json['followerCount'] as num?)?.toInt() ?? 0,
+      viewCount: (json['viewCount'] as num?)?.toInt() ?? 0,
+      discount: switch ((json['discount'] as String?)?.trim()) {
+        final value? when value.isNotEmpty => value,
+        _ => null,
+      },
       colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xffdeeef8,
       address: json['address'] as String? ?? '',
       distanceMeters: (json['distanceMeters'] as num?)?.toInt(),
@@ -759,6 +1015,87 @@ class SearchBusinessApiModel {
       latitude: coordinates.length > 1
           ? (coordinates[1] as num?)?.toDouble()
           : null,
+      subscribedAt: DateTime.tryParse(json['subscribedAt'] as String? ?? ''),
+    );
+  }
+}
+
+class BusinessDetailApiModel {
+  final String id;
+  final String publicId;
+  final String name;
+  final String englishName;
+  final String category;
+  final String description;
+  final String address;
+  final List<BusinessProductApiModel> products;
+  final int productCount;
+  final double rating;
+  final int ratingCount;
+  final int followerCount;
+  final int viewCount;
+  final String? discount;
+  final int colorValue;
+  final double? latitude;
+  final double? longitude;
+  final DateTime? subscribedAt;
+
+  const BusinessDetailApiModel({
+    required this.id,
+    required this.publicId,
+    required this.name,
+    required this.englishName,
+    required this.category,
+    required this.description,
+    required this.address,
+    required this.products,
+    required this.productCount,
+    required this.rating,
+    required this.ratingCount,
+    required this.followerCount,
+    required this.viewCount,
+    required this.discount,
+    required this.colorValue,
+    this.latitude,
+    this.longitude,
+    this.subscribedAt,
+  });
+
+  factory BusinessDetailApiModel.fromJson(Map<String, dynamic> json) {
+    final productsJson = json['products'] as List<dynamic>? ?? [];
+    final location = json['location'] as Map<String, dynamic>?;
+    final coordinates = location?['coordinates'] as List<dynamic>? ?? [];
+    final products = productsJson
+        .whereType<Map<String, dynamic>>()
+        .map(BusinessProductApiModel.fromJson)
+        .toList();
+
+    return BusinessDetailApiModel(
+      id: json['id'] as String? ?? '',
+      publicId: json['publicId'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      englishName: json['englishName'] as String? ?? '',
+      category: json['category'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      address: json['address'] as String? ?? '',
+      products: products,
+      productCount: (json['productCount'] as num?)?.toInt() ?? products.length,
+      rating: (json['rating'] as num?)?.toDouble() ?? 0,
+      ratingCount: (json['ratingCount'] as num?)?.toInt() ?? 0,
+      followerCount: (json['followerCount'] as num?)?.toInt() ?? 0,
+      viewCount: (json['viewCount'] as num?)?.toInt() ?? 0,
+      discount: switch ((json['discount'] as String?)?.trim()) {
+        final value? when value.isNotEmpty => value,
+        _ => null,
+      },
+      colorValue: (json['colorValue'] as num?)?.toInt() ?? 0xffdeeef8,
+      longitude: coordinates.isNotEmpty
+          ? (coordinates[0] as num?)?.toDouble()
+          : null,
+      latitude: coordinates.length > 1
+          ? (coordinates[1] as num?)?.toDouble()
+          : null,
+      subscribedAt: DateTime.tryParse(json['subscribedAt'] as String? ?? ''),
     );
   }
 }
@@ -967,6 +1304,8 @@ class OrderApiModel {
   final List<OrderStatusHistoryApiModel> statusHistory;
   final String cancellationReason;
   final DateTime? createdAt;
+  final OrderCourierApiModel courier;
+  final OrderTrackingApiModel tracking;
 
   const OrderApiModel({
     required this.id,
@@ -984,6 +1323,8 @@ class OrderApiModel {
     required this.statusHistory,
     required this.cancellationReason,
     required this.createdAt,
+    required this.courier,
+    required this.tracking,
   });
 
   factory OrderApiModel.fromJson(Map<String, dynamic> json) {
@@ -1013,6 +1354,150 @@ class OrderApiModel {
           .toList(),
       cancellationReason: json['cancellationReason'] as String? ?? '',
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+      courier: OrderCourierApiModel.fromJson(
+        json['courier'] as Map<String, dynamic>? ?? const {},
+      ),
+      tracking: OrderTrackingApiModel.fromJson(
+        json['tracking'] as Map<String, dynamic>? ?? const {},
+        json['status'] as String? ?? 'pending',
+      ),
+    );
+  }
+}
+
+class OrderCourierApiModel {
+  final String name;
+  final String phone;
+  final DateTime? assignedAt;
+
+  const OrderCourierApiModel({
+    required this.name,
+    required this.phone,
+    required this.assignedAt,
+  });
+
+  bool get isAssigned => name.isNotEmpty;
+
+  factory OrderCourierApiModel.fromJson(Map<String, dynamic> json) {
+    return OrderCourierApiModel(
+      name: json['name'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      assignedAt: DateTime.tryParse(json['assignedAt'] as String? ?? ''),
+    );
+  }
+}
+
+/// The four steps the tracking screen draws. The server collapses its six
+/// stored statuses onto these, so the client never has to map them itself.
+class OrderTrackingStepApiModel {
+  final String step;
+  final DateTime? reachedAt;
+  final bool isReached;
+
+  const OrderTrackingStepApiModel({
+    required this.step,
+    required this.reachedAt,
+    required this.isReached,
+  });
+
+  factory OrderTrackingStepApiModel.fromJson(Map<String, dynamic> json) {
+    return OrderTrackingStepApiModel(
+      step: json['step'] as String? ?? '',
+      reachedAt: DateTime.tryParse(json['reachedAt'] as String? ?? ''),
+      isReached: json['isReached'] as bool? ?? false,
+    );
+  }
+}
+
+class OrderTrackingApiModel {
+  static const List<String> stepOrder = [
+    'placed',
+    'preparing',
+    'outForDelivery',
+    'delivered',
+  ];
+
+  final bool isCancelled;
+  final String currentStep;
+  final int currentIndex;
+  final List<OrderTrackingStepApiModel> steps;
+  final OrderCourierApiModel courier;
+  final bool canCancel;
+  final bool canChangeAddress;
+  final bool canReview;
+
+  const OrderTrackingApiModel({
+    required this.isCancelled,
+    required this.currentStep,
+    required this.currentIndex,
+    required this.steps,
+    required this.courier,
+    required this.canCancel,
+    required this.canChangeAddress,
+    required this.canReview,
+  });
+
+  /// Older responses predate the tracking payload, so the timeline is rebuilt
+  /// from the order status when the server does not send one.
+  factory OrderTrackingApiModel.fromJson(
+    Map<String, dynamic> json,
+    String status,
+  ) {
+    if (json.isEmpty) {
+      return OrderTrackingApiModel.fromStatus(status);
+    }
+
+    final steps = json['steps'] as List<dynamic>? ?? const [];
+
+    return OrderTrackingApiModel(
+      isCancelled: json['isCancelled'] as bool? ?? status == 'cancelled',
+      currentStep: json['currentStep'] as String? ?? '',
+      currentIndex: (json['currentIndex'] as num?)?.toInt() ?? -1,
+      steps: steps
+          .whereType<Map<String, dynamic>>()
+          .map(OrderTrackingStepApiModel.fromJson)
+          .toList(),
+      courier: OrderCourierApiModel.fromJson(
+        json['courier'] as Map<String, dynamic>? ?? const {},
+      ),
+      canCancel: json['canCancel'] as bool? ?? false,
+      canChangeAddress: json['canChangeAddress'] as bool? ?? false,
+      canReview: json['canReview'] as bool? ?? false,
+    );
+  }
+
+  factory OrderTrackingApiModel.fromStatus(String status) {
+    const stepForStatus = {
+      'pending': 'placed',
+      'confirmed': 'placed',
+      'preparing': 'preparing',
+      'outForDelivery': 'outForDelivery',
+      'delivered': 'delivered',
+    };
+    final isCancelled = status == 'cancelled';
+    final currentStep = stepForStatus[status] ?? 'placed';
+    final currentIndex = isCancelled ? -1 : stepOrder.indexOf(currentStep);
+
+    return OrderTrackingApiModel(
+      isCancelled: isCancelled,
+      currentStep: isCancelled ? '' : currentStep,
+      currentIndex: currentIndex,
+      steps: [
+        for (var index = 0; index < stepOrder.length; index++)
+          OrderTrackingStepApiModel(
+            step: stepOrder[index],
+            reachedAt: null,
+            isReached: !isCancelled && index <= currentIndex,
+          ),
+      ],
+      courier: const OrderCourierApiModel(
+        name: '',
+        phone: '',
+        assignedAt: null,
+      ),
+      canCancel: const ['pending', 'confirmed', 'preparing'].contains(status),
+      canChangeAddress: const ['pending', 'confirmed'].contains(status),
+      canReview: status == 'delivered',
     );
   }
 }
@@ -1334,6 +1819,276 @@ class AboutUsSectionApiModel {
       key: json['key'] as String? ?? '',
       title: json['title'] as String? ?? '',
       content: json['content'] as String? ?? '',
+    );
+  }
+}
+
+class ConversationPartyApiModel {
+  final String id;
+  final String name;
+  final String logoUrl;
+
+  const ConversationPartyApiModel({
+    required this.id,
+    required this.name,
+    required this.logoUrl,
+  });
+
+  factory ConversationPartyApiModel.fromJson(Map<String, dynamic> json) {
+    return ConversationPartyApiModel(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      logoUrl: json['logoUrl'] as String? ?? '',
+    );
+  }
+}
+
+class ConversationLastMessageApiModel {
+  final String body;
+  final String senderType;
+  final DateTime? sentAt;
+
+  const ConversationLastMessageApiModel({
+    required this.body,
+    required this.senderType,
+    required this.sentAt,
+  });
+
+  factory ConversationLastMessageApiModel.fromJson(Map<String, dynamic> json) {
+    return ConversationLastMessageApiModel(
+      body: json['body'] as String? ?? '',
+      senderType: json['senderType'] as String? ?? 'customer',
+      sentAt: DateTime.tryParse(json['sentAt'] as String? ?? ''),
+    );
+  }
+}
+
+/// One thread. The server already picks the counterpart for the caller's side,
+/// so [title] is the store name for a customer and the customer name for a
+/// merchant without the client having to decide.
+class ConversationApiModel {
+  final String id;
+  final String title;
+  final String avatarUrl;
+  final ConversationPartyApiModel? business;
+  final ConversationPartyApiModel? customer;
+  final ConversationLastMessageApiModel lastMessage;
+  final int unreadCount;
+  final int messageCount;
+  final DateTime? updatedAt;
+
+  const ConversationApiModel({
+    required this.id,
+    required this.title,
+    required this.avatarUrl,
+    required this.business,
+    required this.customer,
+    required this.lastMessage,
+    required this.unreadCount,
+    required this.messageCount,
+    required this.updatedAt,
+  });
+
+  bool get hasUnread => unreadCount > 0;
+
+  factory ConversationApiModel.fromJson(Map<String, dynamic> json) {
+    final business = json['business'] as Map<String, dynamic>?;
+    final customer = json['customer'] as Map<String, dynamic>?;
+
+    return ConversationApiModel(
+      id: json['id'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      avatarUrl: json['avatarUrl'] as String? ?? '',
+      business: business == null
+          ? null
+          : ConversationPartyApiModel.fromJson(business),
+      customer: customer == null
+          ? null
+          : ConversationPartyApiModel.fromJson(customer),
+      lastMessage: ConversationLastMessageApiModel.fromJson(
+        json['lastMessage'] as Map<String, dynamic>? ?? const {},
+      ),
+      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+      messageCount: (json['messageCount'] as num?)?.toInt() ?? 0,
+      updatedAt: DateTime.tryParse(json['updatedAt'] as String? ?? ''),
+    );
+  }
+}
+
+class ConversationListApiResponse {
+  final List<ConversationApiModel> conversations;
+  final int unreadConversationCount;
+  final int page;
+  final bool hasMore;
+
+  const ConversationListApiResponse({
+    required this.conversations,
+    required this.unreadConversationCount,
+    required this.page,
+    required this.hasMore,
+  });
+
+  factory ConversationListApiResponse.fromJson(Map<String, dynamic> json) {
+    final conversations = json['conversations'] as List<dynamic>? ?? const [];
+    final pagination = json['pagination'] as Map<String, dynamic>? ?? const {};
+
+    return ConversationListApiResponse(
+      conversations: conversations
+          .whereType<Map<String, dynamic>>()
+          .map(ConversationApiModel.fromJson)
+          .toList(),
+      unreadConversationCount:
+          (json['unreadConversationCount'] as num?)?.toInt() ?? 0,
+      page: (pagination['page'] as num?)?.toInt() ?? 1,
+      hasMore: pagination['hasMore'] as bool? ?? false,
+    );
+  }
+}
+
+class MessageApiModel {
+  final String id;
+  final String conversationId;
+  final String senderType;
+  final String senderName;
+  final String body;
+  final bool isMine;
+  final DateTime? readAt;
+  final DateTime? createdAt;
+
+  const MessageApiModel({
+    required this.id,
+    required this.conversationId,
+    required this.senderType,
+    required this.senderName,
+    required this.body,
+    required this.isMine,
+    required this.readAt,
+    required this.createdAt,
+  });
+
+  factory MessageApiModel.fromJson(Map<String, dynamic> json) {
+    return MessageApiModel(
+      id: json['id'] as String? ?? '',
+      conversationId: json['conversationId'] as String? ?? '',
+      senderType: json['senderType'] as String? ?? 'customer',
+      senderName: json['senderName'] as String? ?? '',
+      body: json['body'] as String? ?? '',
+      isMine: json['isMine'] as bool? ?? false,
+      readAt: DateTime.tryParse(json['readAt'] as String? ?? ''),
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+    );
+  }
+}
+
+class ConversationMessagesApiResponse {
+  final ConversationApiModel conversation;
+
+  /// Oldest first, ready to render. The API pages newest first so that walking
+  /// back through history stays a plain offset query.
+  final List<MessageApiModel> messages;
+  final int page;
+  final bool hasMore;
+
+  const ConversationMessagesApiResponse({
+    required this.conversation,
+    required this.messages,
+    required this.page,
+    required this.hasMore,
+  });
+
+  factory ConversationMessagesApiResponse.fromJson(Map<String, dynamic> json) {
+    final messages = json['messages'] as List<dynamic>? ?? const [];
+    final pagination = json['pagination'] as Map<String, dynamic>? ?? const {};
+
+    return ConversationMessagesApiResponse(
+      conversation: ConversationApiModel.fromJson(
+        json['conversation'] as Map<String, dynamic>? ?? const {},
+      ),
+      messages: messages
+          .whereType<Map<String, dynamic>>()
+          .map(MessageApiModel.fromJson)
+          .toList()
+          .reversed
+          .toList(),
+      page: (pagination['page'] as num?)?.toInt() ?? 1,
+      hasMore: pagination['hasMore'] as bool? ?? false,
+    );
+  }
+}
+
+class AppNotificationApiModel {
+  final String id;
+  final String type;
+  final String title;
+  final String body;
+  final Map<String, dynamic> data;
+  final bool isRead;
+  final DateTime? createdAt;
+
+  const AppNotificationApiModel({
+    required this.id,
+    required this.type,
+    required this.title,
+    required this.body,
+    required this.data,
+    required this.isRead,
+    required this.createdAt,
+  });
+
+  String get orderId => data['orderId'] as String? ?? '';
+
+  String get conversationId => data['conversationId'] as String? ?? '';
+
+  factory AppNotificationApiModel.fromJson(Map<String, dynamic> json) {
+    return AppNotificationApiModel(
+      id: json['id'] as String? ?? '',
+      type: json['type'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      body: json['body'] as String? ?? '',
+      data: json['data'] as Map<String, dynamic>? ?? const {},
+      isRead: json['isRead'] as bool? ?? false,
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+    );
+  }
+
+  AppNotificationApiModel copyWith({bool? isRead}) {
+    return AppNotificationApiModel(
+      id: id,
+      type: type,
+      title: title,
+      body: body,
+      data: data,
+      isRead: isRead ?? this.isRead,
+      createdAt: createdAt,
+    );
+  }
+}
+
+class NotificationListApiResponse {
+  final List<AppNotificationApiModel> notifications;
+  final int unreadCount;
+  final int page;
+  final bool hasMore;
+
+  const NotificationListApiResponse({
+    required this.notifications,
+    required this.unreadCount,
+    required this.page,
+    required this.hasMore,
+  });
+
+  factory NotificationListApiResponse.fromJson(Map<String, dynamic> json) {
+    final notifications = json['notifications'] as List<dynamic>? ?? const [];
+    final pagination = json['pagination'] as Map<String, dynamic>? ?? const {};
+
+    return NotificationListApiResponse(
+      notifications: notifications
+          .whereType<Map<String, dynamic>>()
+          .map(AppNotificationApiModel.fromJson)
+          .toList(),
+      unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
+      page: (pagination['page'] as num?)?.toInt() ?? 1,
+      hasMore: pagination['hasMore'] as bool? ?? false,
     );
   }
 }

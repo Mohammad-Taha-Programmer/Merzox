@@ -205,7 +205,9 @@ export function validateBusinessProfilePatch(req, _res, next) {
     'description',
     'category',
     'address',
-    'attachmentUrl'
+    'attachmentUrl',
+    'logoUrl',
+    'socialLinks'
   ];
   const keys = Object.keys(req.body);
   const invalid = keys.filter((key) => !allowed.includes(key));
@@ -235,6 +237,42 @@ export function validateBusinessProfilePatch(req, _res, next) {
     const attachmentUrl = String(req.body.attachmentUrl).trim();
     if (attachmentUrl.length > 1000 || !isOptionalHttpUrl(attachmentUrl)) {
       throw new AppError('Business attachment URL is invalid', 400, 'INVALID_ATTACHMENT_URL');
+    }
+  }
+  if (req.body.logoUrl !== undefined) {
+    const logoUrl = String(req.body.logoUrl).trim();
+    if (logoUrl.length > 1000 || !isOptionalHttpUrl(logoUrl)) {
+      throw new AppError('Business logo URL is invalid', 400, 'INVALID_BUSINESS_LOGO_URL');
+    }
+  }
+  if (req.body.socialLinks !== undefined) {
+    const links = req.body.socialLinks;
+    if (typeof links !== 'object' || links === null || Array.isArray(links)) {
+      throw new AppError('Social links are invalid', 400, 'INVALID_BUSINESS_SOCIAL_LINKS');
+    }
+
+    const allowedLinks = ['instagram', 'whatsapp', 'mobile', 'facebook'];
+    const invalidLinks = Object.keys(links).filter(
+      (key) => !allowedLinks.includes(key)
+    );
+    if (invalidLinks.length > 0) {
+      throw new AppError('Social links are invalid', 400, 'INVALID_BUSINESS_SOCIAL_LINKS');
+    }
+
+    for (const key of ['instagram', 'facebook']) {
+      if (links[key] !== undefined && String(links[key]).trim().length > 200) {
+        throw new AppError('Social links are invalid', 400, 'INVALID_BUSINESS_SOCIAL_LINKS');
+      }
+    }
+    for (const key of ['whatsapp', 'mobile']) {
+      const value = String(links[key] ?? '').trim();
+      if (value.length > 0 && !/^\+?[0-9]{7,15}$/.test(value)) {
+        throw new AppError(
+          'Social contact numbers are invalid',
+          400,
+          'INVALID_BUSINESS_SOCIAL_NUMBER'
+        );
+      }
     }
   }
 
@@ -344,6 +382,94 @@ export function validateBusinessOrderStatus(req, _res, next) {
   }
   if (String(req.body.note ?? '').trim().length > 250) {
     throw new AppError('Order status note is too long', 400, 'INVALID_ORDER_STATUS_NOTE');
+  }
+
+  next();
+}
+
+export function validateConversationOpen(req, _res, next) {
+  const invalid = Object.keys(req.body).filter((key) => key !== 'businessId');
+  if (invalid.length > 0) {
+    throw new AppError(
+      `Unsupported conversation fields: ${invalid.join(', ')}`,
+      400,
+      'INVALID_CONVERSATION_FIELDS'
+    );
+  }
+
+  const businessId = String(req.body.businessId ?? '').trim();
+  if (businessId.length < 3 || businessId.length > 80) {
+    throw new AppError('Business id is invalid', 400, 'INVALID_BUSINESS_ID');
+  }
+
+  next();
+}
+
+export function validateMessageCreate(req, _res, next) {
+  const invalid = Object.keys(req.body).filter((key) => key !== 'body');
+  if (invalid.length > 0) {
+    throw new AppError(
+      `Unsupported message fields: ${invalid.join(', ')}`,
+      400,
+      'INVALID_MESSAGE_FIELDS'
+    );
+  }
+
+  const body = String(req.body.body ?? '').trim();
+  if (body.length === 0) {
+    throw new AppError('Message body is required', 400, 'INVALID_MESSAGE_BODY');
+  }
+  if (body.length > 2000) {
+    throw new AppError('Message body is too long', 400, 'INVALID_MESSAGE_BODY');
+  }
+
+  next();
+}
+
+export function validateOrderAddressPatch(req, _res, next) {
+  const invalid = Object.keys(req.body).filter(
+    (key) => !['deliveryAddress'].includes(key)
+  );
+  if (invalid.length > 0) {
+    throw new AppError(
+      `Unsupported address fields: ${invalid.join(', ')}`,
+      400,
+      'INVALID_ORDER_ADDRESS_FIELDS'
+    );
+  }
+
+  const address = String(req.body.deliveryAddress ?? '').trim();
+  if (address.length < 5 || address.length > 250) {
+    throw new AppError(
+      'Delivery address must be between 5 and 250 characters',
+      400,
+      'INVALID_ORDER_ADDRESS'
+    );
+  }
+
+  next();
+}
+
+export function validateOrderCourierPatch(req, _res, next) {
+  const invalid = Object.keys(req.body).filter(
+    (key) => !['name', 'phone'].includes(key)
+  );
+  if (invalid.length > 0) {
+    throw new AppError(
+      `Unsupported courier fields: ${invalid.join(', ')}`,
+      400,
+      'INVALID_ORDER_COURIER_FIELDS'
+    );
+  }
+
+  const name = String(req.body.name ?? '').trim();
+  if (name.length < 2 || name.length > 80) {
+    throw new AppError('Courier name is invalid', 400, 'INVALID_ORDER_COURIER_NAME');
+  }
+
+  const phone = String(req.body.phone ?? '').trim();
+  if (phone.length > 0 && !/^\+?[0-9]{7,15}$/.test(phone)) {
+    throw new AppError('Courier phone is invalid', 400, 'INVALID_ORDER_COURIER_PHONE');
   }
 
   next();

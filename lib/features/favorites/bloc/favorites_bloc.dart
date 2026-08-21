@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/api_service.dart';
 import '../../authentication/bloc/auth_bloc.dart';
 import '../../cart/cart_storage_keys.dart';
+import '../../cart/cart_item_integrity.dart';
 import 'favorites_event.dart';
 import 'favorites_state.dart';
 
@@ -256,6 +257,17 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
     }
     if (favorite == null) return;
 
+    if (!isMongoBackedEntityId(favorite.business.id) ||
+        !isMongoBackedEntityId(favorite.product.id)) {
+      emit(
+        state.copyWith(
+          status: FavoritesStatus.ready,
+          errorMessage: 'catalog.invalidCartItem',
+        ),
+      );
+      return;
+    }
+
     try {
       await _token();
       final prefs = await SharedPreferences.getInstance();
@@ -269,7 +281,6 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
           'price': favorite.product.price,
           'imageUrl': favorite.product.imageUrl,
           'quantity': 1,
-          'degree': '',
           'addedAt': DateTime.now().toIso8601String(),
         }),
       );

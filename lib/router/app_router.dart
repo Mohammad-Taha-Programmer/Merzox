@@ -12,6 +12,7 @@ import '../features/authentication/bloc/auth_bloc.dart';
 import '../features/authentication/pages/login_page.dart';
 import '../features/authentication/pages/signup_page.dart';
 import '../features/business/enrollment/business_enrollment_bloc.dart';
+import '../features/business/messages/merchant_messages_page.dart';
 import '../features/business/enrollment/business_enrollment_page.dart';
 import '../features/business/shell/business_bloc.dart';
 import '../features/business/shell/business_shell_page.dart';
@@ -24,10 +25,21 @@ import '../features/home/presentation/bloc/home_event.dart';
 import '../features/map/bloc/nearby_map_bloc.dart';
 import '../features/map/bloc/nearby_map_event.dart';
 import '../features/map/pages/nearby_map_page.dart';
+import '../features/messages/bloc/chat_bloc.dart';
+import '../features/messages/bloc/messages_bloc.dart';
+import '../features/messages/bloc/messages_event.dart';
+import '../features/messages/bloc/chat_event.dart';
+import '../features/messages/pages/chat_page.dart';
+import '../features/notifications/bloc/notifications_bloc.dart';
+import '../features/notifications/bloc/notifications_event.dart';
+import '../features/notifications/pages/notifications_page.dart';
 import '../features/onboarding/bloc/onboarding_bloc.dart';
 import '../features/onboarding/view/onboarding_screen.dart';
 import '../features/orders/bloc/orders_bloc.dart';
+import '../features/orders/bloc/order_tracking_bloc.dart';
+import '../features/orders/bloc/order_tracking_event.dart';
 import '../features/orders/bloc/orders_event.dart';
+import '../features/orders/pages/order_tracking_page.dart';
 import '../features/orders/pages/orders_page.dart';
 import '../features/profile/bloc/profile_edit_bloc.dart';
 import '../features/profile/bloc/profile_edit_event.dart';
@@ -100,6 +112,14 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/business/messages',
+        builder: (_, __) => BlocProvider(
+          create: (_) =>
+              MessagesBloc(merchantMode: true)..add(const MessagesStarted()),
+          child: const MerchantMessagesPage(),
+        ),
+      ),
+      GoRoute(
         path: '/business',
         builder: (context, __) => BlocProvider(
           create: (_) => BusinessBloc()..add(const BusinessStarted()),
@@ -140,6 +160,50 @@ class AppRouter {
         builder: (_, __) => BlocProvider(
           create: (_) => OrdersBloc()..add(const OrdersStarted()),
           child: const OrdersPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/orders/:orderId/tracking',
+        builder: (_, state) => BlocProvider(
+          create: (_) =>
+              OrderTrackingBloc(orderId: state.pathParameters['orderId'] ?? '')
+                ..add(const OrderTrackingStarted()),
+          child: const OrderTrackingPage(),
+        ),
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (_, state) {
+          final parameters = state.uri.queryParameters;
+          final conversationId = parameters['conversationId'] ?? '';
+          final businessId = parameters['businessId'] ?? '';
+
+          return BlocProvider(
+            create: (_) {
+              final bloc = ChatBloc(
+                conversationId: conversationId,
+                title: parameters['title'] ?? '',
+                avatarUrl: parameters['avatarUrl'] ?? '',
+              );
+
+              // Coming from a store page there is no thread yet, so the bloc
+              // opens one before it loads any history.
+              return conversationId.isEmpty
+                  ? (bloc..add(ChatOpenedForBusiness(businessId)))
+                  : (bloc..add(const ChatStarted()));
+            },
+            child: const ChatPage(),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, state) => BlocProvider(
+          create: (_) => NotificationsBloc(
+            businessAudience:
+                state.uri.queryParameters['audience'] == 'business',
+          )..add(const NotificationsStarted()),
+          child: const NotificationsPage(),
         ),
       ),
       GoRoute(

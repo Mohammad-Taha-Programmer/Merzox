@@ -2,6 +2,8 @@ sealed class HomeEvent {
   const HomeEvent();
 }
 
+enum HomeCatalogSection { newest, best, offers, nearby, all }
+
 final class HomeStarted extends HomeEvent {
   final bool isGuest;
   final int initialTab;
@@ -45,4 +47,10 @@ final class HomeBusinessFollowToggled extends HomeEvent {
 
 final class HomeAllBusinessesNextPageRequested extends HomeEvent {
   const HomeAllBusinessesNextPageRequested();
+}
+
+final class HomeCatalogSectionRetryRequested extends HomeEvent {
+  final HomeCatalogSection section;
+
+  const HomeCatalogSectionRetryRequested(this.section);
 }

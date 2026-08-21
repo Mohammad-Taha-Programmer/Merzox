@@ -29,6 +29,10 @@ interface also supports English, including automatic RTL/LTR layout changes.
 - Persistent cart and authenticated checkout flow.
 - Order history grouped into current, completed, and cancelled orders.
 - Favorites for businesses, products, and services.
+- Direct messaging with a business, with all/unread inbox tabs and unread badges.
+- Order tracking with a four-step delivery timeline, courier details, delivery
+  address changes before preparation starts, and a post-delivery store rating.
+- Notification feed for order status changes, replies, and new orders.
 - Nearby-business map with filtering, business details, and external directions.
 - Profile editing with multiple labeled phone numbers and email addresses.
 - About Us content retrieved from MongoDB and displayed in accordions.
@@ -41,6 +45,10 @@ interface also supports English, including automatic RTL/LTR layout changes.
 - Business dashboard and profile management.
 - Product and service management.
 - Business order management with validated status transitions.
+- Order detail and invoice view with customer, delivery, and payment details.
+- Courier assignment that populates the customer's tracking screen.
+- Merchant inbox for customer conversations.
+- Store settings for the logo, description, and social media links.
 
 ### Application foundations
 
@@ -210,9 +218,10 @@ review, production secret management, monitoring, backups, or dependency audits.
 
 ## Roadmap
 
-- Production-ready real-time chat between customers and businesses.
+- Push delivery and live sockets for chat and notifications, which are currently
+  fetched on demand rather than streamed.
 - Payment processing for cards, cash, bank transfers, and purchases for others.
-- Rich delivery tracking and notifications.
+- Courier location on a live map during delivery.
 - Consent-based recommendation and preference analysis.
 - Production deployment, observability, automated CI, and store publication.
 

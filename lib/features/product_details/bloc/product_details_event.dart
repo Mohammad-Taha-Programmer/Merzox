@@ -34,12 +34,6 @@ final class ProductDetailsQuantityDecremented extends ProductDetailsEvent {
   const ProductDetailsQuantityDecremented();
 }
 
-final class ProductDetailsDegreeSelected extends ProductDetailsEvent {
-  final String degree;
-
-  const ProductDetailsDegreeSelected(this.degree);
-}
-
 final class ProductDetailsReviewSubmitted extends ProductDetailsEvent {
   final int rating;
   final String comment;
@@ -56,4 +50,12 @@ final class ProductDetailsAddToCartPressed extends ProductDetailsEvent {
 
 final class ProductDetailsBuyNowPressed extends ProductDetailsEvent {
   const ProductDetailsBuyNowPressed();
+}
+
+final class ProductDetailsReloadRequested extends ProductDetailsEvent {
+  const ProductDetailsReloadRequested();
+}
+
+final class ProductDetailsReviewsRetryRequested extends ProductDetailsEvent {
+  const ProductDetailsReviewsRetryRequested();
 }

@@ -8,6 +8,8 @@ import authRoutes from './routes/auth.routes.js';
 import businessRoutes from './routes/business.routes.js';
 import contentRoutes from './routes/content.routes.js';
 import favoriteRoutes from './routes/favorite.routes.js';
+import messageRoutes from './routes/message.routes.js';
+import notificationRoutes from './routes/notification.routes.js';
 import orderRoutes from './routes/order.routes.js';
 import searchRoutes from './routes/search.routes.js';
 import userRoutes from './routes/user.routes.js';
@@ -29,7 +31,9 @@ app.get('/health', (_req, res) => {
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/businesses', businessRoutes);
 app.use('/api/v1/content', contentRoutes);
+app.use('/api/v1/conversations', messageRoutes);
 app.use('/api/v1/favorites', favoriteRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/search', searchRoutes);
 app.use('/api/v1/users', userRoutes);

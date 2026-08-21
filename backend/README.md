@@ -37,12 +37,52 @@ flutter run --dart-define=MERZOX_API_BASE_URL=http://localhost:3000/api/v1
 - `GET /api/v1/businesses/me/dashboard`
 - `GET /api/v1/businesses/me/orders?statusGroup=current`
 - `PATCH /api/v1/businesses/me/orders/:orderId/status`
+- `PATCH /api/v1/businesses/me/orders/:orderId/courier`
+- `GET /api/v1/businesses/me/conversations?filter=all|unread`
+- `GET /api/v1/businesses/me/conversations/unread-count`
 - `GET|POST /api/v1/businesses/me/products`
 - `PATCH|DELETE /api/v1/businesses/me/products/:productId`
 - `PATCH /api/v1/users/me`
+- `GET|POST /api/v1/orders`
+- `GET /api/v1/orders/:id`
+- `PATCH /api/v1/orders/:id/address`
+- `PATCH /api/v1/orders/:id/cancel`
+- `GET|POST /api/v1/conversations`
+- `GET /api/v1/conversations/unread-count`
+- `GET|POST /api/v1/conversations/:id/messages`
+- `POST /api/v1/conversations/:id/read`
+- `GET /api/v1/notifications?audience=customer|business&filter=all|unread`
+- `GET /api/v1/notifications/unread-count`
+- `POST /api/v1/notifications/:id/read`
+- `POST /api/v1/notifications/read-all`
 - `GET /health`
 
 The businesses endpoint uses pagination and caps `limit` at 100.
+
+## Messaging
+
+A conversation is unique per customer and business. `POST /api/v1/conversations`
+returns the existing thread when one is already open, so a store page can link
+straight into a chat without checking first. Access is resolved per request: the
+customer who owns the thread and the owner of its business can read and write to
+it, and everyone else receives a 404.
+
+## Order tracking
+
+`toClientJSON` and `toMerchantJSON` both carry a `tracking` object that collapses
+the six stored statuses onto the four steps the design draws (`placed`,
+`preparing`, `outForDelivery`, `delivered`), along with `canCancel`,
+`canChangeAddress`, and `canReview` flags. The delivery address can be changed
+only while the order is `pending` or `confirmed`; a courier can be assigned from
+`confirmed` through `outForDelivery`.
+
+## Notifications
+
+Notifications are written as a side effect of orders, status changes, messages,
+and reviews. Delivery is best-effort: a failed notification write never fails the
+request that triggered it. Each record carries a `type` and a `data` payload so a
+client can localize the copy and deep-link to the order or conversation, with a
+server-rendered Arabic `title`/`body` as a fallback.
 
 ## Business enrollment
 

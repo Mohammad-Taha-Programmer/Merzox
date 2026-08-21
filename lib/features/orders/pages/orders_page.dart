@@ -481,6 +481,30 @@ class _OrderCard extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            height: 34,
+            child: OutlinedButton.icon(
+              onPressed: () => context.push('/orders/${order.id}/tracking'),
+              style: OutlinedButton.styleFrom(
+                padding: EdgeInsets.zero,
+                side: const BorderSide(color: MerzoxColors.kColor3D5A80),
+                foregroundColor: MerzoxColors.kColor3D5A80,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+              icon: const Icon(Icons.local_shipping_outlined, size: 15),
+              label: Text(
+                'tracking.trackOrder'.tr(),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
           if (group == OrdersGroup.cancelled &&
               order.cancellationReason.isNotEmpty) ...[
             const SizedBox(height: 9),

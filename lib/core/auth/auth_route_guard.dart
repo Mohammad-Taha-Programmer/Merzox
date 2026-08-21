@@ -6,7 +6,15 @@ final class AuthRouteGuard {
     '/favorites',
     '/profile/edit',
     '/business/enroll',
+    '/chat',
+    '/notifications',
   };
+
+  /// Order tracking carries the order id in the path, so it is matched by
+  /// shape rather than by an exact route string.
+  static bool _isAuthenticatedPattern(String path) {
+    return path.startsWith('/orders/') && path.endsWith('/tracking');
+  }
 
   const AuthRouteGuard._();
 
@@ -20,8 +28,14 @@ final class AuthRouteGuard {
       return _normalizeHome(uri, session);
     }
 
-    if (_authenticatedRoutes.contains(path) && !session.isAuthenticated) {
+    if ((_authenticatedRoutes.contains(path) ||
+            _isAuthenticatedPattern(path)) &&
+        !session.isAuthenticated) {
       return '/login';
+    }
+
+    if (path == '/business/messages' && !session.isBusiness) {
+      return session.isAuthenticated ? '/business/enroll' : '/business/login';
     }
 
     if (path == '/business') {

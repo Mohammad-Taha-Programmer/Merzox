@@ -69,15 +69,7 @@ class _NearbyMapPageState extends State<NearbyMapPage> {
   }
 
   Future<void> _openBusinessProfile(SearchBusinessApiModel business) async {
-    final homeBusiness = HomeBusiness(
-      id: business.id,
-      name: business.name,
-      category: business.category,
-      products: business.products,
-      rating: business.rating,
-      distance: _distanceText(business.distanceMeters),
-      colorValue: business.colorValue,
-    );
+    final homeBusiness = HomeBusiness.fromApi(business);
 
     await Navigator.of(context).push(
       MaterialPageRoute<void>(

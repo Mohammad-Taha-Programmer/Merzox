@@ -35,3 +35,15 @@ final class BusinessProfileReviewSubmitted extends BusinessProfileEvent {
     required this.comment,
   });
 }
+
+final class BusinessProfileDetailsRetryRequested extends BusinessProfileEvent {
+  const BusinessProfileDetailsRetryRequested();
+}
+
+final class BusinessProfileProductsRetryRequested extends BusinessProfileEvent {
+  const BusinessProfileProductsRetryRequested();
+}
+
+final class BusinessProfileReviewsRetryRequested extends BusinessProfileEvent {
+  const BusinessProfileReviewsRetryRequested();
+}

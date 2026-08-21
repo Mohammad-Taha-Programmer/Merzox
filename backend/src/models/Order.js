@@ -37,6 +37,15 @@ const statusHistorySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const courierSchema = new mongoose.Schema(
+  {
+    name: { type: String, trim: true, maxlength: 80, default: '' },
+    phone: { type: String, trim: true, maxlength: 20, default: '' },
+    assignedAt: { type: Date, default: null }
+  },
+  { _id: false }
+);
+
 function createPublicId() {
   const timePart = Date.now().toString(36).toUpperCase();
   const randomPart = crypto.randomBytes(4).toString('hex').toUpperCase();
@@ -119,7 +128,8 @@ const orderSchema = new mongoose.Schema(
     },
     cancellationReason: { type: String, trim: true, maxlength: 250, default: '' },
     cancelledAt: { type: Date, default: null },
-    deliveredAt: { type: Date, default: null }
+    deliveredAt: { type: Date, default: null },
+    courier: { type: courierSchema, default: () => ({}) }
   },
   { timestamps: true }
 );
@@ -134,6 +144,57 @@ orderSchema.index(
     partialFilterExpression: { clientOrderId: { $type: 'string' } }
   }
 );
+
+/**
+ * The tracking view collapses the six stored statuses onto the four steps the
+ * design shows, so the timeline is derived here once instead of in each client.
+ */
+const trackingSteps = ['placed', 'preparing', 'outForDelivery', 'delivered'];
+const statusToStep = new Map([
+  ['pending', 'placed'],
+  ['confirmed', 'placed'],
+  ['preparing', 'preparing'],
+  ['outForDelivery', 'outForDelivery'],
+  ['delivered', 'delivered']
+]);
+
+orderSchema.methods.courierJSON = function courierJSON() {
+  const courier = this.courier ?? {};
+  return {
+    name: courier.name ?? '',
+    phone: courier.phone ?? '',
+    assignedAt: courier.assignedAt ?? null
+  };
+};
+
+orderSchema.methods.trackingJSON = function trackingJSON() {
+  const reachedAt = new Map();
+
+  for (const entry of this.statusHistory ?? []) {
+    const step = statusToStep.get(entry.status);
+    if (step && !reachedAt.has(step)) {
+      reachedAt.set(step, entry.changedAt);
+    }
+  }
+
+  const currentStep = statusToStep.get(this.status) ?? 'placed';
+  const currentIndex = trackingSteps.indexOf(currentStep);
+
+  return {
+    isCancelled: this.status === 'cancelled',
+    currentStep: this.status === 'cancelled' ? '' : currentStep,
+    currentIndex: this.status === 'cancelled' ? -1 : currentIndex,
+    steps: trackingSteps.map((step, index) => ({
+      step,
+      reachedAt: reachedAt.get(step) ?? null,
+      isReached: this.status !== 'cancelled' && index <= currentIndex
+    })),
+    courier: this.courierJSON(),
+    canCancel: ['pending', 'confirmed', 'preparing'].includes(this.status),
+    canChangeAddress: ['pending', 'confirmed'].includes(this.status),
+    canReview: this.status === 'delivered'
+  };
+};
 
 orderSchema.methods.toClientJSON = function toClientJSON() {
   return {
@@ -164,8 +225,10 @@ orderSchema.methods.toClientJSON = function toClientJSON() {
     cancellationReason: this.cancellationReason,
     cancelledAt: this.cancelledAt,
     deliveredAt: this.deliveredAt,
+    courier: this.courierJSON(),
     createdAt: this.createdAt,
-    updatedAt: this.updatedAt
+    updatedAt: this.updatedAt,
+    tracking: this.trackingJSON()
   };
 };
 
@@ -195,8 +258,10 @@ orderSchema.methods.toMerchantJSON = function toMerchantJSON() {
     cancellationReason: this.cancellationReason,
     cancelledAt: this.cancelledAt,
     deliveredAt: this.deliveredAt,
+    courier: this.courierJSON(),
     createdAt: this.createdAt,
-    updatedAt: this.updatedAt
+    updatedAt: this.updatedAt,
+    tracking: this.trackingJSON()
   };
 };
 

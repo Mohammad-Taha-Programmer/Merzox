@@ -13,7 +13,7 @@ import 'package:merzox/features/home/presentation/bloc/home_event.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/messages/bloc/messages_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
-import 'package:merzox/features/messages/bloc/messages_state.dart';
+import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
 import 'package:merzox/services/location_permission_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -507,16 +507,31 @@ class _HomeTab extends StatelessWidget {
         _BusinessSection(
           title: 'متاجر جديدة',
           businesses: newBusinesses,
+          status: state.newBusinessesStatus,
+          errorMessage: state.newBusinessesError,
+          onRetry: () => context.read<HomeBloc>().add(
+            const HomeCatalogSectionRetryRequested(HomeCatalogSection.newest),
+          ),
           followedBusinessIds: state.followedBusinessIds,
         ),
         _BusinessSection(
           title: 'أفضل المتاجر',
           businesses: bestBusinesses,
+          status: state.bestBusinessesStatus,
+          errorMessage: state.bestBusinessesError,
+          onRetry: () => context.read<HomeBloc>().add(
+            const HomeCatalogSectionRetryRequested(HomeCatalogSection.best),
+          ),
           followedBusinessIds: state.followedBusinessIds,
         ),
         _BusinessSection(
           title: 'المتاجر التي يوجد فيها عروض',
           businesses: discountedBusinesses,
+          status: state.discountedBusinessesStatus,
+          errorMessage: state.discountedBusinessesError,
+          onRetry: () => context.read<HomeBloc>().add(
+            const HomeCatalogSectionRetryRequested(HomeCatalogSection.offers),
+          ),
           followedBusinessIds: state.followedBusinessIds,
         ),
         SliverToBoxAdapter(
@@ -529,6 +544,11 @@ class _HomeTab extends StatelessWidget {
         _BusinessSection(
           title: 'المتاجر القريبة منك',
           businesses: nearbyBusinesses,
+          status: state.nearbyBusinessesStatus,
+          errorMessage: state.nearbyBusinessesError,
+          onRetry: () => context.read<HomeBloc>().add(
+            const HomeCatalogSectionRetryRequested(HomeCatalogSection.nearby),
+          ),
           followedBusinessIds: state.followedBusinessIds,
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
@@ -780,11 +800,17 @@ class _SearchBox extends StatelessWidget {
 class _BusinessSection extends StatelessWidget {
   final String title;
   final List<HomeBusiness> businesses;
+  final HomeSectionStatus status;
+  final String errorMessage;
+  final VoidCallback onRetry;
   final Set<String> followedBusinessIds;
 
   const _BusinessSection({
     required this.title,
     required this.businesses,
+    required this.status,
+    required this.errorMessage,
+    required this.onRetry,
     required this.followedBusinessIds,
   });
 
@@ -809,7 +835,20 @@ class _BusinessSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 12),
-            if (businesses.isEmpty)
+            if (status == HomeSectionStatus.loading)
+              const SizedBox(
+                height: 96,
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (status == HomeSectionStatus.failure)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _CatalogFailureState(
+                  errorMessage: errorMessage,
+                  onRetry: onRetry,
+                ),
+              )
+            else if (businesses.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _EmptySearchResult(title: title),
@@ -947,20 +986,21 @@ class _BusinessCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    _BusinessIdBadge(id: business.id),
+                    _BusinessIdBadge(id: business.displayId),
                     const SizedBox(height: 8),
                     _RatingStars(rating: business.rating),
                     const Spacer(),
-                    Padding(
-                      padding: const EdgeInsetsDirectional.only(end: 38),
-                      child: Text(
-                        business.distance,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: MerzoxColors.kColor8D99AE,
+                    if (business.distanceMeters case final distance?)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 38),
+                        child: Text(
+                          _businessDistanceText(distance),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: MerzoxColors.kColor8D99AE,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -1163,6 +1203,61 @@ class _EmptySearchResult extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CatalogFailureState extends StatelessWidget {
+  final String errorMessage;
+  final VoidCallback onRetry;
+
+  const _CatalogFailureState({
+    required this.errorMessage,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final message = errorMessage.contains('.')
+        ? errorMessage.tr()
+        : errorMessage;
+
+    return Container(
+      constraints: const BoxConstraints(minHeight: 96),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: MerzoxColors.kColorF9F9F9,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_rounded, color: MerzoxColors.kColor98C1D9),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message.isEmpty ? 'catalog.loadError'.tr() : message,
+              style: TextStyle(fontSize: 12, color: MerzoxColors.kColor767676),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: Text('common.retry'.tr()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _businessDistanceText(int meters) {
+  if (meters < 1000) {
+    return 'map.distanceMeters'.tr(args: ['$meters']);
+  }
+
+  final kilometers = meters / 1000;
+  final value = kilometers >= 10
+      ? kilometers.toStringAsFixed(0)
+      : kilometers.toStringAsFixed(1);
+  return 'map.distanceKilometers'.tr(args: [value]);
 }
 
 class _PlainTabTitle extends StatelessWidget {
@@ -1632,7 +1727,7 @@ class _CartItemTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'الكمية: ${item.quantity}${item.degree.isEmpty ? '' : '  -  الدرجة: ${item.degree}'}',
+                  'الكمية: ${item.quantity}',
                   textDirection: TextDirection.rtl,
                   style: TextStyle(
                     fontSize: 12,
@@ -1767,7 +1862,22 @@ class _BusinessesTabState extends State<_BusinessesTab> {
         const SizedBox(height: 18),
         _SearchBox(onTap: () => context.push('/search')),
         const SizedBox(height: 18),
-        if (businesses.isEmpty)
+        if (widget.state.allBusinessesStatus == HomeSectionStatus.loading &&
+            businesses.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(top: 120),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (widget.state.allBusinessesStatus ==
+                HomeSectionStatus.failure &&
+            businesses.isEmpty)
+          _CatalogFailureState(
+            errorMessage: widget.state.allBusinessesError,
+            onRetry: () => context.read<HomeBloc>().add(
+              const HomeCatalogSectionRetryRequested(HomeCatalogSection.all),
+            ),
+          )
+        else if (businesses.isEmpty)
           const _EmptyFeatureState(
             icon: Icons.search_off_rounded,
             title: 'لا توجد نتائج',
@@ -1781,6 +1891,19 @@ class _BusinessesTabState extends State<_BusinessesTab> {
               child: Center(
                 child: CircularProgressIndicator(
                   color: MerzoxColors.kColorEE6C4D,
+                ),
+              ),
+            )
+          else if (widget.state.allBusinessesStatus ==
+              HomeSectionStatus.failure)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: _CatalogFailureState(
+                errorMessage: widget.state.allBusinessesError,
+                onRetry: () => context.read<HomeBloc>().add(
+                  const HomeCatalogSectionRetryRequested(
+                    HomeCatalogSection.all,
+                  ),
                 ),
               ),
             )
@@ -2089,8 +2212,8 @@ class _ChatTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isGuest) {
       return _GuestLoginTabState(
-        title: 'الرسائل',
-        message: 'لعرض الرسائل الخاصة بك، يرجى تسجيل الدخول أولا',
+        title: 'messages.title'.tr(),
+        message: 'messages.guestHint'.tr(),
         onSignupPressed: onSignupPressed,
         onLoginPressed: onLoginPressed,
       );
@@ -2098,182 +2221,9 @@ class _ChatTab extends StatelessWidget {
 
     return BlocProvider(
       create: (_) => MessagesBloc()..add(const MessagesStarted()),
-      child: const _MessagesView(),
+      child: MessagesInboxView(title: 'messages.title'.tr()),
     );
   }
-}
-
-class _MessagesView extends StatelessWidget {
-  const _MessagesView();
-
-  @override
-  Widget build(BuildContext context) {
-    return BlocBuilder<MessagesBloc, MessagesState>(
-      builder: (context, state) {
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 18, 16, 118),
-          children: [
-            const _PlainTabTitle(title: 'الرسائل'),
-            if (state.status == MessagesStatus.loading)
-              const Padding(
-                padding: EdgeInsets.only(top: 160),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (state.threads.isEmpty)
-              const _EmptyMessagesState()
-            else ...[
-              const SizedBox(height: 20),
-              ...state.threads.map(
-                (thread) => _ChatPreviewTile(
-                  name: thread.name,
-                  lastMessage: thread.lastMessage,
-                  time: thread.time,
-                  unreadCount: thread.unreadCount,
-                  color: MerzoxColors.kColorDEEEF8,
-                ),
-              ),
-            ],
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _EmptyMessagesState extends StatelessWidget {
-  const _EmptyMessagesState();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height - 210,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CustomPaint(
-            size: const Size(190, 194),
-            painter: _EmptyMessagesPainter(),
-          ),
-          const SizedBox(height: 26),
-          const Text(
-            'عذراً، الرسائل فارغة',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: Color(0xFF2B2B2B),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'لا يوجد رسائل، قم بالدردشة مع متجر وقم بالاستفسار\nعن أي منتج داخل المتجر',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 13,
-              height: 1.65,
-              color: MerzoxColors.kColor707070,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _EmptyMessagesPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final linePaint = Paint()
-      ..color = MerzoxColors.kColor98C1D9
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    final dashPath = Path()
-      ..moveTo(size.width * 0.15, size.height * 0.35)
-      ..cubicTo(
-        size.width * 0.05,
-        size.height * 0.05,
-        size.width * 0.55,
-        size.height * 0.35,
-        size.width * 0.42,
-        size.height * 0.66,
-      )
-      ..cubicTo(
-        size.width * 0.28,
-        size.height * 0.98,
-        size.width * 0.75,
-        size.height * 0.86,
-        size.width * 0.74,
-        size.height * 0.65,
-      )
-      ..cubicTo(
-        size.width * 0.73,
-        size.height * 0.48,
-        size.width * 1.02,
-        size.height * 0.62,
-        size.width * 0.86,
-        size.height * 0.74,
-      );
-    _drawDashedPath(canvas, dashPath, linePaint, dash: 7, gap: 7);
-
-    final planePaint = Paint()
-      ..color = MerzoxColors.kColor3D5A80
-      ..style = PaintingStyle.fill;
-    final shadowPaint = Paint()
-      ..color = MerzoxColors.kColor98C1D9.withValues(alpha: 0.45)
-      ..style = PaintingStyle.fill;
-
-    final cx = size.width * 0.56;
-    final cy = size.height * 0.2;
-    final plane = Path()
-      ..moveTo(cx - 22, cy + 8)
-      ..lineTo(cx + 52, cy - 8)
-      ..lineTo(cx - 2, cy + 26)
-      ..lineTo(cx + 1, cy + 10)
-      ..close();
-    canvas.drawPath(plane, planePaint);
-
-    final envelope = Path()
-      ..moveTo(cx - 32, cy - 14)
-      ..lineTo(cx + 4, cy - 6)
-      ..lineTo(cx + 2, cy + 18)
-      ..lineTo(cx - 34, cy + 8)
-      ..close();
-    canvas.drawPath(envelope, shadowPaint);
-    final envelopeStroke = Paint()
-      ..color = MerzoxColors.kColor3D5A80.withValues(alpha: 0.35)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-    canvas.drawPath(envelope, envelopeStroke);
-    canvas.drawLine(
-      Offset(cx - 32, cy - 14),
-      Offset(cx - 16, cy + 3),
-      envelopeStroke,
-    );
-    canvas.drawLine(
-      Offset(cx + 4, cy - 6),
-      Offset(cx - 16, cy + 3),
-      envelopeStroke,
-    );
-  }
-
-  void _drawDashedPath(
-    Canvas canvas,
-    Path path,
-    Paint paint, {
-    required double dash,
-    required double gap,
-  }) {
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final next = distance + dash;
-        canvas.drawPath(metric.extractPath(distance, next), paint);
-        distance = next + gap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _ProfileTab extends StatelessWidget {
@@ -3021,7 +2971,7 @@ class _BusinessProfilePage extends StatelessWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'ID: ${business.id}',
+                  'ID: ${business.displayId}',
                   textAlign: TextAlign.center,
                   textDirection: TextDirection.ltr,
                   style: const TextStyle(
@@ -3031,11 +2981,14 @@ class _BusinessProfilePage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-                const _BusinessProfileStats(),
+                _BusinessProfileStats(
+                  followerCount: business.followerCount,
+                  productCount: business.productCount,
+                ),
                 const SizedBox(height: 22),
                 const _BusinessProfileTabs(),
                 const SizedBox(height: 24),
-                const _BusinessAboutText(),
+                _BusinessAboutText(description: business.description),
                 const SizedBox(height: 34),
                 _BusinessServices(products: business.products),
               ],
@@ -3139,26 +3092,27 @@ class _BusinessProfileHero extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            top: 15,
-            child: Container(
-              height: 24,
-              padding: const EdgeInsets.symmetric(horizontal: 34),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: MerzoxColors.kColor3D5A80,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Text(
-                'أفضل المتاجر',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+          if (business.category.trim().isNotEmpty)
+            Positioned(
+              top: 15,
+              child: Container(
+                height: 24,
+                padding: const EdgeInsets.symmetric(horizontal: 34),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: MerzoxColors.kColor3D5A80,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  business.category,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
-          ),
           const PositionedDirectional(
             top: 3,
             end: 7,
@@ -3240,34 +3194,26 @@ class _BusinessProfileLogo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            name.contains('الياسمين') ? 'Yasmeen' : 'Merzox',
-            style: TextStyle(
-              fontFamily: 'Minion',
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: MerzoxColors.kColor3D5A80,
-            ),
-          ),
-          Text(
-            'store',
-            style: TextStyle(
-              fontSize: 8,
-              letterSpacing: 3,
-              color: MerzoxColors.kColor8D99AE,
-            ),
-          ),
-        ],
+      child: Text(
+        name.trim().isEmpty ? '' : name.trim().characters.first,
+        style: TextStyle(
+          fontSize: 34,
+          fontWeight: FontWeight.w800,
+          color: MerzoxColors.kColor3D5A80,
+        ),
       ),
     );
   }
 }
 
 class _BusinessProfileStats extends StatelessWidget {
-  const _BusinessProfileStats();
+  final int followerCount;
+  final int productCount;
+
+  const _BusinessProfileStats({
+    required this.followerCount,
+    required this.productCount,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -3275,13 +3221,13 @@ class _BusinessProfileStats extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _BusinessProfileStat(
-          value: '300',
+          value: '$followerCount',
           label: 'متابع',
           icon: Icons.person_add_alt_1_outlined,
         ),
         const SizedBox(width: 28),
         _BusinessProfileStat(
-          value: '200',
+          value: '$productCount',
           label: 'منتج',
           icon: Icons.inventory_2_outlined,
         ),
@@ -3373,14 +3319,22 @@ class _BusinessProfileTabDivider extends StatelessWidget {
 }
 
 class _BusinessAboutText extends StatelessWidget {
-  const _BusinessAboutText();
+  final String description;
+
+  const _BusinessAboutText({required this.description});
 
   @override
   Widget build(BuildContext context) {
-    return const Text(
-      'هذا النص افتراضي، هذا النص افتراضي، هذا النص افتراضي، هذا النص افتراضي، هذا النص افتراضي، هذا النص افتراضي، هذا النص افتراضي. هذا النص افتراضي، هذا النص افتراضي هذا النص افتراضي، هذا النص افتراضي',
+    return Text(
+      description.trim().isEmpty
+          ? 'catalog.noBusinessDescription'.tr()
+          : description,
       textAlign: TextAlign.center,
-      style: TextStyle(fontSize: 13, height: 1.75, color: Color(0xFF2B2B2B)),
+      style: const TextStyle(
+        fontSize: 13,
+        height: 1.75,
+        color: Color(0xFF2B2B2B),
+      ),
     );
   }
 }
@@ -3392,8 +3346,6 @@ class _BusinessServices extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final service = products.isEmpty ? 'مكياج' : products.first;
-
     return Align(
       alignment: AlignmentDirectional.centerEnd,
       child: SizedBox(
@@ -3412,29 +3364,42 @@ class _BusinessServices extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Container(
-              width: 58,
-              height: 58,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-                border: Border.all(color: MerzoxColors.kColorEFEFEF),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.spa_rounded,
-                  color: MerzoxColors.kColor3D5A80,
-                  size: 30,
+            if (products.isNotEmpty) ...[
+              Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: MerzoxColors.kColorEFEFEF),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.spa_rounded,
+                    color: MerzoxColors.kColor3D5A80,
+                    size: 30,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 7),
-            Text(
-              service,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, color: MerzoxColors.kColor767676),
-            ),
+              const SizedBox(height: 7),
+              Text(
+                products.first,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: MerzoxColors.kColor767676,
+                ),
+              ),
+            ] else
+              Text(
+                'catalog.noServices'.tr(),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: MerzoxColors.kColor767676,
+                ),
+              ),
           ],
         ),
       ),
@@ -3457,106 +3422,6 @@ class _BusinessChatButton extends StatelessWidget {
         fixedSize: const Size(42, 42),
       ),
       icon: const Icon(Icons.chat_bubble_outline_rounded, size: 22),
-    );
-  }
-}
-
-class _ChatPreviewTile extends StatelessWidget {
-  final String name;
-  final String lastMessage;
-  final String time;
-  final int unreadCount;
-  final Color color;
-
-  const _ChatPreviewTile({
-    required this.name,
-    required this.lastMessage,
-    required this.time,
-    required this.unreadCount,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: MerzoxColors.kColorEFEFEF),
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: color,
-            child: Icon(
-              Icons.storefront_rounded,
-              color: MerzoxColors.kColor3D5A80,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  lastMessage,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: MerzoxColors.kColor767676,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(
-                time,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: MerzoxColors.kColor8D99AE,
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (unreadCount > 0)
-                Container(
-                  width: 22,
-                  height: 22,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: MerzoxColors.kColorEE6C4D,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '$unreadCount',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }

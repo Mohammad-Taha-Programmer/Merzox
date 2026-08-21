@@ -56,9 +56,21 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const socialLinksSchema = new mongoose.Schema(
+  {
+    instagram: { type: String, trim: true, maxlength: 200, default: '' },
+    whatsapp: { type: String, trim: true, maxlength: 20, default: '' },
+    mobile: { type: String, trim: true, maxlength: 20, default: '' },
+    facebook: { type: String, trim: true, maxlength: 200, default: '' }
+  },
+  { _id: false }
+);
+
 const businessSchema = new mongoose.Schema(
   {
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    logoUrl: { type: String, trim: true, maxlength: 1000, default: '' },
+    socialLinks: { type: socialLinksSchema, default: () => ({}) },
     publicId: { type: String, required: true, unique: true, index: true },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     englishName: { type: String, trim: true, maxlength: 120, default: '' },
@@ -101,8 +113,10 @@ businessSchema.methods.toListJSON = function toListJSON() {
     publicId: this.publicId,
     name: this.name,
     englishName: this.englishName,
+    logoUrl: this.logoUrl,
     category: this.category,
     products: activeProducts.slice(0, 6).map((product) => product.name),
+    productCount: activeProducts.length,
     rating: this.ratingAverage,
     ratingCount: this.ratingCount,
     followerCount: this.followerCount,
@@ -119,6 +133,12 @@ businessSchema.methods.toDetailJSON = function toDetailJSON() {
   return {
     ...this.toListJSON(),
     description: this.description,
+    socialLinks: {
+      instagram: this.socialLinks?.instagram ?? '',
+      whatsapp: this.socialLinks?.whatsapp ?? '',
+      mobile: this.socialLinks?.mobile ?? '',
+      facebook: this.socialLinks?.facebook ?? ''
+    },
     location: this.location ?? null,
     products: this.products
       .filter((product) => product.isActive)

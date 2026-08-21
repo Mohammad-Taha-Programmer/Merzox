@@ -1,7 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
+import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/services/api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'business_profile_event.dart';
 import 'business_profile_state.dart';
@@ -9,15 +8,22 @@ import 'business_profile_state.dart';
 class BusinessProfileBloc
     extends Bloc<BusinessProfileEvent, BusinessProfileState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
-  BusinessProfileBloc({ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(const BusinessProfileState()) {
+  BusinessProfileBloc({
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const BusinessProfileState()) {
     on<BusinessProfileStarted>(_onStarted);
     on<BusinessProfileMainTabChanged>(_onMainTabChanged);
     on<BusinessProfileProductFilterChanged>(_onProductFilterChanged);
     on<BusinessProfileProductLikeToggled>(_onProductLikeToggled);
     on<BusinessProfileReviewSubmitted>(_onReviewSubmitted);
+    on<BusinessProfileDetailsRetryRequested>(_onDetailsRetryRequested);
+    on<BusinessProfileProductsRetryRequested>(_onProductsRetryRequested);
+    on<BusinessProfileReviewsRetryRequested>(_onReviewsRetryRequested);
   }
 
   Future<void> _onStarted(
@@ -28,9 +34,38 @@ class BusinessProfileBloc
       state.copyWith(
         status: BusinessProfileStatus.loading,
         businessId: event.businessId,
+        detailsStatus: BusinessProfileSectionStatus.loading,
+        productsStatus: BusinessProfileSectionStatus.loading,
+        detailsError: '',
+        productsError: '',
+        errorMessage: '',
       ),
     );
-    await _loadProducts(emit, event.businessId, state.productClassification);
+
+    final detailsFuture = _capture(
+      () => _apiService.business(businessId: event.businessId),
+    );
+    final productsFuture = _capture(
+      () => _apiService.businessProducts(
+        businessId: event.businessId,
+        classification: state.productClassification,
+      ),
+    );
+    final details = await detailsFuture;
+    final products = await productsFuture;
+
+    emit(
+      state.copyWith(
+        status: BusinessProfileStatus.ready,
+        business: details.value,
+        products: products.value ?? const [],
+        detailsStatus: details.status,
+        productsStatus: products.status,
+        detailsError: details.errorMessage,
+        productsError: products.errorMessage,
+      ),
+    );
+
     await _loadFavoriteStatus(emit, event.businessId);
   }
 
@@ -38,14 +73,16 @@ class BusinessProfileBloc
     BusinessProfileMainTabChanged event,
     Emitter<BusinessProfileState> emit,
   ) async {
-    emit(state.copyWith(mainTabIndex: event.index));
+    emit(state.copyWith(mainTabIndex: event.index.clamp(0, 2)));
 
-    if (event.index == 1 && state.products.isEmpty) {
-      await _loadProducts(emit, state.businessId, state.productClassification);
+    if (event.index == 1 &&
+        state.productsStatus == BusinessProfileSectionStatus.initial) {
+      await _loadProducts(emit, state.productClassification);
     }
 
-    if (event.index == 2 && state.reviews.isEmpty) {
-      await _loadReviews(emit, state.businessId);
+    if (event.index == 2 &&
+        state.reviewsStatus == BusinessProfileSectionStatus.initial) {
+      await _loadReviews(emit);
     }
   }
 
@@ -59,7 +96,7 @@ class BusinessProfileBloc
         products: const [],
       ),
     );
-    await _loadProducts(emit, state.businessId, event.classification);
+    await _loadProducts(emit, event.classification);
   }
 
   Future<void> _onProductLikeToggled(
@@ -106,17 +143,48 @@ class BusinessProfileBloc
     BusinessProfileReviewSubmitted event,
     Emitter<BusinessProfileState> emit,
   ) async {
-    emit(state.copyWith(status: BusinessProfileStatus.savingReview));
+    emit(
+      state.copyWith(
+        status: BusinessProfileStatus.savingReview,
+        errorMessage: '',
+      ),
+    );
 
     try {
       final token = await _token();
-      await _apiService.submitBusinessReview(
+      final submittedReview = await _apiService.submitBusinessReview(
         token: token,
         businessId: state.businessId,
         rating: event.rating,
         comment: event.comment,
       );
-      await _loadReviews(emit, state.businessId);
+      final reviews = await _capture(
+        () => _apiService.businessReviews(businessId: state.businessId),
+      );
+
+      if (reviews.value != null) {
+        emit(
+          state.copyWith(
+            status: BusinessProfileStatus.ready,
+            reviews: reviews.value,
+            reviewsStatus: BusinessProfileSectionStatus.ready,
+            reviewsError: '',
+          ),
+        );
+      } else {
+        final knownReviews = <String, BusinessReviewApiModel>{
+          submittedReview.id: submittedReview,
+          for (final review in state.reviews) review.id: review,
+        };
+        emit(
+          state.copyWith(
+            status: BusinessProfileStatus.ready,
+            reviews: knownReviews.values.toList(),
+            reviewsStatus: BusinessProfileSectionStatus.failure,
+            reviewsError: reviews.errorMessage,
+          ),
+        );
+      }
     } catch (error) {
       emit(
         state.copyWith(
@@ -127,55 +195,90 @@ class BusinessProfileBloc
     }
   }
 
-  Future<void> _loadProducts(
+  Future<void> _onDetailsRetryRequested(
+    BusinessProfileDetailsRetryRequested event,
     Emitter<BusinessProfileState> emit,
-    String businessId,
-    String classification,
   ) async {
-    try {
-      final products = await _apiService.businessProducts(
-        businessId: businessId,
-        classification: classification,
-      );
-      emit(
-        state.copyWith(
-          status: BusinessProfileStatus.ready,
-          products: products.isEmpty
-              ? _fallbackProducts(classification)
-              : products,
-        ),
-      );
-    } catch (error) {
-      emit(
-        state.copyWith(
-          status: BusinessProfileStatus.ready,
-          products: _fallbackProducts(classification),
-          errorMessage: null,
-        ),
-      );
-    }
+    await _loadDetails(emit);
   }
 
-  Future<void> _loadReviews(
+  Future<void> _onProductsRetryRequested(
+    BusinessProfileProductsRetryRequested event,
     Emitter<BusinessProfileState> emit,
-    String businessId,
   ) async {
-    try {
-      final reviews = await _apiService.businessReviews(businessId: businessId);
-      emit(
-        state.copyWith(
-          status: BusinessProfileStatus.ready,
-          reviews: reviews.isEmpty ? _fallbackReviews : reviews,
-        ),
-      );
-    } catch (_) {
-      emit(
-        state.copyWith(
-          status: BusinessProfileStatus.ready,
-          reviews: _fallbackReviews,
-        ),
-      );
-    }
+    await _loadProducts(emit, state.productClassification);
+  }
+
+  Future<void> _onReviewsRetryRequested(
+    BusinessProfileReviewsRetryRequested event,
+    Emitter<BusinessProfileState> emit,
+  ) async {
+    await _loadReviews(emit);
+  }
+
+  Future<void> _loadDetails(Emitter<BusinessProfileState> emit) async {
+    emit(
+      state.copyWith(
+        detailsStatus: BusinessProfileSectionStatus.loading,
+        detailsError: '',
+      ),
+    );
+    final result = await _capture(
+      () => _apiService.business(businessId: state.businessId),
+    );
+    emit(
+      state.copyWith(
+        business: result.value,
+        detailsStatus: result.status,
+        detailsError: result.errorMessage,
+      ),
+    );
+  }
+
+  Future<void> _loadProducts(
+    Emitter<BusinessProfileState> emit,
+    String classification,
+  ) async {
+    emit(
+      state.copyWith(
+        productsStatus: BusinessProfileSectionStatus.loading,
+        productsError: '',
+      ),
+    );
+
+    final result = await _capture(
+      () => _apiService.businessProducts(
+        businessId: state.businessId,
+        classification: classification,
+      ),
+    );
+    emit(
+      state.copyWith(
+        products: result.value ?? const [],
+        productsStatus: result.status,
+        productsError: result.errorMessage,
+      ),
+    );
+  }
+
+  Future<void> _loadReviews(Emitter<BusinessProfileState> emit) async {
+    emit(
+      state.copyWith(
+        reviewsStatus: BusinessProfileSectionStatus.loading,
+        reviewsError: '',
+      ),
+    );
+
+    final result = await _capture(
+      () => _apiService.businessReviews(businessId: state.businessId),
+    );
+    emit(
+      state.copyWith(
+        reviews: result.value ?? const [],
+        reviewsStatus: result.status,
+        reviewsError: result.errorMessage,
+      ),
+    );
   }
 
   Future<void> _loadFavoriteStatus(
@@ -194,45 +297,35 @@ class BusinessProfileBloc
   }
 
   Future<String> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AuthBloc.tokenKey);
-    if (token == null || token.isEmpty) {
+    final session = await _authSessionService.read();
+    final token = session.token;
+    if (token == null) {
       throw StateError('Authentication required');
     }
     return token;
   }
+
+  Future<_LoadResult<T>> _capture<T>(Future<T> Function() request) async {
+    try {
+      return _LoadResult.success(await request());
+    } catch (error) {
+      return _LoadResult.failure(ApiService.messageFromError(error));
+    }
+  }
 }
 
-List<BusinessProductApiModel> _fallbackProducts(String classification) {
-  return List.generate(6, (index) {
-    return BusinessProductApiModel(
-      id: 'local-$classification-$index',
-      name: 'أساس متين',
-      description: 'منتج تجريبي',
-      price: 35,
-      imageUrl: '',
-      imageUrls: const [],
-      classification: classification,
-      rating: 4,
-      ratingCount: 14,
-      likeCount: 0,
-    );
-  });
-}
+final class _LoadResult<T> {
+  final T? value;
+  final String errorMessage;
 
-final List<BusinessReviewApiModel> _fallbackReviews = List.unmodifiable([
-  BusinessReviewApiModel(
-    id: 'local-review-1',
-    userName: 'إبراهيم خالد',
-    rating: 5,
-    comment: 'المتجر رائع ومميز. وفرت منتجات ممتازة وبخدمة مناسبة للغاية.',
-    createdAt: DateTime.now(),
-  ),
-  BusinessReviewApiModel(
-    id: 'local-review-2',
-    userName: 'محمود رمضان',
-    rating: 4,
-    comment: 'خدمة جيدة وتعامل لطيف، والأسعار مناسبة.',
-    createdAt: DateTime.now(),
-  ),
-]);
+  const _LoadResult._({this.value, this.errorMessage = ''});
+
+  const _LoadResult.success(T value) : this._(value: value);
+
+  const _LoadResult.failure(String errorMessage)
+    : this._(errorMessage: errorMessage);
+
+  BusinessProfileSectionStatus get status => value == null
+      ? BusinessProfileSectionStatus.failure
+      : BusinessProfileSectionStatus.ready;
+}
