@@ -1,1 +1,1 @@
-enum StartupDestination { onboarding, login, home, businessHome }
+enum StartupDestination { onboarding, login, guestHome, home, businessHome }

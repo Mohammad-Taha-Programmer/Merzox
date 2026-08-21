@@ -17,8 +17,8 @@ class StartupService {
       return StartupDestination.onboarding;
     }
 
-    if (!loggedIn || token == null || token.isEmpty) {
-      return StartupDestination.login;
+    if (!loggedIn || token == null || token.trim().isEmpty) {
+      return StartupDestination.guestHome;
     }
 
     final userType = prefs.getString(AuthBloc.userTypeKey);
