@@ -3,6 +3,8 @@ import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/auth/auth_route_guard.dart';
+import '../core/auth/auth_session_service.dart';
 import '../core/startup/startup_destination.dart';
 import '../features/about_us/bloc/about_us_bloc.dart';
 import '../features/about_us/pages/about_us_page.dart';
@@ -38,8 +40,10 @@ import '../features/share_app/pages/share_app_page.dart';
 
 class AppRouter {
   final StartupDestination destination;
+  final AuthSessionService _authSessionService;
 
-  AppRouter(this.destination);
+  AppRouter(this.destination, {AuthSessionService? authSessionService})
+    : _authSessionService = authSessionService ?? const AuthSessionService();
 
   GoRouter get router => GoRouter(
     initialLocation: switch (destination) {
@@ -48,6 +52,10 @@ class AppRouter {
       StartupDestination.guestHome => '/home?guest=true',
       StartupDestination.home => '/home',
       StartupDestination.businessHome => '/business',
+    },
+    redirect: (_, state) async {
+      final session = await _authSessionService.read();
+      return AuthRouteGuard.redirect(uri: state.uri, session: session);
     },
     routes: [
       GoRoute(
@@ -111,14 +119,19 @@ class AppRouter {
       GoRoute(
         path: '/home',
         builder: (_, state) {
-          final isGuest = state.uri.queryParameters['guest'] == 'true';
+          final showGuestPresentation =
+              state.uri.queryParameters['guest'] == 'true';
           final initialTab =
               int.tryParse(state.uri.queryParameters['tab'] ?? '') ?? 0;
           return BlocProvider(
-            create: (_) =>
-                HomeBloc()
-                  ..add(HomeStarted(isGuest: isGuest, initialTab: initialTab)),
-            child: HomeScreen(isGuest: isGuest),
+            create: (_) => HomeBloc()
+              ..add(
+                HomeStarted(
+                  isGuest: showGuestPresentation,
+                  initialTab: initialTab,
+                ),
+              ),
+            child: HomeScreen(isGuest: showGuestPresentation),
           );
         },
       ),

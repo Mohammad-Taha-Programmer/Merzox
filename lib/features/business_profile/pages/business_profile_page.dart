@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/auth/auth_gate.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
@@ -538,11 +539,12 @@ class _ProductCard extends StatelessWidget {
                     end: 8,
                     child: InkWell(
                       customBorder: const CircleBorder(),
-                      onTap: () {
-                        context.read<BusinessProfileBloc>().add(
-                          BusinessProfileProductLikeToggled(product.id),
-                        );
-                      },
+                      onTap: () => AuthGate.run(
+                        context,
+                        onAuthenticated: () => context
+                            .read<BusinessProfileBloc>()
+                            .add(BusinessProfileProductLikeToggled(product.id)),
+                      ),
                       child: Container(
                         width: 26,
                         height: 26,
@@ -723,14 +725,20 @@ class _ReviewsTabState extends State<_ReviewsTab> {
           child: FilledButton(
             onPressed: saving
                 ? null
-                : () {
-                    context.read<BusinessProfileBloc>().add(
-                      BusinessProfileReviewSubmitted(
-                        rating: _rating,
-                        comment: _commentController.text,
-                      ),
+                : () async {
+                    final submitted = await AuthGate.run(
+                      context,
+                      onAuthenticated: () =>
+                          context.read<BusinessProfileBloc>().add(
+                            BusinessProfileReviewSubmitted(
+                              rating: _rating,
+                              comment: _commentController.text,
+                            ),
+                          ),
                     );
-                    _commentController.clear();
+                    if (submitted) {
+                      _commentController.clear();
+                    }
                   },
             style: FilledButton.styleFrom(
               backgroundColor: MerzoxColors.kColorEE6C4D,

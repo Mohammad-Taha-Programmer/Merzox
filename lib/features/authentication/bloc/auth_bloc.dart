@@ -7,7 +7,7 @@ import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static const String sessionKey = 'auth_session_active';
-  static const String guestKey = 'auth_guest_session';
+  static const String _legacyGuestKey = 'auth_guest_session';
   static const String nameKey = 'auth_user_name';
   static const String addressKey = 'auth_user_address';
   static const String userTypeKey = 'auth_user_type';
@@ -28,7 +28,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       super(const AuthState()) {
     on<LoginSubmitted>(_onLoginSubmitted);
     on<SignupSubmitted>(_onSignupSubmitted);
-    on<GuestSessionStarted>(_onGuestSessionStarted);
     on<LogoutRequested>(_onLogoutRequested);
   }
 
@@ -77,7 +76,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         state.copyWith(
           status: AuthStatus.authenticated,
-          isGuest: false,
           userType: auth.user.userType,
         ),
       );
@@ -148,7 +146,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         state.copyWith(
           status: AuthStatus.signupCreated,
-          isGuest: false,
           successMessage: message,
         ),
       );
@@ -162,35 +159,12 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     }
   }
 
-  Future<void> _onGuestSessionStarted(
-    GuestSessionStarted event,
-    Emitter<AuthState> emit,
-  ) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(guestKey, true);
-
-    emit(state.copyWith(status: AuthStatus.guest, isGuest: true));
-  }
-
   Future<void> _onLogoutRequested(
     LogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(sessionKey, false);
-    await prefs.setBool(guestKey, false);
-    await prefs.remove(tokenKey);
-    await prefs.remove(userIdKey);
-    await prefs.remove(nameKey);
-    await prefs.remove(addressKey);
-    await prefs.remove(userTypeKey);
-    await prefs.remove(emailKey);
-    await prefs.remove(phoneKey);
-    await prefs.remove(genderKey);
-    await prefs.remove(locationPermissionGrantedKey);
-    await prefs.remove(locationPromptPendingKey);
-
-    emit(state.copyWith(status: AuthStatus.unauthenticated, isGuest: false));
+    await clearStoredSession();
+    emit(state.copyWith(status: AuthStatus.unauthenticated));
   }
 
   Future<void> _clearAuthenticatedSession() async {
@@ -200,7 +174,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static Future<void> clearStoredSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(sessionKey, false);
-    await prefs.setBool(guestKey, false);
+    await prefs.remove(_legacyGuestKey);
     await prefs.remove(tokenKey);
     await prefs.remove(userIdKey);
     await prefs.remove(nameKey);
@@ -220,7 +194,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(sessionKey, true);
-    await prefs.setBool(guestKey, false);
+    await prefs.remove(_legacyGuestKey);
     await prefs.setString(tokenKey, auth.token);
     await prefs.setString(userIdKey, auth.user.id);
     await prefs.setString(nameKey, auth.user.name);

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:merzox/core/auth/auth_gate.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/cart/bloc/cart_bloc.dart';
 import 'package:merzox/features/cart/bloc/cart_event.dart';
@@ -65,32 +66,23 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.isGuest});
 
   Future<void> _logout(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(AuthBloc.sessionKey, false);
-    await prefs.setBool(AuthBloc.guestKey, false);
-    await prefs.remove(AuthBloc.tokenKey);
-    await prefs.remove(AuthBloc.userIdKey);
-    await prefs.remove(AuthBloc.nameKey);
-    await prefs.remove(AuthBloc.addressKey);
-    await prefs.remove(AuthBloc.userTypeKey);
-    await prefs.remove(AuthBloc.emailKey);
-    await prefs.remove(AuthBloc.phoneKey);
-    await prefs.remove(AuthBloc.genderKey);
+    await AuthBloc.clearStoredSession();
 
     if (context.mounted) {
       context.go('/login');
     }
   }
 
-  void _requireLogin(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('سجل الدخول أولاً لاستخدام هذه الميزة'),
-        action: SnackBarAction(
-          label: 'تسجيل الدخول',
-          onPressed: () => context.go('/login'),
-        ),
-      ),
+  void _showAuthGate(BuildContext context) {
+    AuthGate.run(context, onAuthenticated: () {});
+  }
+
+  void _openBusinessEnrollment(BuildContext context) {
+    AuthGate.run(
+      context,
+      onAuthenticated: () {
+        context.push('/business/enroll');
+      },
     );
   }
 
@@ -173,8 +165,8 @@ class HomeScreen extends StatelessWidget {
                 state: state,
                 isGuest: isGuest,
                 onLogout: () => _logout(context),
-                onProtectedAction: () => _requireLogin(context),
-                onBusinessEnrollment: () => context.push('/business/enroll'),
+                onProtectedAction: () => _showAuthGate(context),
+                onBusinessEnrollment: () => _openBusinessEnrollment(context),
                 onLocationRequested: () => context.read<HomeBloc>().add(
                   const HomeLocationServiceRequested(reason: 'nearby'),
                 ),
@@ -187,11 +179,7 @@ class HomeScreen extends StatelessWidget {
                   context.read<HomeBloc>().add(const HomeTabChanged(0));
                 },
               ),
-              2 => _BusinessesTab(
-                state: state,
-                isGuest: isGuest,
-                onProtectedAction: () => _requireLogin(context),
-              ),
+              2 => _BusinessesTab(state: state),
               3 => _ChatTab(
                 isGuest: isGuest,
                 onSignupPressed: () => context.go('/signup'),
@@ -208,7 +196,7 @@ class HomeScreen extends StatelessWidget {
                 onShareApp: () => context.push('/share-app'),
                 onSignupPressed: () => context.go('/signup'),
                 onLoginPressed: () => context.go('/login'),
-                onProtectedAction: () => context.push('/business/enroll'),
+                onProtectedAction: () => _openBusinessEnrollment(context),
               ),
               _ => _ComingSoonTab(index: state.selectedTab),
             },
@@ -508,9 +496,7 @@ class _HomeTab extends StatelessWidget {
                   onProtectedAction: onProtectedAction,
                 ),
                 const SizedBox(height: 24),
-                _AdvertisementCard(
-                  onPressed: isGuest ? onProtectedAction : onBusinessEnrollment,
-                ),
+                _AdvertisementCard(onPressed: onBusinessEnrollment),
                 const SizedBox(height: 16),
                 _SearchBox(onTap: () => context.push('/search')),
                 const SizedBox(height: 28),
@@ -522,22 +508,16 @@ class _HomeTab extends StatelessWidget {
           title: 'متاجر جديدة',
           businesses: newBusinesses,
           followedBusinessIds: state.followedBusinessIds,
-          isGuest: isGuest,
-          onProtectedAction: onProtectedAction,
         ),
         _BusinessSection(
           title: 'أفضل المتاجر',
           businesses: bestBusinesses,
           followedBusinessIds: state.followedBusinessIds,
-          isGuest: isGuest,
-          onProtectedAction: onProtectedAction,
         ),
         _BusinessSection(
           title: 'المتاجر التي يوجد فيها عروض',
           businesses: discountedBusinesses,
           followedBusinessIds: state.followedBusinessIds,
-          isGuest: isGuest,
-          onProtectedAction: onProtectedAction,
         ),
         SliverToBoxAdapter(
           child: _LocationStatusCard(
@@ -550,8 +530,6 @@ class _HomeTab extends StatelessWidget {
           title: 'المتاجر القريبة منك',
           businesses: nearbyBusinesses,
           followedBusinessIds: state.followedBusinessIds,
-          isGuest: isGuest,
-          onProtectedAction: onProtectedAction,
         ),
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
@@ -803,15 +781,11 @@ class _BusinessSection extends StatelessWidget {
   final String title;
   final List<HomeBusiness> businesses;
   final Set<String> followedBusinessIds;
-  final bool isGuest;
-  final VoidCallback onProtectedAction;
 
   const _BusinessSection({
     required this.title,
     required this.businesses,
     required this.followedBusinessIds,
-    required this.isGuest,
-    required this.onProtectedAction,
   });
 
   @override
@@ -852,16 +826,12 @@ class _BusinessSection extends StatelessWidget {
                     return _BusinessCard(
                       business: business,
                       followed: followedBusinessIds.contains(business.id),
-                      onFollowPressed: () {
-                        if (isGuest) {
-                          onProtectedAction();
-                          return;
-                        }
-
-                        context.read<HomeBloc>().add(
+                      onFollowPressed: () => AuthGate.run(
+                        context,
+                        onAuthenticated: () => context.read<HomeBloc>().add(
                           HomeBusinessFollowToggled(business.id),
-                        );
-                      },
+                        ),
+                      ),
                     );
                   },
                   separatorBuilder: (_, __) => const SizedBox(width: 12),
@@ -1458,8 +1428,11 @@ class _CartItemsView extends StatelessWidget {
                 subtotal: state.subtotal,
                 onCheckoutPressed: state.status == CartStatus.checkingOut
                     ? null
-                    : () => context.read<CartBloc>().add(
-                        const CartCheckoutRequested(),
+                    : () => AuthGate.run(
+                        context,
+                        onAuthenticated: () => context.read<CartBloc>().add(
+                          const CartCheckoutRequested(),
+                        ),
                       ),
               ),
             ],
@@ -1716,14 +1689,8 @@ class _CartImageFallback extends StatelessWidget {
 
 class _BusinessesTab extends StatefulWidget {
   final HomeState state;
-  final bool isGuest;
-  final VoidCallback onProtectedAction;
 
-  const _BusinessesTab({
-    required this.state,
-    required this.isGuest,
-    required this.onProtectedAction,
-  });
+  const _BusinessesTab({required this.state});
 
   @override
   State<_BusinessesTab> createState() => _BusinessesTabState();
@@ -1783,8 +1750,6 @@ class _BusinessesTabState extends State<_BusinessesTab> {
           first: businesses[index],
           second: index + 1 < businesses.length ? businesses[index + 1] : null,
           followedBusinessIds: widget.state.followedBusinessIds,
-          isGuest: widget.isGuest,
-          onProtectedAction: widget.onProtectedAction,
         ),
         if (index % 4 == 2) ...[
           const SizedBox(height: 14),
@@ -1893,15 +1858,11 @@ class _AllBusinessesRow extends StatelessWidget {
   final HomeBusiness first;
   final HomeBusiness? second;
   final Set<String> followedBusinessIds;
-  final bool isGuest;
-  final VoidCallback onProtectedAction;
 
   const _AllBusinessesRow({
     required this.first,
     required this.second,
     required this.followedBusinessIds,
-    required this.isGuest,
-    required this.onProtectedAction,
   });
 
   @override
@@ -1939,12 +1900,11 @@ class _AllBusinessesRow extends StatelessWidget {
   }
 
   void _toggleFollow(BuildContext context, String businessId) {
-    if (isGuest) {
-      onProtectedAction();
-      return;
-    }
-
-    context.read<HomeBloc>().add(HomeBusinessFollowToggled(businessId));
+    AuthGate.run(
+      context,
+      onAuthenticated: () =>
+          context.read<HomeBloc>().add(HomeBusinessFollowToggled(businessId)),
+    );
   }
 }
 

@@ -66,6 +66,13 @@ class BusinessProfileBloc
     BusinessProfileProductLikeToggled event,
     Emitter<BusinessProfileState> emit,
   ) async {
+    late final String token;
+    try {
+      token = await _token();
+    } catch (_) {
+      return;
+    }
+
     final likedIds = Set<String>.from(state.likedProductIds);
     final shouldLike = !likedIds.contains(event.productId);
 
@@ -78,7 +85,6 @@ class BusinessProfileBloc
     emit(state.copyWith(likedProductIds: likedIds));
 
     try {
-      final token = await _token();
       await _apiService.setProductLiked(
         token: token,
         businessId: state.businessId,

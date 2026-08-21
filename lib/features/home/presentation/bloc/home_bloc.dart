@@ -152,6 +152,12 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     HomeBusinessFollowToggled event,
     Emitter<HomeState> emit,
   ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString(AuthBloc.tokenKey);
+    if (token == null || token.isEmpty) {
+      return;
+    }
+
     final followedIds = Set<String>.from(state.followedBusinessIds);
     final wasFollowed = followedIds.contains(event.businessId);
 
@@ -164,11 +170,6 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     emit(state.copyWith(followedBusinessIds: followedIds));
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AuthBloc.tokenKey);
-      if (token == null || token.isEmpty) {
-        throw StateError('Authentication required');
-      }
       await _apiService.setBusinessFavorited(
         token: token,
         businessId: event.businessId,
