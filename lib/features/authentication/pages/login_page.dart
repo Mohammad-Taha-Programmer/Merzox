@@ -84,10 +84,6 @@ class _LoginPageState extends State<LoginPage> {
             widget.onAuthenticated();
           }
 
-          if (state.status == AuthStatus.guest) {
-            widget.onBrowseAsGuest();
-          }
-
           if (state.status == AuthStatus.failure &&
               state.errorMessage != null) {
             ScaffoldMessenger.of(
@@ -219,8 +215,7 @@ class _LoginPageState extends State<LoginPage> {
                               TextButton(
                                 onPressed: isLoading
                                     ? null
-                                    : () =>
-                                          bloc.add(const GuestSessionStarted()),
+                                    : widget.onBrowseAsGuest,
                                 child: const Text('المتابعة كضيف'),
                               ),
                             const SizedBox(height: 18),

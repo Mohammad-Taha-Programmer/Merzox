@@ -7,6 +7,13 @@
     "search": "Search",
     "currency": "₪"
   },
+  "authGate": {
+    "title": "Login required",
+    "message": "You need to log in to use this feature.",
+    "login": "Login",
+    "signup": "Create account",
+    "cancel": "Cancel"
+  },
   "nav": {
     "home": "Home",
     "stores": "Businesses",

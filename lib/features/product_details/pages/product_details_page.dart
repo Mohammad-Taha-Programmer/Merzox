@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/auth/auth_gate.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/product_details/bloc/product_details_bloc.dart';
@@ -105,11 +106,17 @@ class _ProductDetailsView extends StatelessWidget {
               : SafeArea(
                   top: false,
                   child: _BottomActions(
-                    onAdd: () => context.read<ProductDetailsBloc>().add(
-                      const ProductDetailsAddToCartPressed(),
+                    onAdd: () => AuthGate.run(
+                      context,
+                      onAuthenticated: () => context
+                          .read<ProductDetailsBloc>()
+                          .add(const ProductDetailsAddToCartPressed()),
                     ),
-                    onBuy: () => context.read<ProductDetailsBloc>().add(
-                      const ProductDetailsBuyNowPressed(),
+                    onBuy: () => AuthGate.run(
+                      context,
+                      onAuthenticated: () => context
+                          .read<ProductDetailsBloc>()
+                          .add(const ProductDetailsBuyNowPressed()),
                     ),
                   ),
                 ),
@@ -581,14 +588,20 @@ class _ReviewsTabState extends State<_ReviewsTab> {
             child: FilledButton(
               onPressed: saving
                   ? null
-                  : () {
-                      context.read<ProductDetailsBloc>().add(
-                        ProductDetailsReviewSubmitted(
-                          rating: _rating,
-                          comment: _commentController.text,
-                        ),
+                  : () async {
+                      final submitted = await AuthGate.run(
+                        context,
+                        onAuthenticated: () =>
+                            context.read<ProductDetailsBloc>().add(
+                              ProductDetailsReviewSubmitted(
+                                rating: _rating,
+                                comment: _commentController.text,
+                              ),
+                            ),
                       );
-                      _commentController.clear();
+                      if (submitted) {
+                        _commentController.clear();
+                      }
                     },
               style: FilledButton.styleFrom(
                 backgroundColor: MerzoxColors.kColorEE6C4D,

@@ -32,10 +32,6 @@ final class SignupSubmitted extends AuthEvent {
   });
 }
 
-final class GuestSessionStarted extends AuthEvent {
-  const GuestSessionStarted();
-}
-
 final class LogoutRequested extends AuthEvent {
   const LogoutRequested();
 }
