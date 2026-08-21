@@ -1,8 +1,13 @@
 final class OnboardingState {
-  int currentPage; // 0, 1, or 2
-  OnboardingState({required this.currentPage});
+  final int currentPage;
+  final bool isCompleted;
 
-  OnboardingState copyWith({int? currentPage}) {
-    return OnboardingState(currentPage: currentPage ?? this.currentPage);
+  const OnboardingState({required this.currentPage, this.isCompleted = false});
+
+  OnboardingState copyWith({int? currentPage, bool? isCompleted}) {
+    return OnboardingState(
+      currentPage: currentPage ?? this.currentPage,
+      isCompleted: isCompleted ?? this.isCompleted,
+    );
   }
 }

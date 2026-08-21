@@ -1,4 +1,4 @@
-abstract class OnboardingEvent{}
+abstract class OnboardingEvent {}
 
 class NextPage extends OnboardingEvent {
   final int page;

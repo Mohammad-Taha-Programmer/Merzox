@@ -1,0 +1,920 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
+import 'package:merzox/features/product_details/bloc/product_details_bloc.dart';
+import 'package:merzox/features/product_details/bloc/product_details_event.dart';
+import 'package:merzox/features/product_details/bloc/product_details_state.dart';
+import 'package:merzox/services/api_service.dart';
+
+class ProductDetailsPage extends StatelessWidget {
+  final HomeBusiness business;
+  final BusinessProductApiModel product;
+
+  const ProductDetailsPage({
+    super.key,
+    required this.business,
+    required this.product,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (_) => ProductDetailsBloc()
+        ..add(
+          ProductDetailsStarted(
+            businessId: business.id,
+            initialProduct: product,
+          ),
+        ),
+      child: _ProductDetailsView(business: business),
+    );
+  }
+}
+
+class _ProductDetailsView extends StatelessWidget {
+  final HomeBusiness business;
+
+  const _ProductDetailsView({required this.business});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<ProductDetailsBloc, ProductDetailsState>(
+      listenWhen: (previous, current) =>
+          previous.message != current.message ||
+          previous.errorMessage != current.errorMessage,
+      listener: (context, state) {
+        final text = state.errorMessage ?? state.message;
+        if (text == null || text.isEmpty) return;
+        final localizedText = text.contains('.') ? text.tr() : text;
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(localizedText)));
+      },
+      builder: (context, state) {
+        final product = state.product;
+
+        return Scaffold(
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            top: false,
+            child: product == null
+                ? const Center(child: CircularProgressIndicator())
+                : Stack(
+                    children: [
+                      ListView(
+                        padding: const EdgeInsets.only(bottom: 96),
+                        children: [
+                          _ImageSlider(product: product, state: state),
+                          _ProductHeader(product: product),
+                          _Tabs(selectedIndex: state.selectedTabIndex),
+                          if (state.selectedTabIndex == 0)
+                            _DescriptionTab(
+                              business: business,
+                              product: product,
+                              state: state,
+                            )
+                          else
+                            _ReviewsTab(state: state),
+                        ],
+                      ),
+                      PositionedDirectional(
+                        end: 18,
+                        top: MediaQuery.paddingOf(context).top + 58,
+                        child: _IconCircle(
+                          icon: Icons.share_outlined,
+                          onPressed: () {},
+                          filled: false,
+                        ),
+                      ),
+                      PositionedDirectional(
+                        start: 18,
+                        top: MediaQuery.paddingOf(context).top + 58,
+                        child: _IconCircle(
+                          icon: Icons.chevron_right_rounded,
+                          onPressed: () => Navigator.of(context).pop(),
+                          filled: false,
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+          bottomNavigationBar: product == null
+              ? null
+              : SafeArea(
+                  top: false,
+                  child: _BottomActions(
+                    onAdd: () => context.read<ProductDetailsBloc>().add(
+                      const ProductDetailsAddToCartPressed(),
+                    ),
+                    onBuy: () => context.read<ProductDetailsBloc>().add(
+                      const ProductDetailsBuyNowPressed(),
+                    ),
+                  ),
+                ),
+        );
+      },
+    );
+  }
+}
+
+class _ImageSlider extends StatefulWidget {
+  final BusinessProductApiModel product;
+  final ProductDetailsState state;
+
+  const _ImageSlider({required this.product, required this.state});
+
+  @override
+  State<_ImageSlider> createState() => _ImageSliderState();
+}
+
+class _ImageSliderState extends State<_ImageSlider> {
+  late final PageController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PageController();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final images = _gallery(widget.product);
+
+    return Column(
+      children: [
+        SizedBox(
+          height: 302,
+          child: PageView.builder(
+            controller: _controller,
+            reverse: Directionality.of(context) == TextDirection.rtl,
+            itemCount: images.length,
+            onPageChanged: (index) {
+              context.read<ProductDetailsBloc>().add(
+                ProductDetailsImageChanged(index),
+              );
+            },
+            itemBuilder: (context, index) {
+              final imageUrl = images[index];
+              return ClipRRect(
+                borderRadius: const BorderRadius.vertical(
+                  bottom: Radius.circular(6),
+                ),
+                child: imageUrl.isEmpty
+                    ? const _ProductPhotoPlaceholder()
+                    : Image.network(
+                        imageUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) =>
+                            const _ProductPhotoPlaceholder(),
+                      ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 7),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(images.length, (index) {
+            final active = index == widget.state.selectedImageIndex;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              margin: const EdgeInsets.symmetric(horizontal: 3),
+              width: active ? 18 : 6,
+              height: 6,
+              decoration: BoxDecoration(
+                color: active
+                    ? MerzoxColors.kColor3D5A80
+                    : MerzoxColors.kColor98C1D9,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            );
+          }),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProductHeader extends StatelessWidget {
+  final BusinessProductApiModel product;
+
+  const _ProductHeader({required this.product});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+      child: Row(
+        textDirection: TextDirection.ltr,
+        children: [
+          Text(
+            '₪ ${product.price.toStringAsFixed(0)}',
+            textDirection: TextDirection.ltr,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          ),
+          const Spacer(),
+          Flexible(
+            flex: 2,
+            child: Text(
+              product.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 20, color: Color(0xFF2B2B2B)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Tabs extends StatelessWidget {
+  final int selectedIndex;
+
+  const _Tabs({required this.selectedIndex});
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['الوصف', 'التقييمات'];
+
+    return Container(
+      height: 50,
+      margin: const EdgeInsets.symmetric(horizontal: 22),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: MerzoxColors.kColorEFEFEF),
+          bottom: BorderSide(color: MerzoxColors.kColorEFEFEF),
+        ),
+      ),
+      child: Row(
+        children: List.generate(labels.length, (index) {
+          final active = index == selectedIndex;
+          return Expanded(
+            child: InkWell(
+              onTap: () {
+                context.read<ProductDetailsBloc>().add(
+                  ProductDetailsTabChanged(index),
+                );
+              },
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        labels[index],
+                        style: TextStyle(
+                          color: active
+                              ? MerzoxColors.kColor2B2B2B
+                              : MerzoxColors.kColorC7C7C7,
+                          fontSize: 14,
+                          fontWeight: active
+                              ? FontWeight.w800
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    height: 1,
+                    width: active ? double.infinity : 0,
+                    color: MerzoxColors.kColorB9DDF3,
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _DescriptionTab extends StatelessWidget {
+  final HomeBusiness business;
+  final BusinessProductApiModel product;
+  final ProductDetailsState state;
+
+  const _DescriptionTab({
+    required this.business,
+    required this.product,
+    required this.state,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 22, 22, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            product.description.isEmpty
+                ? 'كريم أساس سائل سهل الدمج للحصول على بشرة طبيعية خالية من اللمعان، يغطي المسام ويمنح مظهرا ناعما طوال اليوم.'
+                : product.description,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              color: MerzoxColors.kColor666666,
+              fontSize: 15,
+              height: 1.85,
+            ),
+          ),
+          const SizedBox(height: 24),
+          _QuantityRow(quantity: state.quantity),
+          const SizedBox(height: 25),
+          _DegreeSelector(selected: state.selectedDegree),
+          const SizedBox(height: 28),
+          _SellerDetails(business: business),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuantityRow extends StatelessWidget {
+  final int quantity;
+
+  const _QuantityRow({required this.quantity});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      textDirection: TextDirection.ltr,
+      children: [
+        _StepperButton(
+          icon: Icons.remove_rounded,
+          onPressed: () => context.read<ProductDetailsBloc>().add(
+            const ProductDetailsQuantityDecremented(),
+          ),
+        ),
+        Container(
+          width: 58,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            border: Border.symmetric(
+              horizontal: BorderSide(color: MerzoxColors.kColor3D5A80),
+            ),
+          ),
+          child: Text(
+            '$quantity',
+            style: TextStyle(color: MerzoxColors.kColor666666, fontSize: 15),
+          ),
+        ),
+        _StepperButton(
+          icon: Icons.add_rounded,
+          onPressed: () => context.read<ProductDetailsBloc>().add(
+            const ProductDetailsQuantityIncremented(),
+          ),
+        ),
+        const Spacer(),
+        const Text('الكمية', style: TextStyle(fontSize: 15)),
+      ],
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _StepperButton({required this.icon, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 46,
+      height: 32,
+      child: IconButton.filled(
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          backgroundColor: MerzoxColors.kColor3D5A80,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+        ),
+        icon: Icon(icon, size: 20),
+      ),
+    );
+  }
+}
+
+class _DegreeSelector extends StatelessWidget {
+  final String selected;
+
+  const _DegreeSelector({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    const degrees = ['01', '02', '03'];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        const Text('درجة اللون', style: TextStyle(fontSize: 15)),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 17,
+          textDirection: TextDirection.rtl,
+          children: degrees.map((degree) {
+            final active = degree == selected;
+            return OutlinedButton(
+              onPressed: () {
+                context.read<ProductDetailsBloc>().add(
+                  ProductDetailsDegreeSelected(degree),
+                );
+              },
+              style: OutlinedButton.styleFrom(
+                fixedSize: const Size(42, 38),
+                padding: EdgeInsets.zero,
+                foregroundColor: MerzoxColors.kColor3D5A80,
+                backgroundColor: active
+                    ? MerzoxColors.kColorEEF6FB
+                    : Colors.white,
+                side: BorderSide(color: MerzoxColors.kColorB9DDF3),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(5),
+                ),
+              ),
+              child: Text(degree),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _SellerDetails extends StatelessWidget {
+  final HomeBusiness business;
+
+  const _SellerDetails({required this.business});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        const Text('تفاصيل البائع', style: TextStyle(fontSize: 16)),
+        const SizedBox(height: 13),
+        Row(
+          textDirection: TextDirection.ltr,
+          children: [
+            _IconSquare(
+              icon: Icons.chat_bubble_outline_rounded,
+              onPressed: () {},
+            ),
+            const Spacer(),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(business.name, style: const TextStyle(fontSize: 13)),
+                const SizedBox(height: 4),
+                Text(
+                  'رام الله، دوار المنارة',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: MerzoxColors.kColor767676,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(width: 12),
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: MerzoxColors.kColorEEF6FB,
+              child: Text(
+                business.name.isEmpty ? 'M' : business.name.characters.first,
+                style: TextStyle(
+                  color: MerzoxColors.kColor3D5A80,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _ReviewsTab extends StatefulWidget {
+  final ProductDetailsState state;
+
+  const _ReviewsTab({required this.state});
+
+  @override
+  State<_ReviewsTab> createState() => _ReviewsTabState();
+}
+
+class _ReviewsTabState extends State<_ReviewsTab> {
+  final _commentController = TextEditingController();
+  int _rating = 5;
+
+  @override
+  void dispose() {
+    _commentController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final saving = widget.state.status == ProductDetailsStatus.savingReview;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              const Text('ياسمين خالد', style: TextStyle(fontSize: 13)),
+              const SizedBox(width: 10),
+              CircleAvatar(
+                radius: 17,
+                backgroundColor: MerzoxColors.kColor98C1D9,
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          Center(
+            child: _InteractiveStars(
+              value: _rating,
+              onChanged: (value) => setState(() => _rating = value),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _commentController,
+            minLines: 4,
+            maxLines: 4,
+            textAlign: TextAlign.end,
+            decoration: InputDecoration(
+              hintText: 'قم بكتابة تقييمك للمنتج الذي قمت بشرائه هنا',
+              hintStyle: TextStyle(
+                color: MerzoxColors.kColorC7C7C7,
+                fontSize: 12,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(5),
+                borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(5),
+                borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FilledButton(
+              onPressed: saving
+                  ? null
+                  : () {
+                      context.read<ProductDetailsBloc>().add(
+                        ProductDetailsReviewSubmitted(
+                          rating: _rating,
+                          comment: _commentController.text,
+                        ),
+                      );
+                      _commentController.clear();
+                    },
+              style: FilledButton.styleFrom(
+                backgroundColor: MerzoxColors.kColorEE6C4D,
+                fixedSize: const Size(58, 32),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              child: const Text('نشر', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+          const SizedBox(height: 22),
+          Row(
+            children: [
+              Text(
+                '(${widget.state.reviews.length} تقييم)',
+                style: TextStyle(
+                  color: MerzoxColors.kColor9F9F9F,
+                  fontSize: 12,
+                ),
+              ),
+              const Spacer(),
+              const Text(
+                'كل التقييمات',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          ...widget.state.reviews.map(_ReviewTile.new),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewTile extends StatelessWidget {
+  final BusinessReviewApiModel review;
+
+  const _ReviewTile(this.review);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Row(
+        textDirection: TextDirection.ltr,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      '(${review.rating.toStringAsFixed(1)})',
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(
+                        color: MerzoxColors.kColor9F9F9F,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _StarRating(value: review.rating, size: 16),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  review.comment,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(
+                    color: MerzoxColors.kColor5E5E5E,
+                    fontSize: 12,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Column(
+            children: [
+              CircleAvatar(
+                radius: 18,
+                backgroundColor: MerzoxColors.kColor98C1D9,
+              ),
+              const SizedBox(height: 5),
+              Text(
+                review.userName.isEmpty ? 'مستخدم Merzox' : review.userName,
+                style: const TextStyle(fontSize: 12),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BottomActions extends StatelessWidget {
+  final VoidCallback onAdd;
+  final VoidCallback onBuy;
+
+  const _BottomActions({required this.onAdd, required this.onBuy});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 70,
+      padding: const EdgeInsets.fromLTRB(22, 8, 22, 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: Row(
+        textDirection: TextDirection.ltr,
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: onBuy,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: MerzoxColors.kColor2B2B2B,
+                side: BorderSide(color: MerzoxColors.kColorEE6C4D),
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadiusDirectional.horizontal(
+                    start: Radius.circular(4),
+                  ),
+                ),
+              ),
+              child: const Text(
+                'شراء الآن',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+          Expanded(
+            child: FilledButton(
+              onPressed: onAdd,
+              style: FilledButton.styleFrom(
+                backgroundColor: MerzoxColors.kColorEE6C4D,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadiusDirectional.horizontal(
+                    end: Radius.circular(4),
+                  ),
+                ),
+              ),
+              child: const Text(
+                'أضف إلى السلة',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InteractiveStars extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _InteractiveStars({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (index) {
+        final rating = index + 1;
+        return IconButton(
+          onPressed: () => onChanged(rating),
+          icon: Icon(
+            rating <= value ? Icons.star_rounded : Icons.star_border_rounded,
+            color: MerzoxColors.kColorF2CB06,
+            size: 29,
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _StarRating extends StatelessWidget {
+  final double value;
+  final double size;
+
+  const _StarRating({required this.value, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: List.generate(5, (index) {
+        return Icon(
+          index < value.round()
+              ? Icons.star_rounded
+              : Icons.star_border_rounded,
+          color: MerzoxColors.kColorF2CB06,
+          size: size,
+        );
+      }),
+    );
+  }
+}
+
+class _IconCircle extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool filled;
+
+  const _IconCircle({
+    required this.icon,
+    required this.onPressed,
+    required this.filled,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: filled
+            ? MerzoxColors.kColor3D5A80
+            : Colors.transparent,
+        foregroundColor: filled ? Colors.white : MerzoxColors.kColor3B3B3B,
+      ),
+      icon: Icon(icon, size: 25),
+    );
+  }
+}
+
+class _IconSquare extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _IconSquare({required this.icon, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 50,
+      height: 50,
+      child: IconButton.filled(
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          backgroundColor: MerzoxColors.kColor3D5A80,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
+        ),
+        icon: Icon(icon),
+      ),
+    );
+  }
+}
+
+class _ProductPhotoPlaceholder extends StatelessWidget {
+  const _ProductPhotoPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFEFEFEF),
+      alignment: Alignment.center,
+      child: SizedBox(
+        width: 178,
+        height: 230,
+        child: Stack(
+          alignment: Alignment.bottomCenter,
+          children: [
+            Positioned(
+              bottom: 0,
+              child: Container(
+                width: 84,
+                height: 162,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE9C3A8),
+                  border: Border.all(color: const Color(0xFFB88E73)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 18,
+              child: Container(
+                width: 58,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: MerzoxColors.kColor2B2B2B,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 52,
+              child: Text(
+                'Merzox',
+                style: TextStyle(
+                  color: MerzoxColors.kColor3D5A80,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+List<String> _gallery(BusinessProductApiModel product) {
+  if (product.imageUrls.isNotEmpty) {
+    return product.imageUrls;
+  }
+
+  if (product.imageUrl.isNotEmpty) {
+    return [product.imageUrl];
+  }
+
+  return const ['', '', ''];
+}

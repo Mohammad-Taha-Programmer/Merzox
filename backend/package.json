@@ -1,0 +1,31 @@
+{
+  "name": "merzox-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Merzox Node.js and MongoDB backend API",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "seed": "node src/scripts/seed.js",
+    "check:email": "node src/scripts/check-email.js",
+    "check": "node --check src/server.js && node --check src/app.js && node --check src/models/User.js && node --check src/models/Business.js && node --check src/models/Order.js && node --check src/models/Favorite.js && node --check src/models/AboutUsContent.js && node --check src/middleware/auth.js && node --check src/middleware/validate.js && node --check src/controllers/auth.controller.js && node --check src/controllers/business.controller.js && node --check src/controllers/merchant.controller.js && node --check src/controllers/order.controller.js && node --check src/controllers/favorite.controller.js && node --check src/controllers/content.controller.js && node --check src/routes/auth.routes.js && node --check src/routes/business.routes.js && node --check src/routes/order.routes.js && node --check src/routes/favorite.routes.js && node --check src/routes/content.routes.js && node --check src/scripts/seed.js && node --check src/scripts/check-email.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "hpp": "^0.2.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "morgan": "^1.10.0",
+    "nodemailer": "^9.0.3",
+    "validator": "^13.12.0"
+  }
+}

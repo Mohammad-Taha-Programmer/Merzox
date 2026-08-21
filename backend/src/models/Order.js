@@ -1,0 +1,203 @@
+import crypto from 'node:crypto';
+
+import mongoose from 'mongoose';
+
+const orderItemSchema = new mongoose.Schema(
+  {
+    productId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true
+    },
+    name: { type: String, required: true, trim: true, maxlength: 120 },
+    imageUrl: { type: String, trim: true, maxlength: 1000, default: '' },
+    unitPrice: { type: Number, required: true, min: 0 },
+    quantity: { type: Number, required: true, min: 1, max: 100 },
+    variant: { type: String, trim: true, maxlength: 40, default: '' }
+  },
+  { _id: false }
+);
+
+const statusHistorySchema = new mongoose.Schema(
+  {
+    status: {
+      type: String,
+      required: true,
+      enum: [
+        'pending',
+        'confirmed',
+        'preparing',
+        'outForDelivery',
+        'delivered',
+        'cancelled'
+      ]
+    },
+    changedAt: { type: Date, default: Date.now },
+    note: { type: String, trim: true, maxlength: 250, default: '' }
+  },
+  { _id: false }
+);
+
+function createPublicId() {
+  const timePart = Date.now().toString(36).toUpperCase();
+  const randomPart = crypto.randomBytes(4).toString('hex').toUpperCase();
+  return `MX-${timePart}-${randomPart}`;
+}
+
+const orderSchema = new mongoose.Schema(
+  {
+    publicId: {
+      type: String,
+      required: true,
+      unique: true,
+      index: true,
+      default: createPublicId
+    },
+    clientOrderId: { type: String, trim: true, maxlength: 80 },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true
+    },
+    customerName: { type: String, trim: true, maxlength: 80, default: '' },
+    customerPhone: { type: String, trim: true, maxlength: 20, default: '' },
+    business: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Business',
+      required: true,
+      index: true
+    },
+    businessName: { type: String, required: true, trim: true, maxlength: 120 },
+    businessAddress: { type: String, trim: true, maxlength: 250, default: '' },
+    items: {
+      type: [orderItemSchema],
+      required: true,
+      validate: {
+        validator(value) {
+          return value.length > 0 && value.length <= 50;
+        },
+        message: 'An order must contain between 1 and 50 items'
+      }
+    },
+    subtotal: { type: Number, required: true, min: 0 },
+    deliveryFee: { type: Number, required: true, min: 0, default: 10 },
+    total: { type: Number, required: true, min: 0 },
+    currency: { type: String, enum: ['ILS'], default: 'ILS' },
+    deliveryAddress: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: 250
+    },
+    paymentMethod: {
+      type: String,
+      enum: ['cash', 'card', 'bankTransfer', 'assisted'],
+      default: 'cash'
+    },
+    status: {
+      type: String,
+      enum: [
+        'pending',
+        'confirmed',
+        'preparing',
+        'outForDelivery',
+        'delivered',
+        'cancelled'
+      ],
+      default: 'pending',
+      index: true
+    },
+    statusGroup: {
+      type: String,
+      enum: ['current', 'completed', 'cancelled'],
+      default: 'current',
+      index: true
+    },
+    statusHistory: {
+      type: [statusHistorySchema],
+      default: () => [{ status: 'pending', changedAt: new Date() }]
+    },
+    cancellationReason: { type: String, trim: true, maxlength: 250, default: '' },
+    cancelledAt: { type: Date, default: null },
+    deliveredAt: { type: Date, default: null }
+  },
+  { timestamps: true }
+);
+
+orderSchema.index({ user: 1, statusGroup: 1, createdAt: -1 });
+orderSchema.index({ business: 1, status: 1, createdAt: -1 });
+orderSchema.index({ business: 1, statusGroup: 1, createdAt: -1 });
+orderSchema.index(
+  { user: 1, clientOrderId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { clientOrderId: { $type: 'string' } }
+  }
+);
+
+orderSchema.methods.toClientJSON = function toClientJSON() {
+  return {
+    id: this._id.toString(),
+    publicId: this.publicId,
+    business: {
+      id: this.business.toString(),
+      name: this.businessName,
+      address: this.businessAddress
+    },
+    items: this.items.map((item) => ({
+      productId: item.productId.toString(),
+      name: item.name,
+      imageUrl: item.imageUrl,
+      unitPrice: item.unitPrice,
+      quantity: item.quantity,
+      variant: item.variant
+    })),
+    subtotal: this.subtotal,
+    deliveryFee: this.deliveryFee,
+    total: this.total,
+    currency: this.currency,
+    deliveryAddress: this.deliveryAddress,
+    paymentMethod: this.paymentMethod,
+    status: this.status,
+    statusGroup: this.statusGroup,
+    statusHistory: this.statusHistory,
+    cancellationReason: this.cancellationReason,
+    cancelledAt: this.cancelledAt,
+    deliveredAt: this.deliveredAt,
+    createdAt: this.createdAt,
+    updatedAt: this.updatedAt
+  };
+};
+
+orderSchema.methods.toMerchantJSON = function toMerchantJSON() {
+  return {
+    id: this._id.toString(),
+    publicId: this.publicId,
+    customerName: this.customerName,
+    customerPhone: this.customerPhone,
+    items: this.items.map((item) => ({
+      productId: item.productId.toString(),
+      name: item.name,
+      imageUrl: item.imageUrl,
+      unitPrice: item.unitPrice,
+      quantity: item.quantity,
+      variant: item.variant
+    })),
+    subtotal: this.subtotal,
+    deliveryFee: this.deliveryFee,
+    total: this.total,
+    currency: this.currency,
+    deliveryAddress: this.deliveryAddress,
+    paymentMethod: this.paymentMethod,
+    status: this.status,
+    statusGroup: this.statusGroup,
+    statusHistory: this.statusHistory,
+    cancellationReason: this.cancellationReason,
+    cancelledAt: this.cancelledAt,
+    deliveredAt: this.deliveredAt,
+    createdAt: this.createdAt,
+    updatedAt: this.updatedAt
+  };
+};
+
+export const Order = mongoose.model('Order', orderSchema);

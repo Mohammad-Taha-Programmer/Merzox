@@ -1,0 +1,86 @@
+import nodemailer from 'nodemailer';
+
+import { env } from '../config/env.js';
+
+function smtpConfigured() {
+  return Boolean(env.smtp.host && env.smtp.user && env.smtp.pass && env.smtp.from);
+}
+
+export function smtpStatus() {
+  return {
+    configured: smtpConfigured(),
+    hostConfigured: Boolean(env.smtp.host),
+    userConfigured: Boolean(env.smtp.user),
+    passConfigured: Boolean(env.smtp.pass),
+    fromConfigured: Boolean(env.smtp.from)
+  };
+}
+
+let transporter;
+
+function getTransporter() {
+  if (!smtpConfigured()) {
+    return null;
+  }
+
+  transporter ??= nodemailer.createTransport({
+    host: env.smtp.host,
+    port: env.smtp.port,
+    secure: env.smtp.secure,
+    auth: {
+      user: env.smtp.user,
+      pass: env.smtp.pass
+    }
+  });
+
+  return transporter;
+}
+
+export async function sendVerificationEmail({ to, name, link }) {
+  const mailer = getTransporter();
+
+  if (!mailer) {
+    const status = smtpStatus();
+    console.warn('SMTP is not configured. Missing settings:', {
+      SMTP_HOST: !status.hostConfigured,
+      SMTP_USER: !status.userConfigured,
+      SMTP_PASS: !status.passConfigured,
+      SMTP_FROM: !status.fromConfigured
+    });
+    console.warn(`Merzox email verification link for ${to}: ${link}`);
+    return { sent: false, reason: 'SMTP_NOT_CONFIGURED' };
+  }
+
+  await mailer.sendMail({
+    from: env.smtp.from,
+    to,
+    subject: 'Verify your Merzox account',
+    text: [
+      `Hello ${name},`,
+      '',
+      'Please verify your Merzox account by opening this link:',
+      link,
+      '',
+      'This link expires in 24 hours.',
+      '',
+      'Merzox'
+    ].join('\n'),
+    html: `
+      <div dir="ltr" style="font-family:Arial,sans-serif;line-height:1.6;color:#2b2b2b">
+        <h2>Verify your Merzox account</h2>
+        <p>Hello ${name},</p>
+        <p>Please verify your account by clicking the button below.</p>
+        <p>
+          <a href="${link}" style="display:inline-block;background:#ee6c4d;color:#fff;padding:12px 18px;text-decoration:none;border-radius:4px">
+            Verify email
+          </a>
+        </p>
+        <p>If the button does not work, copy and paste this link into your browser:</p>
+        <p><a href="${link}">${link}</a></p>
+        <p>This link expires in 24 hours.</p>
+      </div>
+    `
+  });
+
+  return { sent: true };
+}

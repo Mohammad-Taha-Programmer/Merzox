@@ -1,175 +1,180 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:merzox/features/home/home_screen.dart';
+import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/onboarding/bloc/onboarding_bloc.dart';
 import 'package:merzox/features/onboarding/bloc/onboarding_event.dart';
 import 'package:merzox/features/onboarding/bloc/onboarding_state.dart';
 import 'package:merzox/features/onboarding/view/onboarding_page.dart';
-import 'package:merzox/core/constants/colors.dart';
 
-class OnboardingScreen extends StatelessWidget {
-  OnboardingScreen({super.key});
-  final PageController _pageController = PageController(
-    viewportFraction: 1,
-    keepPage: true,
-    initialPage: 0,
-  );
+class OnboardingScreen extends StatefulWidget {
+  final VoidCallback onFinished;
+
+  const OnboardingScreen({super.key, required this.onFinished});
+
+  @override
+  State<OnboardingScreen> createState() => _OnboardingScreenState();
+}
+
+class _OnboardingScreenState extends State<OnboardingScreen> {
+  static const int _pageCount = 3;
+  static const int _lastPage = _pageCount - 1;
+
+  late final PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _finish(OnboardingBloc bloc) {
+    bloc.add(SkipOnboarding());
+  }
+
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<OnboardingBloc, OnboardingState>(
-      builder: (BuildContext context, OnboardingState state) {
-        final bloc = context.read<OnboardingBloc>();
-        return Scaffold(
-          body: SafeArea(
-            child: Column(
-              children: [
-                // Skip button (Arabic: تخطي) — hidden on last page
-                if (state.currentPage != 2) // last page index is 2
-                  Align(
-                    alignment: Alignment.topLeft,
-                    child: TextButton(
-                      onPressed: () {
-                        bloc.add(SkipOnboarding());
-                      },
-                      child: Text(
-                        'تخطي',
-                        style: TextStyle(
-                          fontSize: 12.0,
-                          color: MerzoxColors.kColor3B3B3B,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  const SizedBox(height: 48), // placeholder to keep layout
-                const SizedBox(height: 60.0),
-                // Main content with PageView filling available space
-                Expanded(
-                  flex: 2,
-                  child: PageView(
-                    scrollDirection: Axis.horizontal,
-                    controller: _pageController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    allowImplicitScrolling: true,
-                    padEnds: true,
-                    pageSnapping: true,
-                    onPageChanged: (page) {
-                      bloc.add(NextPage(page));
-                    },
-                    // new
-                    children: const [
-                      OnboardingPage(
-                        imagePath: 'assets/images/Onboarding/onboarding1.png',
-                        title: 'أفضل الخصومات',
-                        subtitle:
-                            'يوفر التطبيق العديد من الخصومات والعروض في العديد\n من المتاجر',
-                      ),
-                      OnboardingPage(
-                        imagePath: 'assets/images/Onboarding/onboarding2.png',
-                        title: 'توافر الخريطة',
-                        subtitle:
-                            'يوفر التطبيق خريطة للتسهيل خلال عملية البحث\nعلى المتاجر القريبة، وحفظهم',
-                      ),
-                      OnboardingPage(
-                        imagePath: 'assets/images/Onboarding/onboarding3.png',
-                        title: 'توافر أكثر من وسيلة دفع',
-                        subtitle:
-                            'يوفر التطبيق أكثر من وسيلة دفع للتسهيل على\nالزبون',
-                      ),
-                    ],
-                  ),
-                ),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: BlocConsumer<OnboardingBloc, OnboardingState>(
+        listener: (context, state) {
+          if (state.isCompleted) {
+            widget.onFinished();
+          }
+        },
+        builder: (context, state) {
+          final bloc = context.read<OnboardingBloc>();
 
-                // Dots indicator
-                Expanded(
-                  child: Row(
+          return Scaffold(
+            backgroundColor: Colors.white,
+            body: SafeArea(
+              child: Column(
+                children: [
+                  SizedBox(
+                    height: 48,
+                    child: state.currentPage == _lastPage
+                        ? null
+                        : Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              onPressed: () => _finish(bloc),
+                              child: Text(
+                                'تخطي',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: MerzoxColors.kColor3B3B3B,
+                                ),
+                              ),
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 48),
+                  Expanded(
+                    flex: 7,
+                    child: PageView(
+                      controller: _pageController,
+                      onPageChanged: (page) => bloc.add(NextPage(page)),
+                      children: const [
+                        OnboardingPage(
+                          imagePath: 'assets/images/Onboarding/onboarding1.png',
+                          title: 'أفضل العروض القريبة منك',
+                          subtitle:
+                              'اكتشف المتاجر والخدمات في منطقتك واحصل على عروض تناسب احتياجاتك اليومية.',
+                        ),
+                        OnboardingPage(
+                          imagePath: 'assets/images/Onboarding/onboarding2.png',
+                          title: 'متاجر على الخريطة',
+                          subtitle:
+                              'اعثر على الأعمال القريبة منك بسهولة، وتواصل معها أو انتقل إليها مباشرة.',
+                        ),
+                        OnboardingPage(
+                          imagePath: 'assets/images/Onboarding/onboarding3.png',
+                          title: 'دفع وطلبات بمرونة',
+                          subtitle:
+                              'اطلب المنتجات والخدمات، وتتبع طلباتك، واختر طريقة الدفع المناسبة لك.',
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: List<AnimatedContainer>.generate(3, (index) {
+                    children: List.generate(_pageCount, (index) {
+                      final isActive = index == state.currentPage;
+
                       return AnimatedContainer(
-                        curve: Curves.bounceInOut,
-                        margin: const EdgeInsets.all(4),
-                        width: index == state.currentPage ? 20 : 10,
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOut,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        width: isActive ? 22 : 10,
                         height: 10,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: MerzoxColors.kColor98C1D9),
-                          color: index == state.currentPage
+                          color: isActive
                               ? MerzoxColors.kColor3D5A80
                               : Colors.transparent,
                         ),
-                        duration: Duration(milliseconds: 100),
                       );
                     }),
                   ),
-                ),
+                  const SizedBox(height: 36),
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        height: 72,
+                        width: 72,
+                        child: CircularProgressIndicator(
+                          value: (state.currentPage + 1) / _pageCount,
+                          strokeWidth: 3,
+                          valueColor: const AlwaysStoppedAnimation(
+                            MerzoxColors.kColor3D5A80,
+                          ),
+                          backgroundColor: MerzoxColors.kColorFEE3DC,
+                        ),
+                      ),
+                      SizedBox(
+                        width: 58,
+                        height: 58,
+                        child: FilledButton(
+                          style: FilledButton.styleFrom(
+                            shape: const CircleBorder(),
+                            padding: EdgeInsets.zero,
+                            backgroundColor: MerzoxColors.kColorEE6C4D,
+                          ),
+                          onPressed: () {
+                            if (state.currentPage == _lastPage) {
+                              _finish(bloc);
+                              return;
+                            }
 
-                // Circular progress button
-                Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: MerzoxColors.kColorEE6C4D,
-                        shape: BoxShape.circle,
-                      ),
-                      height: 70,
-                      width: 70,
-                      child: CircularProgressIndicator(
-                        value: (state.currentPage + 1) / 3,
-                        strokeWidth: 2,
-                        valueColor: const AlwaysStoppedAnimation(
-                          MerzoxColors.kColor3D5A80,
-                        ),
-                        backgroundColor: MerzoxColors.kColorFEE3DC,
-                      ),
-                    ),
-                    Container(
-                      width: 70,
-                      height: 70,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.white,
-                          style: BorderStyle.solid,
-                          width: 10,
-                        ),
-                      ),
-                      child: IconButton(
-                        color: MerzoxColors.kColorEE6C4D,
-                        icon: const Icon(
-                          size: 20,
-                          Icons.arrow_back_ios_new_rounded,
-                          color: Colors.white,
-                        ),
-                        style: ButtonStyle(
-                          shape: WidgetStateProperty.all(const CircleBorder()),
-                        ),
-                        onPressed: () {
-                          if (state.currentPage == 2) {
-                            bloc.add(SkipOnboarding());
-                            Navigator.of(context).pushReplacement(
-                              MaterialPageRoute(
-                                builder: (context) => HomeScreen(isGuest: true),
-                              ),
-                            );
-                          } else {
                             _pageController.nextPage(
-                              duration: const Duration(milliseconds: 200),
-                              curve: Curves.bounceInOut,
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOut,
                             );
-                            bloc.add(NextPage(state.currentPage));
-                          }
-                        },
+                          },
+                          child: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 80.0),
-              ],
+                    ],
+                  ),
+                  const SizedBox(height: 72),
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

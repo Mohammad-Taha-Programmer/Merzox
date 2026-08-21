@@ -16,12 +16,19 @@ class OnboardingPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Expanded(flex: 17, child: Image.asset(imagePath, height: 250.0)),
-        const SizedBox(height: 42.0),
+        Expanded(
+          flex: 17,
+          child: Image.asset(
+            imagePath,
+            fit: BoxFit.contain,
+            width: double.infinity,
+          ),
+        ),
+        const SizedBox(height: 32.0),
         Text(
           title,
           style: const TextStyle(
-            fontSize: 16.0,
+            fontSize: 20.0,
             fontWeight: FontWeight.bold,
             color: Color(0xFF2B2B2B),
           ),
@@ -34,9 +41,12 @@ class OnboardingPage extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 32.0),
             child: Text(
               subtitle,
-              style: const TextStyle(fontSize: 15.0, color: Color(0xFF2B2B2B)),
+              style: const TextStyle(
+                fontSize: 15.0,
+                color: Color(0xFF2B2B2B),
+                height: 1.45,
+              ),
               textAlign: TextAlign.center,
-              maxLines: 2,
             ),
           ),
         ),

@@ -1,11 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'onboarding_event.dart';
-import 'onboarding_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'onboarding_event.dart';
+import 'onboarding_state.dart';
 
 class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
-  OnboardingBloc() : super(OnboardingState(currentPage: 0)) {
+  OnboardingBloc() : super(const OnboardingState(currentPage: 0)) {
     on<NextPage>(_onNextPage);
     on<SkipOnboarding>(_onSkip);
   }
@@ -14,12 +14,7 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
     NextPage event,
     Emitter<OnboardingState> emit,
   ) async {
-    if (state.currentPage < 2) {
-      emit(OnboardingState(currentPage: event.page));
-    } else {
-      emit(OnboardingState(currentPage: event.page));
-      await _completeOnboarding();
-    }
+    emit(state.copyWith(currentPage: event.page));
   }
 
   Future<void> _onSkip(
@@ -27,6 +22,7 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
     Emitter<OnboardingState> emit,
   ) async {
     await _completeOnboarding();
+    emit(state.copyWith(isCompleted: true));
   }
 
   Future<void> _completeOnboarding() async {

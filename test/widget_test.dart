@@ -1,30 +1,43 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:merzox/main.dart';
+import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
+import 'package:merzox/features/authentication/pages/login_page.dart';
+import 'package:merzox/features/onboarding/bloc/onboarding_bloc.dart';
+import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(Merzox(direct: true,));
+  testWidgets('onboarding renders the first page', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider(
+          create: (_) => OnboardingBloc(),
+          child: OnboardingScreen(onFinished: () {}),
+        ),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(find.text('أفضل العروض القريبة منك'), findsOneWidget);
+    expect(find.text('تخطي'), findsOneWidget);
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  testWidgets('login renders auth and guest actions', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BlocProvider(
+          create: (_) => AuthBloc(),
+          child: LoginPage(
+            onAuthenticated: () {},
+            onBrowseAsGuest: () {},
+            onSignupRequested: () {},
+          ),
+        ),
+      ),
+    );
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('تسجيل الدخول'), findsWidgets);
+    expect(find.text('المتابعة كضيف'), findsOneWidget);
+    expect(find.text('ألا تملك حساب؟'), findsOneWidget);
+    expect(find.text('قم بإنشاء حساب'), findsOneWidget);
   });
 }
