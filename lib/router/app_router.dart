@@ -45,6 +45,7 @@ class AppRouter {
     initialLocation: switch (destination) {
       StartupDestination.onboarding => '/onboarding',
       StartupDestination.login => '/login',
+      StartupDestination.guestHome => '/home?guest=true',
       StartupDestination.home => '/home',
       StartupDestination.businessHome => '/business',
     },
@@ -53,7 +54,9 @@ class AppRouter {
         path: '/onboarding',
         builder: (context, __) => BlocProvider(
           create: (_) => OnboardingBloc(),
-          child: OnboardingScreen(onFinished: () => context.go('/login')),
+          child: OnboardingScreen(
+            onFinished: () => context.go('/home?guest=true'),
+          ),
         ),
       ),
       GoRoute(
@@ -173,6 +176,7 @@ class AppRouter {
         redirect: (_, __) => switch (destination) {
           StartupDestination.onboarding => '/onboarding',
           StartupDestination.login => '/login',
+          StartupDestination.guestHome => '/home?guest=true',
           StartupDestination.home => '/home',
           StartupDestination.businessHome => '/business',
         },
