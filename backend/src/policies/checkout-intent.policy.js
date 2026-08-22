@@ -239,16 +239,31 @@ export function buildAtomicInventoryUpdate({
 }) {
   const productMatch = { _id: productId };
 
-  // Compare-and-set on the pair, but only when both halves were actually
-  // observed. A legacy document may carry neither, and inventing a predicate
-  // for a field that does not exist would refuse a legitimate edit.
-  const hasObservedPair =
-    observedStock?.stockQuantity !== undefined &&
-    observedStock?.unlimitedStock !== undefined;
+  // Compare-and-set, asserting only what actually carries meaning.
+  //
+  // The observation comes from a Mongoose-loaded product, which applies schema
+  // defaults. A pre-inventory document stores no `unlimitedStock` at all, yet
+  // reads back as `true` - so asserting `unlimitedStock: true` would compare
+  // against a field that is absent on disk and refuse every edit to a legacy
+  // product forever.
+  //
+  // The split mirrors `isFiniteStockProduct`:
+  //
+  //   observed finite  -> the product must still be finite AND still hold the
+  //                       same quantity; this is the case a concurrent edit or
+  //                       a settled checkout must be caught by.
+  //   observed unlimited -> only the mode is asserted, with the same `$ne:false`
+  //                       semantics used elsewhere, because a quantity is
+  //                       meaningless while unlimited and may not be stored.
+  const observedFinite = observedStock?.unlimitedStock === false;
 
-  if (hasObservedPair) {
-    productMatch.stockQuantity = observedStock.stockQuantity;
-    productMatch.unlimitedStock = observedStock.unlimitedStock;
+  if (observedFinite) {
+    productMatch.unlimitedStock = false;
+    if (observedStock.stockQuantity !== undefined) {
+      productMatch.stockQuantity = observedStock.stockQuantity;
+    }
+  } else if (observedStock?.unlimitedStock !== undefined) {
+    productMatch.unlimitedStock = { $ne: false };
   }
 
   const filter = {
@@ -299,9 +314,19 @@ export function buildIdentifiedReservation({ businessId, intentId, lines }) {
         $elemMatch: {
           _id: line.product?._id ?? line.productId,
           isActive: true,
+          // The stock-mode assertion is symmetric on purpose. A finite line
+          // must still be finite AND still have the units; a non-finite line
+          // must still be non-finite. Without the second half a checkout that
+          // read the product as unlimited could reserve after a merchant made
+          // it finite, taking the order without consuming the new inventory.
+          //
+          // `$ne: false` is exactly the negation of `isFiniteStockProduct`:
+          // it matches `true`, a missing field and `null` - the legacy shapes
+          // this project treats as unlimited - and rejects only explicit
+          // `false`. Verified against a real server for all four shapes.
           ...(line.finite
             ? { unlimitedStock: false, stockQuantity: { $gte: line.quantity } }
-            : {})
+            : { unlimitedStock: { $ne: false } })
         }
       }
     }))

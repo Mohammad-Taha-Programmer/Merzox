@@ -55,9 +55,13 @@ if (!environment.enabled) {
     buildAtomicInventoryUpdate,
     buildIdentifiedRelease,
     buildIdentifiedReservation,
+    buildReservationSettlement,
     classifyInventoryConflict,
     inventoryConflictResponse
   } = await import('../../src/policies/checkout-intent.policy.js');
+  const { resolveOrderLines } = await import(
+    '../../src/policies/checkout.policy.js'
+  );
   const { reconcileIntent, reconcileStaleCheckouts } = await import(
     '../../src/services/checkout-reconciler.service.js'
   );
@@ -1873,6 +1877,306 @@ if (!environment.enabled) {
         { _id: objectId(store.businessId) },
         { $set: { isActive: true } }
       );
+    });
+
+    // ================================================================= R5 ===
+    // Stock-mode symmetry: a line resolved as unlimited must prove the product
+    // is STILL unlimited, exactly as a finite line proves it is still finite.
+
+    /** Reads the stored product straight from the collection. */
+    async function storedProduct(businessId, productId) {
+      const stored = await Business.findById(objectId(businessId));
+      return stored.products.find(
+        (entry) => entry._id.toString() === productId
+      );
+    }
+
+    /** Switches a product's stock mode the way a merchant edit would. */
+    function setStockMode(businessId, productId, { unlimitedStock, stockQuantity }) {
+      return Business.updateOne(
+        { _id: objectId(businessId) },
+        {
+          $set: {
+            'products.$[p].unlimitedStock': unlimitedStock,
+            'products.$[p].stockQuantity': stockQuantity
+          }
+        },
+        { arrayFilters: [{ 'p._id': objectId(productId) }] }
+      );
+    }
+
+    /** Removes the field entirely, reproducing a pre-inventory document. */
+    function makeLegacy(businessId, productId) {
+      return Business.collection.updateOne(
+        { _id: objectId(businessId) },
+        { $unset: { 'products.$[p].unlimitedStock': '' } },
+        { arrayFilters: [{ 'p._id': objectId(productId) }] }
+      );
+    }
+
+    // ---------------------------------------------------------------- S01 ---
+    await t.test('S01 a stale unlimited line cannot reserve a now-finite product', async () => {
+      const store = await seedStore({ price: 20, unlimitedStock: true }, 's01');
+      const businessId = objectId(store.businessId);
+      const productId = objectId(store.productId);
+
+      // 1-2. resolve the line while the product really is unlimited.
+      const business = await Business.findById(businessId);
+      const resolved = resolveOrderLines({
+        products: business.products,
+        items: [{ productId: store.productId, quantity: 2 }]
+      });
+      assert.equal(resolved.error, undefined);
+      const [staleLine] = resolved.lines;
+      assert.equal(staleLine.finite, false, 'the line was resolved as unlimited');
+
+      // 3. the merchant makes it finite before the reservation runs.
+      await setStockMode(store.businessId, store.productId, {
+        unlimitedStock: false,
+        stockQuantity: 5
+      });
+
+      // 4. execute the production reservation with the stale line.
+      const intentId = new mongoose.Types.ObjectId();
+      const reservation = buildIdentifiedReservation({
+        businessId,
+        intentId,
+        lines: [staleLine]
+      });
+      const result = await Business.updateOne(
+        reservation.filter,
+        reservation.update,
+        reservation.arrayFilters.length > 0
+          ? { arrayFilters: reservation.arrayFilters }
+          : undefined
+      );
+
+      assert.equal(
+        result.matchedCount,
+        0,
+        'a stale unlimited line must not match a finite product'
+      );
+
+      const after = await storedProduct(store.businessId, store.productId);
+      assert.equal(after.stockQuantity, 5, 'stock is untouched');
+      assert.equal(after.unlimitedStock, false);
+      assert.equal(
+        (await outstandingMarkers(store.businessId)).includes(String(intentId)),
+        false,
+        'and no marker was added'
+      );
+    });
+
+    // ---------------------------------------------------------------- S02 ---
+    await t.test('S02 the stale line re-evaluates and consumes the new finite stock', async () => {
+      const store = await seedStore({ price: 20, unlimitedStock: true }, 's02');
+      const businessId = objectId(store.businessId);
+
+      const business = await Business.findById(businessId);
+      const items = [{ productId: store.productId, quantity: 2 }];
+      const [staleLine] = resolveOrderLines({
+        products: business.products,
+        items
+      }).lines;
+      assert.equal(staleLine.finite, false);
+
+      await setStockMode(store.businessId, store.productId, {
+        unlimitedStock: false,
+        stockQuantity: 5
+      });
+
+      // Attempt 1 - the stale line, exactly as reserveStock would try first.
+      const intentId = new mongoose.Types.ObjectId();
+      const first = buildIdentifiedReservation({
+        businessId,
+        intentId,
+        lines: [staleLine]
+      });
+      const firstResult = await Business.updateOne(first.filter, first.update);
+      assert.equal(firstResult.matchedCount, 0, 'attempt 1 misses');
+
+      // reserveStock's own recovery path: nothing held, so re-read the truth.
+      const held = await Business.exists({
+        _id: businessId,
+        stockReservations: intentId
+      });
+      assert.equal(held, null, 'nothing was held by the failed attempt');
+
+      const recheck = await Business.findOne({ _id: businessId, isActive: true });
+      const diagnosis = resolveOrderLines({ products: recheck.products, items });
+      assert.equal(diagnosis.error, undefined, 'the basket is still purchasable');
+      const [freshLine] = diagnosis.lines;
+      assert.equal(freshLine.finite, true, 'and is now a finite line');
+      assert.equal(freshLine.quantity, 2);
+
+      // Attempt 2 - the rebuilt line reserves normally.
+      const second = buildIdentifiedReservation({
+        businessId,
+        intentId,
+        lines: [freshLine]
+      });
+      const secondResult = await Business.updateOne(
+        second.filter,
+        second.update,
+        { arrayFilters: second.arrayFilters }
+      );
+      assert.equal(secondResult.matchedCount, 1, 'attempt 2 reserves');
+
+      const reserved = await storedProduct(store.businessId, store.productId);
+      assert.equal(reserved.stockQuantity, 3, '5 - 2, not left at 5');
+      assert.deepEqual(await outstandingMarkers(store.businessId), [
+        String(intentId)
+      ]);
+
+      // A release must give back exactly what the SUCCESSFUL attempt consumed.
+      const release = buildIdentifiedRelease({
+        businessId,
+        intentId,
+        lines: [{ productId: objectId(store.productId), quantity: 2, finite: true }]
+      });
+      const releaseResult = await Business.updateOne(
+        release.filter,
+        release.update,
+        { arrayFilters: release.arrayFilters }
+      );
+      assert.equal(releaseResult.matchedCount, 1);
+      assert.equal(
+        (await storedProduct(store.businessId, store.productId)).stockQuantity,
+        5,
+        'restored exactly once'
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- S02b --
+    await t.test('S02b the real checkout endpoint consumes the new finite stock', async () => {
+      const store = await seedStore({ price: 20, unlimitedStock: true }, 's02b');
+      const buyer = await seedAccount('buyer-s02b');
+
+      // The merchant converts to finite BEFORE the request arrives, so the
+      // whole two-attempt path runs inside the production controller.
+      await setStockMode(store.businessId, store.productId, {
+        unlimitedStock: false,
+        stockQuantity: 5
+      });
+
+      const response = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: `${stamp}-s02b`,
+        quantity: 2
+      });
+
+      assert.equal(response.status, 201);
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        3,
+        'the finite inventory was genuinely consumed'
+      );
+
+      // The intent recorded what was ACTUALLY reserved, so a later release can
+      // only ever give back that.
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: `${stamp}-s02b`
+      });
+      assert.equal(intent.phase, 'finalized');
+      assert.equal(intent.lines.length, 1);
+      assert.equal(intent.lines[0].finite, true);
+      assert.equal(intent.lines[0].quantity, 2);
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- S03 ---
+    await t.test('S03 legacy products keep unlimited semantics, then convert safely', async () => {
+      const store = await seedStore({ price: 20, unlimitedStock: true }, 's03');
+      const businessId = objectId(store.businessId);
+
+      // A pre-inventory document: the field is absent entirely.
+      await makeLegacy(store.businessId, store.productId);
+      // Read through the raw driver: the Mongoose model would re-apply the
+      // schema default on load and hide the very shape under test.
+      const raw = await Business.collection.findOne(
+        { _id: businessId },
+        { projection: { products: 1 } }
+      );
+      const rawProduct = raw.products.find(
+        (entry) => entry._id.toString() === store.productId
+      );
+      assert.equal(
+        Object.hasOwn(rawProduct, 'unlimitedStock'),
+        false,
+        'the field is genuinely missing on disk'
+      );
+
+      const business = await Business.findById(businessId);
+      const items = [{ productId: store.productId, quantity: 3 }];
+      const [legacyLine] = resolveOrderLines({
+        products: business.products,
+        items
+      }).lines;
+      assert.equal(legacyLine.finite, false, 'legacy reads as unlimited');
+
+      // Unchanged legacy product: the reservation still succeeds and consumes
+      // nothing, so legacy compatibility is intact.
+      const legacyIntent = new mongoose.Types.ObjectId();
+      const legacyReservation = buildIdentifiedReservation({
+        businessId,
+        intentId: legacyIntent,
+        lines: [legacyLine]
+      });
+      const legacyResult = await Business.updateOne(
+        legacyReservation.filter,
+        legacyReservation.update
+      );
+      assert.equal(legacyResult.matchedCount, 1, 'legacy unlimited still reserves');
+      assert.equal(
+        (await storedProduct(store.businessId, store.productId)).stockQuantity,
+        0,
+        'and decrements nothing'
+      );
+
+      // Settle that marker so it cannot interfere with the merchant edit.
+      const settlement = buildReservationSettlement({
+        businessId,
+        intentId: legacyIntent
+      });
+      await Business.updateOne(settlement.filter, settlement.update);
+
+      // Now the merchant converts it through the supported product update path.
+      const converted = await patchProduct(store.merchant.token, store.productId, {
+        unlimitedStock: false,
+        stockQuantity: 5
+      });
+      assert.equal(converted.status, 200, `conversion should apply (${converted.code})`);
+      assert.equal(converted.json.data.product.unlimitedStock, false);
+      assert.equal(converted.json.data.product.stockQuantity, 5);
+
+      // A stale pre-conversion unlimited line must now match nothing.
+      const staleIntent = new mongoose.Types.ObjectId();
+      const stale = buildIdentifiedReservation({
+        businessId,
+        intentId: staleIntent,
+        lines: [legacyLine]
+      });
+      const staleResult = await Business.updateOne(stale.filter, stale.update);
+
+      assert.equal(
+        staleResult.matchedCount,
+        0,
+        'a stale legacy-unlimited line cannot reserve a converted product'
+      );
+      assert.equal(
+        (await storedProduct(store.businessId, store.productId)).stockQuantity,
+        5
+      );
+
+      // And re-evaluation sees the finite truth.
+      const recheck = await Business.findOne({ _id: businessId, isActive: true });
+      const [freshLine] = resolveOrderLines({
+        products: recheck.products,
+        items
+      }).lines;
+      assert.equal(freshLine.finite, true);
     });
   });
 }

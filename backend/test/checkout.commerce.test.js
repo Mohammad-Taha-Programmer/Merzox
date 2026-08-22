@@ -111,6 +111,10 @@ function matchesCondition(value, condition) {
 
   if (condition !== null && typeof condition === 'object' && !Array.isArray(condition)) {
     if ('$gte' in condition) return Number(value) >= Number(condition.$gte);
+    // Mongo semantics, verified against a real server: `$ne` matches a missing
+    // field and null as well as any differing value. That is what makes
+    // `unlimitedStock: {$ne:false}` the exact negation of isFiniteStockProduct.
+    if ('$ne' in condition) return value !== condition.$ne;
     throw new Error(`unsupported condition: ${JSON.stringify(condition)}`);
   }
 

@@ -24,7 +24,10 @@ import {
   isResumable,
   isTerminal
 } from '../src/policies/checkout-intent.policy.js';
-import { normalizeRequestedItems } from '../src/policies/checkout.policy.js';
+import {
+  isFiniteStockProduct,
+  normalizeRequestedItems
+} from '../src/policies/checkout.policy.js';
 
 /**
  * MERZOX-GAP-002-R1 checkout state machine, without a database.
@@ -276,6 +279,92 @@ test('an unlimited-only basket records identity but decrements nothing', () => {
   assert.deepEqual(reservation.update.$addToSet, { stockReservations: intentId });
 });
 
+// ------------------------------------------------- stock-mode symmetry (R5)
+
+test('U01/U02 a finite line asserts it is still finite and still stocked', () => {
+  const productId = new mongoose.Types.ObjectId();
+  const reservation = buildIdentifiedReservation({
+    businessId,
+    intentId,
+    lines: [{ productId, quantity: 3, finite: true }]
+  });
+
+  const [clause] = reservation.filter.$and;
+  const criteria = clause.products.$elemMatch;
+
+  assert.equal(criteria.unlimitedStock, false, 'U01: still finite');
+  assert.deepEqual(criteria.stockQuantity, { $gte: 3 }, 'U02: still stocked');
+});
+
+test('U03/U04/U05 a non-finite line asserts it is still non-finite', () => {
+  const productId = new mongoose.Types.ObjectId();
+  const reservation = buildIdentifiedReservation({
+    businessId,
+    intentId,
+    lines: [{ productId, quantity: 4, finite: false }]
+  });
+
+  const criteria = reservation.filter.$and[0].products.$elemMatch;
+
+  // U03 - an explicitly finite product is rejected...
+  assert.deepEqual(criteria.unlimitedStock, { $ne: false });
+  // ...and the predicate is present at all, which is the whole R5 defect.
+  assert.notEqual(
+    criteria.unlimitedStock,
+    undefined,
+    'a non-finite line must still assert its stock mode'
+  );
+
+  // U04/U05 - `$ne: false` accepts `true`, a missing field and `null`, which is
+  // exactly the negation of isFiniteStockProduct. Asserted against the real
+  // predicate semantics rather than restated as a comment.
+  for (const shape of [{ unlimitedStock: true }, {}, { unlimitedStock: null }]) {
+    assert.equal(
+      isFiniteStockProduct(shape),
+      false,
+      `${JSON.stringify(shape)} must read as non-finite`
+    );
+    assert.notEqual(shape.unlimitedStock, false, 'and must satisfy $ne:false');
+  }
+
+  assert.equal(isFiniteStockProduct({ unlimitedStock: false }), true);
+});
+
+test('U06 no line can reserve on identity and activity alone', () => {
+  const productId = new mongoose.Types.ObjectId();
+
+  for (const finite of [true, false]) {
+    const reservation = buildIdentifiedReservation({
+      businessId,
+      intentId,
+      lines: [{ productId, quantity: 2, finite }]
+    });
+    const criteria = reservation.filter.$and[0].products.$elemMatch;
+
+    // Identity and activity are never sufficient on their own: every line
+    // carries a stock-mode assertion too.
+    assert.deepEqual(
+      Object.keys(criteria).sort(),
+      finite
+        ? ['_id', 'isActive', 'stockQuantity', 'unlimitedStock']
+        : ['_id', 'isActive', 'unlimitedStock'],
+      `finite=${finite}`
+    );
+  }
+});
+
+test('U06 the replay guard is untouched by the stock-mode work', () => {
+  const reservation = buildIdentifiedReservation({
+    businessId,
+    intentId,
+    lines: [{ productId: new mongoose.Types.ObjectId(), quantity: 1, finite: false }]
+  });
+
+  assert.deepEqual(reservation.filter.stockReservations, { $ne: intentId });
+  // A non-finite basket still consumes nothing.
+  assert.equal(reservation.update.$inc, undefined);
+});
+
 // ------------------------------------------------ atomic merchant inventory
 
 test('the merchant inventory write carries its own reservation predicate', () => {
@@ -327,6 +416,43 @@ test('a mixed payload is one write, so it cannot half-apply', () => {
   ]);
   assert.equal(Object.keys(atomic.update).length, 1, 'a single $set operator');
   assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
+});
+
+test('an unlimited observation asserts only the mode, not a phantom quantity', () => {
+  // A legacy document stores no `unlimitedStock`, but Mongoose reads it back as
+  // `true`. Asserting `true` literally would compare against a field that is
+  // absent on disk and refuse every edit to such a product.
+  const atomic = buildAtomicInventoryUpdate({
+    businessId,
+    ownerId: new mongoose.Types.ObjectId(),
+    productId: new mongoose.Types.ObjectId(),
+    write: { unlimitedStock: false, stockQuantity: 5 },
+    observedStock: { stockQuantity: 0, unlimitedStock: true }
+  });
+
+  const criteria = atomic.filter.products.$elemMatch;
+  assert.deepEqual(criteria.unlimitedStock, { $ne: false });
+  assert.equal(
+    criteria.stockQuantity,
+    undefined,
+    'a quantity is meaningless while unlimited'
+  );
+  // The reservation guard is never optional.
+  assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
+});
+
+test('a finite observation still asserts the exact pair', () => {
+  const atomic = buildAtomicInventoryUpdate({
+    businessId,
+    ownerId: new mongoose.Types.ObjectId(),
+    productId: new mongoose.Types.ObjectId(),
+    write: { stockQuantity: 10 },
+    observedStock: { stockQuantity: 5, unlimitedStock: false }
+  });
+
+  const criteria = atomic.filter.products.$elemMatch;
+  assert.equal(criteria.unlimitedStock, false);
+  assert.equal(criteria.stockQuantity, 5);
 });
 
 test('a legacy product without a stock pair is not refused on a phantom field', () => {
