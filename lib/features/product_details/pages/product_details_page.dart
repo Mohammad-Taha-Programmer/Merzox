@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:merzox/core/auth/auth_gate.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
@@ -438,7 +439,20 @@ class _SellerDetails extends StatelessWidget {
           children: [
             _IconSquare(
               icon: Icons.chat_bubble_outline_rounded,
-              onPressed: () {},
+              onPressed: () => AuthGate.run(
+                context,
+                // The chat route opens an existing thread with this store or
+                // creates one, so only the store identity travels with the tap.
+                onAuthenticated: () => context.push(
+                  Uri(
+                    path: '/chat',
+                    queryParameters: {
+                      'businessId': business.id,
+                      'title': business.name,
+                    },
+                  ).toString(),
+                ),
+              ),
             ),
             const Spacer(),
             Column(

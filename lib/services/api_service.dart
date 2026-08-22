@@ -4,6 +4,22 @@ import 'package:merzox/features/business/models/business_models.dart';
 
 final String ipAddress = "192.168.1.8";
 
+/// Raised when a 2xx response does not carry the entity its endpoint promises.
+///
+/// Without this, `response.data?['data'] ?? {}` turns a malformed or truncated
+/// payload into a fully-formed domain object with empty fields, and the UI
+/// renders it as a successful load. A required entity that is absent is a
+/// contract failure, not an empty result.
+class ApiContractException implements Exception {
+  final String endpoint;
+  final String detail;
+
+  const ApiContractException(this.endpoint, this.detail);
+
+  @override
+  String toString() => 'ApiContractException($endpoint): $detail';
+}
+
 class ApiService {
   static const String configuredBaseUrl = String.fromEnvironment(
     'MERZOX_API_BASE_URL',
@@ -53,8 +69,7 @@ class ApiService {
       '/auth/me',
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    final user = data['user'] as Map<String, dynamic>? ?? {};
+    final user = requiredEntity(response.data, 'user', endpoint: 'auth');
 
     return AuthApiUser.fromJson(user);
   }
@@ -80,8 +95,7 @@ class ApiService {
       },
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    final user = data['user'] as Map<String, dynamic>? ?? {};
+    final user = requiredEntity(response.data, 'user', endpoint: 'auth');
 
     return AuthApiUser.fromJson(user);
   }
@@ -103,8 +117,7 @@ class ApiService {
       },
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    final user = data['user'] as Map<String, dynamic>? ?? {};
+    final user = requiredEntity(response.data, 'user', endpoint: 'auth');
 
     return AuthApiUser.fromJson(user);
   }
@@ -244,8 +257,7 @@ class ApiService {
       },
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    final order = data['order'] as Map<String, dynamic>? ?? {};
+    final order = requiredEntity(response.data, 'order', endpoint: 'order');
 
     return OrderApiModel.fromJson(order);
   }
@@ -260,8 +272,7 @@ class ApiService {
       data: {'reason': reason},
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    final order = data['order'] as Map<String, dynamic>? ?? {};
+    final order = requiredEntity(response.data, 'order', endpoint: 'order');
 
     return OrderApiModel.fromJson(order);
   }
@@ -342,8 +353,11 @@ class ApiService {
       data: {'liked': liked},
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    final product = data['product'] as Map<String, dynamic>? ?? {};
+    final product = requiredEntity(
+      response.data,
+      'product',
+      endpoint: 'product',
+    );
 
     return BusinessProductApiModel.fromJson(product);
   }
@@ -359,8 +373,7 @@ class ApiService {
       data: {'rating': rating, 'comment': comment},
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    final review = data['review'] as Map<String, dynamic>? ?? {};
+    final review = requiredEntity(response.data, 'review', endpoint: 'review');
 
     return BusinessReviewApiModel.fromJson(review);
   }
@@ -377,9 +390,16 @@ class ApiService {
       data: {'rating': rating, 'comment': comment},
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    final review = data['review'] as Map<String, dynamic>? ?? {};
-    final product = data['product'] as Map<String, dynamic>? ?? {};
+    final review = requiredEntity(
+      response.data,
+      'review',
+      endpoint: 'productReview',
+    );
+    final product = requiredEntity(
+      response.data,
+      'product',
+      endpoint: 'productReview',
+    );
 
     return ProductReviewSubmitResponse(
       review: BusinessReviewApiModel.fromJson(review),
@@ -536,13 +556,12 @@ class ApiService {
       data: {'status': status, 'note': note},
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    return OwnerOrder.fromJson(data['order'] as Map<String, dynamic>? ?? {});
+    return OwnerOrder.fromJson(
+      requiredEntity(response.data, 'order', endpoint: 'ownerOrder'),
+    );
   }
 
-  Future<List<BusinessProductApiModel>> ownerProducts({
-    required String token,
-  }) async {
+  Future<List<OwnerProduct>> ownerProducts({required String token}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/businesses/me/products',
       options: _authOptions(token),
@@ -551,11 +570,11 @@ class ApiService {
     final products = data['products'] as List<dynamic>? ?? [];
     return products
         .whereType<Map<String, dynamic>>()
-        .map(BusinessProductApiModel.fromJson)
+        .map(OwnerProduct.fromJson)
         .toList();
   }
 
-  Future<BusinessProductApiModel> createOwnerProduct({
+  Future<OwnerProduct> createOwnerProduct({
     required String token,
     required Map<String, dynamic> product,
   }) async {
@@ -565,12 +584,12 @@ class ApiService {
       options: _authOptions(token),
     );
     final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    return BusinessProductApiModel.fromJson(
+    return OwnerProduct.fromJson(
       data['product'] as Map<String, dynamic>? ?? {},
     );
   }
 
-  Future<BusinessProductApiModel> updateOwnerProduct({
+  Future<OwnerProduct> updateOwnerProduct({
     required String token,
     required String productId,
     required Map<String, dynamic> changes,
@@ -581,7 +600,7 @@ class ApiService {
       options: _authOptions(token),
     );
     final data = response.data?['data'] as Map<String, dynamic>? ?? {};
-    return BusinessProductApiModel.fromJson(
+    return OwnerProduct.fromJson(
       data['product'] as Map<String, dynamic>? ?? {},
     );
   }
@@ -807,7 +826,39 @@ class ApiService {
     return OwnerOrder.fromJson(data['order'] as Map<String, dynamic>? ?? {});
   }
 
+  /// Extracts an entity the endpoint is contractually required to return.
+  ///
+  /// Throws [ApiContractException] rather than substituting an empty map, so a
+  /// malformed success can never reach the UI as a ready state. List endpoints
+  /// keep using tolerant parsing: an empty list is a legitimate result.
+  static Map<String, dynamic> requiredEntity(
+    Map<String, dynamic>? body,
+    String key, {
+    required String endpoint,
+    bool requireId = true,
+  }) {
+    final data = body?['data'];
+    if (data is! Map<String, dynamic>) {
+      throw ApiContractException(endpoint, 'response has no data object');
+    }
+
+    final entity = data[key];
+    if (entity is! Map<String, dynamic> || entity.isEmpty) {
+      throw ApiContractException(endpoint, 'response has no "\$key" object');
+    }
+
+    if (requireId && (entity['id'] as String? ?? '').trim().isEmpty) {
+      throw ApiContractException(endpoint, '"\$key" has no id');
+    }
+
+    return entity;
+  }
+
   static String messageFromError(Object error) {
+    if (error is ApiContractException) {
+      return 'تعذر قراءة رد الخادم. حاول مرة أخرى.';
+    }
+
     if (error is DioException) {
       final data = error.response?.data;
       if (data is Map<String, dynamic>) {
@@ -1235,20 +1286,13 @@ class FavoriteStatusApiResponse {
 class OrderItemRequest {
   final String productId;
   final int quantity;
-  final String variant;
 
-  const OrderItemRequest({
-    required this.productId,
-    required this.quantity,
-    this.variant = '',
-  });
+  const OrderItemRequest({required this.productId, required this.quantity});
 
+  /// No variant is sent: the catalog models none, and the API refuses an order
+  /// item that carries anything beyond a product and a quantity.
   Map<String, dynamic> toJson() {
-    return {
-      'productId': productId,
-      'quantity': quantity,
-      if (variant.trim().isNotEmpty) 'variant': variant.trim(),
-    };
+    return {'productId': productId, 'quantity': quantity};
   }
 }
 
@@ -1678,13 +1722,31 @@ class AuthApiResponse {
   const AuthApiResponse({required this.token, required this.user});
 
   factory AuthApiResponse.fromJson(Map<String, dynamic> json) {
-    final data = json['data'] as Map<String, dynamic>? ?? {};
-    final user = data['user'] as Map<String, dynamic>? ?? {};
+    // Checked rather than cast: a malformed envelope must surface as a
+    // contract failure, not an uncaught CastError.
+    final envelope = json['data'];
+    final data = envelope is Map<String, dynamic>
+        ? envelope
+        : const <String, dynamic>{};
 
-    return AuthApiResponse(
-      token: data['token'] as String? ?? '',
-      user: AuthApiUser.fromJson(user),
-    );
+    // A 200 with no usable token must fail here rather than be stored as an
+    // empty one. AuthSessionService would reject it later, but failing at the
+    // parse keeps the reason visible instead of surfacing as a silent logout.
+    final token = (data['token'] as String? ?? '').trim();
+    if (token.isEmpty) {
+      throw const ApiContractException(
+        'auth',
+        'login response carried no token',
+      );
+    }
+
+    // An authenticated response must also carry the identity it authenticates.
+    // Without this, a missing or malformed `data.user` became
+    // `AuthApiUser.fromJson({})` - an id-less user that then travelled through
+    // session persistence and every downstream screen as though it were real.
+    final user = ApiService.requiredEntity(json, 'user', endpoint: 'auth');
+
+    return AuthApiResponse(token: token, user: AuthApiUser.fromJson(user));
   }
 }
 

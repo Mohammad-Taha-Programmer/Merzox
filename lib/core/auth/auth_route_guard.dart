@@ -34,6 +34,13 @@ final class AuthRouteGuard {
       return '/login';
     }
 
+    // A presentation flag must never confer a role. `audience=business` only
+    // selects which feed to request; the session decides whether that is
+    // allowed, and the parameter is stripped when it is not.
+    if (path == '/notifications') {
+      return _normalizeNotifications(uri, session);
+    }
+
     if (path == '/business/messages' && !session.isBusiness) {
       return session.isAuthenticated ? '/business/enroll' : '/business/login';
     }
@@ -48,6 +55,20 @@ final class AuthRouteGuard {
     }
 
     return null;
+  }
+
+  static String? _normalizeNotifications(Uri uri, AuthSessionSnapshot session) {
+    final wantsBusinessFeed = uri.queryParameters['audience'] == 'business';
+
+    if (!wantsBusinessFeed || session.isBusiness) {
+      return null;
+    }
+
+    // The customer keeps their own notifications rather than being bounced
+    // away from a route they are entitled to; only the role claim is removed.
+    final query = Map<String, String>.from(uri.queryParameters)
+      ..remove('audience');
+    return _routeWithQuery(uri, query);
   }
 
   static String? _normalizeHome(Uri uri, AuthSessionSnapshot session) {

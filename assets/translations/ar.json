@@ -133,7 +133,8 @@
     "contactStore": "مراسلة المتجر",
     "loadError": "تعذر تحميل الرسائل. حاول مرة أخرى.",
     "guestTitle": "يرجى تسجيل الدخول",
-    "guestHint": "لعرض الرسائل الخاصة بك، يرجى تسجيل الدخول أولا"
+    "guestHint": "لعرض الرسائل الخاصة بك، يرجى تسجيل الدخول أولا",
+    "readSyncFailed": "تعذر تحديث حالة القراءة، الرسائل معروضة كما هي"
   },
   "notifications": {
     "title": "الاشعارات",
@@ -219,7 +220,8 @@
       "card": "بطاقة",
       "bankTransfer": "تحويل بنكي",
       "assisted": "شراء لشخص آخر"
-    }
+    },
+    "customerNameUnavailable": "اسم العميل غير متوفر"
   },
   "storeSettings": {
     "title": "إعدادات المتجر",
@@ -232,5 +234,38 @@
     "mobile": "قم بإدخال رقم الجوال",
     "facebook": "قم بإدخال صفحة الفيس الخاصة بالمتجر",
     "saved": "تم حفظ إعدادات المتجر"
+  },
+  "merchantProduct": {
+    "addTitle": "إضافة منتج جديد",
+    "editTitle": "تعديل المنتج",
+    "name": "اسم المنتج",
+    "nameHint": "قم بكتابة اسم المنتج",
+    "description": "وصف المنتج",
+    "descriptionHint": "قم بكتابة وصف للمنتج",
+    "price": "السعر",
+    "costPrice": "تكلفة المنتج",
+    "costPriceHint": "هذا الحقل لا يظهر للزبون",
+    "quantity": "الكمية",
+    "quantityHint": "الكمية المتوفرة للمنتج",
+    "unlimited": "غير محدودة",
+    "hasDiscount": "هناك تخفيض",
+    "discountPercent": "نسبة التخفيض %",
+    "priceAfterDiscount": "السعر بعد التخفيض",
+    "classification": "تصنيف المنتجات",
+    "keywords": "كلمات دلالية",
+    "keywordsHint": "قم بكتابة كلمات دلالية لتسهل عملية البحث عن المنتج",
+    "images": "الصور",
+    "imagesHint": "أضف رابط صورة في كل سطر",
+    "isService": "هذا العنصر خدمة",
+    "publish": "النشر على المتجر",
+    "save": "حفظ",
+    "saving": "جاري الحفظ...",
+    "saved": "تم حفظ المنتج",
+    "required": "هذا الحقل مطلوب",
+    "invalidNumber": "قم بإدخال رقم صحيح",
+    "invalidDiscount": "نسبة التخفيض بين 0 و 100",
+    "invalidQuantity": "الكمية يجب أن تكون رقماً صحيحاً غير سالب",
+    "tooManyImages": "الحد الأقصى 8 صور",
+    "tooManyKeywords": "الحد الأقصى 20 كلمة دلالية"
   }
 }

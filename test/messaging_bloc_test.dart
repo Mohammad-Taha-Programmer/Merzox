@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/messages/bloc/chat_bloc.dart';
 import 'package:merzox/features/messages/bloc/chat_event.dart';
 import 'package:merzox/features/messages/bloc/chat_state.dart';
@@ -7,7 +6,7 @@ import 'package:merzox/features/messages/bloc/messages_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/bloc/messages_state.dart';
 import 'package:merzox/services/api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'auth_session_fixtures.dart';
 
 ConversationApiModel _conversation({
   String id = 'c1',
@@ -148,9 +147,7 @@ class _FakeMessagingApi extends ApiService {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({AuthBloc.tokenKey: 'test-token'});
-  });
+  setUp(useAuthenticatedSession);
 
   test('the inbox loads threads and reports the unread count', () async {
     final api = _FakeMessagingApi()
@@ -204,6 +201,10 @@ void main() {
   });
 
   test('a merchant inbox reads the merchant endpoint', () async {
+    // Updated for the FIX2 contract: the merchant inbox is a different
+    // endpoint, so it now requires a business session rather than any
+    // authenticated one.
+    useAuthenticatedSession(business: true);
     final api = _FakeMessagingApi();
     final bloc = MessagesBloc(apiService: api, merchantMode: true);
 
@@ -213,6 +214,23 @@ void main() {
     );
 
     expect(api.merchantCalls, [false]);
+    expect(api.customerUnreadFlags, isEmpty);
+
+    await bloc.close();
+  });
+
+  test('a customer session cannot drive the merchant inbox', () async {
+    // merchantMode is a construction flag, not a role. Without a business
+    // session the bloc must fail before touching either endpoint.
+    final api = _FakeMessagingApi();
+    final bloc = MessagesBloc(apiService: api, merchantMode: true);
+
+    bloc.add(const MessagesStarted());
+    await bloc.stream.firstWhere(
+      (state) => state.status == MessagesStatus.failure,
+    );
+
+    expect(api.merchantCalls, isEmpty);
     expect(api.customerUnreadFlags, isEmpty);
 
     await bloc.close();

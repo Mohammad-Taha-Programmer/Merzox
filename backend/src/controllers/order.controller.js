@@ -3,14 +3,19 @@ import mongoose from 'mongoose';
 import { Business } from '../models/Business.js';
 import { Order } from '../models/Order.js';
 import {
+  addressMutableStatuses,
+  customerCancellableStatuses,
+  orderStatusGroups as policyStatusGroups
+} from '../policies/order-status.policy.js';
+import {
   notifyOrderCancelledByCustomer,
   notifyOrderPlaced
 } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
-const validGroups = new Set(['current', 'completed', 'cancelled']);
-const cancellableStatuses = new Set(['pending', 'confirmed', 'preparing']);
+const validGroups = new Set(policyStatusGroups);
+const cancellableStatuses = new Set(customerCancellableStatuses);
 
 function paginationParams(query) {
   const page = Math.max(Number.parseInt(query.page ?? '1', 10), 1);
@@ -83,7 +88,9 @@ export const createOrder = asyncHandler(async (req, res) => {
       imageUrl,
       unitPrice: Number(product.price ?? 0),
       quantity,
-      variant: String(requested.variant ?? '').trim()
+      // Left empty on purpose: the catalog has no variant to copy from, and the
+      // client is not allowed to define one.
+      variant: ''
     };
   });
 
@@ -202,7 +209,7 @@ export const updateMyOrderAddress = asyncHandler(async (req, res) => {
     {
       _id: req.params.id,
       user: req.user._id,
-      status: { $in: ['pending', 'confirmed'] }
+      status: { $in: addressMutableStatuses }
     },
     { $set: { deliveryAddress } },
     { new: true, runValidators: true }

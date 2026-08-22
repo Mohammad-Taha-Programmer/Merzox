@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/notifications/bloc/notifications_bloc.dart';
 import 'package:merzox/features/notifications/bloc/notifications_event.dart';
 import 'package:merzox/features/notifications/bloc/notifications_state.dart';
@@ -7,7 +6,7 @@ import 'package:merzox/features/orders/bloc/order_tracking_bloc.dart';
 import 'package:merzox/features/orders/bloc/order_tracking_event.dart';
 import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
 import 'package:merzox/services/api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'auth_session_fixtures.dart';
 
 OrderApiModel _order({
   String status = 'preparing',
@@ -172,8 +171,94 @@ class _FakeNotificationsApi extends ApiService {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({AuthBloc.tokenKey: 'test-token'});
+  setUp(useAuthenticatedSession);
+
+  // AC-24: the client-side fallback projection (used when a response predates
+  // the server tracking payload) must be defined for every persisted status.
+  test('every persisted status maps to a defined client tracking step', () {
+    const expected = {
+      'pending': ('placed', 0),
+      'confirmed': ('placed', 0),
+      'preparing': ('preparing', 1),
+      'outForDelivery': ('outForDelivery', 2),
+      'delivered': ('delivered', 3),
+    };
+
+    expected.forEach((status, projection) {
+      final tracking = OrderTrackingApiModel.fromStatus(status);
+      expect(tracking.currentStep, projection.$1, reason: status);
+      expect(tracking.currentIndex, projection.$2, reason: status);
+      expect(tracking.isCancelled, isFalse, reason: status);
+      expect(tracking.steps, hasLength(4), reason: status);
+      expect(tracking.steps.map((step) => step.isReached).toList(), [
+        for (var i = 0; i < 4; i++) i <= projection.$2,
+      ], reason: status);
+    });
+
+    final cancelled = OrderTrackingApiModel.fromStatus('cancelled');
+    expect(cancelled.isCancelled, isTrue);
+    expect(cancelled.currentIndex, -1);
+    expect(cancelled.currentStep, '');
+    expect(cancelled.steps.any((step) => step.isReached), isFalse);
+  });
+
+  test('client projection gates actions the same way the server does', () {
+    expect(
+      OrderTrackingApiModel.fromStatus('pending').canChangeAddress,
+      isTrue,
+    );
+    expect(
+      OrderTrackingApiModel.fromStatus('confirmed').canChangeAddress,
+      isTrue,
+    );
+    expect(
+      OrderTrackingApiModel.fromStatus('preparing').canChangeAddress,
+      isFalse,
+    );
+
+    expect(OrderTrackingApiModel.fromStatus('preparing').canCancel, isTrue);
+    expect(
+      OrderTrackingApiModel.fromStatus('outForDelivery').canCancel,
+      isFalse,
+    );
+    expect(OrderTrackingApiModel.fromStatus('delivered').canCancel, isFalse);
+    expect(OrderTrackingApiModel.fromStatus('cancelled').canCancel, isFalse);
+
+    expect(OrderTrackingApiModel.fromStatus('delivered').canReview, isTrue);
+    expect(OrderTrackingApiModel.fromStatus('preparing').canReview, isFalse);
+    expect(OrderTrackingApiModel.fromStatus('cancelled').canReview, isFalse);
+  });
+
+  test('an unknown server status degrades to the first step, not a crash', () {
+    final tracking = OrderTrackingApiModel.fromStatus('somethingNew');
+
+    expect(tracking.currentStep, 'placed');
+    expect(tracking.canCancel, isFalse);
+    expect(tracking.canChangeAddress, isFalse);
+    expect(tracking.canReview, isFalse);
+  });
+
+  test('the server payload wins over the local projection', () async {
+    // The client must never re-derive a status the server already decided.
+    final order = _order(status: 'preparing');
+    final fromServer = OrderTrackingApiModel.fromJson(const {
+      'isCancelled': false,
+      'currentStep': 'outForDelivery',
+      'currentIndex': 2,
+      'steps': [
+        {'step': 'placed', 'isReached': true},
+        {'step': 'preparing', 'isReached': true},
+        {'step': 'outForDelivery', 'isReached': true},
+        {'step': 'delivered', 'isReached': false},
+      ],
+      'canCancel': false,
+      'canChangeAddress': false,
+      'canReview': false,
+    }, order.status);
+
+    expect(fromServer.currentStep, 'outForDelivery');
+    expect(fromServer.currentIndex, 2);
+    expect(fromServer.canCancel, isFalse);
   });
 
   test('tracking loads the order and its derived timeline', () async {
@@ -320,6 +405,9 @@ void main() {
   });
 
   test('the merchant feed asks for the business audience', () async {
+    // Updated for the FIX2 contract: the business audience now requires a
+    // business session, not merely an authenticated one.
+    useAuthenticatedSession(business: true);
     final api = _FakeNotificationsApi()
       ..items = [_notification()]
       ..unread = 1;
@@ -332,6 +420,21 @@ void main() {
 
     expect(api.audienceFlags, [true]);
     expect(bloc.state.unreadCount, 1);
+
+    await bloc.close();
+  });
+
+  test('a customer session cannot request the business feed', () async {
+    // audience=business is a request parameter, not a role claim.
+    final api = _FakeNotificationsApi();
+    final bloc = NotificationsBloc(apiService: api, businessAudience: true);
+
+    bloc.add(const NotificationsStarted());
+    await bloc.stream.firstWhere(
+      (state) => state.status == NotificationsStatus.failure,
+    );
+
+    expect(api.audienceFlags, isEmpty);
 
     await bloc.close();
   });

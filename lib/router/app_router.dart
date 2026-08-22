@@ -1,7 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/auth/auth_route_guard.dart';
 import '../core/auth/auth_session_service.dart';
@@ -261,11 +260,18 @@ class AppRouter {
     ],
   );
 
-  static Future<void> _goAfterLogin(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    final route = prefs.getString(AuthBloc.userTypeKey) == 'business'
-        ? '/business'
-        : '/home';
-    if (context.mounted) context.go(route);
+  /// The destination after login comes from the centralized session, not from
+  /// a stored userType that could survive a logout.
+  Future<void> _goAfterLogin(BuildContext context) async {
+    final session = await _authSessionService.read();
+
+    if (!context.mounted) return;
+
+    if (!session.isAuthenticated) {
+      context.go('/login');
+      return;
+    }
+
+    context.go(session.isBusiness ? '/business' : '/home');
   }
 }

@@ -14,6 +14,11 @@ final class ChatState {
   final bool hasMore;
   final String errorMessage;
 
+  /// Set when the thread loaded but the server refused to mark it read. The
+  /// conversation stays usable; this only records that the read receipt did
+  /// not land, so the UI never implies a synchronisation that did not happen.
+  final bool readSyncFailed;
+
   const ChatState({
     this.status = ChatStatus.initial,
     this.conversationId = '',
@@ -23,6 +28,7 @@ final class ChatState {
     this.page = 1,
     this.hasMore = false,
     this.errorMessage = '',
+    this.readSyncFailed = false,
   });
 
   bool get isBusy =>
@@ -37,6 +43,7 @@ final class ChatState {
     int? page,
     bool? hasMore,
     String? errorMessage,
+    bool? readSyncFailed,
   }) {
     return ChatState(
       status: status ?? this.status,
@@ -47,6 +54,7 @@ final class ChatState {
       page: page ?? this.page,
       hasMore: hasMore ?? this.hasMore,
       errorMessage: errorMessage ?? this.errorMessage,
+      readSyncFailed: readSyncFailed ?? this.readSyncFailed,
     );
   }
 }

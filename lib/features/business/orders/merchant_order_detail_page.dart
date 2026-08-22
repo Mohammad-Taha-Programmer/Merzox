@@ -2,25 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/business/models/business_models.dart';
-
-/// The statuses a merchant can move an order to, in the order the design's
-/// picker lists them. `pending` is the arrival state and is never a target.
-const List<String> merchantSelectableStatuses = [
-  'confirmed',
-  'preparing',
-  'outForDelivery',
-  'delivered',
-  'cancelled',
-];
-
-const Map<String, Set<String>> merchantOrderTransitions = {
-  'pending': {'confirmed', 'cancelled'},
-  'confirmed': {'preparing', 'cancelled'},
-  'preparing': {'outForDelivery', 'cancelled'},
-  'outForDelivery': {'delivered'},
-  'delivered': <String>{},
-  'cancelled': <String>{},
-};
+import 'package:merzox/features/orders/order_status_policy.dart';
 
 class MerchantOrderDetailPage extends StatelessWidget {
   final OwnerOrder order;
@@ -43,12 +25,8 @@ class MerchantOrderDetailPage extends StatelessWidget {
     this.isSaving = false,
   });
 
-  List<String> get _allowedStatuses {
-    final allowed = merchantOrderTransitions[order.status] ?? const <String>{};
-    return merchantSelectableStatuses
-        .where((status) => allowed.contains(status))
-        .toList();
-  }
+  List<String> get _allowedStatuses =>
+      OrderStatusPolicy.merchantTransitionsFrom(order.status);
 
   Future<void> _assignCourier(BuildContext context) async {
     final nameController = TextEditingController(text: order.courier.name);
@@ -332,12 +310,7 @@ class _CourierSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final canAssign =
-        onAssign != null &&
-        const [
-          'confirmed',
-          'preparing',
-          'outForDelivery',
-        ].contains(order.status);
+        onAssign != null && OrderStatusPolicy.canAssignCourier(order.status);
 
     if (!canAssign && !order.courier.isAssigned) {
       return const SizedBox.shrink();

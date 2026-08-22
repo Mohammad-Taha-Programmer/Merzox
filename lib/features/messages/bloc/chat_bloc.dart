@@ -1,20 +1,22 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/api_service.dart';
-import '../../authentication/bloc/auth_bloc.dart';
+import '../../../core/auth/auth_session_service.dart';
 import 'chat_event.dart';
 import 'chat_state.dart';
 
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
   ChatBloc({
     ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
     String conversationId = '',
     String title = '',
     String avatarUrl = '',
   }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
        super(
          ChatState(
            conversationId: conversationId,
@@ -104,14 +106,19 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         ),
       );
 
-      // Opening the thread is what marks it read; a failure here must not hide
-      // messages that were loaded successfully.
+      // Marking the thread read is a second, independent operation. Its
+      // failure must not hide messages that already loaded, but it must not be
+      // reported as a success either - the inbox stays the unread authority
+      // and refreshes from the backend when this screen is popped.
       try {
         await _apiService.markConversationRead(
           token: token,
           conversationId: state.conversationId,
         );
-      } catch (_) {}
+        emit(state.copyWith(readSyncFailed: false));
+      } catch (_) {
+        emit(state.copyWith(readSyncFailed: true));
+      }
     } catch (error) {
       emit(
         state.copyWith(
@@ -185,12 +192,17 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     }
   }
 
+  /// Session truth lives in [AuthSessionService]: a stale token without an
+  /// active session, or a blank one, resolves to unauthenticated here rather
+  /// than being re-interpreted per bloc.
   Future<String> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AuthBloc.tokenKey);
-    if (token == null || token.isEmpty) {
+    final session = await _authSessionService.read();
+    final token = session.token;
+
+    if (token == null) {
       throw StateError('Authentication required');
     }
+
     return token;
   }
 }

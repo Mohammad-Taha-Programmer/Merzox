@@ -1,17 +1,20 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/api_service.dart';
-import '../../authentication/bloc/auth_bloc.dart';
+import '../../../core/auth/auth_session_service.dart';
 import 'orders_event.dart';
 import 'orders_state.dart';
 
 class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
-  OrdersBloc({ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(const OrdersState()) {
+  OrdersBloc({
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const OrdersState()) {
     on<OrdersStarted>(_onStarted);
     on<OrdersGroupChanged>(_onGroupChanged);
     on<OrdersLoadMoreRequested>(_onLoadMoreRequested);
@@ -157,12 +160,17 @@ class OrdersBloc extends Bloc<OrdersEvent, OrdersState> {
     }
   }
 
+  /// Session truth lives in [AuthSessionService]: a stale token left behind
+  /// after logout, or a blank one, resolves to unauthenticated here rather
+  /// than being re-interpreted per bloc.
   Future<String> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AuthBloc.tokenKey);
-    if (token == null || token.isEmpty) {
+    final session = await _authSessionService.read();
+    final token = session.token;
+
+    if (token == null) {
       throw StateError('Authentication required');
     }
+
     return token;
   }
 }

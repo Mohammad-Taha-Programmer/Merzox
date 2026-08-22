@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -8,10 +9,14 @@ import 'profile_edit_state.dart';
 
 class ProfileEditBloc extends Bloc<ProfileEditEvent, ProfileEditState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
-  ProfileEditBloc({ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(const ProfileEditState()) {
+  ProfileEditBloc({
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const ProfileEditState()) {
     on<ProfileEditStarted>(_onStarted);
     on<ProfileEditSubmitted>(_onSubmitted);
   }
@@ -65,11 +70,14 @@ class ProfileEditBloc extends Bloc<ProfileEditEvent, ProfileEditState> {
     }
   }
 
+  /// Session truth lives in [AuthSessionService]: a stale token left behind
+  /// after logout, or a blank one, resolves to unauthenticated here rather
+  /// than being re-interpreted per bloc.
   Future<String> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AuthBloc.tokenKey);
+    final session = await _authSessionService.read();
+    final token = session.token;
 
-    if (token == null || token.isEmpty) {
+    if (token == null) {
       throw StateError('Authentication required');
     }
 

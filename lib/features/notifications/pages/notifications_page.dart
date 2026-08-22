@@ -78,7 +78,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: BlocBuilder<NotificationsBloc, NotificationsState>(
+        child: BlocConsumer<NotificationsBloc, NotificationsState>(
+          // A read-state write that the server refused is reported here rather
+          // than left to look like it succeeded.
+          listenWhen: (previous, current) =>
+              previous.errorMessage != current.errorMessage,
+          listener: (context, state) {
+            if (state.errorMessage.isEmpty) return;
+            if (state.status == NotificationsStatus.failure) return;
+
+            ScaffoldMessenger.of(context)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(SnackBar(content: Text(state.errorMessage)));
+          },
           builder: (context, state) {
             return Column(
               children: [

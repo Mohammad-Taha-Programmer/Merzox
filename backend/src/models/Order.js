@@ -2,6 +2,12 @@ import crypto from 'node:crypto';
 
 import mongoose from 'mongoose';
 
+import {
+  canChangeDeliveryAddress,
+  canCustomerCancel,
+  canReviewOrder
+} from '../policies/order-status.policy.js';
+
 const orderItemSchema = new mongoose.Schema(
   {
     productId: {
@@ -190,9 +196,9 @@ orderSchema.methods.trackingJSON = function trackingJSON() {
       isReached: this.status !== 'cancelled' && index <= currentIndex
     })),
     courier: this.courierJSON(),
-    canCancel: ['pending', 'confirmed', 'preparing'].includes(this.status),
-    canChangeAddress: ['pending', 'confirmed'].includes(this.status),
-    canReview: this.status === 'delivered'
+    canCancel: canCustomerCancel(this.status),
+    canChangeAddress: canChangeDeliveryAddress(this.status),
+    canReview: canReviewOrder(this.status)
   };
 };
 

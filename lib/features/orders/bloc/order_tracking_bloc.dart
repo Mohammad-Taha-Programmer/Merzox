@@ -1,18 +1,22 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/api_service.dart';
-import '../../authentication/bloc/auth_bloc.dart';
+import '../../../core/auth/auth_session_service.dart';
 import 'order_tracking_event.dart';
 import 'order_tracking_state.dart';
 
 class OrderTrackingBloc extends Bloc<OrderTrackingEvent, OrderTrackingState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
   final String orderId;
 
-  OrderTrackingBloc({required this.orderId, ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(const OrderTrackingState()) {
+  OrderTrackingBloc({
+    required this.orderId,
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const OrderTrackingState()) {
     on<OrderTrackingStarted>(_onStarted);
     on<OrderTrackingRefreshRequested>(_onRefreshRequested);
     on<OrderTrackingCancelRequested>(_onCancelRequested);
@@ -178,12 +182,17 @@ class OrderTrackingBloc extends Bloc<OrderTrackingEvent, OrderTrackingState> {
     }
   }
 
+  /// Session truth lives in [AuthSessionService]: a stale token without an
+  /// active session, or a blank one, resolves to unauthenticated here rather
+  /// than being re-interpreted per bloc.
   Future<String> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AuthBloc.tokenKey);
-    if (token == null || token.isEmpty) {
+    final session = await _authSessionService.read();
+    final token = session.token;
+
+    if (token == null) {
       throw StateError('Authentication required');
     }
+
     return token;
   }
 }
