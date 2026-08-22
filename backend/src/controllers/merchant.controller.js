@@ -13,8 +13,9 @@ import {
   statusGroupFor
 } from '../policies/order-status.policy.js';
 import {
-  INVENTORY_ERRORS,
-  buildAtomicInventoryUpdate
+  buildAtomicInventoryUpdate,
+  classifyInventoryConflict,
+  inventoryConflictResponse
 } from '../policies/checkout-intent.policy.js';
 import { buildProductWrite } from '../policies/product.policy.js';
 import { paginationParams } from '../policies/query.policy.js';
@@ -297,25 +298,30 @@ async function applyInventoryUpdate({ business, product, write, ownerId }) {
 
   if (updated) return updated;
 
-  // The write matched nothing. Distinguish the two honest reasons rather than
-  // reporting a missing product as a reservation conflict.
-  const stillExists = await Business.exists({
+  // The write matched nothing, and the filter has several predicates that could
+  // be the reason. Read once more purely to say which - this read authorizes
+  // nothing and is followed by no second write, so the CAS above remains the
+  // only thing that ever mutates inventory.
+  const current = await Business.findOne({
     _id: business._id,
-    owner: ownerId,
-    'products._id': product._id
+    owner: ownerId
+  }).select('+stockReservations');
+
+  const conflict = classifyInventoryConflict({
+    business: current,
+    product: current?.products?.id(product._id),
+    observedStock: {
+      stockQuantity: product.stockQuantity,
+      unlimitedStock: product.unlimitedStock
+    }
   });
 
-  if (!stillExists) {
-    throw new AppError('Product not found', 404, 'PRODUCT_NOT_FOUND');
-  }
+  // The message never carries the current stock figure, a reservation id, or
+  // anything identifying a customer or their checkout. The mapping lives beside
+  // the classifier so the API and its tests cannot describe it differently.
+  const failure = inventoryConflictResponse(conflict);
 
-  // No reservation id, customer, order key or fingerprint is disclosed: the
-  // merchant is told stock is in use, not who is buying it.
-  throw new AppError(
-    'This product has stock reserved by a checkout in progress, please retry shortly',
-    409,
-    INVENTORY_ERRORS.reserved
-  );
+  throw new AppError(failure.message, failure.status, failure.code);
 }
 
 export const updateMyBusinessProduct = asyncHandler(async (req, res) => {

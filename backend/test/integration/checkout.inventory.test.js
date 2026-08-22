@@ -52,8 +52,11 @@ if (!environment.enabled) {
   const { Order } = await import('../../src/models/Order.js');
   const { User } = await import('../../src/models/User.js');
   const {
+    buildAtomicInventoryUpdate,
     buildIdentifiedRelease,
-    buildIdentifiedReservation
+    buildIdentifiedReservation,
+    classifyInventoryConflict,
+    inventoryConflictResponse
   } = await import('../../src/policies/checkout-intent.policy.js');
   const { reconcileIntent, reconcileStaleCheckouts } = await import(
     '../../src/services/checkout-reconciler.service.js'
@@ -1611,6 +1614,264 @@ if (!environment.enabled) {
         response.code,
         'PRODUCT_INVENTORY_RESERVED',
         'a missing product must not be reported as reserved'
+      );
+    });
+
+    // ================================================================= R4 ===
+    // The atomic write can miss for materially different reasons, and the
+    // merchant is told which one.
+
+    /**
+     * A merchant inventory write whose OBSERVED pair is deliberately stale.
+     *
+     * The HTTP handler always reads the product immediately before writing, so
+     * its observation is current by construction and the compare-and-set can
+     * never miss through it. This drives the same production builder,
+     * classifier and response mapping with the observation a merchant would
+     * actually have been holding.
+     */
+    async function patchWithObservedStock(
+      businessId,
+      productId,
+      write,
+      observedStock
+    ) {
+      const owner = (await Business.findById(objectId(businessId))).owner;
+      const atomic = buildAtomicInventoryUpdate({
+        businessId: objectId(businessId),
+        ownerId: owner,
+        productId: objectId(productId),
+        write,
+        observedStock
+      });
+
+      const updated = await Business.findOneAndUpdate(atomic.filter, atomic.update, {
+        arrayFilters: atomic.arrayFilters,
+        new: true
+      });
+
+      if (updated) return { matched: true, status: 200 };
+
+      const current = await Business.findOne({ _id: objectId(businessId), owner })
+        .select('+stockReservations');
+      const conflict = classifyInventoryConflict({
+        business: current,
+        product: current?.products?.id(objectId(productId)),
+        observedStock
+      });
+      const failure = inventoryConflictResponse(conflict);
+
+      return { matched: false, status: failure.status, code: failure.code };
+    }
+
+    // ---------------------------------------------------------------- M11 ---
+    await t.test('M11 two edits from one observation cannot both apply', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'm11'
+      );
+
+      // The deterministic half. Both writes were computed from the SAME
+      // observed 5, which is the situation `Promise.all` over HTTP can only
+      // sometimes produce: the server is free to serialize the two requests,
+      // and then the second genuinely observes the first's result and is not
+      // stale at all. Driving the observation explicitly makes the invariant
+      // testable instead of timing-dependent.
+      const first = await patchWithObservedStock(
+        store.businessId,
+        store.productId,
+        { stockQuantity: 8 },
+        { stockQuantity: 5, unlimitedStock: false }
+      );
+      const second = await patchWithObservedStock(
+        store.businessId,
+        store.productId,
+        { stockQuantity: 12 },
+        { stockQuantity: 5, unlimitedStock: false }
+      );
+
+      assert.equal(first.matched, true, 'the first edit applies against 5');
+      assert.equal(second.matched, false, 'the second must not overwrite blindly');
+      assert.equal(second.status, 409);
+      assert.notEqual(
+        second.code,
+        'PRODUCT_INVENTORY_RESERVED',
+        'no reservation exists, so this must not claim one'
+      );
+      assert.equal(second.code, 'PRODUCT_INVENTORY_CHANGED');
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        8,
+        'exactly the winning value, never the stale one'
+      );
+
+      // The concurrent half, over real HTTP. Whether the server serializes the
+      // two or not, the outcome must stay inside the allowed set.
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $set: { 'products.$[p].stockQuantity': 5 } },
+        { arrayFilters: [{ 'p._id': objectId(store.productId) }] }
+      );
+
+      const [raceA, raceB] = await Promise.all([
+        patchProduct(store.merchant.token, store.productId, { stockQuantity: 8 }),
+        patchProduct(store.merchant.token, store.productId, { stockQuantity: 12 })
+      ]);
+
+      for (const response of [raceA, raceB]) {
+        assert.ok(
+          [200, 409].includes(response.status),
+          `unexpected status ${response.status}`
+        );
+        if (response.status === 409) {
+          assert.equal(
+            response.code,
+            'PRODUCT_INVENTORY_CHANGED',
+            'a merchant-vs-merchant conflict is never a reservation'
+          );
+        }
+      }
+
+      const finalStock = await ownerStock(store.merchant.token, store.productId);
+      assert.ok(
+        [8, 12].includes(finalStock),
+        `final stock must be a value some request actually asked for, got ${finalStock}`
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+
+      // Nothing unrelated was disturbed.
+      const stored = await Business.findById(objectId(store.businessId));
+      const product = stored.products.find(
+        (entry) => entry._id.toString() === store.productId
+      );
+      assert.equal(product.price, 20);
+      assert.equal(product.unlimitedStock, false);
+    });
+
+    // ---------------------------------------------------------------- M12 ---
+    await t.test('M12 a finalized checkout makes a stale merchant write a change', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'm12'
+      );
+      const buyer = await seedAccount('buyer-m12');
+
+      // 1. what the merchant sees before deciding.
+      const observed = await ownerStock(store.merchant.token, store.productId);
+      assert.equal(observed, 5);
+
+      // 2-4. a checkout consumes 2, finalizes, and its marker is settled.
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: `${stamp}-m12`,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+      const orderId = placed.json.data.order.id;
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+      assert.deepEqual(
+        await outstandingMarkers(store.businessId),
+        [],
+        'the finalized reservation is already settled'
+      );
+
+      // 5. the merchant writes using the pair they observed at step 1.
+      const stale = await patchWithObservedStock(
+        store.businessId,
+        store.productId,
+        { stockQuantity: 10 },
+        { stockQuantity: observed, unlimitedStock: false }
+      );
+
+      assert.equal(stale.matched, false, 'the stale CAS must not apply');
+      assert.equal(stale.status, 409);
+      assert.equal(stale.code, 'PRODUCT_INVENTORY_CHANGED');
+      assert.notEqual(stale.code, 'PRODUCT_INVENTORY_RESERVED');
+
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        3,
+        'the consumed inventory is not lost'
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+      const order = await Order.findById(orderId);
+      assert.ok(order, 'the finalized order is untouched');
+      assert.equal(order.items[0].quantity, 2);
+    });
+
+    // ---------------------------------------------------------------- M13 ---
+    await t.test('M13 the same stale pair WITH a marker is still reserved', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'm13'
+      );
+      const buyer = await seedAccount('buyer-m13');
+      const key = `${stamp}-m13`;
+
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+
+      // Hold the reservation open: the stock pair is stale in exactly the same
+      // way as M12, but this time something really is holding it.
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      await Order.deleteOne({ _id: intent.order });
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'reserved', order: null } }
+      );
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+
+      const blocked = await patchWithObservedStock(
+        store.businessId,
+        store.productId,
+        { stockQuantity: 10 },
+        { stockQuantity: 5, unlimitedStock: false }
+      );
+
+      assert.equal(blocked.status, 409);
+      assert.equal(
+        blocked.code,
+        'PRODUCT_INVENTORY_RESERVED',
+        'the new classification must not collapse both conflicts into one'
+      );
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+    });
+
+    // ---------------------------------------------------------------- M14 ---
+    await t.test('M14 a disabled business is not reported as an inventory conflict', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'm14'
+      );
+
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $set: { isActive: false } }
+      );
+
+      const response = await patchProduct(store.merchant.token, store.productId, {
+        stockQuantity: 9
+      });
+
+      assert.equal(response.status, 403);
+      assert.equal(response.code, 'BUSINESS_ACCOUNT_DISABLED');
+      assert.notEqual(response.code, 'PRODUCT_INVENTORY_RESERVED');
+      assert.notEqual(response.code, 'PRODUCT_INVENTORY_CHANGED');
+
+      // Restored so the shared cleanup can find it by owner as usual.
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $set: { isActive: true } }
       );
     });
   });

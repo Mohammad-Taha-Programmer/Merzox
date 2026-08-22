@@ -11,8 +11,10 @@ import {
   CONVERGENCE_ATTEMPTS,
   CONVERGENCE_INTERVAL_MS,
   IDEMPOTENCY_ERRORS,
+  INVENTORY_CONFLICTS,
   INVENTORY_ERRORS,
   buildAtomicInventoryUpdate,
+  classifyInventoryConflict,
   buildIdentifiedRelease,
   buildIdentifiedReservation,
   buildReservationSettlement,
@@ -343,8 +345,107 @@ test('a legacy product without a stock pair is not refused on a phantom field', 
   assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
 });
 
-test('the merchant conflict code is stable and discloses nothing', () => {
+test('the merchant conflict codes are stable and distinct', () => {
   assert.equal(INVENTORY_ERRORS.reserved, 'PRODUCT_INVENTORY_RESERVED');
+  assert.equal(INVENTORY_ERRORS.changed, 'PRODUCT_INVENTORY_CHANGED');
+  assert.notEqual(INVENTORY_ERRORS.reserved, INVENTORY_ERRORS.changed);
+});
+
+// --------------------------------------------------- conflict classification
+
+const observedStock = { stockQuantity: 5, unlimitedStock: false };
+
+function businessLike({ isActive = true, reservations = [], product } = {}) {
+  return {
+    isActive,
+    stockReservations: reservations,
+    products: { id: () => product }
+  };
+}
+
+test('an outstanding reservation is reported as a reservation', () => {
+  const conflict = classifyInventoryConflict({
+    business: businessLike({
+      reservations: [new mongoose.Types.ObjectId()],
+      product: { stockQuantity: 3, unlimitedStock: false }
+    }),
+    product: { stockQuantity: 3, unlimitedStock: false },
+    observedStock
+  });
+
+  assert.equal(conflict, INVENTORY_CONFLICTS.reserved);
+});
+
+test('a stale stock pair is NOT reported as a reservation', () => {
+  // The exact case R4 exists for: nothing is holding stock, the merchant is
+  // simply looking at a number that moved.
+  const conflict = classifyInventoryConflict({
+    business: businessLike({
+      reservations: [],
+      product: { stockQuantity: 3, unlimitedStock: false }
+    }),
+    product: { stockQuantity: 3, unlimitedStock: false },
+    observedStock
+  });
+
+  assert.equal(conflict, INVENTORY_CONFLICTS.stockChanged);
+  assert.notEqual(conflict, INVENTORY_CONFLICTS.reserved);
+});
+
+test('a changed unlimited flag is also a change, not a reservation', () => {
+  const conflict = classifyInventoryConflict({
+    business: businessLike({
+      reservations: [],
+      product: { stockQuantity: 0, unlimitedStock: true }
+    }),
+    product: { stockQuantity: 0, unlimitedStock: true },
+    observedStock
+  });
+
+  assert.equal(conflict, INVENTORY_CONFLICTS.stockChanged);
+});
+
+test('a missing product or business keeps its own meaning', () => {
+  assert.equal(
+    classifyInventoryConflict({ business: null, product: null, observedStock }),
+    INVENTORY_CONFLICTS.businessMissing
+  );
+  assert.equal(
+    classifyInventoryConflict({
+      business: businessLike({ isActive: false }),
+      product: { stockQuantity: 5, unlimitedStock: false },
+      observedStock
+    }),
+    INVENTORY_CONFLICTS.businessInactive
+  );
+  assert.equal(
+    classifyInventoryConflict({
+      business: businessLike({ reservations: [] }),
+      product: null,
+      observedStock
+    }),
+    INVENTORY_CONFLICTS.productMissing
+  );
+});
+
+test('classification is pure: it can never write', () => {
+  // Given only plain objects with no save/update surface at all, the classifier
+  // still returns an answer - proof that it performs no second inventory write.
+  const inert = Object.freeze({
+    isActive: true,
+    stockReservations: Object.freeze([]),
+    products: Object.freeze({ id: () => Object.freeze({ stockQuantity: 3, unlimitedStock: false }) })
+  });
+
+  assert.equal(
+    classifyInventoryConflict({
+      business: inert,
+      product: inert.products.id(),
+      observedStock
+    }),
+    INVENTORY_CONFLICTS.stockChanged
+  );
+  assert.equal(typeof classifyInventoryConflict, 'function');
 });
 
 // ------------------------------------------------------- provisional privacy

@@ -56,8 +56,102 @@ export const INVENTORY_ERRORS = {
    * Refused rather than merged: the outstanding reservation will be released or
    * settled within the lease above, and the edit succeeds on retry.
    */
-  reserved: 'PRODUCT_INVENTORY_RESERVED'
+  reserved: 'PRODUCT_INVENTORY_RESERVED',
+
+  /**
+   * The atomic write missed because the inventory it was computed from is no
+   * longer current - another merchant edit landed first, or a checkout
+   * finalized and settled. Materially different from `reserved`: nothing is
+   * holding stock, the merchant is simply looking at a stale number and needs
+   * to reload before deciding again.
+   *
+   * Deliberately NOT retried on their behalf: they chose a figure from the
+   * state they saw, and silently re-applying it against different state could
+   * overwrite somebody else's legitimate change.
+   */
+  changed: 'PRODUCT_INVENTORY_CHANGED'
 };
+
+/**
+ * Why an atomic inventory write matched nothing.
+ *
+ * Every predicate in `buildAtomicInventoryUpdate` can be the reason, and they
+ * are NOT interchangeable: "a checkout is holding stock" and "your number is
+ * stale" ask the merchant to do different things. This decides between them
+ * from a fresh read, and is deliberately pure so the decision is testable
+ * without a database.
+ *
+ * It is classification only. It authorizes nothing and performs no write.
+ */
+export const INVENTORY_CONFLICTS = {
+  businessMissing: 'businessMissing',
+  businessInactive: 'businessInactive',
+  productMissing: 'productMissing',
+  reserved: 'reserved',
+  stockChanged: 'stockChanged'
+};
+
+/**
+ * The HTTP answer for each conflict.
+ *
+ * Kept beside the classifier so the controller and its tests cannot drift: a
+ * test that exercised the classifier but hand-wrote the mapping would pass
+ * while the API said something else entirely.
+ */
+export function inventoryConflictResponse(conflict) {
+  switch (conflict) {
+    case INVENTORY_CONFLICTS.businessMissing:
+      return {
+        status: 404,
+        code: 'BUSINESS_PROFILE_NOT_FOUND',
+        message: 'Business profile was not found'
+      };
+    case INVENTORY_CONFLICTS.businessInactive:
+      return {
+        status: 403,
+        code: 'BUSINESS_ACCOUNT_DISABLED',
+        message: 'Business account is disabled'
+      };
+    case INVENTORY_CONFLICTS.productMissing:
+      return { status: 404, code: 'PRODUCT_NOT_FOUND', message: 'Product not found' };
+    case INVENTORY_CONFLICTS.reserved:
+      return {
+        status: 409,
+        code: INVENTORY_ERRORS.reserved,
+        message:
+          'This product has stock reserved by a checkout in progress, please retry shortly'
+      };
+    default:
+      return {
+        status: 409,
+        code: INVENTORY_ERRORS.changed,
+        message:
+          'This product inventory changed while the update was in progress, please reload and try again'
+      };
+  }
+}
+
+export function classifyInventoryConflict({
+  business,
+  product,
+  observedStock
+}) {
+  if (!business) return INVENTORY_CONFLICTS.businessMissing;
+  if (!business.isActive) return INVENTORY_CONFLICTS.businessInactive;
+  if (!product) return INVENTORY_CONFLICTS.productMissing;
+
+  // Checked before the stock pair: an outstanding reservation is the more
+  // actionable answer ("wait a moment"), and a settled one always moves the
+  // pair too, so it would be reported as a change anyway.
+  if ((business.stockReservations ?? []).length > 0) {
+    return INVENTORY_CONFLICTS.reserved;
+  }
+
+  // Anything else the filter could have missed on is, by elimination, the
+  // compare-and-set: the observed pair is no longer what is stored. Reported as
+  // a change rather than as a reservation that demonstrably does not exist.
+  return INVENTORY_CONFLICTS.stockChanged;
+}
 
 export const IDEMPOTENCY_ERRORS = {
   keyReused: 'IDEMPOTENCY_KEY_REUSED',
