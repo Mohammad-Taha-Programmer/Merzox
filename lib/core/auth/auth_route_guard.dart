@@ -10,6 +10,15 @@ final class AuthRouteGuard {
     '/notifications',
   };
 
+  /// Routes that require an enrolled business session, not merely a signed-in
+  /// user. The merchant store preview belongs here: it renders the owner's own
+  /// store, so a customer session must never reach it even though the page it
+  /// shows is otherwise public.
+  static const Set<String> _businessRoutes = {
+    '/business/messages',
+    '/business/preview',
+  };
+
   /// Order tracking carries the order id in the path, so it is matched by
   /// shape rather than by an exact route string.
   static bool _isAuthenticatedPattern(String path) {
@@ -41,7 +50,7 @@ final class AuthRouteGuard {
       return _normalizeNotifications(uri, session);
     }
 
-    if (path == '/business/messages' && !session.isBusiness) {
+    if (_businessRoutes.contains(path) && !session.isBusiness) {
       return session.isAuthenticated ? '/business/enroll' : '/business/login';
     }
 

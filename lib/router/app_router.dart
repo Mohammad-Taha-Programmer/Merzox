@@ -13,6 +13,7 @@ import '../features/authentication/pages/signup_page.dart';
 import '../features/business/enrollment/business_enrollment_bloc.dart';
 import '../features/business/messages/merchant_messages_page.dart';
 import '../features/business/enrollment/business_enrollment_page.dart';
+import '../features/business/preview/store_preview_page.dart';
 import '../features/business/shell/business_bloc.dart';
 import '../features/business/shell/business_shell_page.dart';
 import '../features/favorites/bloc/favorites_bloc.dart';
@@ -116,6 +117,16 @@ class AppRouter {
           create: (_) =>
               MessagesBloc(merchantMode: true)..add(const MessagesStarted()),
           child: const MerchantMessagesPage(),
+        ),
+      ),
+      // The preview takes no business id from the route: it loads the owner
+      // business for the current session, so the URL cannot be pointed at
+      // somebody else's store.
+      GoRoute(
+        path: '/business/preview',
+        builder: (_, __) => BlocProvider(
+          create: (_) => BusinessBloc()..add(const BusinessStarted()),
+          child: const StorePreviewPage(),
         ),
       ),
       GoRoute(

@@ -641,6 +641,23 @@ class _Profile extends StatelessWidget {
                   ),
                 ),
               ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  // Routed rather than pushed locally, so the preview passes
+                  // the business-only route guard and loads the storefront
+                  // from the public contract instead of inheriting the
+                  // merchant's own already-loaded owner state.
+                  onPressed: () => context.push('/business/preview'),
+                  icon: const Icon(Icons.visibility_outlined),
+                  label: Text('merchantPreview.open'.tr()),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: MerzoxColors.kColor3D5A80),
+                    foregroundColor: MerzoxColors.kColor3D5A80,
+                  ),
+                ),
+              ),
               TextButton.icon(
                 onPressed: onLogout,
                 icon: const Icon(Icons.logout_rounded),
