@@ -313,6 +313,12 @@ void main() {
         'id': 'p1',
         'name': 'أساس',
         'price': 35,
+        // The public commerce contract, which the model now requires.
+        'discountPercent': 15,
+        'finalPrice': 29.75,
+        'inStock': true,
+        // Merchant-internal keys, present in the payload and expected to be
+        // dropped rather than stored anywhere reachable.
         'costPrice': 20,
         'stockQuantity': 12,
         'keywords': ['secret'],
@@ -320,6 +326,8 @@ void main() {
 
       expect(customer.name, 'أساس');
       expect(customer.price, 35);
+      expect(customer.finalPrice, 29.75);
+      expect(customer.inStock, isTrue);
 
       // The type itself carries no merchant fields; this asserts the surface.
       expect(

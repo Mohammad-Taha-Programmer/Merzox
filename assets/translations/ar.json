@@ -44,7 +44,12 @@
     "loadError": "تعذر تحميل الطلبات. حاول مرة أخرى.",
     "checkoutSuccess": "تم إنشاء طلبك بنجاح",
     "checkoutError": "تعذر إنشاء الطلب. تحقق من العنوان والمنتجات ثم حاول مجدداً.",
-    "moreItems": "+{} منتجات"
+    "moreItems": "+{} منتجات",
+    "checkoutOutOfStock": "أحد المنتجات لم يعد متوفراً",
+    "checkoutInsufficientStock": "الكمية المطلوبة غير متوفرة",
+    "checkoutProductUnavailable": "أحد المنتجات لم يعد متاحاً",
+    "checkoutBusinessUnavailable": "المتجر غير متاح حالياً",
+    "checkoutAddressRequired": "أضف عنوان توصيل لإتمام الطلب"
   },
   "favorites": {
     "title": "المفضلة",
@@ -93,7 +98,8 @@
     "addressUnavailable": "العنوان غير متوفر",
     "invalidCartItem": "تعذر إضافة هذا العنصر لأن بياناته لا ترتبط بمنتج متاح.",
     "productReviewPublished": "تم نشر تقييم المنتج",
-    "addedToCart": "تمت إضافة المنتج إلى السلة"
+    "addedToCart": "تمت إضافة المنتج إلى السلة",
+    "outOfStock": "غير متوفر حالياً"
   },
   "aboutUs": {
     "title": "من نحن",

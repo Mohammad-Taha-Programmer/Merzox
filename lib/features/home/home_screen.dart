@@ -1734,6 +1734,21 @@ class _CartItemTile extends StatelessWidget {
                     color: MerzoxColors.kColor767676,
                   ),
                 ),
+                // Shown only when the public contract said so on the last
+                // refresh; checkout refuses while any line reads like this.
+                if (!item.inStock)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      'catalog.outOfStock'.tr(),
+                      textDirection: TextDirection.rtl,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: MerzoxColors.kColorEE6C4D,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 8),
                 Row(
                   textDirection: TextDirection.rtl,

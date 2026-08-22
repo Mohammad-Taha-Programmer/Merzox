@@ -51,12 +51,19 @@ BusinessProductApiModel catalogProduct({
   String id = '64c000000000000000000001',
   String name = 'Test product',
   String description = '',
+  double price = 25,
+  double discountPercent = 0,
+  double? finalPrice,
+  bool inStock = true,
 }) {
   return BusinessProductApiModel(
     id: id,
     name: name,
     description: description,
-    price: 25,
+    price: price,
+    discountPercent: discountPercent,
+    finalPrice: finalPrice,
+    inStock: inStock,
     imageUrl: '',
     imageUrls: const [],
     classification: 'new',
@@ -64,6 +71,37 @@ BusinessProductApiModel catalogProduct({
     ratingCount: 0,
     likeCount: 0,
   );
+}
+
+/// A PUBLIC product payload exactly as `Business.productToJSON` emits it.
+///
+/// Tests parse this rather than constructing the model, so a change to the
+/// required commerce contract is caught here instead of being papered over by
+/// constructor defaults.
+Map<String, dynamic> catalogProductJson({
+  String id = '64c000000000000000000001',
+  String name = 'Test product',
+  double price = 25,
+  double discountPercent = 0,
+  double? finalPrice,
+  bool inStock = true,
+}) {
+  return <String, dynamic>{
+    'id': id,
+    'name': name,
+    'description': '',
+    'price': price,
+    'discountPercent': discountPercent,
+    'finalPrice': finalPrice ?? price,
+    'inStock': inStock,
+    'imageUrl': '',
+    'imageUrls': const <String>[],
+    'classification': 'new',
+    'rating': 0,
+    'ratingCount': 0,
+    'likeCount': 0,
+    'isService': false,
+  };
 }
 
 BusinessDetailApiModel catalogBusinessDetail({
