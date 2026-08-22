@@ -1,26 +1,29 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/api_service.dart';
-import '../../authentication/bloc/auth_bloc.dart';
+import '../../../core/auth/auth_session_service.dart';
 import 'messages_event.dart';
 import 'messages_state.dart';
 
 class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
   /// The same list serves the customer inbox and the merchant inbox; only the
   /// endpoint differs, so the side is fixed when the bloc is created.
   final bool merchantMode;
 
-  MessagesBloc({ApiService? apiService, this.merchantMode = false})
-    : _apiService = apiService ?? ApiService(),
-      super(const MessagesState()) {
+  MessagesBloc({
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+    this.merchantMode = false,
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const MessagesState()) {
     on<MessagesStarted>(_onStarted);
     on<MessagesFilterChanged>(_onFilterChanged);
     on<MessagesRefreshRequested>(_onRefreshRequested);
     on<MessagesLoadMoreRequested>(_onLoadMoreRequested);
-    on<MessagesThreadRead>(_onThreadRead);
   }
 
   Future<void> _onStarted(
@@ -112,49 +115,6 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     }
   }
 
-  /// Clearing the badge locally keeps the inbox in step with a thread the user
-  /// just read, without paying for another round trip.
-  void _onThreadRead(MessagesThreadRead event, Emitter<MessagesState> emit) {
-    final existing = state.conversations
-        .where((conversation) => conversation.id == event.conversationId)
-        .firstOrNull;
-
-    if (existing == null || !existing.hasUnread) return;
-
-    final updated = [
-      for (final conversation in state.conversations)
-        if (conversation.id == event.conversationId)
-          ConversationApiModel(
-            id: conversation.id,
-            title: conversation.title,
-            avatarUrl: conversation.avatarUrl,
-            business: conversation.business,
-            customer: conversation.customer,
-            lastMessage: conversation.lastMessage,
-            unreadCount: 0,
-            messageCount: conversation.messageCount,
-            updatedAt: conversation.updatedAt,
-          )
-        else
-          conversation,
-    ];
-
-    emit(
-      state.copyWith(
-        conversations: state.filter == MessagesFilter.unread
-            ? updated
-                  .where(
-                    (conversation) => conversation.id != event.conversationId,
-                  )
-                  .toList()
-            : updated,
-        unreadConversationCount: state.unreadConversationCount > 0
-            ? state.unreadConversationCount - 1
-            : 0,
-      ),
-    );
-  }
-
   Future<ConversationListApiResponse> _fetch({
     required MessagesFilter filter,
     required int page,
@@ -176,12 +136,23 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     );
   }
 
+  /// Session truth lives in [AuthSessionService]: a stale token without an
+  /// active session, or a blank one, resolves to unauthenticated here rather
+  /// than being re-interpreted per bloc.
   Future<String> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AuthBloc.tokenKey);
-    if (token == null || token.isEmpty) {
+    final session = await _authSessionService.read();
+    final token = session.token;
+
+    if (token == null) {
       throw StateError('Authentication required');
     }
+
+    // The merchant inbox is a different endpoint, not a different view of the
+    // same data, so the session must prove the role before it is requested.
+    if (merchantMode && !session.isBusiness) {
+      throw StateError('A business account is required');
+    }
+
     return token;
   }
 }

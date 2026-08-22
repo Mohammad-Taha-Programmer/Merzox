@@ -250,3 +250,96 @@ final class BusinessDashboardData {
     );
   }
 }
+
+/// The merchant view of a product.
+///
+/// Deliberately separate from the customer-facing `BusinessProductApiModel`:
+/// `costPrice`, exact `stockQuantity`, and `keywords` are merchant-internal and
+/// must never be introduced into a model the customer surfaces deserialize.
+///
+/// Every field tolerates absence so products stored before FIX4 still parse:
+/// a legacy document carries no stock fields at all, and is treated as
+/// unlimited rather than out of stock.
+final class OwnerProduct {
+  final String id;
+  final String name;
+  final String description;
+  final double price;
+
+  /// Merchant-internal margin data. Null when the merchant has not set one.
+  final double? costPrice;
+  final int stockQuantity;
+  final bool unlimitedStock;
+  final double discountPercent;
+
+  /// Server-derived; never sent when saving.
+  final double finalPrice;
+  final bool inStock;
+  final List<String> keywords;
+  final List<String> imageUrls;
+  final String classification;
+  final bool isService;
+  final bool isActive;
+
+  const OwnerProduct({
+    required this.id,
+    required this.name,
+    this.description = '',
+    this.price = 0,
+    this.costPrice,
+    this.stockQuantity = 0,
+    this.unlimitedStock = true,
+    this.discountPercent = 0,
+    this.finalPrice = 0,
+    this.inStock = true,
+    this.keywords = const [],
+    this.imageUrls = const [],
+    this.classification = 'new',
+    this.isService = false,
+    this.isActive = true,
+  });
+
+  String get imageUrl => imageUrls.isEmpty ? '' : imageUrls.first;
+
+  bool get hasDiscount => discountPercent > 0;
+
+  factory OwnerProduct.fromJson(Map<String, dynamic> json) {
+    final rawImages = json['imageUrls'] as List<dynamic>? ?? const [];
+    final images = rawImages
+        .whereType<String>()
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toList();
+    final legacyImage = (json['imageUrl'] as String? ?? '').trim();
+    if (legacyImage.isNotEmpty && !images.contains(legacyImage)) {
+      images.add(legacyImage);
+    }
+
+    final rawKeywords = json['keywords'] as List<dynamic>? ?? const [];
+    final price = (json['price'] as num?)?.toDouble() ?? 0;
+
+    return OwnerProduct(
+      id: json['id'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      price: price,
+      costPrice: (json['costPrice'] as num?)?.toDouble(),
+      stockQuantity: (json['stockQuantity'] as num?)?.toInt() ?? 0,
+      // Absent on legacy documents: those predate inventory and stayed
+      // purchasable, so unlimited is the honest reading.
+      unlimitedStock: json['unlimitedStock'] as bool? ?? true,
+      discountPercent: (json['discountPercent'] as num?)?.toDouble() ?? 0,
+      finalPrice: (json['finalPrice'] as num?)?.toDouble() ?? price,
+      inStock: json['inStock'] as bool? ?? true,
+      keywords: rawKeywords
+          .whereType<String>()
+          .map((keyword) => keyword.trim())
+          .where((keyword) => keyword.isNotEmpty)
+          .toList(),
+      imageUrls: images,
+      classification: json['classification'] as String? ?? 'new',
+      isService: json['isService'] as bool? ?? false,
+      isActive: json['isActive'] as bool? ?? true,
+    );
+  }
+}

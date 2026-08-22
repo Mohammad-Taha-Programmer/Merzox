@@ -133,7 +133,8 @@
     "contactStore": "Message the store",
     "loadError": "Messages could not be loaded. Please try again.",
     "guestTitle": "Please sign in",
-    "guestHint": "Sign in first to see your messages"
+    "guestHint": "Sign in first to see your messages",
+    "readSyncFailed": "The read receipt did not sync; your messages are still up to date"
   },
   "notifications": {
     "title": "Notifications",
@@ -219,7 +220,8 @@
       "card": "Card",
       "bankTransfer": "Bank transfer",
       "assisted": "Purchase for someone else"
-    }
+    },
+    "customerNameUnavailable": "Customer name unavailable"
   },
   "storeSettings": {
     "title": "Store settings",
@@ -232,5 +234,38 @@
     "mobile": "Mobile number",
     "facebook": "Facebook page for the store",
     "saved": "Store settings saved"
+  },
+  "merchantProduct": {
+    "addTitle": "Add a new product",
+    "editTitle": "Edit product",
+    "name": "Product name",
+    "nameHint": "Write the product name",
+    "description": "Product description",
+    "descriptionHint": "Write a description for the product",
+    "price": "Price",
+    "costPrice": "Cost price",
+    "costPriceHint": "This field is never shown to customers",
+    "quantity": "Quantity",
+    "quantityHint": "Quantity available for this product",
+    "unlimited": "Unlimited",
+    "hasDiscount": "Has a discount",
+    "discountPercent": "Discount %",
+    "priceAfterDiscount": "Price after discount",
+    "classification": "Product classification",
+    "keywords": "Keywords",
+    "keywordsHint": "Add keywords to make this product easier to find",
+    "images": "Images",
+    "imagesHint": "Add one image link per line",
+    "isService": "This item is a service",
+    "publish": "Publish to the store",
+    "save": "Save",
+    "saving": "Saving...",
+    "saved": "Product saved",
+    "required": "This field is required",
+    "invalidNumber": "Enter a valid number",
+    "invalidDiscount": "Discount must be between 0 and 100",
+    "invalidQuantity": "Quantity must be a whole, non-negative number",
+    "tooManyImages": "At most 8 images",
+    "tooManyKeywords": "At most 20 keywords"
   }
 }

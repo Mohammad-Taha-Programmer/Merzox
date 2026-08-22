@@ -1,35 +1,24 @@
 import mongoose from 'mongoose';
 
 import { Business } from '../models/Business.js';
+import { paginationParams, readFilterParam } from '../policies/query.policy.js';
 import { Conversation } from '../models/Conversation.js';
 import { Message } from '../models/Message.js';
+import {
+  messageCompensationLog,
+  resolveSendFailure
+} from '../policies/message-consistency.policy.js';
+import {
+  acknowledgementFilter,
+  acknowledgementUpdate,
+  isNoOpAcknowledgement
+} from '../policies/unread-counter.policy.js';
 import { notifyNewMessage } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
-function paginationParams(query) {
-  const parsedPage = Number.parseInt(query.page ?? '1', 10);
-  const parsedLimit = Number.parseInt(query.limit ?? '20', 10);
-  const page = Number.isFinite(parsedPage) ? Math.max(parsedPage, 1) : 1;
-  const limit = Number.isFinite(parsedLimit)
-    ? Math.min(Math.max(parsedLimit, 1), 50)
-    : 20;
-
-  return { page, limit, skip: (page - 1) * limit };
-}
-
 function conversationFilter(query) {
-  const filter = String(query.filter ?? 'all').trim();
-
-  if (filter !== 'all' && filter !== 'unread') {
-    throw new AppError(
-      'Conversation filter must be all or unread',
-      400,
-      'INVALID_CONVERSATION_FILTER'
-    );
-  }
-
-  return filter;
+  return readFilterParam(query.filter, 'INVALID_CONVERSATION_FILTER');
 }
 
 function findBusiness(id) {
@@ -62,6 +51,23 @@ async function requireOwnedBusiness(req) {
   return business;
 }
 
+/**
+ * Removes a message whose conversation summary could not be updated.
+ *
+ * Returns whether the compensation actually succeeded. When it did not, the
+ * caller must not report the original cause: a message now exists that no
+ * conversation summary accounts for, and only a distinct error conveys that.
+ */
+async function compensateMessage(messageId) {
+  try {
+    await Message.deleteOne({ _id: messageId });
+    return true;
+  } catch (error) {
+    console.error(...messageCompensationLog(error));
+    return false;
+  }
+}
+
 async function loadConversation(id) {
   if (!mongoose.isValidObjectId(id)) {
     throw new AppError('Conversation id is invalid', 400, 'INVALID_CONVERSATION_ID');
@@ -88,7 +94,10 @@ async function resolveViewer(req, conversation) {
 
   if (req.user.userType === 'business') {
     const business = await Business.findOne({ owner: req.user._id });
-    if (business && conversation.business.equals(business._id)) {
+    // isActive is checked here too, so a disabled store cannot keep reading or
+    // answering threads through the per-conversation routes after the list
+    // routes have already started refusing it.
+    if (business && business.isActive && conversation.business.equals(business._id)) {
       return { viewerType: 'business', business };
     }
   }
@@ -165,22 +174,33 @@ export const openConversation = asyncHandler(async (req, res) => {
     );
   }
 
-  const conversation = await Conversation.findOneAndUpdate(
-    { user: req.user._id, business: business._id },
-    {
-      $setOnInsert: {
-        user: req.user._id,
-        business: business._id
-      },
-      $set: {
-        userName: req.user.name,
-        businessName: business.name,
-        businessLogoUrl: business.logoUrl ?? '',
-        isActive: true
-      }
-    },
-    { new: true, upsert: true, setDefaultsOnInsert: true }
-  );
+  const filter = { user: req.user._id, business: business._id };
+  const update = {
+    $setOnInsert: { user: req.user._id, business: business._id },
+    $set: {
+      userName: req.user.name,
+      businessName: business.name,
+      businessLogoUrl: business.logoUrl ?? '',
+      isActive: true
+    }
+  };
+
+  let conversation;
+  try {
+    conversation = await Conversation.findOneAndUpdate(filter, update, {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true
+    });
+  } catch (error) {
+    // Two simultaneous "open chat" taps both miss the document and both try to
+    // insert. The unique {user, business} index lets exactly one win; the loser
+    // reads the winner's row instead of surfacing a duplicate-key error.
+    if (error?.code !== 11000) throw error;
+
+    conversation = await Conversation.findOne(filter);
+    if (!conversation) throw error;
+  }
 
   res.status(201).json({
     success: true,
@@ -226,6 +246,15 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
       ? req.user.name
       : business?.name ?? conversation.businessName;
 
+  const unreadField =
+    viewerType === 'customer' ? 'unreadForBusiness' : 'unreadForUser';
+
+  // The message and the conversation summary are two documents. Transactions
+  // are deliberately not used: the deployment topology is not guaranteed to be
+  // a replica set, and a standalone MongoDB would reject them outright.
+  // Instead the write is compensated - if the summary update fails, the
+  // just-created message is removed and the request fails, so a 201 always
+  // means both documents agree.
   const message = await Message.create({
     conversation: conversation._id,
     business: conversation.business,
@@ -235,23 +264,33 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
     body
   });
 
-  const unreadField =
-    viewerType === 'customer' ? 'unreadForBusiness' : 'unreadForUser';
-
-  const updated = await Conversation.findByIdAndUpdate(
-    conversation._id,
-    {
-      $set: {
-        lastMessage: {
-          body: message.body,
-          senderType: viewerType,
-          sentAt: message.createdAt
-        }
+  let updated;
+  try {
+    updated = await Conversation.findByIdAndUpdate(
+      conversation._id,
+      {
+        $set: {
+          lastMessage: {
+            body: message.body,
+            senderType: viewerType,
+            sentAt: message.createdAt
+          }
+        },
+        $inc: { [unreadField]: 1, messageCount: 1 }
       },
-      $inc: { [unreadField]: 1, messageCount: 1 }
-    },
-    { new: true }
-  );
+      { new: true }
+    );
+  } catch (error) {
+    const compensated = await compensateMessage(message._id);
+    throw resolveSendFailure({ compensated, originalError: error });
+  }
+
+  // A null result means the conversation disappeared between the access check
+  // and this write; the orphaned message must not survive it.
+  if (!updated) {
+    const compensated = await compensateMessage(message._id);
+    throw resolveSendFailure({ compensated });
+  }
 
   if (viewerType === 'customer') {
     const owner = business?.owner ?? (await Business.findById(conversation.business))?.owner;
@@ -296,21 +335,47 @@ export const markConversationRead = asyncHandler(async (req, res) => {
     viewerType === 'customer' ? 'unreadForUser' : 'unreadForBusiness';
   const counterpart = viewerType === 'customer' ? 'business' : 'customer';
 
-  const [updated] = await Promise.all([
-    Conversation.findByIdAndUpdate(
-      conversation._id,
-      { $set: { [unreadField]: 0 } },
-      { new: true }
-    ),
-    Message.updateMany(
-      {
-        conversation: conversation._id,
-        senderType: counterpart,
-        readAt: null
-      },
-      { $set: { readAt: new Date() } }
-    )
-  ]);
+  // A read acknowledgement may only cover what already existed when the
+  // request reached the server. Without this cutoff a message that arrives
+  // mid-request would be silently consumed as "read" by an acknowledgement the
+  // reader never saw.
+  const readThrough = new Date();
+
+  // Messages are settled first, then the counter is adjusted by exactly what
+  // that update changed. The counter is never recomputed and re-set: a recount
+  // would overwrite an increment a sender made in between, leaving an unread
+  // message behind a zeroed badge.
+  const acknowledgement = await Message.updateMany(
+    acknowledgementFilter({
+      conversationId: conversation._id,
+      counterpartSenderType: counterpart,
+      readThrough
+    }),
+    { $set: { readAt: readThrough } }
+  );
+
+  const acknowledged = acknowledgement.modifiedCount ?? 0;
+
+  // Nothing was acknowledged, so the counter must not be touched at all - a
+  // concurrent sender's increment has to survive an empty acknowledgement.
+  let updated;
+  if (isNoOpAcknowledgement(acknowledged)) {
+    updated = await Conversation.findById(conversation._id);
+  } else {
+    await Conversation.updateOne(
+      { _id: conversation._id },
+      acknowledgementUpdate(unreadField, acknowledged)
+    );
+    updated = await Conversation.findById(conversation._id);
+  }
+
+  if (!updated) {
+    throw new AppError(
+      'Conversation was not found',
+      404,
+      'CONVERSATION_NOT_FOUND'
+    );
+  }
 
   res.json({
     success: true,

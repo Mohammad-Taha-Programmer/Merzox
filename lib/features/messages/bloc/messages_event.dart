@@ -25,11 +25,3 @@ final class MessagesRefreshRequested extends MessagesEvent {
 final class MessagesLoadMoreRequested extends MessagesEvent {
   const MessagesLoadMoreRequested();
 }
-
-/// Emitted after a thread is opened so the list drops its badge without a
-/// full reload.
-final class MessagesThreadRead extends MessagesEvent {
-  final String conversationId;
-
-  const MessagesThreadRead(this.conversationId);
-}

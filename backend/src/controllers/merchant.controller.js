@@ -5,49 +5,24 @@ import mongoose from 'mongoose';
 import { Business } from '../models/Business.js';
 import { Order } from '../models/Order.js';
 import { User } from '../models/User.js';
+import {
+  canTransitionOwnerOrder,
+  courierAssignableStatuses,
+  orderStatusGroups as policyStatusGroups,
+  orderStatuses as policyStatuses,
+  statusGroupFor
+} from '../policies/order-status.policy.js';
+import { buildProductWrite } from '../policies/product.policy.js';
+import { paginationParams } from '../policies/query.policy.js';
 import { notifyOrderStatus } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { normalizeIdentifier, normalizePhone } from '../utils/normalize.js';
 
-const orderStatuses = new Set([
-  'pending',
-  'confirmed',
-  'preparing',
-  'outForDelivery',
-  'delivered',
-  'cancelled'
-]);
-const orderStatusGroups = new Set(['current', 'completed', 'cancelled']);
-const ownerOrderTransitions = new Map([
-  ['pending', new Set(['confirmed', 'cancelled'])],
-  ['confirmed', new Set(['preparing', 'cancelled'])],
-  ['preparing', new Set(['outForDelivery', 'cancelled'])],
-  ['outForDelivery', new Set(['delivered'])],
-  ['delivered', new Set()],
-  ['cancelled', new Set()]
-]);
-const productFields = [
-  'name',
-  'description',
-  'price',
-  'imageUrl',
-  'imageUrls',
-  'classification',
-  'isService',
-  'isActive'
-];
-
-function paginationParams(query) {
-  const parsedPage = Number.parseInt(query.page ?? '1', 10);
-  const parsedLimit = Number.parseInt(query.limit ?? '20', 10);
-  const page = Number.isFinite(parsedPage) ? Math.max(parsedPage, 1) : 1;
-  const limit = Number.isFinite(parsedLimit)
-    ? Math.min(Math.max(parsedLimit, 1), 50)
-    : 20;
-
-  return { page, limit, skip: (page - 1) * limit };
-}
+// The transition map, the status list, and the group mapping all live in the
+// shared policy now; these are lookup views over it.
+const orderStatuses = new Set(policyStatuses);
+const orderStatusGroups = new Set(policyStatusGroups);
 
 function createBusinessPublicId() {
   const timePart = Date.now().toString(36).toUpperCase();
@@ -69,23 +44,8 @@ async function findOwnedBusiness(req) {
   return business;
 }
 
-function assignProductFields(product, body) {
-  for (const field of productFields) {
-    if (body[field] !== undefined) {
-      product[field] = body[field];
-    }
-  }
-}
-
-function statusGroupFor(status) {
-  if (status === 'delivered') return 'completed';
-  if (status === 'cancelled') return 'cancelled';
-  return 'current';
-}
-
-export function canTransitionOwnerOrder(from, to) {
-  return ownerOrderTransitions.get(from)?.has(to) ?? false;
-}
+// Re-exported so existing importers keep a stable entry point.
+export { canTransitionOwnerOrder };
 
 export const enrollBusiness = asyncHandler(async (req, res) => {
   if (req.user.userType !== 'normal') {
@@ -265,29 +225,32 @@ export const listMyBusinessProducts = asyncHandler(async (req, res) => {
   const products = [...business.products]
     .filter((product) => product.isActive)
     .sort((left, right) => right.createdAt - left.createdAt)
-    .map((product) => business.productToJSON(product));
+    .map((product) => business.productToOwnerJSON(product));
 
   res.json({ success: true, data: { products } });
 });
 
 export const createMyBusinessProduct = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);
+
+  // buildProductWrite returns only contract fields, so nothing from the request
+  // body reaches the subdocument unchecked and Mongo assigns the identity.
   business.products.push({
-    name: req.body.name,
-    description: req.body.description ?? '',
-    price: req.body.price,
-    imageUrl: req.body.imageUrl ?? '',
-    imageUrls: req.body.imageUrls ?? [],
-    classification: req.body.classification ?? 'new',
-    isService: req.body.isService ?? false,
-    isActive: req.body.isActive ?? true
+    description: '',
+    imageUrl: '',
+    imageUrls: [],
+    classification: 'new',
+    isService: false,
+    isActive: true,
+    ...buildProductWrite(req.body)
   });
+
   const product = business.products[business.products.length - 1];
   await business.save();
 
   res.status(201).json({
     success: true,
-    data: { product: business.productToJSON(product) }
+    data: { product: business.productToOwnerJSON(product) }
   });
 });
 
@@ -298,10 +261,19 @@ export const updateMyBusinessProduct = asyncHandler(async (req, res) => {
     throw new AppError('Product not found', 404, 'PRODUCT_NOT_FOUND');
   }
 
-  assignProductFields(product, req.body);
+  const write = buildProductWrite(req.body, {
+    unlimitedStock: product.unlimitedStock,
+    stockQuantity: product.stockQuantity
+  });
+  for (const [field, value] of Object.entries(write)) {
+    product[field] = value;
+  }
   await business.save();
 
-  res.json({ success: true, data: { product: business.productToJSON(product) } });
+  res.json({
+    success: true,
+    data: { product: business.productToOwnerJSON(product) }
+  });
 });
 
 export const deleteMyBusinessProduct = asyncHandler(async (req, res) => {
@@ -314,7 +286,10 @@ export const deleteMyBusinessProduct = asyncHandler(async (req, res) => {
   product.isActive = false;
   await business.save();
 
-  res.json({ success: true, data: { product: business.productToJSON(product) } });
+  res.json({
+    success: true,
+    data: { product: business.productToOwnerJSON(product) }
+  });
 });
 
 export const listMyBusinessOrders = asyncHandler(async (req, res) => {
@@ -433,7 +408,7 @@ export const updateMyBusinessOrderCourier = asyncHandler(async (req, res) => {
     {
       _id: req.params.orderId,
       business: business._id,
-      status: { $in: ['confirmed', 'preparing', 'outForDelivery'] }
+      status: { $in: courierAssignableStatuses }
     },
     {
       $set: {

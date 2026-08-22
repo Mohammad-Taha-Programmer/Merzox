@@ -69,6 +69,53 @@ test('tracking advances with the status history and keeps the first timestamp pe
   assert.equal(tracking.canCancel, true);
 });
 
+// AC-24: the projection is asserted for every status the schema can store, so
+// no persisted state can reach the tracking screen without a defined step.
+test('every persisted status projects onto a defined tracking step', () => {
+  const expected = {
+    pending: { step: 'placed', index: 0 },
+    confirmed: { step: 'placed', index: 0 },
+    preparing: { step: 'preparing', index: 1 },
+    outForDelivery: { step: 'outForDelivery', index: 2 },
+    delivered: { step: 'delivered', index: 3 }
+  };
+
+  for (const [status, { step, index }] of Object.entries(expected)) {
+    const tracking = buildOrder({ status }).trackingJSON();
+    assert.equal(tracking.currentStep, step, `status ${status} step`);
+    assert.equal(tracking.currentIndex, index, `status ${status} index`);
+    assert.equal(tracking.isCancelled, false, `status ${status} cancelled`);
+    assert.equal(tracking.steps.length, 4, `status ${status} step count`);
+    assert.deepEqual(
+      tracking.steps.map((entry) => entry.isReached),
+      tracking.steps.map((_, position) => position <= index),
+      `status ${status} reached flags`
+    );
+  }
+
+  const cancelled = buildOrder({ status: 'cancelled' }).trackingJSON();
+  assert.equal(cancelled.isCancelled, true);
+  assert.equal(cancelled.currentIndex, -1);
+});
+
+test('a confirmed order is still cancellable and address-changeable', () => {
+  const tracking = buildOrder({ status: 'confirmed' }).trackingJSON();
+
+  assert.equal(tracking.canCancel, true);
+  assert.equal(tracking.canChangeAddress, true);
+  assert.equal(tracking.canReview, false);
+});
+
+test('projecting tracking never mutates the stored status', () => {
+  const order = buildOrder({ status: 'preparing' });
+
+  order.trackingJSON();
+  order.trackingJSON();
+
+  assert.equal(order.status, 'preparing');
+  assert.equal(order.statusGroup, 'current');
+});
+
 test('a delivered order unlocks reviewing and locks cancellation', () => {
   const order = buildOrder({ status: 'delivered', statusGroup: 'completed' });
   const tracking = order.trackingJSON();

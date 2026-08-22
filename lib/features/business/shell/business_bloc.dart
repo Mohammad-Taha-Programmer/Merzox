@@ -1,8 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/api_service.dart';
-import '../../authentication/bloc/auth_bloc.dart';
+import '../../../core/auth/auth_session_service.dart';
 import '../models/business_models.dart';
 
 sealed class BusinessEvent {
@@ -73,7 +72,7 @@ final class BusinessState {
   final BusinessDashboardData? dashboard;
   final List<OwnerOrder> orders;
   final Map<String, int> orderCounts;
-  final List<BusinessProductApiModel> products;
+  final List<OwnerProduct> products;
   final String? errorMessage;
   final int revision;
 
@@ -98,7 +97,7 @@ final class BusinessState {
     BusinessDashboardData? dashboard,
     List<OwnerOrder>? orders,
     Map<String, int>? orderCounts,
-    List<BusinessProductApiModel>? products,
+    List<OwnerProduct>? products,
     String? errorMessage,
     int? revision,
   }) => BusinessState(
@@ -117,10 +116,14 @@ final class BusinessState {
 
 class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
-  BusinessBloc({ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(const BusinessState()) {
+  BusinessBloc({
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const BusinessState()) {
     on<BusinessStarted>(_onStarted);
     on<BusinessTabChanged>((event, emit) {
       emit(state.copyWith(selectedTab: event.index));
@@ -134,12 +137,17 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     on<BusinessProfileSaved>(_onProfileSaved);
   }
 
+  /// Session truth lives in [AuthSessionService]: a stale token without an
+  /// active session, or a blank one, resolves to unauthenticated here rather
+  /// than being re-interpreted per bloc.
   Future<String> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AuthBloc.tokenKey);
-    if (token == null || token.isEmpty) {
+    final session = await _authSessionService.read();
+    final token = session.token;
+
+    if (token == null) {
       throw StateError('Authentication required');
     }
+
     return token;
   }
 
@@ -172,7 +180,7 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
           dashboard: results[1] as BusinessDashboardData,
           orders: orderList.orders,
           orderCounts: orderList.counts,
-          products: results[3] as List<BusinessProductApiModel>,
+          products: results[3] as List<OwnerProduct>,
         ),
       );
     } catch (error) {

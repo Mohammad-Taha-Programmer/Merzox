@@ -1,21 +1,28 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/api_service.dart';
-import '../../authentication/bloc/auth_bloc.dart';
+import '../../../core/auth/auth_session_service.dart';
 import 'notifications_event.dart';
 import 'notifications_state.dart';
 
 class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
   /// A business owner also has a customer inbox, so the audience is chosen by
   /// the screen that opens this bloc rather than inferred from the account.
   final bool businessAudience;
 
-  NotificationsBloc({ApiService? apiService, this.businessAudience = false})
-    : _apiService = apiService ?? ApiService(),
-      super(const NotificationsState()) {
+  /// Guards against a second bulk write while one is still in flight.
+  bool _markingAll = false;
+
+  NotificationsBloc({
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+    this.businessAudience = false,
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const NotificationsState()) {
     on<NotificationsStarted>(_onStarted);
     on<NotificationsRefreshRequested>(_onRefreshRequested);
     on<NotificationsLoadMoreRequested>(_onLoadMoreRequested);
@@ -104,8 +111,10 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     }
   }
 
-  /// The row is greyed out immediately; the server call only confirms it, so a
-  /// slow network never leaves the list feeling stuck.
+  /// Optimistic, but reversible: the row greys out at once, and if the server
+  /// refuses the write the exact affected row is put back and the failure is
+  /// surfaced. A silent catch here would leave the UI claiming a read state
+  /// MongoDB never recorded.
   Future<void> _onMarkedRead(
     NotificationMarkedRead event,
     Emitter<NotificationsState> emit,
@@ -125,6 +134,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
               notification,
         ],
         unreadCount: state.unreadCount > 0 ? state.unreadCount - 1 : 0,
+        errorMessage: '',
       ),
     );
 
@@ -133,14 +143,36 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         token: await _token(),
         notificationId: event.notificationId,
       );
-    } catch (_) {}
+    } catch (error) {
+      // Only this row is reverted, so a rollback cannot undo a different
+      // notification the user marked while this request was in flight.
+      emit(
+        state.copyWith(
+          notifications: [
+            for (final notification in state.notifications)
+              if (notification.id == event.notificationId)
+                notification.copyWith(isRead: false)
+              else
+                notification,
+          ],
+          unreadCount: state.unreadCount + 1,
+          errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    }
   }
 
+  /// The whole visible page is one bulk operation, so the pre-change list and
+  /// count are captured and restored together when the server write fails.
   Future<void> _onAllMarkedRead(
     NotificationsAllMarkedRead event,
     Emitter<NotificationsState> emit,
   ) async {
-    if (state.unreadCount == 0) return;
+    if (state.unreadCount == 0 || _markingAll) return;
+
+    final previousNotifications = state.notifications;
+    final previousUnreadCount = state.unreadCount;
+    _markingAll = true;
 
     emit(
       state.copyWith(
@@ -149,6 +181,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
             notification.copyWith(isRead: true),
         ],
         unreadCount: 0,
+        errorMessage: '',
       ),
     );
 
@@ -158,16 +191,35 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         businessAudience: businessAudience,
       );
     } catch (error) {
-      emit(state.copyWith(errorMessage: ApiService.messageFromError(error)));
+      emit(
+        state.copyWith(
+          notifications: previousNotifications,
+          unreadCount: previousUnreadCount,
+          errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    } finally {
+      _markingAll = false;
     }
   }
 
   Future<String> _token() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(AuthBloc.tokenKey);
-    if (token == null || token.isEmpty) {
+    final session = await _authSessionService.read();
+    final token = session.token;
+
+    if (token == null) {
       throw StateError('Authentication required');
     }
+
+    // The business feed additionally requires the session to actually be a
+    // business. The route guard already strips an `audience=business` claim
+    // from a customer and the backend answers 403; this is the middle layer,
+    // so a bloc constructed with `businessAudience: true` by any other path
+    // still cannot issue the request.
+    if (businessAudience && !session.isBusiness) {
+      throw StateError('A business account is required');
+    }
+
     return token;
   }
 }

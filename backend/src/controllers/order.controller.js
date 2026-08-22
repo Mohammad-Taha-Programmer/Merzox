@@ -3,23 +3,35 @@ import mongoose from 'mongoose';
 import { Business } from '../models/Business.js';
 import { Order } from '../models/Order.js';
 import {
+  addressMutableStatuses,
+  customerCancellableStatuses,
+  orderStatusGroups as policyStatusGroups
+} from '../policies/order-status.policy.js';
+import { paginationParams } from '../policies/query.policy.js';
+import {
   notifyOrderCancelledByCustomer,
   notifyOrderPlaced
 } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
-const validGroups = new Set(['current', 'completed', 'cancelled']);
-const cancellableStatuses = new Set(['pending', 'confirmed', 'preparing']);
+const validGroups = new Set(policyStatusGroups);
+const cancellableStatuses = new Set(customerCancellableStatuses);
 
-function paginationParams(query) {
-  const page = Math.max(Number.parseInt(query.page ?? '1', 10), 1);
-  const limit = Math.min(
-    Math.max(Number.parseInt(query.limit ?? '20', 10), 1),
-    50
-  );
+/**
+ * Rejects a malformed order id before any query runs.
+ *
+ * `getMyOrder` and `cancelMyOrder` previously passed the raw parameter straight
+ * into Mongoose, so a malformed id produced a cast error rather than a clean
+ * 400. A well-formed but unknown id still falls through to the existing 404, so
+ * ownership is not disclosed.
+ */
+function requireOrderId(value) {
+  if (!mongoose.isValidObjectId(value)) {
+    throw new AppError('Order id is invalid', 400, 'INVALID_ORDER_ID');
+  }
 
-  return { page, limit, skip: (page - 1) * limit };
+  return value;
 }
 
 function cleanClientOrderId(value) {
@@ -83,7 +95,9 @@ export const createOrder = asyncHandler(async (req, res) => {
       imageUrl,
       unitPrice: Number(product.price ?? 0),
       quantity,
-      variant: String(requested.variant ?? '').trim()
+      // Left empty on purpose: the catalog has no variant to copy from, and the
+      // client is not allowed to define one.
+      variant: ''
     };
   });
 
@@ -179,7 +193,8 @@ export const listMyOrders = asyncHandler(async (req, res) => {
 });
 
 export const getMyOrder = asyncHandler(async (req, res) => {
-  const order = await Order.findOne({ _id: req.params.id, user: req.user._id });
+  const orderId = requireOrderId(req.params.id);
+  const order = await Order.findOne({ _id: orderId, user: req.user._id });
 
   if (!order) {
     throw new AppError('Order was not found', 404, 'ORDER_NOT_FOUND');
@@ -193,23 +208,20 @@ export const getMyOrder = asyncHandler(async (req, res) => {
  * while the merchant has not started preparing the order.
  */
 export const updateMyOrderAddress = asyncHandler(async (req, res) => {
-  if (!mongoose.isValidObjectId(req.params.id)) {
-    throw new AppError('Order id is invalid', 400, 'INVALID_ORDER_ID');
-  }
-
+  const orderId = requireOrderId(req.params.id);
   const deliveryAddress = String(req.body.deliveryAddress).trim();
   const order = await Order.findOneAndUpdate(
     {
-      _id: req.params.id,
+      _id: orderId,
       user: req.user._id,
-      status: { $in: ['pending', 'confirmed'] }
+      status: { $in: addressMutableStatuses }
     },
     { $set: { deliveryAddress } },
     { new: true, runValidators: true }
   );
 
   if (!order) {
-    const exists = await Order.exists({ _id: req.params.id, user: req.user._id });
+    const exists = await Order.exists({ _id: orderId, user: req.user._id });
     if (!exists) {
       throw new AppError('Order was not found', 404, 'ORDER_NOT_FOUND');
     }
@@ -224,11 +236,12 @@ export const updateMyOrderAddress = asyncHandler(async (req, res) => {
 });
 
 export const cancelMyOrder = asyncHandler(async (req, res) => {
+  const orderId = requireOrderId(req.params.id);
   const reason = String(req.body.reason ?? '').trim();
   const cancelledAt = new Date();
   const order = await Order.findOneAndUpdate(
     {
-      _id: req.params.id,
+      _id: orderId,
       user: req.user._id,
       status: { $in: [...cancellableStatuses] }
     },
@@ -247,7 +260,7 @@ export const cancelMyOrder = asyncHandler(async (req, res) => {
   );
 
   if (!order) {
-    const exists = await Order.exists({ _id: req.params.id, user: req.user._id });
+    const exists = await Order.exists({ _id: orderId, user: req.user._id });
     if (!exists) {
       throw new AppError('Order was not found', 404, 'ORDER_NOT_FOUND');
     }

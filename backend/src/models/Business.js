@@ -1,5 +1,12 @@
 import mongoose from 'mongoose';
 
+import {
+  finalPriceFor,
+  isProductInStock,
+  LEGACY_UNLIMITED_STOCK_DEFAULT,
+  PRODUCT_LIMITS
+} from '../policies/product.policy.js';
+
 const contactSchema = new mongoose.Schema(
   {
     name: { type: String, trim: true, maxlength: 80 },
@@ -30,6 +37,44 @@ const productSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 120 },
     description: { type: String, trim: true, maxlength: 500 },
     price: { type: Number, min: 0 },
+    // Merchant-internal margin data. It is never placed on a public serializer
+    // - see productToJSON below - so it must not be added there by habit.
+    costPrice: { type: Number, min: 0, default: null },
+    // Stock is a pair: `unlimitedStock` decides whether `stockQuantity` means
+    // anything. There is deliberately no -1 sentinel.
+    stockQuantity: {
+      type: Number,
+      min: 0,
+      max: PRODUCT_LIMITS.maxStockQuantity,
+      default: 0
+    },
+    // Defaults to true so products created before inventory existed stay
+    // purchasable instead of silently reading as out of stock.
+    unlimitedStock: {
+      type: Boolean,
+      default: LEGACY_UNLIMITED_STOCK_DEFAULT
+    },
+    // A bounded percentage, never a free-text badge: the final price is derived
+    // from it so a discount cannot describe a price the server did not compute.
+    discountPercent: { type: Number, min: 0, max: 100, default: 0 },
+    keywords: {
+      type: [String],
+      default: [],
+      validate: {
+        validator(value) {
+          return (
+            value.length <= PRODUCT_LIMITS.maxKeywords &&
+            value.every(
+              (keyword) =>
+                typeof keyword === 'string' &&
+                keyword.trim().length > 0 &&
+                keyword.length <= PRODUCT_LIMITS.keywordMax
+            )
+          );
+        },
+        message: 'Product keywords are invalid'
+      }
+    },
     imageUrl: { type: String, trim: true },
     imageUrls: {
       type: [String],
@@ -154,12 +199,29 @@ businessSchema.methods.toOwnerJSON = function toOwnerJSON() {
   };
 };
 
+/**
+ * The PUBLIC product shape. `costPrice`, exact `stockQuantity`, and `keywords`
+ * are intentionally absent: they are merchant-internal, and this serializer is
+ * what reaches the catalog, search, favorites, and product detail responses.
+ *
+ * If a new merchant-only field is added to the schema, it belongs in
+ * productToOwnerJSON below - never here.
+ */
 businessSchema.methods.productToJSON = function productToJSON(product) {
   const imageUrls = Array.from(
     new Set([...(product.imageUrls ?? []), product.imageUrl].filter(Boolean))
   );
+  const discountPercent = product.discountPercent ?? 0;
 
   return {
+    discountPercent,
+    // Derived here rather than accepted from a client, so a displayed price
+    // always follows from the stored base price and discount.
+    finalPrice: finalPriceFor({
+      price: product.price ?? 0,
+      discountPercent
+    }),
+    inStock: isProductInStock(product),
     id: product._id.toString(),
     business: this._id.toString(),
     name: product.name,
@@ -175,6 +237,23 @@ businessSchema.methods.productToJSON = function productToJSON(product) {
     isActive: product.isActive,
     createdAt: product.createdAt,
     updatedAt: product.updatedAt
+  };
+};
+
+/**
+ * The MERCHANT-OWNER product shape: everything public, plus the commercial
+ * fields only the owning business may see. Reached exclusively through
+ * owner-authenticated routes.
+ */
+businessSchema.methods.productToOwnerJSON = function productToOwnerJSON(
+  product
+) {
+  return {
+    ...this.productToJSON(product),
+    costPrice: product.costPrice ?? null,
+    stockQuantity: product.stockQuantity ?? 0,
+    unlimitedStock: product.unlimitedStock ?? LEGACY_UNLIMITED_STOCK_DEFAULT,
+    keywords: [...(product.keywords ?? [])]
   };
 };
 

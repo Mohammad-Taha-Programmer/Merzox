@@ -4,12 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/api_service.dart';
 import '../../../services/device_location_service.dart';
 import '../../../services/location_permission_service.dart';
+import '../../../core/auth/auth_session_service.dart';
 import '../../authentication/bloc/auth_bloc.dart';
 import 'nearby_map_event.dart';
 import 'nearby_map_state.dart';
 
 class NearbyMapBloc extends Bloc<NearbyMapEvent, NearbyMapState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
   final DeviceLocationService _deviceLocationService;
   final LocationPermissionService _permissionService;
 
@@ -17,7 +19,9 @@ class NearbyMapBloc extends Bloc<NearbyMapEvent, NearbyMapState> {
     ApiService? apiService,
     DeviceLocationService? deviceLocationService,
     LocationPermissionService? permissionService,
+    AuthSessionService authSessionService = const AuthSessionService(),
   }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
        _deviceLocationService =
            deviceLocationService ?? DeviceLocationService(),
        _permissionService = permissionService ?? LocationPermissionService(),
@@ -179,8 +183,11 @@ class NearbyMapBloc extends Bloc<NearbyMapEvent, NearbyMapState> {
       await prefs.setBool('${AuthBloc.locationPromptAskedPrefix}$userId', true);
     }
 
-    final token = prefs.getString(AuthBloc.tokenKey);
-    if (token == null || token.isEmpty) return;
+    // The location keys above are UI state and stay in preferences; the
+    // bearer token for this protected call does not.
+    final session = await _authSessionService.read();
+    final token = session.token;
+    if (token == null) return;
 
     try {
       await _apiService.updatePermissions(token: token, location: granted);

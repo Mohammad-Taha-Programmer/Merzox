@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/messages/bloc/chat_bloc.dart';
 import 'package:merzox/features/messages/bloc/chat_event.dart';
 import 'package:merzox/features/messages/bloc/chat_state.dart';
@@ -7,7 +6,7 @@ import 'package:merzox/features/messages/bloc/messages_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/bloc/messages_state.dart';
 import 'package:merzox/services/api_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'auth_session_fixtures.dart';
 
 ConversationApiModel _conversation({
   String id = 'c1',
@@ -148,9 +147,7 @@ class _FakeMessagingApi extends ApiService {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    SharedPreferences.setMockInitialValues({AuthBloc.tokenKey: 'test-token'});
-  });
+  setUp(useAuthenticatedSession);
 
   test('the inbox loads threads and reports the unread count', () async {
     final api = _FakeMessagingApi()
@@ -204,6 +201,10 @@ void main() {
   });
 
   test('a merchant inbox reads the merchant endpoint', () async {
+    // Updated for the FIX2 contract: the merchant inbox is a different
+    // endpoint, so it now requires a business session rather than any
+    // authenticated one.
+    useAuthenticatedSession(business: true);
     final api = _FakeMessagingApi();
     final bloc = MessagesBloc(apiService: api, merchantMode: true);
 
@@ -218,14 +219,69 @@ void main() {
     await bloc.close();
   });
 
-  test('reading a thread clears its badge without a reload', () async {
+  test('a customer session cannot drive the merchant inbox', () async {
+    // merchantMode is a construction flag, not a role. Without a business
+    // session the bloc must fail before touching either endpoint.
+    final api = _FakeMessagingApi();
+    final bloc = MessagesBloc(apiService: api, merchantMode: true);
+
+    bloc.add(const MessagesStarted());
+    await bloc.stream.firstWhere(
+      (state) => state.status == MessagesStatus.failure,
+    );
+
+    expect(api.merchantCalls, isEmpty);
+    expect(api.customerUnreadFlags, isEmpty);
+
+    await bloc.close();
+  });
+
+  // R2 §1: the inbox no longer zeroes an unread count locally. Whatever the
+  // backend reports on refresh is what the badge shows, so a chat whose
+  // mark-read failed keeps its unread state instead of appearing read.
+  test(
+    'CASE A: a confirmed read is reflected by the backend refresh',
+    () async {
+      var readOnServer = false;
+      final api = _FakeMessagingApi()
+        ..onConversations = (_, page) => ConversationListApiResponse(
+          conversations: [
+            _conversation(id: 'c1', unreadCount: readOnServer ? 0 : 2),
+          ],
+          unreadConversationCount: readOnServer ? 0 : 1,
+          page: page,
+          hasMore: false,
+        );
+      final bloc = MessagesBloc(apiService: api);
+
+      bloc.add(const MessagesStarted());
+      await bloc.stream.firstWhere(
+        (state) => state.status == MessagesStatus.ready,
+      );
+      expect(bloc.state.conversations.single.unreadCount, 2);
+
+      // The chat page persisted the receipt; the server now reports it read.
+      readOnServer = true;
+      bloc.add(const MessagesRefreshRequested());
+      await bloc.stream.firstWhere(
+        (state) =>
+            state.status == MessagesStatus.ready &&
+            state.conversations.single.unreadCount == 0,
+      );
+
+      expect(bloc.state.unreadConversationCount, 0);
+
+      await bloc.close();
+    },
+  );
+
+  test('CASE B: a failed mark-read leaves the badge untouched', () async {
+    // The server still reports the thread unread because the receipt never
+    // landed. Nothing in the inbox may force it to zero.
     final api = _FakeMessagingApi()
       ..onConversations = (_, page) => ConversationListApiResponse(
-        conversations: [
-          _conversation(id: 'c1', unreadCount: 2),
-          _conversation(id: 'c2', unreadCount: 1),
-        ],
-        unreadConversationCount: 2,
+        conversations: [_conversation(id: 'c1', unreadCount: 2)],
+        unreadConversationCount: 1,
         page: page,
         hasMore: false,
       );
@@ -236,18 +292,89 @@ void main() {
       (state) => state.status == MessagesStatus.ready,
     );
 
-    bloc.add(const MessagesThreadRead('c1'));
+    // Returning from chat refreshes; it must not fabricate a read state.
+    bloc.add(const MessagesRefreshRequested());
     await bloc.stream.firstWhere(
-      (state) => state.conversations.first.unreadCount == 0,
+      (state) => state.status == MessagesStatus.ready,
     );
 
+    expect(bloc.state.conversations.single.unreadCount, 2);
     expect(bloc.state.unreadConversationCount, 1);
-    expect(bloc.state.conversations.last.unreadCount, 1);
-    // No second request: the badge was cleared locally.
-    expect(api.customerUnreadFlags, hasLength(1));
 
     await bloc.close();
   });
+
+  test('CASE C: the backend response is the only unread authority', () async {
+    // An arbitrary server-reported count is adopted verbatim, including one
+    // that grew while the chat page was open.
+    var unread = 2;
+    final api = _FakeMessagingApi()
+      ..onConversations = (_, page) => ConversationListApiResponse(
+        conversations: [_conversation(id: 'c1', unreadCount: unread)],
+        unreadConversationCount: unread > 0 ? 1 : 0,
+        page: page,
+        hasMore: false,
+      );
+    final bloc = MessagesBloc(apiService: api);
+
+    bloc.add(const MessagesStarted());
+    await bloc.stream.firstWhere(
+      (state) => state.status == MessagesStatus.ready,
+    );
+
+    unread = 5;
+    bloc.add(const MessagesRefreshRequested());
+    await bloc.stream.firstWhere(
+      (state) =>
+          state.status == MessagesStatus.ready &&
+          state.conversations.single.unreadCount == 5,
+    );
+
+    await bloc.close();
+  });
+
+  test(
+    'CASE D: the unread filter drops a thread only when the server does',
+    () async {
+      // Opening a chat must not remove a row from the unread tab on its own.
+      var stillUnread = true;
+      final api = _FakeMessagingApi()
+        ..onConversations = (unreadOnly, page) => ConversationListApiResponse(
+          conversations: stillUnread
+              ? [_conversation(id: 'c1', unreadCount: 2)]
+              : const [],
+          unreadConversationCount: stillUnread ? 1 : 0,
+          page: page,
+          hasMore: false,
+        );
+      final bloc = MessagesBloc(apiService: api);
+
+      bloc.add(const MessagesFilterChanged(MessagesFilter.unread));
+      await bloc.stream.firstWhere(
+        (state) =>
+            state.status == MessagesStatus.ready &&
+            state.filter == MessagesFilter.unread,
+      );
+      expect(bloc.state.conversations, hasLength(1));
+
+      // Returning from chat with the receipt still unpersisted: row stays.
+      bloc.add(const MessagesRefreshRequested());
+      await bloc.stream.firstWhere(
+        (state) => state.status == MessagesStatus.ready,
+      );
+      expect(bloc.state.conversations, hasLength(1));
+
+      // Only once the server says it is read does the row leave the filter.
+      stillUnread = false;
+      bloc.add(const MessagesRefreshRequested());
+      await bloc.stream.firstWhere(
+        (state) =>
+            state.status == MessagesStatus.ready && state.conversations.isEmpty,
+      );
+
+      await bloc.close();
+    },
+  );
 
   test('opening a thread loads history and marks it read', () async {
     final api = _FakeMessagingApi();

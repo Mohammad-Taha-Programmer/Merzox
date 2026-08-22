@@ -1,5 +1,12 @@
 import validator from 'validator';
 
+import { merchantSelectableStatuses } from '../policies/order-status.policy.js';
+import {
+  merchantWritableProductFields,
+  normalizeKeywords,
+  productClassifications,
+  PRODUCT_LIMITS
+} from '../policies/product.policy.js';
 import { AppError } from '../utils/AppError.js';
 
 export function validateSignup(req, _res, next) {
@@ -56,6 +63,13 @@ export function validateProfilePatch(req, _res, next) {
   next();
 }
 
+/**
+ * Variant-shaped keys are accepted only when empty. They exist purely so an
+ * older client sending `variant: ''` is not rejected outright.
+ */
+const variantLikeItemFields = ['variant', 'degree', 'option'];
+const allowedItemFields = ['productId', 'quantity', ...variantLikeItemFields];
+
 export function validateOrderCreate(req, _res, next) {
   const allowed = [
     'businessId',
@@ -92,7 +106,23 @@ export function validateOrderCreate(req, _res, next) {
     }
 
     const itemFields = Object.keys(item);
-    if (itemFields.some((key) => !['productId', 'quantity', 'variant'].includes(key))) {
+    // Business.products models no variant, degree, or option, so a supplied
+    // value cannot be validated against anything. An explicit code is returned
+    // rather than a generic field error so a client can tell "this product has
+    // no variants yet" apart from "you sent a malformed item".
+    for (const key of variantLikeItemFields) {
+      if (String(item[key] ?? '').trim().length > 0) {
+        throw new AppError(
+          'This product does not support variants',
+          400,
+          'UNSUPPORTED_PRODUCT_VARIANT'
+        );
+      }
+    }
+
+    // An absent or empty variant is normalized away, so the key may be present
+    // as long as it carries nothing.
+    if (itemFields.some((key) => !allowedItemFields.includes(key))) {
       throw new AppError('Order item contains unsupported fields', 400, 'INVALID_ORDER_ITEM');
     }
 
@@ -104,9 +134,6 @@ export function validateOrderCreate(req, _res, next) {
       throw new AppError('Product quantity is invalid', 400, 'INVALID_QUANTITY');
     }
 
-    if (String(item.variant ?? '').length > 40) {
-      throw new AppError('Product variant is too long', 400, 'INVALID_VARIANT');
-    }
   }
 
   const paymentMethods = new Set(['cash', 'card', 'bankTransfer', 'assisted']);
@@ -280,36 +307,92 @@ export function validateBusinessProfilePatch(req, _res, next) {
 }
 
 function validateBusinessProductBody(body, { partial }) {
-  const allowed = [
-    'name',
-    'description',
-    'price',
-    'imageUrl',
-    'imageUrls',
-    'classification',
-    'isService',
-    'isActive'
-  ];
+  // Sourced from the shared contract: identity, ratings, likes, and timestamps
+  // are absent from it, so injecting them is rejected here rather than being
+  // silently dropped later.
   const keys = Object.keys(body);
-  const invalid = keys.filter((key) => !allowed.includes(key));
+  const invalid = keys.filter(
+    (key) => !merchantWritableProductFields.includes(key)
+  );
   if (invalid.length > 0 || (partial && keys.length === 0)) {
     throw new AppError('Product fields are invalid', 400, 'INVALID_PRODUCT_FIELDS');
   }
 
   if (!partial || body.name !== undefined) {
     const name = String(body.name ?? '').trim();
-    if (name.length < 2 || name.length > 120) {
+    if (
+      name.length < PRODUCT_LIMITS.nameMin ||
+      name.length > PRODUCT_LIMITS.nameMax
+    ) {
       throw new AppError('Product name is invalid', 400, 'INVALID_PRODUCT_NAME');
     }
   }
   if (!partial || body.price !== undefined) {
+    // Number(null), Number('') and Number([]) all coerce to 0, so the type is
+    // checked before the value: a price must be stated, not implied.
+    if (!isNumericInput(body.price)) {
+      throw new AppError('Product price is invalid', 400, 'INVALID_PRODUCT_PRICE');
+    }
     const price = Number(body.price);
     if (!Number.isFinite(price) || price < 0) {
       throw new AppError('Product price is invalid', 400, 'INVALID_PRODUCT_PRICE');
     }
   }
-  if (body.description !== undefined && String(body.description).trim().length > 500) {
+  if (
+    body.description !== undefined &&
+    String(body.description).trim().length > PRODUCT_LIMITS.descriptionMax
+  ) {
     throw new AppError('Product description is too long', 400, 'INVALID_PRODUCT_DESCRIPTION');
+  }
+  if (body.price !== undefined && Number(body.price) > PRODUCT_LIMITS.maxPrice) {
+    throw new AppError('Product price is invalid', 400, 'INVALID_PRODUCT_PRICE');
+  }
+
+  // costPrice is optional and may be cleared, but a supplied value must be a
+  // real nonnegative number.
+  if (body.costPrice !== undefined && body.costPrice !== null && body.costPrice !== '') {
+    if (!isNumericInput(body.costPrice)) {
+      throw new AppError('Product cost price is invalid', 400, 'INVALID_PRODUCT_COST_PRICE');
+    }
+    const costPrice = Number(body.costPrice);
+    if (!Number.isFinite(costPrice) || costPrice < 0 || costPrice > PRODUCT_LIMITS.maxPrice) {
+      throw new AppError('Product cost price is invalid', 400, 'INVALID_PRODUCT_COST_PRICE');
+    }
+  }
+
+  if (body.unlimitedStock !== undefined && typeof body.unlimitedStock !== 'boolean') {
+    throw new AppError('Unlimited stock must be boolean', 400, 'INVALID_PRODUCT_STOCK_MODE');
+  }
+
+  // A finite stock must be a whole, nonnegative count. When unlimited stock is
+  // requested the quantity is meaningless and is normalized away rather than
+  // rejected, so a form that leaves a stale number behind still saves cleanly.
+  if (body.stockQuantity !== undefined && body.unlimitedStock !== true) {
+    if (!isNumericInput(body.stockQuantity)) {
+      throw new AppError('Product stock quantity is invalid', 400, 'INVALID_PRODUCT_STOCK');
+    }
+    const stockQuantity = Number(body.stockQuantity);
+    if (
+      !Number.isInteger(stockQuantity) ||
+      stockQuantity < 0 ||
+      stockQuantity > PRODUCT_LIMITS.maxStockQuantity
+    ) {
+      throw new AppError('Product stock quantity is invalid', 400, 'INVALID_PRODUCT_STOCK');
+    }
+  }
+
+  if (body.discountPercent !== undefined) {
+    if (!isNumericInput(body.discountPercent)) {
+      throw new AppError('Product discount is invalid', 400, 'INVALID_PRODUCT_DISCOUNT');
+    }
+    const discountPercent = Number(body.discountPercent);
+    if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) {
+      throw new AppError('Product discount is invalid', 400, 'INVALID_PRODUCT_DISCOUNT');
+    }
+  }
+
+  if (body.keywords !== undefined && normalizeKeywords(body.keywords) === null) {
+    throw new AppError('Product keywords are invalid', 400, 'INVALID_PRODUCT_KEYWORDS');
   }
   if (body.imageUrl !== undefined) {
     const imageUrl = String(body.imageUrl).trim();
@@ -320,7 +403,7 @@ function validateBusinessProductBody(body, { partial }) {
   if (body.imageUrls !== undefined) {
     if (
       !Array.isArray(body.imageUrls) ||
-      body.imageUrls.length > 8 ||
+      body.imageUrls.length > PRODUCT_LIMITS.maxImages ||
       body.imageUrls.some(
         (url) =>
           typeof url !== 'string' ||
@@ -333,7 +416,7 @@ function validateBusinessProductBody(body, { partial }) {
   }
   if (
     body.classification !== undefined &&
-    !['new', 'bestSelling', 'offers'].includes(body.classification)
+    !productClassifications.includes(body.classification)
   ) {
     throw new AppError('Product classification is invalid', 400, 'INVALID_PRODUCT_CLASSIFICATION');
   }
@@ -342,6 +425,17 @@ function validateBusinessProductBody(body, { partial }) {
       throw new AppError(`${field} must be boolean`, 400, 'INVALID_PRODUCT_BOOLEAN');
     }
   }
+}
+
+/**
+ * A value that may legitimately be read as a number. Rejects the shapes that
+ * JavaScript silently coerces to 0 - null, booleans, arrays, objects, and the
+ * empty string - so an absent value can never masquerade as a free product.
+ */
+function isNumericInput(value) {
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value === 'string') return value.trim().length > 0;
+  return false;
 }
 
 function isOptionalHttpUrl(value) {
@@ -373,11 +467,9 @@ export function validateBusinessOrderStatus(req, _res, next) {
     throw new AppError('Order status fields are invalid', 400, 'INVALID_ORDER_STATUS_FIELDS');
   }
 
-  if (
-    !['confirmed', 'preparing', 'outForDelivery', 'delivered', 'cancelled'].includes(
-      req.body.status
-    )
-  ) {
+  // Sourced from the shared policy rather than restated here, so the validator
+  // and the controller can never disagree about what a merchant may select.
+  if (!merchantSelectableStatuses.includes(req.body.status)) {
     throw new AppError('Order status is invalid', 400, 'INVALID_ORDER_STATUS');
   }
   if (String(req.body.note ?? '').trim().length > 250) {

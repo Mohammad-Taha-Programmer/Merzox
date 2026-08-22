@@ -70,6 +70,7 @@ class _ChatPageState extends State<ChatPage> {
               children: [
                 _ChatHeader(title: state.title, avatarUrl: state.avatarUrl),
                 const Divider(height: 1, color: MerzoxColors.kColorEFEFEF),
+                if (state.readSyncFailed) const _ReadSyncNotice(),
                 Expanded(
                   child: _ChatBody(state: state, controller: _scrollController),
                 ),
@@ -115,6 +116,40 @@ class _ChatHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
+        ],
+      ),
+    );
+  }
+}
+
+/// A quiet strip, not a blocking error: the thread loaded and is usable, only
+/// the read receipt failed to reach the server.
+class _ReadSyncNotice extends StatelessWidget {
+  const _ReadSyncNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: MerzoxColors.kColorF3EBB9.withValues(alpha: 0.45),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.sync_problem_rounded,
+            size: 15,
+            color: MerzoxColors.kColor767676,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'messages.readSyncFailed'.tr(),
+              style: const TextStyle(
+                fontSize: 10,
+                color: MerzoxColors.kColor5E5E5E,
+              ),
+            ),
+          ),
         ],
       ),
     );

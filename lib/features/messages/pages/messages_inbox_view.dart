@@ -67,9 +67,10 @@ class _MessagesInboxViewState extends State<MessagesInboxView> {
     );
 
     if (!mounted) return;
-    bloc
-      ..add(MessagesThreadRead(conversation.id))
-      ..add(const MessagesRefreshRequested());
+    // The backend owns the unread state. Zeroing it locally here would claim a
+    // read receipt that ChatBloc may have failed to persist, so the inbox is
+    // simply re-read and whatever the server reports wins.
+    bloc.add(const MessagesRefreshRequested());
   }
 
   @override

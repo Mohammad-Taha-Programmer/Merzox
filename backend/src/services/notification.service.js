@@ -1,4 +1,6 @@
-import { Notification } from '../models/Notification.js';
+import { env } from '../config/env.js';
+import { Notification, notificationTypes } from '../models/Notification.js';
+import { formatErrorCode, safeErrorCode, safeErrorName } from '../utils/safe-log.js';
 
 const orderStatusCopy = {
   pending: 'تم الطلب بنجاح',
@@ -17,11 +19,35 @@ export function orderStatusLabel(status) {
  * Notifications are best-effort: a delivery failure must never fail the request
  * that triggered it, so every write is guarded here rather than at each caller.
  */
+/**
+ * Reduces a notification type to a value known to the schema. An unrecognised
+ * type is reported as 'unknown' rather than echoed, so nothing derived from a
+ * request can reach the log through this field.
+ */
+function safeType(type) {
+  return notificationTypes.includes(type) ? type : 'unknown';
+}
+
+export function notificationFailureLog(payload, error) {
+  return [
+    '[notification] NOTIFICATION_PERSIST_FAILED',
+    `type=${safeType(payload?.type)}`,
+    `errorName=${safeErrorName(error)}`,
+    `errorCode=${formatErrorCode(error)}`
+  ];
+}
+
 async function create(payload) {
   try {
     const notification = await Notification.create(payload);
     return notification;
-  } catch {
+  } catch (error) {
+    // Best-effort delivery still has to leave a trace, but the trace is built
+    // from a fixed allowlist of bounded primitives. The payload carries
+    // customer names and order identifiers and is never touched.
+    if (env.nodeEnv !== 'test') {
+      console.error(...notificationFailureLog(payload, error));
+    }
     return null;
   }
 }
@@ -111,3 +137,12 @@ export function notifyNewReview({
     data: { rating, reviewerName, target }
   });
 }
+
+/**
+ * Exported for testing: these are the only values the failure log may contain.
+ */
+export const notificationLogSanitizers = {
+  safeType,
+  safeErrorName,
+  safeErrorCode
+};

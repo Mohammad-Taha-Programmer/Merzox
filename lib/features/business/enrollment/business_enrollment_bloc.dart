@@ -1,6 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../core/auth/auth_session_service.dart';
 import '../../../services/api_service.dart';
 import '../../authentication/bloc/auth_bloc.dart';
 
@@ -81,10 +81,14 @@ final class BusinessEnrollmentState {
 class BusinessEnrollmentBloc
     extends Bloc<BusinessEnrollmentEvent, BusinessEnrollmentState> {
   final ApiService _apiService;
+  final AuthSessionService _authSessionService;
 
-  BusinessEnrollmentBloc({ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(const BusinessEnrollmentState()) {
+  BusinessEnrollmentBloc({
+    ApiService? apiService,
+    AuthSessionService authSessionService = const AuthSessionService(),
+  }) : _apiService = apiService ?? ApiService(),
+       _authSessionService = authSessionService,
+       super(const BusinessEnrollmentState()) {
     on<BusinessEnrollmentFirstStepSaved>((event, emit) {
       emit(
         state.copyWith(
@@ -108,9 +112,11 @@ class BusinessEnrollmentBloc
   ) async {
     emit(state.copyWith(status: BusinessEnrollmentStatus.submitting));
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AuthBloc.tokenKey);
-      if (token == null || token.isEmpty) {
+      // Enrollment upgrades the signed-in account, so it must run against a
+      // genuinely active session rather than a leftover token.
+      final session = await _authSessionService.read();
+      final token = session.token;
+      if (token == null) {
         throw StateError('Authentication required');
       }
       await _apiService.enrollBusiness(
