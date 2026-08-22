@@ -11,6 +11,8 @@ import {
   CONVERGENCE_ATTEMPTS,
   CONVERGENCE_INTERVAL_MS,
   IDEMPOTENCY_ERRORS,
+  INVENTORY_ERRORS,
+  buildAtomicInventoryUpdate,
   buildIdentifiedRelease,
   buildIdentifiedReservation,
   buildReservationSettlement,
@@ -270,6 +272,79 @@ test('an unlimited-only basket records identity but decrements nothing', () => {
 
   assert.equal(reservation.update.$inc, undefined);
   assert.deepEqual(reservation.update.$addToSet, { stockReservations: intentId });
+});
+
+// ------------------------------------------------ atomic merchant inventory
+
+test('the merchant inventory write carries its own reservation predicate', () => {
+  const productId = new mongoose.Types.ObjectId();
+  const ownerId = new mongoose.Types.ObjectId();
+
+  const atomic = buildAtomicInventoryUpdate({
+    businessId,
+    ownerId,
+    productId,
+    write: { stockQuantity: 10, unlimitedStock: false, description: 'new' },
+    observedStock: { stockQuantity: 5, unlimitedStock: false }
+  });
+
+  // The whole point of R3: reservation absence is evaluated by MongoDB at
+  // write time, in the same operation that changes the stock.
+  assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
+  assert.equal(atomic.update.$set['products.$[product].stockQuantity'], 10);
+  assert.equal(atomic.update.$set['products.$[product].unlimitedStock'], false);
+
+  // Ownership is part of the write, never inferred from a request body.
+  assert.equal(atomic.filter.owner, ownerId);
+  assert.equal(atomic.filter._id, businessId);
+  assert.equal(atomic.filter.isActive, true);
+
+  // Compare-and-set on the pair the caller derived its write from.
+  assert.equal(atomic.filter.products.$elemMatch.stockQuantity, 5);
+  assert.equal(atomic.filter.products.$elemMatch.unlimitedStock, false);
+  assert.deepEqual(atomic.arrayFilters, [{ 'product._id': productId }]);
+});
+
+test('a mixed payload is one write, so it cannot half-apply', () => {
+  const productId = new mongoose.Types.ObjectId();
+
+  const atomic = buildAtomicInventoryUpdate({
+    businessId,
+    ownerId: new mongoose.Types.ObjectId(),
+    productId,
+    write: { stockQuantity: 10, description: 'new description', price: 42 },
+    observedStock: { stockQuantity: 5, unlimitedStock: false }
+  });
+
+  // Every field rides on the same guarded update: if the filter misses, none
+  // of them is written.
+  assert.deepEqual(Object.keys(atomic.update.$set).sort(), [
+    'products.$[product].description',
+    'products.$[product].price',
+    'products.$[product].stockQuantity'
+  ]);
+  assert.equal(Object.keys(atomic.update).length, 1, 'a single $set operator');
+  assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
+});
+
+test('a legacy product without a stock pair is not refused on a phantom field', () => {
+  const atomic = buildAtomicInventoryUpdate({
+    businessId,
+    ownerId: new mongoose.Types.ObjectId(),
+    productId: new mongoose.Types.ObjectId(),
+    write: { stockQuantity: 3, unlimitedStock: false },
+    observedStock: { stockQuantity: undefined, unlimitedStock: undefined }
+  });
+
+  // No compare-and-set on values the document never carried...
+  assert.equal(atomic.filter.products.$elemMatch.stockQuantity, undefined);
+  assert.equal(atomic.filter.products.$elemMatch.unlimitedStock, undefined);
+  // ...but the reservation guard is never optional.
+  assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
+});
+
+test('the merchant conflict code is stable and discloses nothing', () => {
+  assert.equal(INVENTORY_ERRORS.reserved, 'PRODUCT_INVENTORY_RESERVED');
 });
 
 // ------------------------------------------------------- provisional privacy

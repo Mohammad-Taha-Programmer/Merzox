@@ -139,55 +139,90 @@ function orderResponse(res, order, { duplicated }) {
  * this intent already holds the reservation (resume), or the stock genuinely is
  * not there (fail).
  */
+/**
+ * At most one re-evaluation. A merchant may change a product's stock semantics
+ * while a checkout is in flight, and the customer should be judged against what
+ * is true now - but a loop here would be a spin against a merchant who keeps
+ * editing, so the second miss is final.
+ */
+const RESERVE_ATTEMPTS = 2;
+
 async function reserveStock({ intent, businessId, lines, normalizedItems }) {
-  const reservation = buildIdentifiedReservation({
-    businessId,
-    intentId: intent._id,
-    lines
-  });
+  let attemptLines = lines;
 
-  const result = await Business.updateOne(
-    reservation.filter,
-    reservation.update,
-    reservation.arrayFilters.length > 0
-      ? { arrayFilters: reservation.arrayFilters }
-      : undefined
-  );
+  for (let attempt = 0; attempt < RESERVE_ATTEMPTS; attempt += 1) {
+    const reservation = buildIdentifiedReservation({
+      businessId,
+      intentId: intent._id,
+      lines: attemptLines
+    });
 
-  if (result.matchedCount === 0) {
+    const result = await Business.updateOne(
+      reservation.filter,
+      reservation.update,
+      reservation.arrayFilters.length > 0
+        ? { arrayFilters: reservation.arrayFilters }
+        : undefined
+    );
+
+    if (result.matchedCount > 0) break;
+
     const alreadyHeld = await Business.exists({
       _id: businessId,
       stockReservations: intent._id
     });
+    if (alreadyHeld) break;
 
-    if (!alreadyHeld) {
-      const recheck = await Business.findOne({ _id: businessId, isActive: true });
-      const diagnosis = recheck
-        ? resolveOrderLines({
-            products: recheck.products,
-            items: normalizedItems
-          })
-        : { error: CHECKOUT_ERRORS.notAvailable };
-      const code = diagnosis.error ?? CHECKOUT_ERRORS.outOfStock;
+    // Nothing matched and nothing is held, so the product moved underneath us.
+    // Re-read the truth before deciding whether that is a refusal or simply a
+    // different - still purchasable - shape.
+    const recheck = await Business.findOne({ _id: businessId, isActive: true });
+    const diagnosis = recheck
+      ? resolveOrderLines({ products: recheck.products, items: normalizedItems })
+      : { error: CHECKOUT_ERRORS.notAvailable };
 
-      // Terminal, and there is nothing to give back: no marker means no
-      // decrement ever happened for this intent.
-      await CheckoutIntent.updateOne(
-        { _id: intent._id, phase: 'prepared' },
-        { $set: { phase: 'released', failureCode: code } }
-      );
+    const stillPurchasable =
+      !diagnosis.error && attempt + 1 < RESERVE_ATTEMPTS;
 
-      throw checkoutFailure(code);
+    if (stillPurchasable) {
+      // For example: the merchant switched the product to unlimited stock. The
+      // basket is genuinely fine now, so reserve against the new semantics
+      // rather than failing a customer for a change they never made.
+      attemptLines = diagnosis.lines;
+      continue;
     }
+
+    const code = diagnosis.error ?? CHECKOUT_ERRORS.outOfStock;
+
+    // Terminal, and there is nothing to give back: no marker means no
+    // decrement ever happened for this intent.
+    await CheckoutIntent.updateOne(
+      { _id: intent._id, phase: 'prepared' },
+      { $set: { phase: 'released', failureCode: code } }
+    );
+
+    throw checkoutFailure(code);
   }
 
   // Only after the stock is provably held. A crash before this line leaves the
   // intent in `prepared` with the marker set, and the branch above resumes it
-  // without decrementing a second time.
+  // without decrementing a second time. The stored lines are whatever was
+  // ACTUALLY reserved, so a later release can only give back exactly that.
   await CheckoutIntent.updateOne(
     { _id: intent._id, phase: 'prepared' },
-    { $set: { phase: 'reserved' } }
+    {
+      $set: {
+        phase: 'reserved',
+        lines: attemptLines.map((line) => ({
+          productId: line.product._id,
+          quantity: line.quantity,
+          finite: line.finite
+        }))
+      }
+    }
   );
+
+  return attemptLines;
 }
 
 /**
@@ -316,7 +351,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     throw checkoutFailure(resolved.error);
   }
 
-  const { lines } = resolved;
+  let { lines } = resolved;
   const deliveryAddress = String(
     req.body.deliveryAddress ?? req.user.address ?? ''
   ).trim();
@@ -428,7 +463,9 @@ export const createOrder = asyncHandler(async (req, res) => {
   }
 
   if (intent.phase === 'prepared') {
-    await reserveStock({
+    // The reservation may have been re-evaluated against fresher product
+    // truth, so downstream pricing and release use what was actually taken.
+    lines = await reserveStock({
       intent,
       businessId: business._id,
       lines,

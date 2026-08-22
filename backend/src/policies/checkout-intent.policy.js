@@ -59,22 +59,6 @@ export const INVENTORY_ERRORS = {
   reserved: 'PRODUCT_INVENTORY_RESERVED'
 };
 
-/**
- * The intents that currently hold inventory for one product.
- *
- * Scoped to reservations the business still lists as outstanding, so a settled
- * or released checkout never blocks a merchant. `$elemMatch` matters: the line
- * must be BOTH this product and finite, not two different lines that happen to
- * satisfy one condition each.
- */
-export function outstandingReservationFilter({ outstandingIds, productId }) {
-  return {
-    _id: { $in: outstandingIds },
-    phase: { $in: ['prepared', 'reserved'] },
-    lines: { $elemMatch: { productId, finite: true } }
-  };
-}
-
 export const IDEMPOTENCY_ERRORS = {
   keyReused: 'IDEMPOTENCY_KEY_REUSED',
   inProgress: 'CHECKOUT_IN_PROGRESS'
@@ -126,6 +110,74 @@ export function isResumable(phase) {
 
 export function isTerminal(phase) {
   return phase === 'finalized' || phase === 'released';
+}
+
+/**
+ * The merchant inventory write, as ONE atomic decision.
+ *
+ * A read that observes "no reservation outstanding" is worthless by the time a
+ * later save runs: a checkout can reserve in between, and the save would then
+ * overwrite a decremented quantity with a figure computed from stale data. So
+ * the reservation-absence predicate is not a pre-check at all - it is part of
+ * the same update's filter, and MongoDB evaluates it at write time.
+ *
+ * Two predicates carry the guarantee:
+ *
+ *   1. `stockReservations.0` must not exist. The array holds OUTSTANDING
+ *      reservations only, so an empty array (or an absent field on a legacy
+ *      document) means no checkout is holding stock right now. This is a
+ *      business-wide lock, which is deliberately blunter than a per-product one
+ *      and correspondingly harder to get wrong.
+ *   2. the stock pair must still be what the caller observed. `normalizeStock`
+ *      may derive one half of the pair from the current value, so the write
+ *      only applies if that current value has not moved underneath it.
+ *
+ * Every field the merchant is allowed to change is applied in the same update,
+ * which is what makes a mixed payload all-or-nothing: if the filter misses,
+ * nothing is written - not the stock, and not the description alongside it.
+ */
+export function buildAtomicInventoryUpdate({
+  businessId,
+  ownerId,
+  productId,
+  write,
+  observedStock
+}) {
+  const productMatch = { _id: productId };
+
+  // Compare-and-set on the pair, but only when both halves were actually
+  // observed. A legacy document may carry neither, and inventing a predicate
+  // for a field that does not exist would refuse a legitimate edit.
+  const hasObservedPair =
+    observedStock?.stockQuantity !== undefined &&
+    observedStock?.unlimitedStock !== undefined;
+
+  if (hasObservedPair) {
+    productMatch.stockQuantity = observedStock.stockQuantity;
+    productMatch.unlimitedStock = observedStock.unlimitedStock;
+  }
+
+  const filter = {
+    _id: businessId,
+    // Ownership stays part of the write itself, never inferred from a body.
+    owner: ownerId,
+    isActive: true,
+    // The whole point: evaluated by MongoDB at write time, not by us earlier.
+    'stockReservations.0': { $exists: false },
+    products: { $elemMatch: productMatch }
+  };
+
+  const set = {};
+  for (const [field, value] of Object.entries(write)) {
+    set[`products.$[product].${field}`] = value;
+  }
+
+  return {
+    filter,
+    update: { $set: set },
+    arrayFilters: [{ 'product._id': productId }],
+    guardsReservation: true
+  };
 }
 
 /**

@@ -3,7 +3,6 @@ import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 
 import { Business } from '../models/Business.js';
-import { CheckoutIntent } from '../models/CheckoutIntent.js';
 import { Order } from '../models/Order.js';
 import { User } from '../models/User.js';
 import {
@@ -15,7 +14,7 @@ import {
 } from '../policies/order-status.policy.js';
 import {
   INVENTORY_ERRORS,
-  outstandingReservationFilter
+  buildAtomicInventoryUpdate
 } from '../policies/checkout-intent.policy.js';
 import { buildProductWrite } from '../policies/product.policy.js';
 import { paginationParams } from '../policies/query.policy.js';
@@ -265,37 +264,58 @@ function touchesInventory(body) {
 }
 
 /**
- * Refuses a stock rewrite while a checkout still holds some of that stock.
+ * Applies a merchant product update whose correctness depends on inventory.
  *
- * Without this, a merchant setting stock to 10 while 2 units are reserved would
- * later have those 2 handed back on top of the new figure - the release would
- * turn their intended 10 into 12. Nothing merges the two decisions sensibly, so
- * the edit is refused for the short life of the reservation instead.
+ * The reservation check is NOT performed here and then trusted later - it is a
+ * predicate inside the very update MongoDB executes, so a checkout that
+ * reserves stock a microsecond after we read the document still causes this
+ * write to match nothing. The previous read/check/save shape could not promise
+ * that: the observation was true when made and stale when used.
  *
- * Only inventory fields are blocked. Name, description, price, discount,
- * images, keywords and activation stay editable throughout, because none of
- * them can be corrupted by a release.
+ * Only inventory-touching requests take this path. Name, description, price,
+ * discount, images, keywords and activation cannot be corrupted by a release,
+ * so they keep the ordinary document save and stay editable throughout.
  */
-async function refuseIfInventoryReserved(business, productId) {
-  const holder = await Business.findById(business._id).select(
-    '+stockReservations'
-  );
-  const outstandingIds = holder?.stockReservations ?? [];
-  if (outstandingIds.length === 0) return;
+async function applyInventoryUpdate({ business, product, write, ownerId }) {
+  const atomic = buildAtomicInventoryUpdate({
+    businessId: business._id,
+    ownerId,
+    productId: product._id,
+    write,
+    observedStock: {
+      stockQuantity: product.stockQuantity,
+      unlimitedStock: product.unlimitedStock
+    }
+  });
 
-  const blocking = await CheckoutIntent.exists(
-    outstandingReservationFilter({ outstandingIds, productId })
-  );
+  // `new: true` so the response reports what MongoDB actually stored, never the
+  // stale in-memory subdocument this request started from.
+  const updated = await Business.findOneAndUpdate(atomic.filter, atomic.update, {
+    arrayFilters: atomic.arrayFilters,
+    new: true
+  });
 
-  if (blocking) {
-    // No reservation id is disclosed: a merchant is told that stock is in use,
-    // not who is buying it.
-    throw new AppError(
-      'This product has stock reserved by a checkout in progress, please retry shortly',
-      409,
-      INVENTORY_ERRORS.reserved
-    );
+  if (updated) return updated;
+
+  // The write matched nothing. Distinguish the two honest reasons rather than
+  // reporting a missing product as a reservation conflict.
+  const stillExists = await Business.exists({
+    _id: business._id,
+    owner: ownerId,
+    'products._id': product._id
+  });
+
+  if (!stillExists) {
+    throw new AppError('Product not found', 404, 'PRODUCT_NOT_FOUND');
   }
+
+  // No reservation id, customer, order key or fingerprint is disclosed: the
+  // merchant is told stock is in use, not who is buying it.
+  throw new AppError(
+    'This product has stock reserved by a checkout in progress, please retry shortly',
+    409,
+    INVENTORY_ERRORS.reserved
+  );
 }
 
 export const updateMyBusinessProduct = asyncHandler(async (req, res) => {
@@ -305,14 +325,28 @@ export const updateMyBusinessProduct = asyncHandler(async (req, res) => {
     throw new AppError('Product not found', 404, 'PRODUCT_NOT_FOUND');
   }
 
-  if (touchesInventory(req.body)) {
-    await refuseIfInventoryReserved(business, product._id);
-  }
-
   const write = buildProductWrite(req.body, {
     unlimitedStock: product.unlimitedStock,
     stockQuantity: product.stockQuantity
   });
+
+  if (touchesInventory(req.body)) {
+    // Every field of this request goes in one guarded update, so a blocked
+    // inventory change cannot leave a description or price behind it applied.
+    const updated = await applyInventoryUpdate({
+      business,
+      product,
+      write,
+      ownerId: req.user._id
+    });
+    const stored = updated.products.id(product._id);
+
+    return res.json({
+      success: true,
+      data: { product: updated.productToOwnerJSON(stored) }
+    });
+  }
+
   for (const [field, value] of Object.entries(write)) {
     product[field] = value;
   }

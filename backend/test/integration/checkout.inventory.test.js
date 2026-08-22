@@ -40,6 +40,10 @@ if (!environment.enabled) {
   // import time, so from here on the app cannot name any other database.
   process.env.MONGODB_URI = environment.dbUri;
   process.env.NODE_ENV = 'test';
+  // This suite issues far more requests in a minute than a person could. Rate
+  // limiting is not what is under test here, and a 429 would only mask the
+  // assertions, so the limiter is lifted for this process only.
+  process.env.RATE_LIMIT_MAX = '100000';
 
   const mongoose = (await import('mongoose')).default;
   const { default: app } = await import('../../src/app.js');
@@ -1355,6 +1359,259 @@ if (!environment.enabled) {
       assert.deepEqual(await outstandingMarkers(store.businessId), [
         String(intent._id)
       ]);
+    });
+
+    // ================================================================= R3 ===
+    // The merchant inventory write and the reservation predicate are one
+    // atomic MongoDB operation, so a checkout that reserves between a read and
+    // a write can no longer be overwritten.
+
+    // ---------------------------------------------------------------- M07 ---
+    await t.test('M07 a stock rewrite racing a reservation has only two outcomes', async () => {
+      const ROUNDS = 10;
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'm07'
+      );
+      const buyer = await seedAccount('buyer-m07');
+
+      for (let round = 0; round < ROUNDS; round += 1) {
+        // Reset the product directly, so each round starts from the same 5
+        // without spending API calls on fresh fixtures.
+        await Business.updateOne(
+          { _id: objectId(store.businessId) },
+          {
+            $set: {
+              'products.$[p].stockQuantity': 5,
+              'products.$[p].unlimitedStock': false
+            }
+          },
+          { arrayFilters: [{ 'p._id': objectId(store.productId) }] }
+        );
+
+        // Fired together: whichever MongoDB serializes first decides.
+        const [checkout, rewrite] = await Promise.all([
+          placeOrder(buyer.token, {
+            ...store,
+            clientOrderId: `${stamp}-m07-${round}`,
+            quantity: 2
+          }),
+          patchProduct(store.merchant.token, store.productId, {
+            stockQuantity: 10
+          })
+        ]);
+
+        assert.equal(checkout.status, 201, `round ${round}: the checkout must succeed`);
+
+        const finalStock = await ownerStock(store.merchant.token, store.productId);
+
+        if (rewrite.status === 200) {
+          // OUTCOME A - the merchant landed first, the checkout reserved
+          // against the NEW figure.
+          assert.equal(
+            finalStock,
+            8,
+            `round ${round}: merchant-first must leave 10 - 2`
+          );
+        } else {
+          // OUTCOME B - the reservation was outstanding at write time.
+          assert.equal(rewrite.status, 409, `round ${round}: unexpected ${rewrite.status}`);
+          assert.equal(rewrite.code, 'PRODUCT_INVENTORY_RESERVED');
+          assert.equal(
+            finalStock,
+            3,
+            `round ${round}: checkout-first must leave 5 - 2`
+          );
+        }
+
+        // The forbidden results, spelled out: a lost decrement, a corrupted
+        // release, or anything negative.
+        assert.ok(
+          [3, 8].includes(finalStock),
+          `round ${round}: illegal final stock ${finalStock}`
+        );
+        assert.ok(finalStock >= 0, `round ${round}: stock went negative`);
+        assert.equal(
+          await Order.countDocuments({ user: objectId(buyer.userId) }),
+          round + 1,
+          `round ${round}: one order per round, never two`
+        );
+        assert.deepEqual(
+          await outstandingMarkers(store.businessId),
+          [],
+          `round ${round}: nothing left outstanding`
+        );
+      }
+    });
+
+    // ---------------------------------------------------------------- M08 ---
+    await t.test('M08 an unlimited toggle racing a reservation stays truthful', async () => {
+      const ROUNDS = 10;
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'm08'
+      );
+      const buyer = await seedAccount('buyer-m08');
+
+      for (let round = 0; round < ROUNDS; round += 1) {
+        await Business.updateOne(
+          { _id: objectId(store.businessId) },
+          {
+            $set: {
+              'products.$[p].stockQuantity': 5,
+              'products.$[p].unlimitedStock': false
+            }
+          },
+          { arrayFilters: [{ 'p._id': objectId(store.productId) }] }
+        );
+
+        const [checkout, toggle] = await Promise.all([
+          placeOrder(buyer.token, {
+            ...store,
+            clientOrderId: `${stamp}-m08-${round}`,
+            quantity: 2
+          }),
+          patchProduct(store.merchant.token, store.productId, {
+            unlimitedStock: true
+          })
+        ]);
+
+        const stored = await Business.findById(objectId(store.businessId));
+        const product = stored.products.find(
+          (entry) => entry._id.toString() === store.productId
+        );
+
+        if (toggle.status === 200) {
+          // The merchant won. Canonical normalization zeroes the meaningless
+          // quantity, and no stale finite figure may survive to be resurrected.
+          assert.equal(product.unlimitedStock, true, `round ${round}`);
+          assert.equal(
+            product.stockQuantity,
+            0,
+            `round ${round}: no hidden stale quantity`
+          );
+        } else {
+          assert.equal(toggle.status, 409, `round ${round}: unexpected ${toggle.status}`);
+          assert.equal(toggle.code, 'PRODUCT_INVENTORY_RESERVED');
+          assert.equal(product.unlimitedStock, false, `round ${round}`);
+          assert.equal(
+            product.stockQuantity,
+            3,
+            `round ${round}: the finite remainder is correct`
+          );
+        }
+
+        assert.equal(checkout.status, 201, `round ${round}: the checkout succeeds either way`);
+        assert.deepEqual(await outstandingMarkers(store.businessId), []);
+      }
+    });
+
+    // ---------------------------------------------------------------- M09 ---
+    await t.test('M09 a blocked mixed payload changes nothing at all', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'm09'
+      );
+      const buyer = await seedAccount('buyer-m09');
+      const key = `${stamp}-m09`;
+
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+
+      // Hold the reservation open, as an in-flight checkout would.
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      await Order.deleteOne({ _id: intent.order });
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'reserved', order: null } }
+      );
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+
+      const before = await Business.findById(objectId(store.businessId));
+      const originalDescription = before.products.find(
+        (entry) => entry._id.toString() === store.productId
+      ).description;
+
+      const mixed = await patchProduct(store.merchant.token, store.productId, {
+        stockQuantity: 10,
+        description: 'وصف جديد لا يجب أن يُحفظ'
+      });
+
+      assert.equal(mixed.status, 409);
+      assert.equal(mixed.code, 'PRODUCT_INVENTORY_RESERVED');
+
+      const blocked = await Business.findById(objectId(store.businessId));
+      const blockedProduct = blocked.products.find(
+        (entry) => entry._id.toString() === store.productId
+      );
+      assert.equal(blockedProduct.stockQuantity, 3, 'the stock is untouched');
+      assert.equal(
+        blockedProduct.description,
+        originalDescription,
+        'and so is the non-inventory field that rode along'
+      );
+
+      // No reservation identity may leak to the merchant.
+      const body = JSON.stringify(mixed.json);
+      assert.equal(body.includes(String(intent._id)), false);
+      assert.equal(body.includes(String(buyer.userId)), false);
+      assert.equal(body.includes(key), false);
+      assert.equal(body.includes(intent.fingerprint), false);
+
+      // Once the reservation settles, the very same request applies in full.
+      await reconcileIntent(await CheckoutIntent.findById(intent._id));
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+
+      const retried = await patchProduct(store.merchant.token, store.productId, {
+        stockQuantity: 10,
+        description: 'وصف جديد لا يجب أن يُحفظ'
+      });
+
+      assert.equal(retried.status, 200);
+      assert.equal(retried.json.data.product.stockQuantity, 10);
+      assert.equal(
+        retried.json.data.product.description,
+        'وصف جديد لا يجب أن يُحفظ'
+      );
+
+      // The response must report what MongoDB stored, not a stale subdocument.
+      const persisted = await Business.findById(objectId(store.businessId));
+      const persistedProduct = persisted.products.find(
+        (entry) => entry._id.toString() === store.productId
+      );
+      assert.equal(persistedProduct.stockQuantity, 10);
+      assert.equal(persistedProduct.description, 'وصف جديد لا يجب أن يُحفظ');
+    });
+
+    // ---------------------------------------------------------------- M10 ---
+    await t.test('M10 a genuinely missing product is still a 404', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'm10'
+      );
+      const ghost = new mongoose.Types.ObjectId();
+
+      const response = await patchProduct(store.merchant.token, String(ghost), {
+        stockQuantity: 4
+      });
+
+      assert.equal(response.status, 404);
+      assert.equal(response.code, 'PRODUCT_NOT_FOUND');
+      assert.notEqual(
+        response.code,
+        'PRODUCT_INVENTORY_RESERVED',
+        'a missing product must not be reported as reserved'
+      );
     });
   });
 }
