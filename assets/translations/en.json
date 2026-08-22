@@ -267,5 +267,13 @@
     "invalidQuantity": "Quantity must be a whole, non-negative number",
     "tooManyImages": "At most 8 images",
     "tooManyKeywords": "At most 20 keywords"
+  },
+  "merchantPreview": {
+    "title": "Store preview",
+    "open": "Preview store as a customer",
+    "banner": "Preview mode - this is what customers see",
+    "close": "Exit preview",
+    "loadError": "Could not load your store for preview",
+    "retry": "Retry"
   }
 }

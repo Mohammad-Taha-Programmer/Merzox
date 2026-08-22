@@ -8,6 +8,7 @@ import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
+import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/services/api_service.dart';
 
@@ -15,20 +16,43 @@ class BusinessProfilePage extends StatelessWidget {
   final HomeBusiness business;
   final ValueChanged<int> onNavChanged;
 
+  /// Customer by default. [BusinessProfileViewMode.merchantPreview] renders the
+  /// same storefront from the same public data, with customer interactions
+  /// removed - it is not a second implementation.
+  final BusinessProfileViewMode viewMode;
+
+  /// Supplied in preview so the merchant can return to their own interface;
+  /// the customer bottom navigation is used otherwise.
+  final VoidCallback? onClosePreview;
+
+  /// Test seam: an already-started bloc to render against. Nothing in the app
+  /// supplies it, so the page keeps owning its bloc in production.
+  @visibleForTesting
+  final BusinessProfileBloc? bloc;
+
   const BusinessProfilePage({
     super.key,
     required this.business,
     required this.onNavChanged,
+    this.viewMode = BusinessProfileViewMode.customer,
+    this.onClosePreview,
+    this.bloc,
   });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
+      // An injected bloc has already been started by whoever built it;
+      // re-dispatching would repeat every public request.
       create: (_) =>
-          BusinessProfileBloc()..add(BusinessProfileStarted(business.id)),
+          bloc ??
+          (BusinessProfileBloc(viewMode: viewMode)
+            ..add(BusinessProfileStarted(business.id))),
       child: _BusinessProfileView(
         business: business,
         onNavChanged: onNavChanged,
+        viewMode: viewMode,
+        onClosePreview: onClosePreview,
       ),
     );
   }
@@ -37,10 +61,14 @@ class BusinessProfilePage extends StatelessWidget {
 class _BusinessProfileView extends StatelessWidget {
   final HomeBusiness business;
   final ValueChanged<int> onNavChanged;
+  final BusinessProfileViewMode viewMode;
+  final VoidCallback? onClosePreview;
 
   const _BusinessProfileView({
     required this.business,
     required this.onNavChanged,
+    required this.viewMode,
+    this.onClosePreview,
   });
 
   @override
@@ -50,6 +78,20 @@ class _BusinessProfileView extends StatelessWidget {
       body: SafeArea(
         child: BlocBuilder<BusinessProfileBloc, BusinessProfileState>(
           builder: (context, state) {
+            // R1 truth gate. In preview the incoming `business` is an
+            // identity-only seed derived from the owner record, so rendering
+            // the storefront from it would show owner-side or default facts as
+            // if a customer could see them. Until the PUBLIC detail request has
+            // succeeded there is nothing truthful to draw, so the preview shows
+            // its loading or failure state instead of a storefront body.
+            //
+            // Customer mode is untouched: its seed already came from the public
+            // business list, so it may legitimately render while the detail
+            // request refreshes it.
+            if (viewMode.isPreview && state.business == null) {
+              return _PreviewAwaitingPublicTruth(state: state);
+            }
+
             final resolvedBusiness = state.business == null
                 ? business
                 : HomeBusiness.fromDetail(state.business!);
@@ -104,39 +146,132 @@ class _BusinessProfileView extends StatelessWidget {
                     if (state.mainTabIndex == 0)
                       _AboutTab(state: state, business: resolvedBusiness)
                     else if (state.mainTabIndex == 1)
-                      _ProductsTab(state: state, business: resolvedBusiness)
+                      _ProductsTab(
+                        state: state,
+                        business: resolvedBusiness,
+                        viewMode: viewMode,
+                      )
                     else
-                      _ReviewsTab(state: state),
+                      _ReviewsTab(state: state, viewMode: viewMode),
                   ],
                 ),
-                PositionedDirectional(
-                  end: 0,
-                  bottom: 106,
-                  child: _ChatButton(
-                    onPressed: () => AuthGate.run(
-                      context,
-                      // The thread is created by the chat route on first open,
-                      // so only the store id has to travel with the tap.
-                      onAuthenticated: () => context.push(
-                        Uri(
-                          path: '/chat',
-                          queryParameters: {
-                            'businessId': resolvedBusiness.id,
-                            'title': resolvedBusiness.name,
-                          },
-                        ).toString(),
+                // A merchant must not open a customer chat with their own
+                // store, so the affordance is absent rather than disabled.
+                if (viewMode.allowsCustomerActions)
+                  PositionedDirectional(
+                    end: 0,
+                    bottom: 106,
+                    child: _ChatButton(
+                      onPressed: () => AuthGate.run(
+                        context,
+                        // The thread is created by the chat route on first
+                        // open, so only the store id travels with the tap.
+                        onAuthenticated: () => context.push(
+                          Uri(
+                            path: '/chat',
+                            queryParameters: {
+                              'businessId': resolvedBusiness.id,
+                              'title': resolvedBusiness.name,
+                            },
+                          ).toString(),
+                        ),
                       ),
                     ),
                   ),
-                ),
               ],
             );
           },
         ),
       ),
-      bottomNavigationBar: _ProfileBottomNavigationBar(
-        selectedIndex: 0,
-        onChanged: onNavChanged,
+      bottomNavigationBar: viewMode.isPreview
+          ? _PreviewCloseBar(onClose: onClosePreview)
+          : _ProfileBottomNavigationBar(
+              selectedIndex: 0,
+              onChanged: onNavChanged,
+            ),
+    );
+  }
+}
+
+/// What the merchant preview shows before the public storefront exists.
+///
+/// Deliberately renders no store facts at all - no hero, name, public id,
+/// follower or product count. A count of zero drawn from a seed would be a
+/// manufactured fact, which is exactly what this screen must never do.
+class _PreviewAwaitingPublicTruth extends StatelessWidget {
+  final BusinessProfileState state;
+
+  const _PreviewAwaitingPublicTruth({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final failed = state.detailsStatus == BusinessProfileSectionStatus.failure;
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: _TopBar(onBack: () => Navigator.of(context).pop()),
+        ),
+        Expanded(
+          child: Center(
+            child: failed
+                // Retries the PUBLIC detail request, not the owner lookup: the
+                // owner record already resolved and is not what failed.
+                ? _SectionFailure(
+                    message: state.detailsError,
+                    onRetry: () => context.read<BusinessProfileBloc>().add(
+                      const BusinessProfileDetailsRetryRequested(),
+                    ),
+                  )
+                : const CircularProgressIndicator(),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Replaces the customer bottom navigation while previewing. It is the only
+/// action a merchant gets from inside the preview, which keeps the surface
+/// read-only without altering the storefront body.
+class _PreviewCloseBar extends StatelessWidget {
+  final VoidCallback? onClose;
+
+  const _PreviewCloseBar({this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'merchantPreview.banner'.tr(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 11,
+                color: MerzoxColors.kColor767676,
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: onClose ?? () => Navigator.of(context).maybePop(),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  backgroundColor: MerzoxColors.kColor3D5A80,
+                ),
+                icon: const Icon(Icons.close_rounded, size: 18),
+                label: Text('merchantPreview.close'.tr()),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -530,7 +665,13 @@ class _ProductsTab extends StatelessWidget {
   final BusinessProfileState state;
   final HomeBusiness business;
 
-  const _ProductsTab({required this.state, required this.business});
+  final BusinessProfileViewMode viewMode;
+
+  const _ProductsTab({
+    required this.state,
+    required this.business,
+    required this.viewMode,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -569,6 +710,7 @@ class _ProductsTab extends StatelessWidget {
                 business: business,
                 product: product,
                 liked: state.likedProductIds.contains(product.id),
+                viewMode: viewMode,
               );
             },
           ),
@@ -620,12 +762,30 @@ class _ProductCard extends StatelessWidget {
   final HomeBusiness business;
   final BusinessProductApiModel product;
   final bool liked;
+  final BusinessProfileViewMode viewMode;
 
   const _ProductCard({
     required this.business,
     required this.product,
     required this.liked,
+    required this.viewMode,
   });
+
+  /// Preview keeps products non-interactive rather than opening the customer
+  /// product page, which carries cart, favourite, chat and review actions.
+  /// Threading a read-only mode through that page too would be a far larger
+  /// surface for no extra preview fidelity - the card already shows exactly
+  /// what a customer sees.
+  void _openProduct(BuildContext context) {
+    if (!viewMode.allowsCustomerActions) return;
+
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) =>
+            ProductDetailsPage(business: business, product: product),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -636,14 +796,7 @@ class _ProductCard extends StatelessWidget {
         side: BorderSide(color: MerzoxColors.kColorEFEFEF),
       ),
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) =>
-                  ProductDetailsPage(business: business, product: product),
-            ),
-          );
-        },
+        onTap: () => _openProduct(context),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -653,36 +806,40 @@ class _ProductCard extends StatelessWidget {
                   Positioned.fill(
                     child: _ProductImage(imageUrl: product.imageUrl),
                   ),
-                  PositionedDirectional(
-                    top: 8,
-                    end: 8,
-                    child: InkWell(
-                      customBorder: const CircleBorder(),
-                      onTap: () => AuthGate.run(
-                        context,
-                        onAuthenticated: () => context
-                            .read<BusinessProfileBloc>()
-                            .add(BusinessProfileProductLikeToggled(product.id)),
-                      ),
-                      child: Container(
-                        width: 26,
-                        height: 26,
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
-                          shape: BoxShape.circle,
+                  // A merchant liking their own product would be a real
+                  // customer mutation, so the control is absent in preview.
+                  if (viewMode.allowsCustomerActions)
+                    PositionedDirectional(
+                      top: 8,
+                      end: 8,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: () => AuthGate.run(
+                          context,
+                          onAuthenticated: () =>
+                              context.read<BusinessProfileBloc>().add(
+                                BusinessProfileProductLikeToggled(product.id),
+                              ),
                         ),
-                        child: Icon(
-                          liked
-                              ? Icons.favorite_rounded
-                              : Icons.favorite_border_rounded,
-                          color: liked
-                              ? MerzoxColors.kColor3D5A80
-                              : MerzoxColors.kColor98C1D9,
-                          size: 18,
+                        child: Container(
+                          width: 26,
+                          height: 26,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            liked
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            color: liked
+                                ? MerzoxColors.kColor3D5A80
+                                : MerzoxColors.kColor98C1D9,
+                            size: 18,
+                          ),
                         ),
                       ),
                     ),
-                  ),
                 ],
               ),
             ),
@@ -716,16 +873,11 @@ class _ProductCard extends StatelessWidget {
             SizedBox(
               height: 34,
               child: FilledButton(
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => ProductDetailsPage(
-                        business: business,
-                        product: product,
-                      ),
-                    ),
-                  );
-                },
+                // Disabled in preview: adding your own product to a customer
+                // cart would create real customer state.
+                onPressed: viewMode.allowsCustomerActions
+                    ? () => _openProduct(context)
+                    : null,
                 style: FilledButton.styleFrom(
                   backgroundColor: MerzoxColors.kColorEE6C4D,
                   shape: const RoundedRectangleBorder(
@@ -773,7 +925,9 @@ class _ProductImage extends StatelessWidget {
 class _ReviewsTab extends StatefulWidget {
   final BusinessProfileState state;
 
-  const _ReviewsTab({required this.state});
+  final BusinessProfileViewMode viewMode;
+
+  const _ReviewsTab({required this.state, required this.viewMode});
 
   @override
   State<_ReviewsTab> createState() => _ReviewsTabState();
@@ -796,64 +950,70 @@ class _ReviewsTabState extends State<_ReviewsTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Center(
-          child: _InteractiveStars(
-            value: _rating,
-            onChanged: (value) => setState(() => _rating = value),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _commentController,
-          minLines: 1,
-          maxLines: 3,
-          decoration: InputDecoration(
-            hintText: 'اكتب تقييمك هنا',
-            hintStyle: TextStyle(
-              fontSize: 12,
-              color: MerzoxColors.kColorC7C7C7,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
-              borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(4),
-              borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
+        // The whole composer is absent in preview: a merchant reviewing their
+        // own store is a customer mutation, not a presentation detail. The
+        // published reviews below remain visible, because that is exactly what
+        // a customer sees.
+        if (widget.viewMode.allowsCustomerActions) ...[
+          Center(
+            child: _InteractiveStars(
+              value: _rating,
+              onChanged: (value) => setState(() => _rating = value),
             ),
           ),
-        ),
-        const SizedBox(height: 10),
-        Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: FilledButton(
-            onPressed: saving
-                ? null
-                : () async {
-                    final submitted = await AuthGate.run(
-                      context,
-                      onAuthenticated: () =>
-                          context.read<BusinessProfileBloc>().add(
-                            BusinessProfileReviewSubmitted(
-                              rating: _rating,
-                              comment: _commentController.text,
-                            ),
-                          ),
-                    );
-                    if (submitted) {
-                      _commentController.clear();
-                    }
-                  },
-            style: FilledButton.styleFrom(
-              backgroundColor: MerzoxColors.kColorEE6C4D,
-              fixedSize: const Size(58, 32),
-              shape: RoundedRectangleBorder(
+          const SizedBox(height: 12),
+          TextField(
+            controller: _commentController,
+            minLines: 1,
+            maxLines: 3,
+            decoration: InputDecoration(
+              hintText: 'اكتب تقييمك هنا',
+              hintStyle: TextStyle(
+                fontSize: 12,
+                color: MerzoxColors.kColorC7C7C7,
+              ),
+              border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(4),
+                borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
               ),
             ),
-            child: const Text('نشر', style: TextStyle(fontSize: 12)),
           ),
-        ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FilledButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      final submitted = await AuthGate.run(
+                        context,
+                        onAuthenticated: () =>
+                            context.read<BusinessProfileBloc>().add(
+                              BusinessProfileReviewSubmitted(
+                                rating: _rating,
+                                comment: _commentController.text,
+                              ),
+                            ),
+                      );
+                      if (submitted) {
+                        _commentController.clear();
+                      }
+                    },
+              style: FilledButton.styleFrom(
+                backgroundColor: MerzoxColors.kColorEE6C4D,
+                fixedSize: const Size(58, 32),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              child: const Text('نشر', style: TextStyle(fontSize: 12)),
+            ),
+          ),
+        ],
         const SizedBox(height: 18),
         const Text(
           'كل التقييمات',

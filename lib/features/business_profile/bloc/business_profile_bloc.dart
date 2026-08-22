@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/services/api_service.dart';
 
+import '../business_profile_view_mode.dart';
 import 'business_profile_event.dart';
 import 'business_profile_state.dart';
 
@@ -10,9 +11,14 @@ class BusinessProfileBloc
   final ApiService _apiService;
   final AuthSessionService _authSessionService;
 
+  /// Customer by default. The merchant preview uses the same public reads but
+  /// performs no customer-side request or mutation.
+  final BusinessProfileViewMode viewMode;
+
   BusinessProfileBloc({
     ApiService? apiService,
     AuthSessionService authSessionService = const AuthSessionService(),
+    this.viewMode = BusinessProfileViewMode.customer,
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
        super(const BusinessProfileState()) {
@@ -66,7 +72,11 @@ class BusinessProfileBloc
       ),
     );
 
-    await _loadFavoriteStatus(emit, event.businessId);
+    // Preview issues no customer request: favourite status is a protected
+    // read that says nothing about how customers see the store.
+    if (viewMode.allowsCustomerActions) {
+      await _loadFavoriteStatus(emit, event.businessId);
+    }
   }
 
   Future<void> _onMainTabChanged(
@@ -103,6 +113,10 @@ class BusinessProfileBloc
     BusinessProfileProductLikeToggled event,
     Emitter<BusinessProfileState> emit,
   ) async {
+    // Refused at the event layer, not merely hidden in the UI: a merchant must
+    // not be able to like their own product through any path.
+    if (!viewMode.allowsCustomerActions) return;
+
     late final String token;
     try {
       token = await _token();
@@ -143,6 +157,10 @@ class BusinessProfileBloc
     BusinessProfileReviewSubmitted event,
     Emitter<BusinessProfileState> emit,
   ) async {
+    // A merchant reviewing their own store is refused here, so hiding the
+    // composer is defence in depth rather than the only guard.
+    if (!viewMode.allowsCustomerActions) return;
+
     emit(
       state.copyWith(
         status: BusinessProfileStatus.savingReview,
