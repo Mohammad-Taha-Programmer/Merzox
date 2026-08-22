@@ -111,6 +111,33 @@ const socialLinksSchema = new mongoose.Schema(
   { _id: false }
 );
 
+/**
+ * One outstanding reservation, and exactly what it consumed.
+ *
+ * The consumption lives here rather than only on the CheckoutIntent because
+ * this document is written in the SAME atomic update as the decrement. A crash
+ * immediately afterwards therefore cannot leave inventory consumed with no
+ * durable record of what to give back.
+ */
+const stockReservationSchema = new mongoose.Schema(
+  {
+    intent: { type: mongoose.Schema.Types.ObjectId, required: true },
+    lines: {
+      type: [
+        new mongoose.Schema(
+          {
+            productId: { type: mongoose.Schema.Types.ObjectId, required: true },
+            quantity: { type: Number, required: true, min: 1 }
+          },
+          { _id: false }
+        )
+      ],
+      default: []
+    }
+  },
+  { _id: false }
+);
+
 const businessSchema = new mongoose.Schema(
   {
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -142,7 +169,7 @@ const businessSchema = new mongoose.Schema(
      * and appears on no serializer.
      */
     stockReservations: {
-      type: [mongoose.Schema.Types.ObjectId],
+      type: [stockReservationSchema],
       default: [],
       select: false
     },

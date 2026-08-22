@@ -25,6 +25,16 @@ export const checkoutPhases = [
   'prepared',
   /** Finite inventory has been consumed exactly once, order not yet written. */
   'reserved',
+  /**
+   * A worker has claimed the exclusive right to write this checkout's order.
+   * No reconciler may refund inventory while this claim stands and is fresh.
+   */
+  'finalizing',
+  /**
+   * A worker has claimed the exclusive right to give this reservation back.
+   * No order may be created for this checkout once the claim is taken.
+   */
+  'releasing',
   /** The order exists and is customer-visible. Terminal. */
   'finalized',
   /** The reservation was rolled back exactly once. Terminal. */

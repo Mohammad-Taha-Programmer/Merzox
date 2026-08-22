@@ -3,11 +3,14 @@ import { CheckoutIntent } from '../models/CheckoutIntent.js';
 import { Order } from '../models/Order.js';
 import {
   CHECKOUT_STALE_LEASE_MS,
+  RECLAIMABLE_PHASES,
   RECONCILE_BATCH_LIMIT,
   RECONCILE_INTERVAL_MS,
   buildIdentifiedRelease,
-  buildReservationSettlement
+  buildReservationSettlement,
+  reservedLinesFromMarker
 } from '../policies/checkout-intent.policy.js';
+import { claimRelease } from './checkout-claim.service.js';
 import { safeErrorCode } from '../utils/safe-log.js';
 
 /**
@@ -56,8 +59,11 @@ async function settleMarker(intent) {
 }
 
 async function finalizeAgainst(intent, order) {
+  // A durable order exists, so the only correct outcome is finalized - never a
+  // refund. Conditional on a non-terminal phase so a checkout somebody already
+  // released is not silently rewritten.
   await CheckoutIntent.updateOne(
-    { _id: intent._id, phase: { $in: ['prepared', 'reserved'] } },
+    { _id: intent._id, phase: { $in: RECLAIMABLE_PHASES } },
     { $set: { phase: 'finalized', order: order._id, failureCode: null } }
   );
   await settleMarker(intent);
@@ -65,24 +71,51 @@ async function finalizeAgainst(intent, order) {
   return RECONCILE_ACTIONS.finalized;
 }
 
-async function releaseAndClose(intent, failureCode) {
-  const release = buildIdentifiedRelease({
-    businessId: intent.business,
-    intentId: intent._id,
-    lines: intent.lines ?? []
-  });
+/**
+ * Gives back exactly what the outstanding marker says was consumed.
+ *
+ * The lines come from the Business document, not from the CheckoutIntent. The
+ * marker was written in the same atomic update as the decrement, so it cannot
+ * disagree with it; the intent's own copy is written afterwards and a crash in
+ * between would leave it stale - describing, for instance, an unlimited line
+ * for stock that was actually taken finitely.
+ */
+async function releaseAndClose(intent, failureCode, staleAfterMs) {
+  // A live finalizer is never robbed: its claim can only be taken over once it
+  // has gone quiet for longer than the abandonment lease.
+  const claimed = await claimRelease({ intentId: intent._id, staleAfterMs });
 
-  // Guarded by the marker, so a reservation that was already given back - or
-  // never taken - cannot be given back a second time.
-  await Business.updateOne(
-    release.filter,
-    release.update,
-    release.arrayFilters.length > 0
-      ? { arrayFilters: release.arrayFilters }
-      : undefined
+  if (!claimed) {
+    // Finalization owns it, or it is already terminal. Refunding now could
+    // strand a durable order against restored stock.
+    return RECONCILE_ACTIONS.skipped;
+  }
+
+  const holder = await Business.findById(intent.business).select(
+    '+stockReservations'
   );
+  const reservedLines = reservedLinesFromMarker(holder, intent._id);
+
+  if (reservedLines) {
+    const release = buildIdentifiedRelease({
+      businessId: intent.business,
+      intentId: intent._id,
+      lines: reservedLines
+    });
+
+    // Guarded by the marker, so a reservation that was already given back - or
+    // never taken - cannot be given back a second time.
+    await Business.updateOne(
+      release.filter,
+      release.update,
+      release.arrayFilters.length > 0
+        ? { arrayFilters: release.arrayFilters }
+        : undefined
+    );
+  }
+
   await CheckoutIntent.updateOne(
-    { _id: intent._id, phase: { $in: ['prepared', 'reserved'] } },
+    { _id: intent._id, phase: 'releasing' },
     { $set: { phase: 'released', failureCode } }
   );
 
@@ -96,7 +129,7 @@ async function releaseAndClose(intent, failureCode) {
  * the checkout succeeded and only the bookkeeping is missing; if it does not,
  * nothing was sold and the reservation must go back.
  */
-export async function reconcileIntent(intent) {
+export async function reconcileIntent(intent, staleAfterMs = CHECKOUT_STALE_LEASE_MS) {
   if (intent.phase === 'released') {
     // A release already pulled its own marker in the same update, so there is
     // nothing left to do.
@@ -110,6 +143,8 @@ export async function reconcileIntent(intent) {
     return RECONCILE_ACTIONS.markerCleaned;
   }
 
+  // A durable order is decisive: if one exists this checkout succeeded, and the
+  // only thing missing is bookkeeping. Checked before any release is claimed.
   const order = await Order.findOne({
     user: intent.user,
     clientOrderId: intent.clientOrderId
@@ -117,7 +152,7 @@ export async function reconcileIntent(intent) {
 
   if (order) return finalizeAgainst(intent, order);
 
-  return releaseAndClose(intent, 'CHECKOUT_ABANDONED');
+  return releaseAndClose(intent, 'CHECKOUT_ABANDONED', staleAfterMs);
 }
 
 /**
@@ -133,7 +168,9 @@ export async function reconcileStaleCheckouts({
 } = {}) {
   const cutoff = new Date(now - staleAfterMs);
   const candidates = await CheckoutIntent.find({
-    phase: { $in: ['prepared', 'reserved', 'finalized'] },
+    // Stale claims are swept too: a worker that died holding `finalizing` or
+    // `releasing` would otherwise strand its reservation forever.
+    phase: { $in: [...RECLAIMABLE_PHASES, 'finalized'] },
     updatedAt: { $lte: cutoff }
   })
     .sort({ updatedAt: 1 })
@@ -153,7 +190,7 @@ export async function reconcileStaleCheckouts({
     if (intent.phase === 'finalized') {
       const outstanding = await Business.exists({
         _id: intent.business,
-        stockReservations: intent._id
+        'stockReservations.intent': intent._id
       });
 
       if (!outstanding) {
@@ -162,7 +199,7 @@ export async function reconcileStaleCheckouts({
       }
     }
 
-    summary[await reconcileIntent(intent)] += 1;
+    summary[await reconcileIntent(intent, staleAfterMs)] += 1;
   }
 
   return summary;

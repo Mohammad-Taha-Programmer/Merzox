@@ -144,8 +144,10 @@ function matchesFilter(document, filter) {
     // Mongo array-membership semantics: `field: value` matches when the array
     // contains value, and `$ne` matches when it does not. This is what makes
     // the reservation marker a replay guard.
-    if (key === 'stockReservations') {
-      const held = (document.stockReservations ?? []).map(String);
+    if (key === 'stockReservations.intent') {
+      const held = (document.stockReservations ?? []).map((entry) =>
+        String(entry.intent)
+      );
       if (condition && typeof condition === 'object' && '$ne' in condition) {
         if (held.includes(String(condition.$ne))) return false;
       } else if (!held.includes(String(condition))) {
@@ -175,20 +177,19 @@ function applyConditionalUpdate(document, { filter, update, arrayFilters }) {
     return { matchedCount: 1, modifiedCount: 0 };
   }
 
-  const known = ['$inc', '$addToSet', '$pull'];
+  const known = ['$inc', '$push', '$pull'];
   const unknown = Object.keys(update).filter((key) => !known.includes(key));
   if (unknown.length > 0) throw new Error(`unsupported update: ${unknown}`);
 
-  if (update.$addToSet?.stockReservations) {
+  if (update.$push?.stockReservations) {
     const held = document.stockReservations ?? (document.stockReservations = []);
-    const marker = update.$addToSet.stockReservations;
-    if (!held.map(String).includes(String(marker))) held.push(marker);
+    held.push(update.$push.stockReservations);
   }
 
   if (update.$pull?.stockReservations) {
-    const marker = String(update.$pull.stockReservations);
+    const marker = String(update.$pull.stockReservations.intent);
     document.stockReservations = (document.stockReservations ?? []).filter(
-      (entry) => String(entry) !== marker
+      (entry) => String(entry.intent) !== marker
     );
   }
 
@@ -404,7 +405,12 @@ test('B10 - unlimited stock is never decremented', () => {
   // Nothing to consume at all: the reservation records its identity but emits
   // no decrement whatsoever.
   assert.equal(reservation.update.$inc, undefined);
-  assert.ok(reservation.update.$addToSet.stockReservations);
+  assert.ok(reservation.update.$push.stockReservations.intent);
+  assert.deepEqual(
+    reservation.update.$push.stockReservations.lines,
+    [],
+    'an unlimited basket records a marker holding nothing'
+  );
 
   const result = applyConditionalUpdate(business, reservation);
   assert.equal(result.matchedCount, 1);

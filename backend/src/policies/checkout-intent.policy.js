@@ -50,6 +50,31 @@ export const RECONCILE_INTERVAL_MS = 60 * 1000;
 /** The most intents one sweep will touch, so a backlog cannot stall a process. */
 export const RECONCILE_BATCH_LIMIT = 200;
 
+/**
+ * The phases from which a worker may still claim the right to act, and the
+ * claims themselves.
+ *
+ * Finalization and release are mutually exclusive DATABASE decisions, not
+ * intentions checked earlier: whoever flips the phase owns the outcome, and the
+ * loser sees a matched count of zero and stops. Without this a reconciler could
+ * read "no order yet", a request could then create one, and the reconciler
+ * would refund inventory that a durable order owns.
+ */
+export const CLAIMABLE_PHASES = ['prepared', 'reserved'];
+
+/** A dead finalizer's claim may be taken over, but only once it is stale. */
+export const RECLAIMABLE_PHASES = ['prepared', 'reserved', 'finalizing', 'releasing'];
+
+export const CHECKOUT_CLAIMS = {
+  finalizing: 'finalizing',
+  releasing: 'releasing'
+};
+
+export const CLAIM_ERRORS = {
+  /** Another worker owns this checkout's outcome. Stable and retriable. */
+  lost: 'CHECKOUT_CLAIM_LOST'
+};
+
 export const INVENTORY_ERRORS = {
   /**
    * A merchant tried to rewrite stock while a checkout still holds some of it.
@@ -301,6 +326,27 @@ export function buildAtomicInventoryUpdate({
  * what makes the operation idempotent: replaying it after a crash matches
  * nothing instead of decrementing a second time.
  */
+/**
+ * The consumption an outstanding reservation is holding.
+ *
+ * Only finite lines ever take stock, so only they are recorded. This travels
+ * INSIDE the reservation marker, in the same atomic Business update as the
+ * decrement, which is what makes it recoverable: there is no window in which
+ * inventory is consumed but the record of what it consumed lives in another
+ * document that may never have been written.
+ */
+export function reservationEntryFor({ intentId, lines }) {
+  return {
+    intent: intentId,
+    lines: lines
+      .filter((line) => line.finite)
+      .map((line) => ({
+        productId: line.product?._id ?? line.productId,
+        quantity: line.quantity
+      }))
+  };
+}
+
 export function buildIdentifiedReservation({ businessId, intentId, lines }) {
   const finiteLines = lines.filter((line) => line.finite);
 
@@ -308,7 +354,7 @@ export function buildIdentifiedReservation({ businessId, intentId, lines }) {
     _id: businessId,
     isActive: true,
     // Never twice for the same intent.
-    stockReservations: { $ne: intentId },
+    'stockReservations.intent': { $ne: intentId },
     $and: lines.map((line) => ({
       products: {
         $elemMatch: {
@@ -344,7 +390,12 @@ export function buildIdentifiedReservation({ businessId, intentId, lines }) {
     };
   });
 
-  const update = { $addToSet: { stockReservations: intentId } };
+  // The marker carries what it consumed, written in the SAME update as the
+  // decrement. Recovery therefore never has to trust metadata from a later
+  // cross-collection write that may not have happened.
+  const update = {
+    $push: { stockReservations: reservationEntryFor({ intentId, lines }) }
+  };
   if (finiteLines.length > 0) update.$inc = increments;
 
   return { filter, update, arrayFilters };
@@ -369,7 +420,7 @@ export function buildIdentifiedRelease({ businessId, intentId, lines }) {
   const filter = {
     _id: businessId,
     // Only a reservation that is still outstanding can be released.
-    stockReservations: intentId
+    'stockReservations.intent': intentId
   };
 
   const increments = {};
@@ -383,10 +434,31 @@ export function buildIdentifiedRelease({ businessId, intentId, lines }) {
     };
   });
 
-  const update = { $pull: { stockReservations: intentId } };
+  const update = { $pull: { stockReservations: { intent: intentId } } };
   if (finiteLines.length > 0) update.$inc = increments;
 
   return { filter, update, arrayFilters };
+}
+
+/**
+ * The lines an outstanding marker says it consumed.
+ *
+ * This is the authoritative source for compensation. It is read from the
+ * Business document itself, so it cannot disagree with the decrement it was
+ * written beside. `finite: true` because only finite lines are ever recorded.
+ */
+export function reservedLinesFromMarker(business, intentId) {
+  const entry = (business?.stockReservations ?? []).find(
+    (marker) => String(marker.intent) === String(intentId)
+  );
+
+  if (!entry) return null;
+
+  return (entry.lines ?? []).map((line) => ({
+    productId: line.productId,
+    quantity: line.quantity,
+    finite: true
+  }));
 }
 
 /**
@@ -398,7 +470,7 @@ export function buildIdentifiedRelease({ businessId, intentId, lines }) {
  */
 export function buildReservationSettlement({ businessId, intentId }) {
   return {
-    filter: { _id: businessId, stockReservations: intentId },
-    update: { $pull: { stockReservations: intentId } }
+    filter: { _id: businessId, 'stockReservations.intent': intentId },
+    update: { $pull: { stockReservations: { intent: intentId } } }
   };
 }

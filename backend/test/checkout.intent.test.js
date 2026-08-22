@@ -8,6 +8,10 @@ import { CheckoutIntent, checkoutPhases } from '../src/models/CheckoutIntent.js'
 import { Order } from '../src/models/Order.js';
 import {
   ABANDONED_AFTER_MS,
+  CHECKOUT_CLAIMS,
+  CLAIMABLE_PHASES,
+  CLAIM_ERRORS,
+  RECLAIMABLE_PHASES,
   CONVERGENCE_ATTEMPTS,
   CONVERGENCE_INTERVAL_MS,
   IDEMPOTENCY_ERRORS,
@@ -140,8 +144,59 @@ test('the canonical payload carries no secret and no server-derived price', () =
 
 // ------------------------------------------------------------- phase legality
 
-test('the phases are exactly the four the protocol defines', () => {
-  assert.deepEqual(checkoutPhases, ['prepared', 'reserved', 'finalized', 'released']);
+test('the phases are exactly the six the protocol defines', () => {
+  assert.deepEqual(checkoutPhases, [
+    'prepared',
+    'reserved',
+    // The two claims: whoever takes one owns the outcome, and the other is
+    // then impossible.
+    'finalizing',
+    'releasing',
+    'finalized',
+    'released'
+  ]);
+});
+
+test('a claim is only ever taken from an unfinished phase', () => {
+  assert.deepEqual(CLAIMABLE_PHASES, ['prepared', 'reserved']);
+  // Finalized and released are terminal and can never be claimed again.
+  for (const terminal of ['finalized', 'released']) {
+    assert.equal(CLAIMABLE_PHASES.includes(terminal), false, terminal);
+    assert.equal(RECLAIMABLE_PHASES.includes(terminal), false, terminal);
+  }
+  // A dead worker's claim may be taken over, but only once it is stale.
+  assert.deepEqual(RECLAIMABLE_PHASES, [
+    'prepared',
+    'reserved',
+    'finalizing',
+    'releasing'
+  ]);
+  assert.equal(CHECKOUT_CLAIMS.finalizing, 'finalizing');
+  assert.equal(CHECKOUT_CLAIMS.releasing, 'releasing');
+  assert.equal(CLAIM_ERRORS.lost, 'CHECKOUT_CLAIM_LOST');
+});
+
+test('release can never be claimed straight from a finalizing checkout', () => {
+  // A finalizing claim is excluded from the ordinary release claim, so a live
+  // finalizer cannot have its inventory refunded underneath it.
+  assert.equal(CLAIMABLE_PHASES.includes('finalizing'), false);
+  // Only the stale-takeover path may touch it, and that path is gated by the
+  // abandonment lease.
+  assert.equal(RECLAIMABLE_PHASES.includes('finalizing'), true);
+});
+
+test('internal claims never reach a public order status', () => {
+  const publicStatuses = [
+    'pending',
+    'confirmed',
+    'preparing',
+    'outForDelivery',
+    'delivered',
+    'cancelled'
+  ];
+  for (const claim of Object.values(CHECKOUT_CLAIMS)) {
+    assert.equal(publicStatuses.includes(claim), false, claim);
+  }
 });
 
 test('only unfinished phases may still do work', () => {
@@ -231,9 +286,9 @@ test('a reservation refuses to run twice for the same identity', () => {
   });
 
   // The replay guard.
-  assert.deepEqual(reservation.filter.stockReservations, { $ne: intentId });
+  assert.deepEqual(reservation.filter['stockReservations.intent'], { $ne: intentId });
   // The decrement and the marker are one update, never two.
-  assert.deepEqual(reservation.update.$addToSet, { stockReservations: intentId });
+  assert.equal(String(reservation.update.$push.stockReservations.intent), String(intentId));
   assert.equal(Object.keys(reservation.update.$inc).length, 1, 'only the finite line');
   assert.equal(Object.values(reservation.update.$inc)[0], -2);
 });
@@ -241,8 +296,8 @@ test('a reservation refuses to run twice for the same identity', () => {
 test('a release only runs while the reservation is outstanding', () => {
   const release = buildIdentifiedRelease({ businessId, intentId, lines: lines() });
 
-  assert.equal(release.filter.stockReservations, intentId);
-  assert.deepEqual(release.update.$pull, { stockReservations: intentId });
+  assert.equal(release.filter['stockReservations.intent'], intentId);
+  assert.deepEqual(release.update.$pull, { stockReservations: { intent: intentId } });
   assert.equal(Object.values(release.update.$inc)[0], 2, 'exactly what was taken');
   // A merchant switching the product to unlimited must not be handed stock.
   assert.equal(release.arrayFilters[0]['line0.unlimitedStock'], false);
@@ -254,7 +309,7 @@ test('no builder emits an unconditional stock increment', () => {
     buildIdentifiedRelease({ businessId, intentId, lines: lines() })
   ]) {
     assert.ok(
-      built.filter.stockReservations !== undefined,
+      built.filter['stockReservations.intent'] !== undefined,
       'every stock write is guarded by the reservation marker'
     );
   }
@@ -263,8 +318,10 @@ test('no builder emits an unconditional stock increment', () => {
 test('settling a finalized reservation clears the marker without refunding', () => {
   const settlement = buildReservationSettlement({ businessId, intentId });
 
-  assert.equal(settlement.filter.stockReservations, intentId);
-  assert.deepEqual(settlement.update, { $pull: { stockReservations: intentId } });
+  assert.equal(settlement.filter['stockReservations.intent'], intentId);
+  assert.deepEqual(settlement.update, {
+    $pull: { stockReservations: { intent: intentId } }
+  });
   assert.equal(settlement.update.$inc, undefined, 'a finalized order keeps its stock');
 });
 
@@ -276,7 +333,7 @@ test('an unlimited-only basket records identity but decrements nothing', () => {
   });
 
   assert.equal(reservation.update.$inc, undefined);
-  assert.deepEqual(reservation.update.$addToSet, { stockReservations: intentId });
+  assert.equal(String(reservation.update.$push.stockReservations.intent), String(intentId));
 });
 
 // ------------------------------------------------- stock-mode symmetry (R5)
@@ -360,7 +417,7 @@ test('U06 the replay guard is untouched by the stock-mode work', () => {
     lines: [{ productId: new mongoose.Types.ObjectId(), quantity: 1, finite: false }]
   });
 
-  assert.deepEqual(reservation.filter.stockReservations, { $ne: intentId });
+  assert.deepEqual(reservation.filter['stockReservations.intent'], { $ne: intentId });
   // A non-finite basket still consumes nothing.
   assert.equal(reservation.update.$inc, undefined);
 });
@@ -596,7 +653,7 @@ test('the reservation marker is never selected into a business response', () => 
     publicId: 'MXB-GAP002R1',
     name: 'متجر',
     category: 'فئة',
-    stockReservations: [intentId]
+    stockReservations: [{ intent: intentId, lines: [] }]
   });
 
   for (const json of [business.toListJSON(), business.toDetailJSON(), business.toOwnerJSON()]) {

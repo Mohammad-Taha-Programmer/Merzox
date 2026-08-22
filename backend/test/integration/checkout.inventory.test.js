@@ -65,6 +65,9 @@ if (!environment.enabled) {
   const { reconcileIntent, reconcileStaleCheckouts } = await import(
     '../../src/services/checkout-reconciler.service.js'
   );
+  const { claimFinalization, claimRelease, confirmFinalization } = await import(
+    '../../src/services/checkout-claim.service.js'
+  );
 
   const PASSWORD = 'IntegrationPass123';
   const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -567,10 +570,9 @@ if (!environment.enabled) {
         { $set: { phase: 'reserved', order: null } }
       );
       // The reservation marker is still outstanding, as it would be.
-      await Business.updateOne(
-        { _id: businessId },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
 
       const resumed = await placeOrder(buyer.token, { ...store, clientOrderId: key });
 
@@ -580,9 +582,8 @@ if (!environment.enabled) {
         3,
         'without decrementing a second time'
       );
-      const settled = await Business.findById(businessId).select('+stockReservations');
       assert.equal(
-        (settled.stockReservations ?? []).map(String).includes(String(intent._id)),
+        (await outstandingMarkers(store.businessId)).includes(String(intent._id)),
         false,
         'and the reservation is settled'
       );
@@ -645,10 +646,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'prepared', order: null } }
       );
-      await Business.updateOne(
-        { _id: businessId },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
       const stockBefore = await ownerStock(store.merchant.token, store.productId);
 
       const resumed = await placeOrder(buyer.token, { ...store, clientOrderId: key });
@@ -829,7 +829,38 @@ if (!environment.enabled) {
       const stored = await Business.findById(objectId(businessId)).select(
         '+stockReservations'
       );
-      return (stored?.stockReservations ?? []).map(String);
+      return (stored?.stockReservations ?? []).map((entry) => String(entry.intent));
+    }
+
+    /** The consumption an outstanding marker says it is holding. */
+    async function markerLines(businessId, intentId) {
+      const stored = await Business.findById(objectId(businessId)).select(
+        '+stockReservations'
+      );
+      const entry = (stored?.stockReservations ?? []).find(
+        (marker) => String(marker.intent) === String(intentId)
+      );
+      return entry
+        ? entry.lines.map((line) => ({
+            productId: String(line.productId),
+            quantity: line.quantity
+          }))
+        : null;
+    }
+
+    /**
+     * Re-attaches a reservation marker the way production does: the marker
+     * carries what it consumed, so recovery never has to trust the intent.
+     */
+    function attachMarker(businessId, intentId, lines) {
+      return Business.updateOne(
+        { _id: objectId(businessId) },
+        {
+          $push: {
+            stockReservations: { intent: objectId(intentId), lines: lines ?? [] }
+          }
+        }
+      );
     }
 
     /** Ages an intent so the reconciler treats it as abandoned. */
@@ -866,10 +897,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'reserved', order: null } }
       );
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
       assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
 
       const rewrite = await patchProduct(store.merchant.token, store.productId, {
@@ -919,10 +949,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'reserved', order: null } }
       );
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
 
       const toggle = await patchProduct(store.merchant.token, store.productId, {
         unlimitedStock: true
@@ -958,10 +987,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'reserved', order: null } }
       );
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
 
       // None of these can be corrupted by a release, so none of them is blocked.
       const edit = await patchProduct(store.merchant.token, store.productId, {
@@ -1022,10 +1050,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'reserved', order: null } }
       );
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
       await reconcileIntent(await CheckoutIntent.findById(intent._id));
 
       assert.deepEqual(await outstandingMarkers(store.businessId), []);
@@ -1064,10 +1091,9 @@ if (!environment.enabled) {
       assert.equal(intent.phase, 'finalized');
 
       // The exact state a crash between finalization and cleanup leaves.
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
       assert.deepEqual(await outstandingMarkers(store.businessId), [
         String(intent._id)
       ]);
@@ -1187,10 +1213,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'reserved', order: null } }
       );
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
       await makeStale(intent._id);
       assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
 
@@ -1234,10 +1259,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'reserved', order: null } }
       );
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
       await makeStale(intent._id);
 
       await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
@@ -1273,10 +1297,9 @@ if (!environment.enabled) {
         user: objectId(buyer.userId),
         clientOrderId: key
       });
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
       await makeStale(intent._id);
 
       const summary = await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
@@ -1314,10 +1337,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'reserved', order: null } }
       );
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
       await makeStale(intent._id);
 
       await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
@@ -1354,10 +1376,9 @@ if (!environment.enabled) {
         phase: 'reserved',
         lines: [{ productId: objectId(store.productId), quantity: 2, finite: true }]
       });
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
 
       await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
 
@@ -1539,10 +1560,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'reserved', order: null } }
       );
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
 
       const before = await Business.findById(objectId(store.businessId));
       const originalDescription = before.products.find(
@@ -1830,10 +1850,9 @@ if (!environment.enabled) {
         { _id: intent._id },
         { $set: { phase: 'reserved', order: null } }
       );
-      await Business.updateOne(
-        { _id: objectId(store.businessId) },
-        { $addToSet: { stockReservations: intent._id } }
-      );
+      await attachMarker(store.businessId, intent._id, [
+        { productId: objectId(store.productId), quantity: intent.lines[0].quantity }
+      ]);
 
       const blocked = await patchWithObservedStock(
         store.businessId,
@@ -2177,6 +2196,636 @@ if (!environment.enabled) {
         items
       }).lines;
       assert.equal(freshLine.finite, true);
+    });
+
+    // ================================================================= R6 ===
+    // Recovery must know what a reservation ACTUALLY consumed, and
+    // finalization and release must be mutually exclusive.
+
+    /**
+     * Reserves through the production builders and then stops, reproducing a
+     * crash in the window between the Business write and the CheckoutIntent
+     * metadata write. The intent is deliberately left saying `prepared` with
+     * whatever lines it was created with.
+     */
+    async function reserveThenCrash({ businessId, intentId, lines }) {
+      const reservation = buildIdentifiedReservation({
+        businessId: objectId(businessId),
+        intentId: objectId(intentId),
+        lines
+      });
+
+      return Business.updateOne(
+        reservation.filter,
+        reservation.update,
+        reservation.arrayFilters.length > 0
+          ? { arrayFilters: reservation.arrayFilters }
+          : undefined
+      );
+    }
+
+    /** Creates an intent in the exact shape the pre-reservation code writes. */
+    function seedIntent({ userId, clientOrderId, businessId, lines, phase = 'prepared' }) {
+      return CheckoutIntent.create({
+        user: objectId(userId),
+        clientOrderId,
+        fingerprint: `seed-${clientOrderId}`,
+        business: objectId(businessId),
+        phase,
+        lines
+      });
+    }
+
+    // ---------------------------------------------------------------- X01 ---
+    await t.test('X01 recovery compensates re-evaluated semantics, not stale ones', async () => {
+      const store = await seedStore({ price: 20, unlimitedStock: true }, 'x01');
+      const buyer = await seedAccount('buyer-x01');
+      const productId = objectId(store.productId);
+
+      // The line as first resolved: the product really was unlimited.
+      const business = await Business.findById(objectId(store.businessId));
+      const items = [{ productId: store.productId, quantity: 2 }];
+      const [staleLine] = resolveOrderLines({
+        products: business.products,
+        items
+      }).lines;
+      assert.equal(staleLine.finite, false);
+
+      // The intent stores that stale, pre-reservation shape - exactly what the
+      // production code persists before it ever touches inventory.
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: `${stamp}-x01`,
+        businessId: store.businessId,
+        lines: [{ productId, quantity: 2, finite: false }]
+      });
+
+      // The merchant makes it finite.
+      await setStockMode(store.businessId, store.productId, {
+        unlimitedStock: false,
+        stockQuantity: 5
+      });
+
+      // Attempt 1 misses; re-evaluation produces a finite line; attempt 2 wins.
+      const first = await reserveThenCrash({
+        businessId: store.businessId,
+        intentId: intent._id,
+        lines: [staleLine]
+      });
+      assert.equal(first.matchedCount, 0, 'the stale unlimited attempt misses');
+
+      const recheck = await Business.findOne({ _id: objectId(store.businessId) });
+      const [freshLine] = resolveOrderLines({
+        products: recheck.products,
+        items
+      }).lines;
+      assert.equal(freshLine.finite, true);
+
+      const second = await reserveThenCrash({
+        businessId: store.businessId,
+        intentId: intent._id,
+        lines: [freshLine]
+      });
+      assert.equal(second.matchedCount, 1, 'the fresh finite attempt reserves');
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+
+      // CRASH: the intent still says prepared, with finite:false lines.
+      const crashed = await CheckoutIntent.findById(intent._id);
+      assert.equal(crashed.phase, 'prepared');
+      assert.equal(crashed.lines[0].finite, false, 'the intent metadata is stale');
+
+      // The marker, however, knows exactly what was taken.
+      assert.deepEqual(await markerLines(store.businessId, intent._id), [
+        { productId: store.productId, quantity: 2 }
+      ]);
+
+      // No customer retry. The reconciler acts alone.
+      await makeStale(intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      const settled = await CheckoutIntent.findById(intent._id);
+      assert.equal(settled.phase, 'released');
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        5,
+        'the finite consumption is given back despite the stale intent lines'
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 0);
+    });
+
+    // ---------------------------------------------------------------- X02 ---
+    await t.test('X02 the opposite transition invents no stock', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'x02'
+      );
+      const buyer = await seedAccount('buyer-x02');
+      const productId = objectId(store.productId);
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: `${stamp}-x02`,
+        businessId: store.businessId,
+        // Stale the other way round: the intent believes it is finite.
+        lines: [{ productId, quantity: 2, finite: true }]
+      });
+
+      const business = await Business.findById(objectId(store.businessId));
+      const items = [{ productId: store.productId, quantity: 2 }];
+      const [staleFinite] = resolveOrderLines({
+        products: business.products,
+        items
+      }).lines;
+      assert.equal(staleFinite.finite, true);
+
+      // The merchant wins and makes it unlimited.
+      await setStockMode(store.businessId, store.productId, {
+        unlimitedStock: true,
+        stockQuantity: 0
+      });
+
+      const first = await reserveThenCrash({
+        businessId: store.businessId,
+        intentId: intent._id,
+        lines: [staleFinite]
+      });
+      assert.equal(first.matchedCount, 0, 'the stale finite attempt misses');
+
+      const recheck = await Business.findOne({ _id: objectId(store.businessId) });
+      const [freshLine] = resolveOrderLines({
+        products: recheck.products,
+        items
+      }).lines;
+      assert.equal(freshLine.finite, false);
+
+      const second = await reserveThenCrash({
+        businessId: store.businessId,
+        intentId: intent._id,
+        lines: [freshLine]
+      });
+      assert.equal(second.matchedCount, 1);
+      assert.deepEqual(
+        await markerLines(store.businessId, intent._id),
+        [],
+        'an unlimited reservation holds nothing'
+      );
+
+      await makeStale(intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      const stored = await Business.findById(objectId(store.businessId));
+      const product = stored.products.find(
+        (entry) => entry._id.toString() === store.productId
+      );
+      assert.equal(
+        product.stockQuantity,
+        0,
+        'no quantity is invented for an unlimited product'
+      );
+      assert.equal(product.unlimitedStock, true);
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+      assert.equal(
+        (await CheckoutIntent.findById(intent._id)).phase,
+        'released'
+      );
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 0);
+    });
+
+    // ---------------------------------------------------------------- X03 ---
+    await t.test('X03 a multi-line crash is compensated completely', async () => {
+      const merchant = await seedAccount('merchant-x03');
+      const businessId = await enrollStore(merchant, `store-x03-${stamp}`);
+      const buyer = await seedAccount('buyer-x03');
+
+      const p1 = await call('POST', '/api/v1/businesses/me/products', {
+        token: merchant.token,
+        body: { name: `x03-p1-${stamp}`, price: 10, unlimitedStock: true }
+      });
+      const p2 = await call('POST', '/api/v1/businesses/me/products', {
+        token: merchant.token,
+        body: {
+          name: `x03-p2-${stamp}`,
+          price: 10,
+          unlimitedStock: false,
+          stockQuantity: 9
+        }
+      });
+      const p1Id = p1.json.data.product.id;
+      const p2Id = p2.json.data.product.id;
+
+      const items = [
+        { productId: p1Id, quantity: 2 },
+        { productId: p2Id, quantity: 3 }
+      ];
+      const business = await Business.findById(objectId(businessId));
+      const staleLines = resolveOrderLines({
+        products: business.products,
+        items
+      }).lines;
+      assert.equal(staleLines.find((l) => String(l.product._id) === p1Id).finite, false);
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: `${stamp}-x03`,
+        businessId,
+        lines: [
+          { productId: objectId(p1Id), quantity: 2, finite: false },
+          { productId: objectId(p2Id), quantity: 3, finite: true }
+        ]
+      });
+
+      // P1 becomes finite underneath the checkout.
+      await setStockMode(businessId, p1Id, {
+        unlimitedStock: false,
+        stockQuantity: 6
+      });
+
+      const first = await reserveThenCrash({
+        businessId,
+        intentId: intent._id,
+        lines: staleLines
+      });
+      assert.equal(first.matchedCount, 0);
+
+      const recheck = await Business.findOne({ _id: objectId(businessId) });
+      const freshLines = resolveOrderLines({
+        products: recheck.products,
+        items
+      }).lines;
+      assert.equal(freshLines.every((line) => line.finite), true);
+
+      const second = await reserveThenCrash({
+        businessId,
+        intentId: intent._id,
+        lines: freshLines
+      });
+      assert.equal(second.matchedCount, 1);
+      assert.equal(await ownerStock(merchant.token, p1Id), 4);
+      assert.equal(await ownerStock(merchant.token, p2Id), 6);
+
+      await makeStale(intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      assert.equal(await ownerStock(merchant.token, p1Id), 6, 'P1 fully restored');
+      assert.equal(await ownerStock(merchant.token, p2Id), 9, 'P2 fully restored');
+      assert.deepEqual(await outstandingMarkers(businessId), []);
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 0);
+    });
+
+    // ---------------------------------------------------------------- X04 ---
+    await t.test('X04 finalize and reconcile can never both win', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'x04'
+      );
+      const buyer = await seedAccount('buyer-x04');
+      const key = `${stamp}-x04`;
+      const productId = objectId(store.productId);
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: key,
+        businessId: store.businessId,
+        lines: [{ productId, quantity: 2, finite: true }],
+        phase: 'reserved'
+      });
+      await reserveThenCrash({
+        businessId: store.businessId,
+        intentId: intent._id,
+        lines: [{ productId, quantity: 2, finite: true }]
+      });
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+      await makeStale(intent._id);
+
+      // The dangerous interleaving, forced: the reconciler establishes "no
+      // order yet", THEN a finalizer runs, THEN the reconciler tries to refund.
+      const seenOrder = await Order.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      assert.equal(seenOrder, null, 'R observed no order');
+
+      const finalizeWon = await CheckoutIntent.findOneAndUpdate(
+        { _id: intent._id, phase: { $in: ['prepared', 'reserved'] } },
+        { $set: { phase: 'finalizing' } },
+        { new: true }
+      );
+      assert.ok(finalizeWon, 'F acquired the finalization claim');
+      const order = await Order.create({
+        clientOrderId: key,
+        user: objectId(buyer.userId),
+        customerName: 'x04',
+        customerPhone: '0590000000',
+        business: objectId(store.businessId),
+        businessName: 'x04',
+        businessAddress: 'x04',
+        items: [{ productId, name: 'x04', unitPrice: 20, quantity: 2 }],
+        subtotal: 40,
+        deliveryFee: 10,
+        total: 50,
+        deliveryAddress: 'x04 address'
+      });
+
+      // R now attempts what used to refund unconditionally.
+      const action = await reconcileIntent(await CheckoutIntent.findById(intent._id));
+
+      const settled = await CheckoutIntent.findById(intent._id);
+      const finalStock = await ownerStock(store.merchant.token, store.productId);
+      const orderCount = await Order.countDocuments({ user: objectId(buyer.userId) });
+
+      // Only the two whole outcomes are permitted.
+      if (settled.phase === 'finalized' || finalizeWon) {
+        assert.equal(orderCount, 1, 'exactly one order');
+        assert.equal(finalStock, 3, 'stock stays consumed');
+        assert.notEqual(settled.phase, 'released', 'a durable order is never released');
+      }
+
+      // The forbidden combinations, stated directly.
+      assert.equal(
+        orderCount === 1 && finalStock === 5,
+        false,
+        'FORBIDDEN: order exists and stock was restored'
+      );
+      assert.equal(
+        orderCount === 1 && settled.phase === 'released',
+        false,
+        'FORBIDDEN: order exists and the intent says released'
+      );
+      assert.equal(
+        orderCount === 0 && finalStock === 3 && settled.phase === 'released',
+        false,
+        'FORBIDDEN: stock consumed with no order and a released intent'
+      );
+      assert.ok(action, 'the reconciler reported an action');
+      void order;
+    });
+
+    // ---------------------------------------------------------------- X05 ---
+    await t.test('X05 once release owns the checkout, no order may appear', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'x05'
+      );
+      const buyer = await seedAccount('buyer-x05');
+      const key = `${stamp}-x05`;
+      const productId = objectId(store.productId);
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: key,
+        businessId: store.businessId,
+        lines: [{ productId, quantity: 2, finite: true }],
+        phase: 'reserved'
+      });
+      await reserveThenCrash({
+        businessId: store.businessId,
+        intentId: intent._id,
+        lines: [{ productId, quantity: 2, finite: true }]
+      });
+      await makeStale(intent._id);
+
+      // Release wins first.
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+      const released = await CheckoutIntent.findById(intent._id);
+      assert.equal(released.phase, 'released');
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        5,
+        'restored exactly once'
+      );
+
+      // The customer now retries the same key through the real endpoint.
+      const retry = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+
+      assert.equal(retry.status, 409, 'a released checkout answers a stable failure');
+      assert.equal(
+        await Order.countDocuments({ user: objectId(buyer.userId) }),
+        0,
+        'no order may be created for a released checkout'
+      );
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        5,
+        'and no second reservation is taken'
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- X06 ---
+    await t.test('X06 once finalization owns the checkout, no refund may happen', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'x06'
+      );
+      const buyer = await seedAccount('buyer-x06');
+      const key = `${stamp}-x06`;
+
+      // A real, completed checkout: finalization owns it.
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      assert.equal(intent.phase, 'finalized');
+
+      // The reconciler runs over it.
+      await makeStale(intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        3,
+        'the reconciler cannot refund a finalized checkout'
+      );
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 1);
+      assert.equal(
+        (await CheckoutIntent.findById(intent._id)).phase,
+        'finalized'
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- X07 ---
+    await t.test('X07 a lost claim is never treated as ownership', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'x07'
+      );
+      const buyer = await seedAccount('buyer-x07');
+      const key = `${stamp}-x07`;
+      const productId = objectId(store.productId);
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: key,
+        businessId: store.businessId,
+        lines: [{ productId, quantity: 2, finite: true }],
+        phase: 'reserved'
+      });
+      await reserveThenCrash({
+        businessId: store.businessId,
+        intentId: intent._id,
+        lines: [{ productId, quantity: 2, finite: true }]
+      });
+
+      // Somebody else already owns the outcome.
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'releasing' } }
+      );
+
+      // A finalization claim from this state must match nothing...
+      const lost = await CheckoutIntent.findOneAndUpdate(
+        { _id: intent._id, phase: { $in: ['prepared', 'reserved'] } },
+        { $set: { phase: 'finalizing' } },
+        { new: true }
+      );
+      assert.equal(lost, null, 'the claim was not acquired');
+
+      // ...and the production endpoint must refuse rather than proceed.
+      const attempt = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+
+      assert.equal(attempt.status, 409);
+      assert.equal(
+        await Order.countDocuments({ user: objectId(buyer.userId) }),
+        0,
+        'no order may be written without ownership'
+      );
+      assert.equal(
+        (await CheckoutIntent.findById(intent._id)).phase,
+        'releasing',
+        'and the losing worker did not overwrite the owner'
+      );
+    });
+
+    // ---------------------------------------------------------------- X08 ---
+    await t.test('X08 a live finalizer is never robbed by the reconciler', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'x08'
+      );
+      const buyer = await seedAccount('buyer-x08');
+      const key = `${stamp}-x08`;
+      const productId = objectId(store.productId);
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: key,
+        businessId: store.businessId,
+        lines: [{ productId, quantity: 2, finite: true }],
+        phase: 'reserved'
+      });
+      await reserveThenCrash({
+        businessId: store.businessId,
+        intentId: intent._id,
+        lines: [{ productId, quantity: 2, finite: true }]
+      });
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+
+      // A finalizer takes the claim and is still working - no order yet.
+      const claimed = await claimFinalization({ intentId: intent._id });
+      assert.ok(claimed, 'the finalizer owns the checkout');
+      assert.equal(claimed.phase, 'finalizing');
+      assert.equal(
+        await Order.countDocuments({ user: objectId(buyer.userId) }),
+        0,
+        'and has not written its order yet'
+      );
+
+      // The reconciler runs over a checkout whose claim is fresh.
+      const action = await reconcileIntent(
+        await CheckoutIntent.findById(intent._id)
+      );
+
+      assert.equal(action, 'skipped', 'a fresh claim must not be taken over');
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        3,
+        'and the finalizer inventory must not be refunded underneath it'
+      );
+      assert.equal(
+        (await CheckoutIntent.findById(intent._id)).phase,
+        'finalizing',
+        'the claim still stands'
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), [
+        String(intent._id)
+      ]);
+
+      // Once it goes quiet past the lease, takeover is allowed.
+      await makeStale(intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        5,
+        'an abandoned claim is eventually settled'
+      );
+      assert.equal((await CheckoutIntent.findById(intent._id)).phase, 'released');
+    });
+
+    // ---------------------------------------------------------------- X09 ---
+    await t.test('X09 a lost claim is reported, never assumed', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'x09'
+      );
+      const buyer = await seedAccount('buyer-x09');
+      const key = `${stamp}-x09`;
+      const productId = objectId(store.productId);
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: key,
+        businessId: store.businessId,
+        lines: [{ productId, quantity: 2, finite: true }],
+        phase: 'reserved'
+      });
+
+      // The worker acquires the claim...
+      const claimed = await claimFinalization({ intentId: intent._id });
+      assert.ok(claimed);
+
+      // ...then stalls long enough that a reconciler takes the checkout over
+      // and settles it, exactly as X08's second half does.
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'released', failureCode: 'CHECKOUT_ABANDONED' } }
+      );
+
+      // The stalled worker's order lands and it asks whether it still owns the
+      // outcome. It does not, and it must be told so rather than assuming.
+      const confirmed = await confirmFinalization({
+        intentId: intent._id,
+        orderId: new mongoose.Types.ObjectId()
+      });
+
+      assert.equal(confirmed.owned, false, 'a lost claim reports not-owned');
+      assert.equal(
+        (await CheckoutIntent.findById(intent._id)).phase,
+        'released',
+        'and the owner is not overwritten'
+      );
+
+      // A release claim likewise cannot be taken from a terminal checkout.
+      const releaseAttempt = await claimRelease({ intentId: intent._id });
+      assert.equal(releaseAttempt, null, 'a terminal checkout is unclaimable');
     });
   });
 }

@@ -11,6 +11,8 @@ import {
   orderStatusGroups as policyStatusGroups
 } from '../policies/order-status.policy.js';
 import {
+  CLAIMABLE_PHASES,
+  CLAIM_ERRORS,
   CONVERGENCE_ATTEMPTS,
   CONVERGENCE_INTERVAL_MS,
   IDEMPOTENCY_ERRORS,
@@ -30,6 +32,10 @@ import {
   totalFor
 } from '../policies/checkout.policy.js';
 import { paginationParams } from '../policies/query.policy.js';
+import {
+  claimFinalization,
+  confirmFinalization
+} from '../services/checkout-claim.service.js';
 import {
   notifyOrderCancelledByCustomer,
   notifyOrderPlaced
@@ -87,6 +93,10 @@ const checkoutFailures = {
   [IDEMPOTENCY_ERRORS.inProgress]: {
     status: 409,
     message: 'This order is still being processed, please retry'
+  },
+  [CLAIM_ERRORS.lost]: {
+    status: 409,
+    message: 'This checkout was settled by another process, please retry'
   }
 };
 
@@ -169,7 +179,7 @@ async function reserveStock({ intent, businessId, lines, normalizedItems }) {
 
     const alreadyHeld = await Business.exists({
       _id: businessId,
-      stockReservations: intent._id
+      'stockReservations.intent': intent._id
     });
     if (alreadyHeld) break;
 
@@ -195,9 +205,10 @@ async function reserveStock({ intent, businessId, lines, normalizedItems }) {
     const code = diagnosis.error ?? CHECKOUT_ERRORS.outOfStock;
 
     // Terminal, and there is nothing to give back: no marker means no
-    // decrement ever happened for this intent.
+    // decrement ever happened for this intent. Conditional on the phase, so a
+    // checkout another worker already owns is never overwritten.
     await CheckoutIntent.updateOne(
-      { _id: intent._id, phase: 'prepared' },
+      { _id: intent._id, phase: { $in: CLAIMABLE_PHASES } },
       { $set: { phase: 'released', failureCode: code } }
     );
 
@@ -271,11 +282,39 @@ async function releaseStock({ intent, businessId, lines }) {
  * there first; that is convergence, not failure, so the existing order is
  * adopted rather than a second one created.
  */
+/**
+ * Writes the order, but only under an acquired finalization claim.
+ *
+ * Every decisive transition below checks what the database actually did. A
+ * transition that matched nothing means somebody else owns this checkout, and
+ * the only safe response is to undo what this worker created and stop.
+ */
 async function finalizeCheckout({ intent, businessId, lines, orderDraft }) {
+  const claimed = await claimFinalization({ intentId: intent._id });
+
+  if (!claimed) {
+    // Release already owns it, or it is already terminal. Never create an order
+    // for a checkout this worker does not own.
+    const current = await CheckoutIntent.findById(intent._id);
+
+    if (current?.phase === 'finalized' && current.order) {
+      const existing = await Order.findById(current.order);
+      if (existing) return existing;
+    }
+
+    throw checkoutFailure(
+      current?.phase === 'released'
+        ? current.failureCode ?? CLAIM_ERRORS.lost
+        : CLAIM_ERRORS.lost
+    );
+  }
+
   let order = null;
+  let createdHere = false;
 
   try {
     order = await Order.create(orderDraft);
+    createdHere = true;
   } catch (error) {
     if (isDuplicateKeyError(error)) {
       order = await findExistingOrder(orderDraft.user, orderDraft.clientOrderId);
@@ -283,10 +322,11 @@ async function finalizeCheckout({ intent, businessId, lines, orderDraft }) {
 
     if (!order) {
       // The order could not be persisted at all, so the inventory this intent
-      // is holding has to go back - once.
+      // is holding has to go back - once. This worker still owns the claim, so
+      // it is the one entitled to do that.
       await releaseStock({ intent, businessId, lines });
       await CheckoutIntent.updateOne(
-        { _id: intent._id, phase: { $in: ['prepared', 'reserved'] } },
+        { _id: intent._id, phase: 'finalizing' },
         { $set: { phase: 'released', failureCode: 'CHECKOUT_FAILED' } }
       );
 
@@ -295,11 +335,30 @@ async function finalizeCheckout({ intent, businessId, lines, orderDraft }) {
   }
 
   // The intent records the durable order FIRST, so a crash before the marker
-  // comes off is recoverable rather than ambiguous.
-  await CheckoutIntent.updateOne(
-    { _id: intent._id, phase: { $in: ['prepared', 'reserved'] } },
-    { $set: { phase: 'finalized', order: order._id, failureCode: null } }
-  );
+  // comes off is recoverable rather than ambiguous. Conditional on the claim
+  // still being ours.
+  const finalized = await confirmFinalization({
+    intentId: intent._id,
+    orderId: order._id
+  });
+
+  if (!finalized.owned) {
+    // The claim was taken away - only possible if this worker stalled past the
+    // abandonment lease and a reconciler took over.
+    const current = await CheckoutIntent.findById(intent._id);
+
+    if (current?.phase === 'finalized' && current.order) {
+      const settledOrder = await Order.findById(current.order);
+      if (settledOrder) return settledOrder;
+    }
+
+    // The reservation was given back by whoever took the claim, so the order
+    // this worker just wrote must not survive to reference refunded stock.
+    if (createdHere) await Order.deleteOne({ _id: order._id });
+
+    throw checkoutFailure(CLAIM_ERRORS.lost);
+  }
+
   await settleReservation({ intent, businessId });
 
   return order;
