@@ -13,6 +13,7 @@ import {
   statusGroupFor
 } from '../policies/order-status.policy.js';
 import { buildProductWrite } from '../policies/product.policy.js';
+import { paginationParams } from '../policies/query.policy.js';
 import { notifyOrderStatus } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -22,17 +23,6 @@ import { normalizeIdentifier, normalizePhone } from '../utils/normalize.js';
 // shared policy now; these are lookup views over it.
 const orderStatuses = new Set(policyStatuses);
 const orderStatusGroups = new Set(policyStatusGroups);
-
-function paginationParams(query) {
-  const parsedPage = Number.parseInt(query.page ?? '1', 10);
-  const parsedLimit = Number.parseInt(query.limit ?? '20', 10);
-  const page = Number.isFinite(parsedPage) ? Math.max(parsedPage, 1) : 1;
-  const limit = Number.isFinite(parsedLimit)
-    ? Math.min(Math.max(parsedLimit, 1), 50)
-    : 20;
-
-  return { page, limit, skip: (page - 1) * limit };
-}
 
 function createBusinessPublicId() {
   const timePart = Date.now().toString(36).toUpperCase();

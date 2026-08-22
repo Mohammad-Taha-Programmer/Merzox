@@ -314,20 +314,127 @@ void main() {
     expect(permissive.canCancel, isTrue);
   });
 
-  test('missing permission flags default closed, never open', () {
-    final tracking = OrderTrackingApiModel.fromJson(const {
-      'currentStep': 'placed',
-      'currentIndex': 0,
-      'steps': <dynamic>[],
+  // R3 §1: a non-empty but structurally wrong tracking object used to parse
+  // into a ready-looking model with every field defaulted.
+  test('CASE A: a non-empty but malformed tracking object is refused', () {
+    expect(
+      () => OrderTrackingApiModel.fromJson(const {'foo': 1}),
+      throwsA(isA<ApiContractException>()),
+    );
+    expect(
+      () => OrderApiModel.fromJson(const {
+        'id': 'o1',
+        'status': 'pending',
+        'tracking': {'foo': 1},
+      }),
+      throwsA(isA<ApiContractException>()),
+    );
+  });
+
+  test('CASE B: a missing permission flag is a contract failure', () {
+    // Never synthesized as false - an absent flag means a malformed response.
+    for (final missing in ['canCancel', 'canChangeAddress', 'canReview']) {
+      final payload = Map<String, dynamic>.from(serverTracking('pending'))
+        ..remove(missing);
+
+      expect(
+        () => OrderTrackingApiModel.fromJson(payload),
+        throwsA(isA<ApiContractException>()),
+        reason: 'missing $missing',
+      );
+    }
+  });
+
+  test('CASE B2: every other required field is mandatory too', () {
+    for (final missing in [
+      'isCancelled',
+      'currentStep',
+      'currentIndex',
+      'steps',
+      'courier',
+    ]) {
+      final payload = Map<String, dynamic>.from(serverTracking('pending'))
+        ..remove(missing);
+
+      expect(
+        () => OrderTrackingApiModel.fromJson(payload),
+        throwsA(isA<ApiContractException>()),
+        reason: 'missing $missing',
+      );
+    }
+  });
+
+  test('CASES C-G: a field of the wrong type is a contract failure', () {
+    final wrongTypes = <String, List<Object?>>{
+      'currentStep': [1, true, <dynamic>[], null],
+      'currentIndex': ['0', 1.5, true, null],
+      'steps': [1, 'text', <String, dynamic>{}, null],
+      'courier': [1, 'text', <dynamic>[], null],
+      'isCancelled': ['false', 0, null],
+      'canCancel': ['true', 1, null],
+      'canChangeAddress': ['true', 1, null],
+      'canReview': ['true', 1, null],
+    };
+
+    wrongTypes.forEach((field, values) {
+      for (final value in values) {
+        final payload = Map<String, dynamic>.from(serverTracking('pending'))
+          ..[field] = value;
+
+        expect(
+          () => OrderTrackingApiModel.fromJson(payload),
+          throwsA(isA<ApiContractException>()),
+          reason: '$field = $value',
+        );
+      }
     });
+  });
+
+  test('CASE H: a fully valid server object is preserved exactly', () {
+    final payload = serverTracking('preparing');
+    final tracking = OrderTrackingApiModel.fromJson(payload);
+
+    expect(tracking.isCancelled, payload['isCancelled']);
+    expect(tracking.currentStep, payload['currentStep']);
+    expect(tracking.currentIndex, payload['currentIndex']);
+    expect(tracking.steps, hasLength(4));
+    expect(tracking.canCancel, payload['canCancel']);
+    expect(tracking.canChangeAddress, payload['canChangeAddress']);
+    expect(tracking.canReview, payload['canReview']);
+  });
+
+  test('CASE I: a backend false is preserved as false', () {
+    final tracking = OrderTrackingApiModel.fromJson(
+      serverTracking(
+        'pending',
+        canCancel: false,
+        canChangeAddress: false,
+        canReview: false,
+      ),
+    );
 
     expect(tracking.canCancel, isFalse);
     expect(tracking.canChangeAddress, isFalse);
     expect(tracking.canReview, isFalse);
   });
 
+  test('CASE J: no status-derived permission fallback exists', () {
+    // An integer currentIndex expressed as a whole double is still accepted,
+    // because JSON does not distinguish them.
+    final payload = Map<String, dynamic>.from(serverTracking('pending'))
+      ..['currentIndex'] = 0.0;
+    expect(OrderTrackingApiModel.fromJson(payload).currentIndex, 0);
+
+    // But nothing anywhere reconstructs permissions from a status string.
+    expect(
+      () => OrderTrackingApiModel.fromJson(const {'status': 'pending'}),
+      throwsA(isA<ApiContractException>()),
+    );
+  });
+
   test('the server payload is used verbatim', () async {
-    // The client must never re-derive a status the server already decided.
+    // A complete server object: the client must never re-derive a status the
+    // server already decided.
     final fromServer = OrderTrackingApiModel.fromJson(const {
       'isCancelled': false,
       'currentStep': 'outForDelivery',
@@ -338,6 +445,7 @@ void main() {
         {'step': 'outForDelivery', 'isReached': true},
         {'step': 'delivered', 'isReached': false},
       ],
+      'courier': {'name': '', 'phone': '', 'assignedAt': null},
       'canCancel': false,
       'canChangeAddress': false,
       'canReview': false,

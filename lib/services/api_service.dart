@@ -1486,6 +1486,29 @@ class OrderTrackingApiModel {
   /// There is deliberately no status-derived fallback: reconstructing the
   /// permission flags on the client would let a stale or truncated response
   /// widen what the customer is allowed to do.
+  /// Reads one field of the required shape, or fails the contract.
+  ///
+  /// Defaulting a missing field would resurrect the problem R2 removed: a
+  /// permission flag that the server never sent would be synthesized here, and
+  /// a structurally wrong payload like `{'foo': 1}` would parse into a
+  /// ready-looking object with every field defaulted.
+  static T _field<T>(Map<String, dynamic> json, String key) {
+    final value = json[key];
+
+    // `int` arrives as `num` from JSON when the value is whole.
+    if (T == int) {
+      if (value is int) return value as T;
+      if (value is num && value == value.roundToDouble()) {
+        return value.toInt() as T;
+      }
+      throw ApiContractException('order', 'tracking.$key is not an integer');
+    }
+
+    if (value is T) return value;
+
+    throw ApiContractException('order', 'tracking.$key has the wrong type');
+  }
+
   factory OrderTrackingApiModel.fromJson(Object? raw) {
     if (raw is! Map<String, dynamic> || raw.isEmpty) {
       throw const ApiContractException(
@@ -1495,22 +1518,23 @@ class OrderTrackingApiModel {
     }
 
     final json = raw;
-    final steps = json['steps'] as List<dynamic>? ?? const [];
 
     return OrderTrackingApiModel(
-      isCancelled: json['isCancelled'] as bool? ?? false,
-      currentStep: json['currentStep'] as String? ?? '',
-      currentIndex: (json['currentIndex'] as num?)?.toInt() ?? -1,
-      steps: steps
+      isCancelled: _field<bool>(json, 'isCancelled'),
+      currentStep: _field<String>(json, 'currentStep'),
+      currentIndex: _field<int>(json, 'currentIndex'),
+      steps: _field<List<dynamic>>(json, 'steps')
           .whereType<Map<String, dynamic>>()
           .map(OrderTrackingStepApiModel.fromJson)
           .toList(),
       courier: OrderCourierApiModel.fromJson(
-        json['courier'] as Map<String, dynamic>? ?? const {},
+        _field<Map<String, dynamic>>(json, 'courier'),
       ),
-      canCancel: json['canCancel'] as bool? ?? false,
-      canChangeAddress: json['canChangeAddress'] as bool? ?? false,
-      canReview: json['canReview'] as bool? ?? false,
+      // Permission flags are never defaulted: an absent flag is a malformed
+      // response, not a closed permission.
+      canCancel: _field<bool>(json, 'canCancel'),
+      canChangeAddress: _field<bool>(json, 'canChangeAddress'),
+      canReview: _field<bool>(json, 'canReview'),
     );
   }
 }

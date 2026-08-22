@@ -122,6 +122,7 @@ class _SpyApi extends ApiService {
         'currentStep': 'placed',
         'currentIndex': 0,
         'steps': <dynamic>[],
+        'courier': {'name': '', 'phone': '', 'assignedAt': null},
         'canCancel': true,
         'canChangeAddress': true,
         'canReview': false,
