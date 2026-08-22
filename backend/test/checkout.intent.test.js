@@ -10,7 +10,9 @@ import {
   ABANDONED_AFTER_MS,
   CHECKOUT_CLAIMS,
   CLAIMABLE_PHASES,
+  CHECKOUT_TRANSITIONS,
   CLAIM_ERRORS,
+  FINALIZABLE_PHASES,
   RECLAIMABLE_PHASES,
   CONVERGENCE_ATTEMPTS,
   CONVERGENCE_INTERVAL_MS,
@@ -25,6 +27,7 @@ import {
   canonicalCheckoutPayload,
   checkoutFingerprint,
   isAbandoned,
+  isLegalTransition,
   isResumable,
   isTerminal
 } from '../src/policies/checkout-intent.policy.js';
@@ -176,13 +179,79 @@ test('a claim is only ever taken from an unfinished phase', () => {
   assert.equal(CLAIM_ERRORS.lost, 'CHECKOUT_CLAIM_LOST');
 });
 
-test('release can never be claimed straight from a finalizing checkout', () => {
+test('release can never be claimed from a finalizing checkout, stale or not', () => {
   // A finalizing claim is excluded from the ordinary release claim, so a live
-  // finalizer cannot have its inventory refunded underneath it.
+  // finalizer cannot have its inventory refunded underneath it...
   assert.equal(CLAIMABLE_PHASES.includes('finalizing'), false);
-  // Only the stale-takeover path may touch it, and that path is gated by the
-  // abandonment lease.
+  // ...and going quiet does not change that. Staleness only decides whether the
+  // SAME decision may be resumed by somebody else; it never reverses it.
+  assert.equal(isLegalTransition('finalizing', 'releasing'), false);
+  assert.equal(isLegalTransition('releasing', 'finalizing'), false);
+  // The sweep still has work to do on both, which is a different question.
   assert.equal(RECLAIMABLE_PHASES.includes('finalizing'), true);
+  assert.equal(RECLAIMABLE_PHASES.includes('releasing'), true);
+});
+
+test('the checkout decision is monotonic', () => {
+  // Deciding: an undecided checkout may go either way.
+  for (const undecided of CLAIMABLE_PHASES) {
+    assert.equal(isLegalTransition(undecided, 'finalizing'), true, undecided);
+    assert.equal(isLegalTransition(undecided, 'releasing'), true, undecided);
+  }
+
+  // Continuing: a decision may be resumed by another worker in the SAME
+  // direction, and completed.
+  assert.equal(isLegalTransition('finalizing', 'finalizing'), true);
+  assert.equal(isLegalTransition('finalizing', 'finalized'), true);
+  assert.equal(isLegalTransition('releasing', 'releasing'), true);
+  assert.equal(isLegalTransition('releasing', 'released'), true);
+
+  // Reversing: never, in either direction.
+  assert.equal(isLegalTransition('finalizing', 'releasing'), false);
+  assert.equal(isLegalTransition('finalizing', 'released'), false);
+  assert.equal(isLegalTransition('releasing', 'finalizing'), false);
+  assert.equal(isLegalTransition('releasing', 'finalized'), false);
+
+  // Terminal: nothing leaves a terminal phase, to any other phase at all.
+  for (const terminal of ['finalized', 'released']) {
+    assert.deepEqual(CHECKOUT_TRANSITIONS[terminal], [], terminal);
+    for (const phase of checkoutPhases) {
+      assert.equal(isLegalTransition(terminal, phase), false, `${terminal}->${phase}`);
+    }
+  }
+
+  // Every declared edge names a real phase.
+  for (const [from, targets] of Object.entries(CHECKOUT_TRANSITIONS)) {
+    assert.ok(checkoutPhases.includes(from), from);
+    for (const to of targets) assert.ok(checkoutPhases.includes(to), to);
+  }
+});
+
+test('a releasing checkout can never be adopted onto an order', () => {
+  // The set recovery uses when a durable order is found. `releasing` is absent
+  // on purpose: once release owns the outcome, no order belongs to it.
+  assert.deepEqual(FINALIZABLE_PHASES, ['prepared', 'reserved', 'finalizing']);
+  assert.equal(FINALIZABLE_PHASES.includes('releasing'), false);
+  assert.equal(FINALIZABLE_PHASES.includes('released'), false);
+  assert.equal(FINALIZABLE_PHASES.includes('finalized'), false);
+});
+
+test('the finalization snapshot is internal and never selected by default', () => {
+  const path = CheckoutIntent.schema.path('finalization');
+  assert.ok(path, 'the snapshot is a declared field');
+  assert.equal(path.options.select, false, 'never returned unless asked for');
+
+  // No customer- or merchant-facing model can carry it, so no serializer of
+  // theirs could ever leak it.
+  assert.equal(Order.schema.path('finalization'), undefined);
+  assert.equal(Business.schema.path('finalization'), undefined);
+
+  // The reservation marker is the same kind of secret and is already proven
+  // unselectable; the snapshot is held to the identical rule.
+  assert.equal(
+    Business.schema.path('stockReservations').options.select,
+    false
+  );
 });
 
 test('internal claims never reach a public order status', () => {

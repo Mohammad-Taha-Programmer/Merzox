@@ -62,8 +62,38 @@ export const RECONCILE_BATCH_LIMIT = 200;
  */
 export const CLAIMABLE_PHASES = ['prepared', 'reserved'];
 
-/** A dead finalizer's claim may be taken over, but only once it is stale. */
+/** Every non-terminal phase, i.e. everything a sweep still has work to do on. */
 export const RECLAIMABLE_PHASES = ['prepared', 'reserved', 'finalizing', 'releasing'];
+
+/**
+ * The phases from which a checkout may still become `finalized`.
+ *
+ * `releasing` is deliberately absent. The checkout decision is MONOTONIC: once
+ * release owns the outcome no order may be adopted for it, just as once
+ * finalization owns the outcome no refund may happen. A stale claim may be
+ * CONTINUED by another worker in the same direction; it may never be reversed,
+ * because a paused finalizer whose stock was refunded could still land a
+ * durable order and die before undoing it.
+ */
+export const FINALIZABLE_PHASES = ['prepared', 'reserved', 'finalizing'];
+
+/**
+ * The legal phase transitions, stated once so a test can hold the code to them.
+ *
+ * Terminal phases have no outgoing edges at all.
+ */
+export const CHECKOUT_TRANSITIONS = Object.freeze({
+  prepared: ['reserved', 'finalizing', 'releasing', 'released'],
+  reserved: ['finalizing', 'releasing'],
+  finalizing: ['finalizing', 'finalized'],
+  releasing: ['releasing', 'released'],
+  finalized: [],
+  released: []
+});
+
+export function isLegalTransition(from, to) {
+  return (CHECKOUT_TRANSITIONS[from] ?? []).includes(to);
+}
 
 export const CHECKOUT_CLAIMS = {
   finalizing: 'finalizing',

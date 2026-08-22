@@ -54,20 +54,24 @@ if (!environment.enabled) {
   const {
     buildAtomicInventoryUpdate,
     buildIdentifiedRelease,
+    checkoutFingerprint,
     buildIdentifiedReservation,
     buildReservationSettlement,
     classifyInventoryConflict,
     inventoryConflictResponse
   } = await import('../../src/policies/checkout-intent.policy.js');
-  const { resolveOrderLines } = await import(
+  const { normalizeRequestedItems, resolveOrderLines } = await import(
     '../../src/policies/checkout.policy.js'
   );
   const { reconcileIntent, reconcileStaleCheckouts } = await import(
     '../../src/services/checkout-reconciler.service.js'
   );
-  const { claimFinalization, claimRelease, confirmFinalization } = await import(
-    '../../src/services/checkout-claim.service.js'
-  );
+  const {
+    claimFinalization,
+    claimRelease,
+    confirmFinalization,
+    confirmRelease
+  } = await import('../../src/services/checkout-claim.service.js');
 
   const PASSWORD = 'IntegrationPass123';
   const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -2225,15 +2229,85 @@ if (!environment.enabled) {
     }
 
     /** Creates an intent in the exact shape the pre-reservation code writes. */
-    function seedIntent({ userId, clientOrderId, businessId, lines, phase = 'prepared' }) {
+    function seedIntent({
+      userId,
+      clientOrderId,
+      businessId,
+      lines,
+      phase = 'prepared',
+      fingerprint
+    }) {
       return CheckoutIntent.create({
         user: objectId(userId),
         clientOrderId,
-        fingerprint: `seed-${clientOrderId}`,
+        fingerprint: fingerprint ?? `seed-${clientOrderId}`,
         business: objectId(businessId),
         phase,
         lines
       });
+    }
+
+    /**
+     * The exact fingerprint the checkout endpoint derives for this basket.
+     *
+     * A seeded intent needs it whenever the test then drives the REAL endpoint:
+     * without it the request is refused as a reused key and never reaches the
+     * behaviour under test.
+     */
+    const CHECKOUT_ADDRESS = 'عنوان التوصيل للاختبار';
+
+    function realFingerprint({ businessId, productId, quantity }) {
+      const normalized = normalizeRequestedItems([
+        { productId: String(productId), quantity }
+      ]);
+      return checkoutFingerprint({
+        businessId: String(businessId),
+        items: normalized.items,
+        deliveryAddress: CHECKOUT_ADDRESS,
+        paymentMethod: 'cash'
+      });
+    }
+
+    /**
+     * A server-authoritative order draft, frozen the way production freezes one
+     * at the finalization decision.
+     */
+    function finalizationSnapshot({
+      key,
+      buyer,
+      store,
+      productId,
+      name,
+      unitPrice,
+      quantity
+    }) {
+      const subtotal = unitPrice * quantity;
+      return {
+        orderDraft: {
+          clientOrderId: key,
+          user: objectId(buyer.userId),
+          customerName: `buyer-${key}`,
+          customerPhone: buyer.phone,
+          business: objectId(store.businessId),
+          businessName: `store-${key}`,
+          businessAddress: 'عنوان الاختبار',
+          items: [
+            {
+              productId: objectId(productId),
+              name,
+              imageUrl: '',
+              unitPrice,
+              quantity,
+              variant: ''
+            }
+          ],
+          subtotal,
+          deliveryFee: 10,
+          total: subtotal + 10,
+          deliveryAddress: CHECKOUT_ADDRESS,
+          paymentMethod: 'cash'
+        }
+      };
     }
 
     // ---------------------------------------------------------------- X01 ---
@@ -2739,7 +2813,18 @@ if (!environment.enabled) {
       assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
 
       // A finalizer takes the claim and is still working - no order yet.
-      const claimed = await claimFinalization({ intentId: intent._id });
+      const claimed = await claimFinalization({
+        intentId: intent._id,
+        snapshot: finalizationSnapshot({
+          key,
+          buyer,
+          store,
+          productId: store.productId,
+          name: 'x08',
+          unitPrice: 20,
+          quantity: 2
+        })
+      });
       assert.ok(claimed, 'the finalizer owns the checkout');
       assert.equal(claimed.phase, 'finalizing');
       assert.equal(
@@ -2768,16 +2853,24 @@ if (!environment.enabled) {
         String(intent._id)
       ]);
 
-      // Once it goes quiet past the lease, takeover is allowed.
+      // Once it goes quiet past the lease, takeover is allowed - but only in
+      // the SAME direction. R7: an abandoned finalization is FINISHED, never
+      // refunded, because a paused finalizer could still land its order.
       await makeStale(intent._id);
       await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
 
       assert.equal(
         await ownerStock(store.merchant.token, store.productId),
-        5,
-        'an abandoned claim is eventually settled'
+        3,
+        'an abandoned finalization keeps the stock it decided to sell'
       );
-      assert.equal((await CheckoutIntent.findById(intent._id)).phase, 'released');
+      assert.equal((await CheckoutIntent.findById(intent._id)).phase, 'finalized');
+      assert.equal(
+        await Order.countDocuments({ user: objectId(buyer.userId) }),
+        1,
+        'and is settled by completing exactly one order'
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
     });
 
     // ---------------------------------------------------------------- X09 ---
@@ -2799,7 +2892,18 @@ if (!environment.enabled) {
       });
 
       // The worker acquires the claim...
-      const claimed = await claimFinalization({ intentId: intent._id });
+      const claimed = await claimFinalization({
+        intentId: intent._id,
+        snapshot: finalizationSnapshot({
+          key,
+          buyer,
+          store,
+          productId: store.productId,
+          name: 'x09',
+          unitPrice: 20,
+          quantity: 2
+        })
+      });
       assert.ok(claimed);
 
       // ...then stalls long enough that a reconciler takes the checkout over
@@ -2813,7 +2917,8 @@ if (!environment.enabled) {
       // outcome. It does not, and it must be told so rather than assuming.
       const confirmed = await confirmFinalization({
         intentId: intent._id,
-        orderId: new mongoose.Types.ObjectId()
+        orderId: new mongoose.Types.ObjectId(),
+        claimToken: claimed.claimToken
       });
 
       assert.equal(confirmed.owned, false, 'a lost claim reports not-owned');
@@ -2826,6 +2931,568 @@ if (!environment.enabled) {
       // A release claim likewise cannot be taken from a terminal checkout.
       const releaseAttempt = await claimRelease({ intentId: intent._id });
       assert.equal(releaseAttempt, null, 'a terminal checkout is unclaimable');
+    });
+
+    // ================================================================= R7 ===
+    // The checkout decision is MONOTONIC. A lease lets another worker CONTINUE
+    // a decision; it never lets one reverse it. Everything below is a real race
+    // against a real server, because the whole claim is a claim about what the
+    // database does under concurrency.
+
+    /**
+     * Reserves finite stock and then leaves the checkout mid-flight, exactly as
+     * a crashed worker would: the marker is attached, the intent says
+     * `reserved`, and its fingerprint matches what the real endpoint derives so
+     * a later customer retry is not turned away as a reused key.
+     */
+    async function stagedCheckout({ label, quantity, stock, price = 20 }) {
+      const store = await seedStore(
+        { price, unlimitedStock: false, stockQuantity: stock },
+        label
+      );
+      const buyer = await seedAccount(`buyer-${label}`);
+      const key = `${stamp}-${label}`;
+      const productId = objectId(store.productId);
+      const lines = [{ productId, quantity, finite: true }];
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: key,
+        businessId: store.businessId,
+        lines,
+        phase: 'reserved',
+        fingerprint: realFingerprint({
+          businessId: store.businessId,
+          productId: store.productId,
+          quantity
+        })
+      });
+      await reserveThenCrash({
+        businessId: store.businessId,
+        intentId: intent._id,
+        lines
+      });
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        stock - quantity,
+        'the reservation actually consumed stock'
+      );
+
+      return { store, buyer, key, productId, intent, quantity, price };
+    }
+
+    function snapshotFor(staged, { name, unitPrice }) {
+      return finalizationSnapshot({
+        key: staged.key,
+        buyer: staged.buyer,
+        store: staged.store,
+        productId: staged.productId,
+        name,
+        unitPrice: unitPrice ?? staged.price,
+        quantity: staged.quantity
+      });
+    }
+
+    // ---------------------------------------------------------------- Y01 ---
+    await t.test('Y01 an abandoned finalization is finished, never refunded', async () => {
+      const staged = await stagedCheckout({ label: 'y01', quantity: 2, stock: 5 });
+
+      // The decision to sell is taken, and the draft is frozen with it.
+      const claimed = await claimFinalization({
+        intentId: staged.intent._id,
+        snapshot: snapshotFor(staged, { name: 'y01 product' })
+      });
+      assert.ok(claimed, 'the finalization decision stands');
+      assert.equal(claimed.phase, 'finalizing');
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        0,
+        'and no order exists yet - this is the dangerous window'
+      );
+
+      // The worker never comes back.
+      await makeStale(staged.intent._id);
+      const summary = await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+      assert.equal(summary.released, 0, 'nothing may be released');
+      assert.equal(summary.finalized, 1, 'the decision is carried out');
+
+      const settled = await CheckoutIntent.findById(staged.intent._id);
+      assert.equal(settled.phase, 'finalized');
+      assert.ok(settled.order, 'the intent names the order it produced');
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        1,
+        'exactly one order'
+      );
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        3,
+        'the stock the decision sold is never given back'
+      );
+      assert.deepEqual(await outstandingMarkers(staged.store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- Y02 ---
+    await t.test('Y02 recovery uses the frozen snapshot, not the merchant catalog', async () => {
+      const staged = await stagedCheckout({ label: 'y02', quantity: 2, stock: 5 });
+
+      const claimed = await claimFinalization({
+        intentId: staged.intent._id,
+        snapshot: snapshotFor(staged, { name: 'committed name', unitPrice: 20 })
+      });
+      assert.ok(claimed);
+
+      // The merchant now rewrites the product underneath the decision.
+      const edited = await patchProduct(
+        staged.store.merchant.token,
+        staged.store.productId,
+        { name: 'renamed after the decision', price: 999, discountPercent: 50 }
+      );
+      assert.equal(edited.status, 200, `the merchant edit landed (${edited.code})`);
+
+      await makeStale(staged.intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      const order = await Order.findOne({
+        user: objectId(staged.buyer.userId),
+        clientOrderId: staged.key
+      });
+      assert.ok(order, 'recovery completed the order');
+      assert.equal(order.items[0].unitPrice, 20, 'the committed price survives');
+      assert.equal(order.items[0].name, 'committed name');
+      assert.equal(order.subtotal, 40);
+      assert.equal(order.total, 50);
+      // Explicitly NOT the merchant's newer truth.
+      assert.notEqual(order.items[0].unitPrice, 999);
+      assert.notEqual(order.items[0].unitPrice, 499.5);
+      assert.notEqual(order.items[0].name, 'renamed after the decision');
+    });
+
+    // ---------------------------------------------------------------- Y03 ---
+    await t.test('Y03 an abandoned release is refunded, and can never finalize', async () => {
+      const staged = await stagedCheckout({ label: 'y03', quantity: 2, stock: 5 });
+
+      // The decision to give the stock back is taken - and then the worker dies
+      // before the refund itself.
+      const claimed = await claimRelease({ intentId: staged.intent._id });
+      assert.ok(claimed, 'the release decision stands');
+      assert.equal(claimed.phase, 'releasing');
+      await makeStale(staged.intent._id);
+
+      // The customer retries the very same key through the real endpoint. It
+      // must NOT be able to turn the decision back into a sale.
+      const retry = await placeOrder(staged.buyer.token, {
+        ...staged.store,
+        clientOrderId: staged.key,
+        quantity: 2
+      });
+      assert.equal(retry.status, 409);
+      assert.equal(
+        retry.code,
+        'CHECKOUT_CLAIM_LOST',
+        'refused for the right reason: the outcome is already owned'
+      );
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        0,
+        'no order may be created for a releasing checkout'
+      );
+      assert.equal(
+        (await CheckoutIntent.findById(staged.intent._id)).phase,
+        'releasing',
+        'and the retry did not reverse the decision'
+      );
+
+      await makeStale(staged.intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        5,
+        'the reservation went back exactly once'
+      );
+      assert.equal((await CheckoutIntent.findById(staged.intent._id)).phase, 'released');
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        0
+      );
+      assert.deepEqual(await outstandingMarkers(staged.store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- Y04 ---
+    await t.test('Y04 a stalled finalizer and its successor converge on one order', async () => {
+      const staged = await stagedCheckout({ label: 'y04', quantity: 2, stock: 5 });
+
+      // F1 takes the decision, then stalls past its lease.
+      const f1 = await claimFinalization({
+        intentId: staged.intent._id,
+        snapshot: snapshotFor(staged, { name: 'y04 product' })
+      });
+      assert.ok(f1);
+      await makeStale(staged.intent._id);
+
+      // No release is reachable from a finalization, stale or not.
+      const releaseAttempt = await claimRelease({
+        intentId: staged.intent._id,
+        staleAfterMs: 60 * 1000
+      });
+      assert.equal(
+        releaseAttempt,
+        null,
+        'a stale finalization can never be claimed for release'
+      );
+
+      // F2 resumes the SAME decision and completes it.
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+      const afterF2 = await CheckoutIntent.findById(staged.intent._id);
+      assert.equal(afterF2.phase, 'finalized');
+      const successorOrderId = String(afterF2.order);
+
+      // F1 finally wakes up and finishes its own work, exactly as production
+      // would: it writes its order, then asks whether it still owns the claim.
+      const stored = await CheckoutIntent.findById(staged.intent._id).select(
+        '+finalization'
+      );
+      let f1Order = null;
+      try {
+        f1Order = await Order.create(stored.finalization.orderDraft);
+      } catch {
+        f1Order = await Order.findOne({
+          user: objectId(staged.buyer.userId),
+          clientOrderId: staged.key
+        });
+      }
+      assert.equal(
+        String(f1Order._id),
+        successorOrderId,
+        'the unique key converges both workers on ONE physical order'
+      );
+
+      const confirmed = await confirmFinalization({
+        intentId: staged.intent._id,
+        orderId: f1Order._id,
+        claimToken: f1.claimToken
+      });
+      assert.equal(confirmed.owned, false, 'F1 knows its claim was superseded');
+
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        1,
+        'exactly one order, and none of them deleted'
+      );
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        3,
+        'the stock stays sold throughout'
+      );
+      assert.equal(
+        (await CheckoutIntent.findById(staged.intent._id)).phase,
+        'finalized'
+      );
+      assert.deepEqual(await outstandingMarkers(staged.store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- Y05 ---
+    await t.test('Y05 a stalled releaser and its successor refund exactly once', async () => {
+      const staged = await stagedCheckout({ label: 'y05', quantity: 2, stock: 5 });
+
+      // R1 takes the release decision, then stalls past its lease.
+      const r1 = await claimRelease({ intentId: staged.intent._id });
+      assert.ok(r1);
+      await makeStale(staged.intent._id);
+
+      // Neither R1's successor nor anybody else may turn this into a sale.
+      const finalizeAttempt = await claimFinalization({
+        intentId: staged.intent._id,
+        snapshot: snapshotFor(staged, { name: 'y05 product' }),
+        staleAfterMs: 60 * 1000
+      });
+      assert.equal(
+        finalizeAttempt,
+        null,
+        'a stale release can never be claimed for finalization'
+      );
+
+      // R2 resumes the same decision and completes the refund.
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        5,
+        'restored once'
+      );
+
+      // R1 wakes up and tries to finish. Its fencing token is gone, and the
+      // refund it would repeat is guarded by the marker that no longer exists.
+      const repeat = buildIdentifiedRelease({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id,
+        lines: [
+          { productId: staged.productId, quantity: staged.quantity, finite: true }
+        ]
+      });
+      const repeated = await Business.updateOne(
+        repeat.filter,
+        repeat.update,
+        repeat.arrayFilters.length > 0
+          ? { arrayFilters: repeat.arrayFilters }
+          : undefined
+      );
+      assert.equal(repeated.matchedCount, 0, 'a second refund matches nothing');
+
+      const confirmed = await confirmRelease({
+        intentId: staged.intent._id,
+        failureCode: 'CHECKOUT_ABANDONED',
+        claimToken: r1.claimToken
+      });
+      assert.equal(confirmed.owned, false, 'R1 knows its claim was superseded');
+
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        5,
+        'and the stock is exact, not doubled'
+      );
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        0,
+        'a released checkout never produces an order'
+      );
+      assert.equal(
+        (await CheckoutIntent.findById(staged.intent._id)).phase,
+        'released'
+      );
+      assert.deepEqual(await outstandingMarkers(staged.store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- Y06 ---
+    await t.test('Y06 staleness never changes a claim direction', async () => {
+      const staged = await stagedCheckout({ label: 'y06', quantity: 1, stock: 5 });
+      const intentId = staged.intent._id;
+      const snapshot = snapshotFor(staged, { name: 'y06 product' });
+      const lease = 60 * 1000;
+
+      async function setPhase(phase) {
+        await CheckoutIntent.updateOne({ _id: intentId }, { $set: { phase } });
+      }
+
+      // --- fresh finalizing -------------------------------------------------
+      await setPhase('finalizing');
+      assert.equal(
+        await claimRelease({ intentId, staleAfterMs: lease }),
+        null,
+        'fresh finalizing -> claimRelease must not match'
+      );
+      assert.equal(
+        await claimFinalization({ intentId, staleAfterMs: lease }),
+        null,
+        'and a fresh claim is not resumable either'
+      );
+
+      // --- stale finalizing -------------------------------------------------
+      await makeStale(intentId);
+      assert.equal(
+        await claimRelease({ intentId, staleAfterMs: lease }),
+        null,
+        'stale finalizing -> claimRelease must STILL not match'
+      );
+      const resumedFinalize = await claimFinalization({ intentId, staleAfterMs: lease });
+      assert.ok(resumedFinalize, 'only the same direction may resume it');
+      assert.equal(resumedFinalize.phase, 'finalizing');
+
+      // --- fresh releasing --------------------------------------------------
+      await setPhase('releasing');
+      assert.equal(
+        await claimFinalization({ intentId, snapshot, staleAfterMs: lease }),
+        null,
+        'fresh releasing -> claimFinalization must not match'
+      );
+      assert.equal(
+        await claimRelease({ intentId, staleAfterMs: lease }),
+        null,
+        'and a fresh release claim is not resumable either'
+      );
+
+      // --- stale releasing --------------------------------------------------
+      await makeStale(intentId);
+      assert.equal(
+        await claimFinalization({ intentId, snapshot, staleAfterMs: lease }),
+        null,
+        'stale releasing -> claimFinalization must STILL not match'
+      );
+      const resumedRelease = await claimRelease({ intentId, staleAfterMs: lease });
+      assert.ok(resumedRelease, 'only the same direction may resume it');
+      assert.equal(resumedRelease.phase, 'releasing');
+
+      // --- terminal ---------------------------------------------------------
+      for (const terminal of ['finalized', 'released']) {
+        await setPhase(terminal);
+        await makeStale(intentId);
+        assert.equal(
+          await claimFinalization({ intentId, snapshot, staleAfterMs: lease }),
+          null,
+          `${terminal} is unclaimable for finalization`
+        );
+        assert.equal(
+          await claimRelease({ intentId, staleAfterMs: lease }),
+          null,
+          `${terminal} is unclaimable for release`
+        );
+      }
+    });
+
+    // ---------------------------------------------------------------- Y07 ---
+    await t.test('Y07 an order written just before a crash is adopted, not undone', async () => {
+      const staged = await stagedCheckout({ label: 'y07', quantity: 2, stock: 5 });
+
+      const claimed = await claimFinalization({
+        intentId: staged.intent._id,
+        snapshot: snapshotFor(staged, { name: 'y07 product' })
+      });
+      assert.ok(claimed);
+
+      // The order lands...
+      const stored = await CheckoutIntent.findById(staged.intent._id).select(
+        '+finalization'
+      );
+      const order = await Order.create(stored.finalization.orderDraft);
+      // ...and the process dies before the phase or the marker can be updated.
+      assert.equal(
+        (await CheckoutIntent.findById(staged.intent._id)).phase,
+        'finalizing'
+      );
+
+      await makeStale(staged.intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      const settled = await CheckoutIntent.findById(staged.intent._id);
+      assert.equal(settled.phase, 'finalized');
+      assert.equal(String(settled.order), String(order._id), 'the same order, adopted');
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        1,
+        'no second order, and no compensating delete'
+      );
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        3,
+        'the stock is not refunded'
+      );
+      assert.deepEqual(await outstandingMarkers(staged.store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- Y08 ---
+    await t.test('Y08 a refund that landed before a crash is not repeated', async () => {
+      const staged = await stagedCheckout({ label: 'y08', quantity: 2, stock: 5 });
+
+      const claimed = await claimRelease({ intentId: staged.intent._id });
+      assert.ok(claimed);
+
+      // The refund lands...
+      const release = buildIdentifiedRelease({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id,
+        lines: [
+          { productId: staged.productId, quantity: staged.quantity, finite: true }
+        ]
+      });
+      const refunded = await Business.updateOne(
+        release.filter,
+        release.update,
+        release.arrayFilters.length > 0
+          ? { arrayFilters: release.arrayFilters }
+          : undefined
+      );
+      assert.equal(refunded.matchedCount, 1, 'the refund landed');
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        5
+      );
+      // ...and the process dies before `released` is written.
+      assert.equal(
+        (await CheckoutIntent.findById(staged.intent._id)).phase,
+        'releasing'
+      );
+
+      await makeStale(staged.intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        5,
+        'the second pass changes nothing'
+      );
+      assert.equal(
+        (await CheckoutIntent.findById(staged.intent._id)).phase,
+        'released'
+      );
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        0,
+        'a release never produces an order'
+      );
+      assert.deepEqual(await outstandingMarkers(staged.store.businessId), []);
+
+      // And running it again is still a no-op.
+      await makeStale(staged.intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        5
+      );
+    });
+
+    // ---------------------------------------------------------------- Y09 ---
+    await t.test('Y09 the finalization snapshot never reaches any client', async () => {
+      const store = await seedStore(
+        { price: 30, unlimitedStock: false, stockQuantity: 4 },
+        'y09'
+      );
+      const buyer = await seedAccount('buyer-y09');
+      const key = `${stamp}-y09`;
+
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 1
+      });
+      assert.equal(placed.status, 201);
+
+      // The snapshot is real and durable...
+      const stored = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      }).select('+finalization');
+      assert.ok(stored.finalization?.orderDraft, 'the decision was snapshotted');
+      assert.equal(stored.finalization.orderDraft.items[0].unitPrice, 30);
+
+      // ...and it is not selected by an ordinary read.
+      const ordinary = await CheckoutIntent.findById(stored._id);
+      assert.equal(ordinary.finalization, undefined);
+
+      // Nothing a customer or a merchant can ask for contains it.
+      const orderId = placed.json.data.order.id;
+      const surfaces = [
+        await call('GET', '/api/v1/orders/mine', { token: buyer.token }),
+        await call('GET', `/api/v1/orders/mine/${orderId}`, { token: buyer.token }),
+        await call('GET', '/api/v1/businesses/me/orders', {
+          token: store.merchant.token
+        }),
+        await call('GET', '/api/v1/businesses/me/products', {
+          token: store.merchant.token
+        }),
+        await call('GET', `/api/v1/businesses/${store.businessId}`)
+      ];
+
+      for (const surface of surfaces) {
+        const body = JSON.stringify(surface.json ?? {});
+        assert.equal(body.includes('finalization'), false, 'no snapshot field');
+        assert.equal(body.includes('claimToken'), false, 'no fencing token');
+        assert.equal(body.includes('stockReservations'), false, 'no markers');
+      }
+
+      // The checkout response itself, too.
+      const body = JSON.stringify(placed.json);
+      assert.equal(body.includes('finalization'), false);
+      assert.equal(body.includes('claimToken'), false);
     });
   });
 }

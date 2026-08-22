@@ -83,6 +83,38 @@ const checkoutIntentSchema = new mongoose.Schema(
     /** The exact reservation, so a release can only give back what it took. */
     lines: { type: [intentLineSchema], default: [] },
 
+    /**
+     * The fencing token of the claim that currently owns this checkout.
+     *
+     * A lease says WHEN a claim may be taken over; this says WHOSE it is. Every
+     * decisive write is conditional on it, so a worker that stalled past the
+     * lease cannot land a result under the claim that replaced it.
+     */
+    claimToken: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null
+    },
+
+    /**
+     * Everything needed to write this checkout's order, frozen at the instant
+     * the finalization decision was made.
+     *
+     * It exists so a crash between "finalizing" and `Order.create` is
+     * recoverable by FINISHING the order rather than refunding stock the
+     * decision already sold. Recovery must never re-derive prices from the
+     * merchant's current catalog: the historical order price is the one
+     * committed here.
+     *
+     * Deliberately `select: false` and deliberately Mixed - it is an internal
+     * verbatim copy of a server-built draft, never a customer- or
+     * merchant-facing shape, and nothing serializes it to anybody.
+     */
+    finalization: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+      select: false
+    },
+
     /** Set once, when the order becomes customer-visible. */
     order: {
       type: mongoose.Schema.Types.ObjectId,

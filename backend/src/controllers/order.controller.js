@@ -16,7 +16,6 @@ import {
   CONVERGENCE_ATTEMPTS,
   CONVERGENCE_INTERVAL_MS,
   IDEMPOTENCY_ERRORS,
-  buildIdentifiedRelease,
   buildIdentifiedReservation,
   buildReservationSettlement,
   checkoutFingerprint,
@@ -240,9 +239,10 @@ async function reserveStock({ intent, businessId, lines, normalizedItems }) {
  * Retires a settled reservation.
  *
  * A pull with NO increment: once an order exists the stock belongs to it, so
- * this is bookkeeping, not a refund. Distinct from `releaseStock` on purpose -
- * the two must never be confused. Idempotent: with the marker already gone the
- * filter simply matches nothing.
+ * this is bookkeeping, not a refund. It is the ONLY inventory write the request
+ * path performs after a finalization decision: giving stock back once that
+ * decision stands is forbidden, and belongs to the release path alone.
+ * Idempotent: with the marker already gone the filter simply matches nothing.
  */
 async function settleReservation({ intent, businessId }) {
   const settlement = buildReservationSettlement({
@@ -251,28 +251,6 @@ async function settleReservation({ intent, businessId }) {
   });
 
   await Business.updateOne(settlement.filter, settlement.update);
-}
-
-/**
- * Gives a reservation back, exactly once.
- *
- * The filter requires the marker to still be present, so a second release
- * changes nothing. There is deliberately no unconditional increment anywhere.
- */
-async function releaseStock({ intent, businessId, lines }) {
-  const release = buildIdentifiedRelease({
-    businessId,
-    intentId: intent._id,
-    lines
-  });
-
-  await Business.updateOne(
-    release.filter,
-    release.update,
-    release.arrayFilters.length > 0
-      ? { arrayFilters: release.arrayFilters }
-      : undefined
-  );
 }
 
 /**
@@ -285,12 +263,21 @@ async function releaseStock({ intent, businessId, lines }) {
 /**
  * Writes the order, but only under an acquired finalization claim.
  *
- * Every decisive transition below checks what the database actually did. A
- * transition that matched nothing means somebody else owns this checkout, and
- * the only safe response is to undo what this worker created and stop.
+ * Acquiring the claim IS the decision to sell, and it is irrevocable: from here
+ * the checkout can only become an order. That is why the draft is frozen into
+ * the intent by the very same write - a crash on the next line is then finished
+ * by recovery rather than refunded, and the price the customer committed to is
+ * the one that survives.
+ *
+ * Every decisive transition below checks what the database actually did, and is
+ * fenced by the claim's token so a worker whose claim was taken over cannot act
+ * on ownership it no longer has.
  */
-async function finalizeCheckout({ intent, businessId, lines, orderDraft }) {
-  const claimed = await claimFinalization({ intentId: intent._id });
+async function finalizeCheckout({ intent, businessId, orderDraft }) {
+  const claimed = await claimFinalization({
+    intentId: intent._id,
+    snapshot: { orderDraft }
+  });
 
   if (!claimed) {
     // Release already owns it, or it is already terminal. Never create an order
@@ -310,26 +297,21 @@ async function finalizeCheckout({ intent, businessId, lines, orderDraft }) {
   }
 
   let order = null;
-  let createdHere = false;
 
   try {
     order = await Order.create(orderDraft);
-    createdHere = true;
   } catch (error) {
-    if (isDuplicateKeyError(error)) {
-      order = await findExistingOrder(orderDraft.user, orderDraft.clientOrderId);
-    }
+    // Any failure, not only a duplicate key: a write can also land and still
+    // report an error. Looking for the order first is what stops this worker
+    // from concluding "nothing was sold" when something was.
+    order = await findExistingOrder(orderDraft.user, orderDraft.clientOrderId);
 
     if (!order) {
-      // The order could not be persisted at all, so the inventory this intent
-      // is holding has to go back - once. This worker still owns the claim, so
-      // it is the one entitled to do that.
-      await releaseStock({ intent, businessId, lines });
-      await CheckoutIntent.updateOne(
-        { _id: intent._id, phase: 'finalizing' },
-        { $set: { phase: 'released', failureCode: 'CHECKOUT_FAILED' } }
-      );
-
+      // The decision to finalize stands, and so does the snapshot that can
+      // complete it. Giving the stock back here would be the one reversal this
+      // design forbids - a resumed finalization could then sell inventory that
+      // had already been refunded - so the worker reports the failure and
+      // leaves the order for recovery to write.
       throw error;
     }
   }
@@ -339,12 +321,17 @@ async function finalizeCheckout({ intent, businessId, lines, orderDraft }) {
   // still being ours.
   const finalized = await confirmFinalization({
     intentId: intent._id,
-    orderId: order._id
+    orderId: order._id,
+    claimToken: claimed.claimToken
   });
 
   if (!finalized.owned) {
-    // The claim was taken away - only possible if this worker stalled past the
-    // abandonment lease and a reconciler took over.
+    // The claim was taken over - only possible if this worker stalled past the
+    // abandonment lease. A finalization can only be taken over by ANOTHER
+    // FINALIZER, so whoever holds it now is also writing this same order: the
+    // unique {user, clientOrderId} key converges them. The order is valid and
+    // is never deleted; deleting it was only ever needed to undo a refund that
+    // can no longer happen.
     const current = await CheckoutIntent.findById(intent._id);
 
     if (current?.phase === 'finalized' && current.order) {
@@ -352,11 +339,7 @@ async function finalizeCheckout({ intent, businessId, lines, orderDraft }) {
       if (settledOrder) return settledOrder;
     }
 
-    // The reservation was given back by whoever took the claim, so the order
-    // this worker just wrote must not survive to reference refunded stock.
-    if (createdHere) await Order.deleteOne({ _id: order._id });
-
-    throw checkoutFailure(CLAIM_ERRORS.lost);
+    return order;
   }
 
   await settleReservation({ intent, businessId });
@@ -536,7 +519,6 @@ export const createOrder = asyncHandler(async (req, res) => {
   const order = await finalizeCheckout({
     intent,
     businessId: business._id,
-    lines,
     orderDraft: {
       clientOrderId,
       user: req.user._id,
