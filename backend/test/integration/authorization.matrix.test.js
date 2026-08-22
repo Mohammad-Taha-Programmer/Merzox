@@ -22,7 +22,15 @@ import { fixtureId, resolveIntegrationEnvironment } from './test-environment.js'
  *   MERZOX_TEST_API_URL=http://localhost:4100/api/v1
  *   MERZOX_TEST_DB_URI=mongodb://127.0.0.1:27017/merzox_test
  *
- * The API at MERZOX_TEST_API_URL must be serving MERZOX_TEST_DB_URI.
+ * IMPORTANT - the operator must start that API against the test database:
+ *
+ *   cd backend
+ *   MONGODB_URI=mongodb://127.0.0.1:27017/merzox_test npm.cmd start
+ *
+ * The harness cannot verify which database a server is serving, so it only
+ * accepts a LOOPBACK MERZOX_TEST_API_URL. A remote API is refused outright:
+ * pairing a local test database with a remote API would create fixtures in
+ * production and clean only the local database.
  */
 
 const environment = resolveIntegrationEnvironment();

@@ -1,34 +1,26 @@
 import mongoose from 'mongoose';
 
 import { Notification } from '../models/Notification.js';
+import {
+  enumParam,
+  NOTIFICATION_AUDIENCES,
+  paginationParams,
+  readFilterParam
+} from '../policies/query.policy.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-
-function paginationParams(query) {
-  const parsedPage = Number.parseInt(query.page ?? '1', 10);
-  const parsedLimit = Number.parseInt(query.limit ?? '20', 10);
-  const page = Number.isFinite(parsedPage) ? Math.max(parsedPage, 1) : 1;
-  const limit = Number.isFinite(parsedLimit)
-    ? Math.min(Math.max(parsedLimit, 1), 50)
-    : 20;
-
-  return { page, limit, skip: (page - 1) * limit };
-}
 
 /**
  * A business owner keeps a customer account too, so the audience is taken from
  * the request rather than inferred from the account type.
  */
 function audienceFrom(query, user) {
-  const requested = String(query.audience ?? 'customer').trim();
-
-  if (requested !== 'customer' && requested !== 'business') {
-    throw new AppError(
-      'Notification audience must be customer or business',
-      400,
-      'INVALID_NOTIFICATION_AUDIENCE'
-    );
-  }
+  const requested = enumParam(query.audience, {
+    name: 'audience',
+    allowed: NOTIFICATION_AUDIENCES,
+    fallback: 'customer',
+    code: 'INVALID_NOTIFICATION_AUDIENCE'
+  });
 
   if (requested === 'business' && user.userType !== 'business') {
     throw new AppError(
@@ -44,7 +36,10 @@ function audienceFrom(query, user) {
 export const listMyNotifications = asyncHandler(async (req, res) => {
   const audience = audienceFrom(req.query, req.user);
   const { page, limit, skip } = paginationParams(req.query);
-  const onlyUnread = String(req.query.filter ?? 'all').trim() === 'unread';
+  // Refused rather than defaulted: `filter=banana` must not be served as `all`.
+  const onlyUnread =
+    readFilterParam(req.query.filter, 'INVALID_NOTIFICATION_FILTER') ===
+    'unread';
   const baseFilter = { user: req.user._id, audience };
   const criteria = onlyUnread ? { ...baseFilter, readAt: null } : baseFilter;
 

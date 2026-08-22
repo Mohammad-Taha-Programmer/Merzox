@@ -135,6 +135,70 @@ export function isDisposableDatabaseName(name) {
 }
 
 /**
+ * Hosts accepted for the integration API.
+ *
+ * The MongoDB guard protects the cleanup connection, but fixtures are created
+ * through MERZOX_TEST_API_URL - and nothing proves that API is serving the test
+ * database. A configuration like:
+ *
+ *   MERZOX_TEST_DB_URI=mongodb://localhost:27017/merzox_test
+ *   MERZOX_TEST_API_URL=https://a-production-api.example/api/v1
+ *
+ * would create real users and orders remotely and then clean only the local
+ * database. Until the harness can verify a server's identity, only a loopback
+ * API is accepted: an operator can point that at the test database, a remote
+ * host cannot be vouched for.
+ */
+const LOOPBACK_API_HOSTS = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+/**
+ * Validates the integration API URL without touching the network.
+ *
+ * Returns `{ ok: true }` or `{ ok: false, reason }`. No DNS is resolved and no
+ * TLS setting is relaxed; a host that merely looks local by name is not enough,
+ * which is why the check is on the parsed hostname.
+ */
+export function validateIntegrationApiUrl(rawUrl) {
+  const value = String(rawUrl ?? '').trim();
+
+  if (value.length === 0) {
+    return { ok: false, reason: 'MERZOX_TEST_API_URL is not set' };
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    return { ok: false, reason: 'MERZOX_TEST_API_URL is not a valid URL' };
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return {
+      ok: false,
+      reason: `MERZOX_TEST_API_URL must be http or https (got "${parsed.protocol.replace(':', '')}")`
+    };
+  }
+
+  // Credentials in the URL would end up in fixture requests and logs.
+  if (parsed.username.length > 0 || parsed.password.length > 0) {
+    return {
+      ok: false,
+      reason: 'MERZOX_TEST_API_URL must not embed credentials'
+    };
+  }
+
+  const host = parsed.hostname.toLowerCase();
+  if (!LOOPBACK_API_HOSTS.has(host)) {
+    return {
+      ok: false,
+      reason: `MERZOX_TEST_API_URL host "${host}" is not loopback (the integration API must run locally against MERZOX_TEST_DB_URI)`
+    };
+  }
+
+  return { ok: true };
+}
+
+/**
  * Resolves the harness configuration.
  *
  * Returns either `{ enabled: true, apiUrl, dbUri, dbName }` or
@@ -151,8 +215,9 @@ export function resolveIntegrationEnvironment(env = process.env) {
   }
 
   const apiUrl = String(env.MERZOX_TEST_API_URL ?? '').trim();
-  if (apiUrl.length === 0) {
-    return { enabled: false, reason: 'MERZOX_TEST_API_URL is not set' };
+  const apiCheck = validateIntegrationApiUrl(apiUrl);
+  if (!apiCheck.ok) {
+    return { enabled: false, reason: apiCheck.reason };
   }
 
   const dbUri = String(env.MERZOX_TEST_DB_URI ?? '').trim();

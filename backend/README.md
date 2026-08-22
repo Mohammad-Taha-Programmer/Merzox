@@ -76,8 +76,20 @@ MERZOX_TEST_API_URL=http://localhost:4100/api/v1
 MERZOX_TEST_DB_URI=mongodb://127.0.0.1:27017/merzox_test
 ```
 
-The API served at `MERZOX_TEST_API_URL` must be running against
-`MERZOX_TEST_DB_URI`. The harness refuses to run unless the **database name**
+The API served at `MERZOX_TEST_API_URL` must itself be started with
+`MONGODB_URI` pointing at `MERZOX_TEST_DB_URI`:
+
+```powershell
+cd backend
+$env:MONGODB_URI = "mongodb://127.0.0.1:27017/merzox_test"
+npm.cmd start
+```
+
+The harness cannot verify which database a running server is serving, so it
+accepts only a **loopback** `MERZOX_TEST_API_URL` (`localhost`, `127.0.0.1`,
+`::1`). A remote or production-looking API URL, a non-http scheme, an embedded
+credential, or a malformed URL is refused. Pairing a local test database with a
+remote API would create fixtures in production and clean only the local one. The harness refuses to run unless the **database name**
 contains `test` or `integration` - a hostname is not accepted as proof, and a
 URI identical to `MONGODB_URI` is rejected outright. Cleanup is scoped to the
 user ids the run created; no collection is ever dropped.

@@ -24,7 +24,6 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     on<MessagesFilterChanged>(_onFilterChanged);
     on<MessagesRefreshRequested>(_onRefreshRequested);
     on<MessagesLoadMoreRequested>(_onLoadMoreRequested);
-    on<MessagesThreadRead>(_onThreadRead);
   }
 
   Future<void> _onStarted(
@@ -114,49 +113,6 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         ),
       );
     }
-  }
-
-  /// Clearing the badge locally keeps the inbox in step with a thread the user
-  /// just read, without paying for another round trip.
-  void _onThreadRead(MessagesThreadRead event, Emitter<MessagesState> emit) {
-    final existing = state.conversations
-        .where((conversation) => conversation.id == event.conversationId)
-        .firstOrNull;
-
-    if (existing == null || !existing.hasUnread) return;
-
-    final updated = [
-      for (final conversation in state.conversations)
-        if (conversation.id == event.conversationId)
-          ConversationApiModel(
-            id: conversation.id,
-            title: conversation.title,
-            avatarUrl: conversation.avatarUrl,
-            business: conversation.business,
-            customer: conversation.customer,
-            lastMessage: conversation.lastMessage,
-            unreadCount: 0,
-            messageCount: conversation.messageCount,
-            updatedAt: conversation.updatedAt,
-          )
-        else
-          conversation,
-    ];
-
-    emit(
-      state.copyWith(
-        conversations: state.filter == MessagesFilter.unread
-            ? updated
-                  .where(
-                    (conversation) => conversation.id != event.conversationId,
-                  )
-                  .toList()
-            : updated,
-        unreadConversationCount: state.unreadConversationCount > 0
-            ? state.unreadConversationCount - 1
-            : 0,
-      ),
-    );
   }
 
   Future<ConversationListApiResponse> _fetch({

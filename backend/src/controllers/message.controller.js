@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 import { Business } from '../models/Business.js';
+import { paginationParams, readFilterParam } from '../policies/query.policy.js';
 import { Conversation } from '../models/Conversation.js';
 import { Message } from '../models/Message.js';
 import {
@@ -16,29 +17,8 @@ import { notifyNewMessage } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
-function paginationParams(query) {
-  const parsedPage = Number.parseInt(query.page ?? '1', 10);
-  const parsedLimit = Number.parseInt(query.limit ?? '20', 10);
-  const page = Number.isFinite(parsedPage) ? Math.max(parsedPage, 1) : 1;
-  const limit = Number.isFinite(parsedLimit)
-    ? Math.min(Math.max(parsedLimit, 1), 50)
-    : 20;
-
-  return { page, limit, skip: (page - 1) * limit };
-}
-
 function conversationFilter(query) {
-  const filter = String(query.filter ?? 'all').trim();
-
-  if (filter !== 'all' && filter !== 'unread') {
-    throw new AppError(
-      'Conversation filter must be all or unread',
-      400,
-      'INVALID_CONVERSATION_FILTER'
-    );
-  }
-
-  return filter;
+  return readFilterParam(query.filter, 'INVALID_CONVERSATION_FILTER');
 }
 
 function findBusiness(id) {

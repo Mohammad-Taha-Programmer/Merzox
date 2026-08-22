@@ -5,7 +5,8 @@ import {
   databaseNameFromUri,
   isDisposableDatabaseName,
   normalizedDatabaseTarget,
-  resolveIntegrationEnvironment
+  resolveIntegrationEnvironment,
+  validateIntegrationApiUrl
 } from './integration/test-environment.js';
 
 /**
@@ -185,6 +186,89 @@ test('the normalized target ignores credentials, options and host order', () => 
   ]) {
     assert.equal(normalizedDatabaseTarget(uri), '', String(uri));
   }
+});
+
+// R2 §4: fixtures are created through the API, and nothing proves that API is
+// serving the test database. Only a loopback API is accepted.
+test('a loopback integration API is accepted', () => {
+  for (const url of [
+    'http://localhost:4100/api/v1',
+    'http://127.0.0.1:4100/api/v1',
+    'http://[::1]:4100/api/v1',
+    'https://localhost:4100/api/v1',
+    'http://LOCALHOST:4100/api/v1'
+  ]) {
+    assert.equal(validateIntegrationApiUrl(url).ok, true, url);
+
+    const resolved = resolveIntegrationEnvironment({
+      ...SAFE,
+      MERZOX_TEST_API_URL: url
+    });
+    assert.equal(resolved.enabled, true, url);
+  }
+});
+
+test('a remote or production-looking API is refused', () => {
+  for (const url of [
+    'https://a-production-api.example/api/v1',
+    'https://merzox.example.com/api/v1',
+    'http://192.168.1.8:4000/api/v1',
+    'http://10.0.2.2:4000/api/v1',
+    'https://cluster0.example.mongodb.net/api/v1'
+  ]) {
+    const check = validateIntegrationApiUrl(url);
+    assert.equal(check.ok, false, url);
+    assert.match(check.reason, /not loopback/);
+
+    const resolved = resolveIntegrationEnvironment({
+      ...SAFE,
+      MERZOX_TEST_API_URL: url
+    });
+    assert.equal(resolved.enabled, false, url);
+  }
+});
+
+test('a malformed API URL is refused', () => {
+  for (const url of ['not-a-url', 'localhost:4100', '://x', ' ', 'http://']) {
+    const check = validateIntegrationApiUrl(url);
+    assert.equal(check.ok, false, JSON.stringify(url));
+  }
+});
+
+test('a non-http scheme is refused', () => {
+  for (const url of [
+    'ftp://localhost/api',
+    'file:///C:/api',
+    'ws://localhost:4100',
+    'javascript:alert(1)'
+  ]) {
+    const check = validateIntegrationApiUrl(url);
+    assert.equal(check.ok, false, url);
+  }
+});
+
+test('an API URL embedding credentials is refused', () => {
+  for (const url of [
+    'http://user:pass@localhost:4100/api/v1',
+    'http://user@localhost:4100/api/v1'
+  ]) {
+    const check = validateIntegrationApiUrl(url);
+    assert.equal(check.ok, false, url);
+    assert.match(check.reason, /credentials/);
+  }
+});
+
+test('the dangerous split configuration from the review is refused', () => {
+  // Local test database, remote production API: fixtures would be created in
+  // production and only the local database cleaned.
+  const resolved = resolveIntegrationEnvironment({
+    MERZOX_INTEGRATION_TESTS: 'true',
+    MERZOX_TEST_DB_URI: 'mongodb://localhost:27017/merzox_test',
+    MERZOX_TEST_API_URL: 'https://a-production-api.example/api/v1'
+  });
+
+  assert.equal(resolved.enabled, false);
+  assert.match(resolved.reason, /not loopback/);
 });
 
 test('a database without a disposable marker is refused', () => {

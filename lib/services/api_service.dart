@@ -1401,10 +1401,10 @@ class OrderApiModel {
       courier: OrderCourierApiModel.fromJson(
         json['courier'] as Map<String, dynamic>? ?? const {},
       ),
-      tracking: OrderTrackingApiModel.fromJson(
-        json['tracking'] as Map<String, dynamic>? ?? const {},
-        json['status'] as String? ?? 'pending',
-      ),
+      // Customer action permissions are a backend decision. A missing or
+      // malformed tracking object is a contract failure, never an invitation
+      // to infer canCancel/canChangeAddress/canReview from the status.
+      tracking: OrderTrackingApiModel.fromJson(json['tracking']),
     );
   }
 }
@@ -1481,20 +1481,24 @@ class OrderTrackingApiModel {
     required this.canReview,
   });
 
-  /// Older responses predate the tracking payload, so the timeline is rebuilt
-  /// from the order status when the server does not send one.
-  factory OrderTrackingApiModel.fromJson(
-    Map<String, dynamic> json,
-    String status,
-  ) {
-    if (json.isEmpty) {
-      return OrderTrackingApiModel.fromStatus(status);
+  /// Parses the server's tracking payload.
+  ///
+  /// There is deliberately no status-derived fallback: reconstructing the
+  /// permission flags on the client would let a stale or truncated response
+  /// widen what the customer is allowed to do.
+  factory OrderTrackingApiModel.fromJson(Object? raw) {
+    if (raw is! Map<String, dynamic> || raw.isEmpty) {
+      throw const ApiContractException(
+        'order',
+        'order response carried no tracking object',
+      );
     }
 
+    final json = raw;
     final steps = json['steps'] as List<dynamic>? ?? const [];
 
     return OrderTrackingApiModel(
-      isCancelled: json['isCancelled'] as bool? ?? status == 'cancelled',
+      isCancelled: json['isCancelled'] as bool? ?? false,
       currentStep: json['currentStep'] as String? ?? '',
       currentIndex: (json['currentIndex'] as num?)?.toInt() ?? -1,
       steps: steps
@@ -1507,41 +1511,6 @@ class OrderTrackingApiModel {
       canCancel: json['canCancel'] as bool? ?? false,
       canChangeAddress: json['canChangeAddress'] as bool? ?? false,
       canReview: json['canReview'] as bool? ?? false,
-    );
-  }
-
-  factory OrderTrackingApiModel.fromStatus(String status) {
-    const stepForStatus = {
-      'pending': 'placed',
-      'confirmed': 'placed',
-      'preparing': 'preparing',
-      'outForDelivery': 'outForDelivery',
-      'delivered': 'delivered',
-    };
-    final isCancelled = status == 'cancelled';
-    final currentStep = stepForStatus[status] ?? 'placed';
-    final currentIndex = isCancelled ? -1 : stepOrder.indexOf(currentStep);
-
-    return OrderTrackingApiModel(
-      isCancelled: isCancelled,
-      currentStep: isCancelled ? '' : currentStep,
-      currentIndex: currentIndex,
-      steps: [
-        for (var index = 0; index < stepOrder.length; index++)
-          OrderTrackingStepApiModel(
-            step: stepOrder[index],
-            reachedAt: null,
-            isReached: !isCancelled && index <= currentIndex,
-          ),
-      ],
-      courier: const OrderCourierApiModel(
-        name: '',
-        phone: '',
-        assignedAt: null,
-      ),
-      canCancel: const ['pending', 'confirmed', 'preparing'].contains(status),
-      canChangeAddress: const ['pending', 'confirmed'].contains(status),
-      canReview: status == 'delivered',
     );
   }
 }

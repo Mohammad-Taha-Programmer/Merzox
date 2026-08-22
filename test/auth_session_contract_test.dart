@@ -112,7 +112,21 @@ class _SpyApi extends ApiService {
     required String orderId,
   }) async {
     calls.add('order');
-    return OrderApiModel.fromJson(const {'id': 'o1', 'status': 'pending'});
+    // Tracking is part of the order contract, so the spy returns a server-
+    // shaped payload rather than a bare order.
+    return OrderApiModel.fromJson(const {
+      'id': 'o1',
+      'status': 'pending',
+      'tracking': {
+        'isCancelled': false,
+        'currentStep': 'placed',
+        'currentIndex': 0,
+        'steps': <dynamic>[],
+        'canCancel': true,
+        'canChangeAddress': true,
+        'canReview': false,
+      },
+    });
   }
 
   @override
