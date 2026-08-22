@@ -204,11 +204,54 @@ async function continueFinalization(intent, staleAfterMs) {
  * the checkout succeeded and only the bookkeeping is missing; if it does not,
  * nothing was sold and the reservation must go back.
  */
+/**
+ * Clears whatever a terminally released checkout still has recorded.
+ *
+ * Two things can be sitting there. A `failed` entry is the durable refusal that
+ * fenced concurrent reservation writes; it holds nothing, so it is simply
+ * pulled. A live reservation should not be there at all - but if a worker that
+ * stalled longer than the whole lease managed to reserve after the refusal
+ * record was swept, the stock it took has to come back. Both are marker-guarded
+ * and therefore apply exactly once.
+ */
+async function settleTerminalMarker(intent) {
+  const holder = await Business.findById(intent.business).select(
+    '+stockReservations'
+  );
+  const reservedLines = reservedLinesFromMarker(holder, intent._id);
+
+  if (reservedLines) {
+    const release = buildIdentifiedRelease({
+      businessId: intent.business,
+      intentId: intent._id,
+      lines: reservedLines
+    });
+
+    await Business.updateOne(
+      release.filter,
+      release.update,
+      release.arrayFilters.length > 0
+        ? { arrayFilters: release.arrayFilters }
+        : undefined
+    );
+
+    return RECONCILE_ACTIONS.released;
+  }
+
+  // A refusal record, or nothing at all. A pull with no increment either way.
+  await settleMarker(intent);
+
+  return RECONCILE_ACTIONS.markerCleaned;
+}
+
 export async function reconcileIntent(intent, staleAfterMs = CHECKOUT_STALE_LEASE_MS) {
   if (intent.phase === 'released') {
-    // A release already pulled its own marker in the same update, so there is
-    // nothing left to do.
-    return RECONCILE_ACTIONS.skipped;
+    // A release pulls its own marker in the same update, so usually there is
+    // nothing here. What can remain is the durable refusal record left by a
+    // terminal reservation failure - and, in the one window where a worker
+    // stalled past the whole lease, stock it took afterwards. R8: a released
+    // intent is no longer invisible to the sweep, so neither can persist.
+    return settleTerminalMarker(intent);
   }
 
   if (intent.phase === 'finalized') {
@@ -260,8 +303,11 @@ export async function reconcileStaleCheckouts({
   const cutoff = new Date(now - staleAfterMs);
   const candidates = await CheckoutIntent.find({
     // Stale claims are swept too: a worker that died holding `finalizing` or
-    // `releasing` would otherwise strand its reservation forever.
-    phase: { $in: [...RECLAIMABLE_PHASES, 'finalized'] },
+    // `releasing` would otherwise strand its reservation forever. Terminal
+    // phases are included because BOTH can still own an entry in the business
+    // document - a lingering marker after finalization, or a refusal record
+    // after a terminal reservation failure.
+    phase: { $in: [...RECLAIMABLE_PHASES, 'finalized', 'released'] },
     updatedAt: { $lte: cutoff }
   })
     .sort({ updatedAt: 1 })
@@ -276,9 +322,9 @@ export async function reconcileStaleCheckouts({
   };
 
   for (const intent of candidates) {
-    // A finalized intent with no outstanding marker is already settled; the
-    // sweep must not keep re-touching it.
-    if (intent.phase === 'finalized') {
+    // A terminal intent with no outstanding entry is already settled; the sweep
+    // must not keep re-touching it.
+    if (intent.phase === 'finalized' || intent.phase === 'released') {
       const outstanding = await Business.exists({
         _id: intent.business,
         'stockReservations.intent': intent._id

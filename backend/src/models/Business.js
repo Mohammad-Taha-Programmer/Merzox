@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 import {
+  RESERVATION_STATES,
+  RESERVATION_STATES_LIST
+} from '../policies/checkout-intent.policy.js';
+
+import {
   finalPriceFor,
   isProductInStock,
   LEGACY_UNLIMITED_STOCK_DEFAULT,
@@ -122,6 +127,26 @@ const socialLinksSchema = new mongoose.Schema(
 const stockReservationSchema = new mongoose.Schema(
   {
     intent: { type: mongoose.Schema.Types.ObjectId, required: true },
+    /**
+     * What this entry asserts about its checkout.
+     *
+     * `reserved` holds stock. `failed` holds nothing: it is the durable record
+     * that this checkout's reservation was refused, and it exists so that the
+     * refusal and a successful reservation compete for the SAME single-document
+     * predicate. Whoever pushes an entry for the intent first wins, and the
+     * loser's write matches nothing - which is the only way to make the two
+     * outcomes mutually exclusive without a transaction.
+     *
+     * Absent means `reserved`: entries written before this field existed only
+     * ever recorded live reservations.
+     */
+    state: {
+      type: String,
+      enum: RESERVATION_STATES_LIST,
+      default: RESERVATION_STATES.reserved
+    },
+    /** Set on a `failed` entry only, so a retry answers the same way. */
+    failureCode: { type: String, default: null },
     lines: {
       type: [
         new mongoose.Schema(
@@ -167,6 +192,12 @@ const businessSchema = new mongoose.Schema(
      * Entries are removed when the checkout finalizes or releases, so the set
      * only ever holds checkouts that are genuinely in flight. It is internal
      * and appears on no serializer.
+     *
+     * The array is also the arbiter between a successful reservation and a
+     * terminal reservation failure for the same checkout: both are a `$push`
+     * guarded by "no entry for this intent yet", so exactly one can land. A
+     * `failed` entry holds no stock, and is therefore ignored by the merchant
+     * inventory guard and by compensation.
      */
     stockReservations: {
       type: [stockReservationSchema],

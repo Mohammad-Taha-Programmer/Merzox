@@ -72,6 +72,14 @@ if (!environment.enabled) {
     confirmFinalization,
     confirmRelease
   } = await import('../../src/services/checkout-claim.service.js');
+  const {
+    RESERVATION_OUTCOMES,
+    attemptReservation,
+    claimReservationFailure,
+    reservationOutcome,
+    resolveReservationFailure,
+    withdrawReservationFailure
+  } = await import('../../src/services/checkout-reservation.service.js');
 
   const PASSWORD = 'IntegrationPass123';
   const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -3493,6 +3501,703 @@ if (!environment.enabled) {
       const body = JSON.stringify(placed.json);
       assert.equal(body.includes('finalization'), false);
       assert.equal(body.includes('claimToken'), false);
+    });
+
+    // ================================================================= R8 ===
+    // A checkout's RESERVATION outcome is exclusive too. A worker may not
+    // conclude "the stock is not there" from an earlier read: both the
+    // reservation and the terminal refusal are a `$push` guarded by the same
+    // "no entry for this intent yet" predicate, so exactly one can land.
+
+    /**
+     * A checkout parked at `prepared` with no reservation of any kind, and a
+     * fingerprint matching what the real endpoint derives - so the same key can
+     * be driven through the real controller afterwards.
+     */
+    async function pendingCheckout({ label, quantity, product }) {
+      const store = await seedStore(product, label);
+      const buyer = await seedAccount(`buyer-${label}`);
+      const key = `${stamp}-${label}`;
+      const productId = objectId(store.productId);
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: key,
+        businessId: store.businessId,
+        lines: [{ productId, quantity, finite: true }],
+        phase: 'prepared',
+        fingerprint: realFingerprint({
+          businessId: store.businessId,
+          productId: store.productId,
+          quantity
+        })
+      });
+
+      return { store, buyer, key, productId, intent, quantity };
+    }
+
+    /** Every entry recorded against a business, refusals included. */
+    async function reservationEntries(businessId) {
+      const stored = await Business.findById(objectId(businessId)).select(
+        '+stockReservations'
+      );
+      return (stored?.stockReservations ?? []).map((entry) => ({
+        intent: String(entry.intent),
+        state: entry.state,
+        failureCode: entry.failureCode ?? null,
+        lines: (entry.lines ?? []).length
+      }));
+    }
+
+    /**
+     * The forbidden state, asserted directly: a checkout that terminally failed
+     * while a live reservation for it still holds stock.
+     */
+    async function assertNoOrphanConsumption(staged, initialStock) {
+      const intent = await CheckoutIntent.findById(staged.intent._id);
+      const entries = await reservationEntries(staged.store.businessId);
+      const live = entries.filter(
+        (entry) =>
+          entry.intent === String(staged.intent._id) && entry.state !== 'failed'
+      );
+      const stock = await ownerStock(
+        staged.store.merchant.token,
+        staged.store.productId
+      );
+
+      assert.equal(
+        intent.phase === 'released' && live.length > 0,
+        false,
+        'FORBIDDEN: released intent with a live reservation'
+      );
+      assert.equal(
+        intent.phase === 'released' && stock !== initialStock,
+        false,
+        'FORBIDDEN: released intent with consumed stock'
+      );
+      return { intent, entries, live, stock };
+    }
+
+    // ---------------------------------------------------------------- Z01 ---
+    await t.test('Z01 terminal failure and reservation cannot both land', async () => {
+      const staged = await pendingCheckout({
+        label: 'z01',
+        quantity: 2,
+        product: { price: 20, unlimitedStock: false, stockQuantity: 1 }
+      });
+
+      // Worker A asks for 2 against a stock of 1 and is refused...
+      const aAttempt = await attemptReservation({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id,
+        lines: [{ productId: staged.productId, quantity: 2, finite: true }]
+      });
+      assert.equal(aAttempt.matched, false);
+
+      // ...and observes that nothing is recorded. THIS is the stale
+      // observation the old code used to act on several operations later.
+      const aObserved = await reservationOutcome({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id
+      });
+      assert.equal(aObserved.state, RESERVATION_OUTCOMES.open);
+
+      // A is paused here. The merchant restocks, and worker B - the same
+      // checkout, taken over after the convergence timeout - reserves.
+      const restock = await patchProduct(
+        staged.store.merchant.token,
+        staged.store.productId,
+        { stockQuantity: 5 }
+      );
+      assert.equal(restock.status, 200, `restock landed (${restock.code})`);
+
+      const bAttempt = await attemptReservation({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id,
+        lines: [{ productId: staged.productId, quantity: 2, finite: true }]
+      });
+      assert.equal(bAttempt.matched, true, 'B reserved');
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        3
+      );
+
+      // A now wakes up and tries to commit its terminal failure. It must lose.
+      const aClaim = await claimReservationFailure({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id,
+        failureCode: 'INSUFFICIENT_STOCK'
+      });
+      assert.equal(
+        aClaim.owned,
+        false,
+        'a terminal failure cannot be declared over a live reservation'
+      );
+
+      // And what it must do instead: converge on the reservation.
+      const settled = await reservationOutcome({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id
+      });
+      assert.equal(settled.state, RESERVATION_OUTCOMES.reserved);
+      assert.deepEqual(
+        settled.lines.map((line) => line.quantity),
+        [2]
+      );
+
+      const state = await assertNoOrphanConsumption(staged, 5);
+      assert.notEqual(state.intent.phase, 'released');
+      assert.equal(state.live.length, 1, 'exactly one live reservation');
+      assert.equal(state.stock, 3, 'consumed exactly once');
+
+      // The real endpoint then converges on that reservation and sells it.
+      const finished = await placeOrder(staged.buyer.token, {
+        ...staged.store,
+        clientOrderId: staged.key,
+        quantity: 2
+      });
+      assert.equal(finished.status, 201, `converged (${finished.code})`);
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        3,
+        'and did not consume a second time'
+      );
+      assert.deepEqual(await outstandingMarkers(staged.store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- Z02 ---
+    await t.test('Z02 a stale reserver is fenced out after the failure decision', async () => {
+      const staged = await pendingCheckout({
+        label: 'z02',
+        quantity: 2,
+        product: { price: 20, unlimitedStock: false, stockQuantity: 1 }
+      });
+
+      // Worker B has decided what it will reserve, but has not written yet.
+      const bLines = [{ productId: staged.productId, quantity: 2, finite: true }];
+
+      // Worker A wins the terminal failure first.
+      const aClaim = await claimReservationFailure({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id,
+        failureCode: 'INSUFFICIENT_STOCK'
+      });
+      assert.equal(aClaim.owned, true, 'A owns the refusal');
+      await CheckoutIntent.updateOne(
+        { _id: staged.intent._id, phase: { $in: ['prepared', 'reserved'] } },
+        { $set: { phase: 'released', failureCode: 'INSUFFICIENT_STOCK' } }
+      );
+
+      // The merchant even restocks, so the ONLY thing that can stop B is the
+      // fence itself - not a lack of inventory.
+      const restock = await patchProduct(
+        staged.store.merchant.token,
+        staged.store.productId,
+        { stockQuantity: 9 }
+      );
+      assert.equal(restock.status, 200, `restock landed (${restock.code})`);
+
+      // B finally writes. This is the fencing proof.
+      const bAttempt = await attemptReservation({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id,
+        lines: bLines
+      });
+
+      assert.equal(bAttempt.matched, false, 'B matched zero documents');
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        9,
+        'no decrement'
+      );
+
+      const entries = await reservationEntries(staged.store.businessId);
+      const mine = entries.filter(
+        (entry) => entry.intent === String(staged.intent._id)
+      );
+      assert.equal(mine.length, 1, 'exactly one recorded outcome');
+      assert.equal(mine[0].state, 'failed');
+      assert.equal(mine[0].lines, 0, 'a refusal holds nothing');
+      assert.equal(
+        (await CheckoutIntent.findById(staged.intent._id)).phase,
+        'released'
+      );
+
+      // A merchant is not frozen by a refusal record: it holds no stock.
+      assert.equal(restock.status, 200);
+
+      // And the sweep eventually clears the record without inventing stock.
+      await makeStale(staged.intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+      assert.deepEqual(await reservationEntries(staged.store.businessId), []);
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        9,
+        'clearing a refusal never refunds'
+      );
+    });
+
+    // ---------------------------------------------------------------- Z03 ---
+    await t.test('Z03 when the reservation wins first, the loser converges', async () => {
+      const staged = await pendingCheckout({
+        label: 'z03',
+        quantity: 2,
+        product: { price: 25, unlimitedStock: false, stockQuantity: 5 }
+      });
+
+      // B reserves successfully first.
+      await reserveThenCrash({
+        businessId: staged.store.businessId,
+        intentId: staged.intent._id,
+        lines: [{ productId: staged.productId, quantity: 2, finite: true }]
+      });
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        3
+      );
+
+      // A's failure path now runs through the REAL endpoint on the same key.
+      const attempt = await placeOrder(staged.buyer.token, {
+        ...staged.store,
+        clientOrderId: staged.key,
+        quantity: 2
+      });
+
+      assert.equal(attempt.status, 201, `A converged, not failed (${attempt.code})`);
+      assert.equal(attempt.json.data.order.items[0].unitPrice, 25);
+
+      const state = await assertNoOrphanConsumption(staged, 5);
+      assert.notEqual(state.intent.phase, 'released');
+      assert.equal(
+        state.stock,
+        3,
+        'the held reservation was sold, never consumed twice'
+      );
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        1
+      );
+      assert.deepEqual(await outstandingMarkers(staged.store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- Z04 ---
+    await t.test('Z04 a stock-mode re-evaluation cannot race a stale refusal', async () => {
+      const store = await seedStore({ price: 30, unlimitedStock: true }, 'z04');
+      const buyer = await seedAccount('buyer-z04');
+      const key = `${stamp}-z04`;
+      const productId = objectId(store.productId);
+
+      const intent = await seedIntent({
+        userId: buyer.userId,
+        clientOrderId: key,
+        businessId: store.businessId,
+        // The stale line, read while the product was still unlimited.
+        lines: [{ productId, quantity: 2, finite: false }],
+        phase: 'prepared',
+        fingerprint: realFingerprint({
+          businessId: store.businessId,
+          productId: store.productId,
+          quantity: 2
+        })
+      });
+      const staged = { store, buyer, key, productId, intent, quantity: 2 };
+
+      // The merchant converts the product to finite stock.
+      const converted = await patchProduct(store.merchant.token, store.productId, {
+        unlimitedStock: false,
+        stockQuantity: 5
+      });
+      assert.equal(converted.status, 200, `converted (${converted.code})`);
+
+      // Worker A's stale unlimited line can no longer reserve (R5/S01).
+      const stale = await attemptReservation({
+        businessId: objectId(store.businessId),
+        intentId: intent._id,
+        lines: [{ productId, quantity: 2, finite: false }]
+      });
+      assert.equal(stale.matched, false, 'a stale unlimited line reserves nothing');
+
+      // Worker B re-evaluates against the finite truth and reserves.
+      const reEvaluated = await attemptReservation({
+        businessId: objectId(store.businessId),
+        intentId: intent._id,
+        lines: [{ productId, quantity: 2, finite: true }]
+      });
+      assert.equal(reEvaluated.matched, true);
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+
+      // A, still holding its stale diagnosis, tries to fail terminally.
+      const aClaim = await claimReservationFailure({
+        businessId: objectId(store.businessId),
+        intentId: intent._id,
+        failureCode: 'PRODUCT_OUT_OF_STOCK'
+      });
+      assert.equal(aClaim.owned, false, 'the re-evaluated reservation already won');
+
+      const state = await assertNoOrphanConsumption(staged, 5);
+      assert.notEqual(state.intent.phase, 'released');
+      assert.equal(state.stock, 3);
+
+      // Recovery still compensates the ACTUAL finite consumption, not the
+      // stale `finite: false` line the intent was created with (R6/X01).
+      assert.deepEqual(await markerLines(store.businessId, intent._id), [
+        { productId: String(productId), quantity: 2 }
+      ]);
+      await makeStale(intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        5,
+        'restored exactly what was taken'
+      );
+    });
+
+    // ---------------------------------------------------------------- Z05 ---
+    await t.test('Z05 insufficient stock then a restock resolves to one outcome', async () => {
+      const staged = await pendingCheckout({
+        label: 'z05',
+        quantity: 2,
+        product: { price: 40, unlimitedStock: false, stockQuantity: 1 }
+      });
+
+      // A diagnoses insufficient stock and pauses before its decision.
+      const aAttempt = await attemptReservation({
+        businessId: objectId(staged.store.businessId),
+        intentId: staged.intent._id,
+        lines: [{ productId: staged.productId, quantity: 2, finite: true }]
+      });
+      assert.equal(aAttempt.matched, false);
+
+      // The merchant restocks, and B drives the SAME key through the real
+      // endpoint - which reserves and sells.
+      const restock = await patchProduct(
+        staged.store.merchant.token,
+        staged.store.productId,
+        { stockQuantity: 5 }
+      );
+      assert.equal(restock.status, 200, `restock landed (${restock.code})`);
+
+      const bResult = await placeOrder(staged.buyer.token, {
+        ...staged.store,
+        clientOrderId: staged.key,
+        quantity: 2
+      });
+      assert.equal(bResult.status, 201, `B sold it (${bResult.code})`);
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        3
+      );
+
+      // A resumes and drives its own terminal-failure path through the real
+      // endpoint. The checkout it wanted to fail has already been sold, so it
+      // must report the ORDER, not a stock error.
+      const aResult = await placeOrder(staged.buyer.token, {
+        ...staged.store,
+        clientOrderId: staged.key,
+        quantity: 2
+      });
+      assert.ok(
+        [200, 201].includes(aResult.status),
+        `a sold checkout is never failed retroactively (${aResult.code})`
+      );
+      assert.equal(
+        aResult.json.data.order.id,
+        bResult.json.data.order.id,
+        'both converge on the same physical order'
+      );
+
+      // And no refusal record survives for a checkout that succeeded.
+      const records = await reservationEntries(staged.store.businessId);
+      assert.deepEqual(
+        records.filter((entry) => entry.intent === String(staged.intent._id)),
+        [],
+        'no refusal record for a sold checkout'
+      );
+
+      const intent = await CheckoutIntent.findById(staged.intent._id);
+      assert.equal(intent.phase, 'finalized');
+      assert.equal(
+        await Order.countDocuments({ user: objectId(staged.buyer.userId) }),
+        1,
+        'exactly one order'
+      );
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        3,
+        'no orphan consumption'
+      );
+    });
+
+    // ---------------------------------------------------------------- Z06 ---
+    await t.test('Z06 recovery is unchanged, and an orphan now self-heals', async () => {
+      // Part 1: the exact R6/R7 state - prepared intent, successful marker and
+      // decrement, no customer retry. Recovery must be untouched by R8.
+      const staged = await pendingCheckout({
+        label: 'z06',
+        quantity: 2,
+        product: { price: 15, unlimitedStock: false, stockQuantity: 5 }
+      });
+      await reserveThenCrash({
+        businessId: staged.store.businessId,
+        intentId: staged.intent._id,
+        lines: [{ productId: staged.productId, quantity: 2, finite: true }]
+      });
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        3
+      );
+
+      await makeStale(staged.intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        5,
+        'authoritative-marker recovery still restores exactly'
+      );
+      assert.equal(
+        (await CheckoutIntent.findById(staged.intent._id)).phase,
+        'released'
+      );
+      assert.deepEqual(await reservationEntries(staged.store.businessId), []);
+
+      // Part 2: the state the OLD bug produced - a released intent standing
+      // against a live reservation. Before R8 the sweep never even looked at a
+      // released intent, so this leaked a unit of stock permanently.
+      const orphan = await pendingCheckout({
+        label: 'z06b',
+        quantity: 2,
+        product: { price: 15, unlimitedStock: false, stockQuantity: 5 }
+      });
+      await CheckoutIntent.updateOne(
+        { _id: orphan.intent._id },
+        { $set: { phase: 'released', failureCode: 'INSUFFICIENT_STOCK' } }
+      );
+      await reserveThenCrash({
+        businessId: orphan.store.businessId,
+        intentId: orphan.intent._id,
+        lines: [{ productId: orphan.productId, quantity: 2, finite: true }]
+      });
+      assert.equal(
+        await ownerStock(orphan.store.merchant.token, orphan.store.productId),
+        3,
+        'the orphan consumption exists'
+      );
+
+      await makeStale(orphan.intent._id);
+      const summary = await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      assert.ok(summary.inspected > 0, 'a released intent is no longer invisible');
+      assert.equal(
+        await ownerStock(orphan.store.merchant.token, orphan.store.productId),
+        5,
+        'the orphan consumption is given back'
+      );
+      assert.deepEqual(await reservationEntries(orphan.store.businessId), []);
+
+      // Idempotent: a second sweep invents nothing.
+      await makeStale(orphan.intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+      assert.equal(
+        await ownerStock(orphan.store.merchant.token, orphan.store.productId),
+        5
+      );
+    });
+
+    // ---------------------------------------------------------------- Z07 ---
+    await t.test('Z07 a refusal record blocks nothing a merchant may do', async () => {
+      const staged = await pendingCheckout({
+        label: 'z07',
+        quantity: 2,
+        product: { price: 20, unlimitedStock: false, stockQuantity: 4 }
+      });
+
+      // A LIVE reservation still freezes merchant inventory (M01 unchanged)...
+      await reserveThenCrash({
+        businessId: staged.store.businessId,
+        intentId: staged.intent._id,
+        lines: [{ productId: staged.productId, quantity: 2, finite: true }]
+      });
+      const blocked = await patchProduct(
+        staged.store.merchant.token,
+        staged.store.productId,
+        { stockQuantity: 50 }
+      );
+      assert.equal(blocked.status, 409, 'a live reservation still blocks');
+      assert.equal(blocked.code, 'PRODUCT_INVENTORY_RESERVED');
+
+      // ...and the response still leaks nothing.
+      const blockedBody = JSON.stringify(blocked.json);
+      assert.equal(blockedBody.includes('stockReservations'), false);
+      assert.equal(blockedBody.includes(String(staged.intent._id)), false);
+
+      // Clear it, then record a refusal for a DIFFERENT checkout instead.
+      await makeStale(staged.intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      const other = await seedIntent({
+        userId: staged.buyer.userId,
+        clientOrderId: `${staged.key}-b`,
+        businessId: staged.store.businessId,
+        lines: [{ productId: staged.productId, quantity: 99, finite: true }],
+        phase: 'prepared'
+      });
+      const refused = await claimReservationFailure({
+        businessId: objectId(staged.store.businessId),
+        intentId: other._id,
+        failureCode: 'INSUFFICIENT_STOCK'
+      });
+      assert.equal(refused.owned, true);
+
+      // A refusal holds no stock, so the merchant is free.
+      const allowed = await patchProduct(
+        staged.store.merchant.token,
+        staged.store.productId,
+        { stockQuantity: 50 }
+      );
+      assert.equal(
+        allowed.status,
+        200,
+        `a refusal record must not freeze inventory (${allowed.code})`
+      );
+      assert.equal(
+        await ownerStock(staged.store.merchant.token, staged.store.productId),
+        50
+      );
+
+      // And nothing about the record reaches any client.
+      const surfaces = [
+        await call('GET', '/api/v1/businesses/me/products', {
+          token: staged.store.merchant.token
+        }),
+        await call('GET', `/api/v1/businesses/${staged.store.businessId}`),
+        await call('GET', '/api/v1/businesses/me/orders', {
+          token: staged.store.merchant.token
+        })
+      ];
+      for (const surface of surfaces) {
+        const body = JSON.stringify(surface.json ?? {});
+        assert.equal(body.includes('stockReservations'), false);
+        assert.equal(body.includes(String(other._id)), false);
+        assert.equal(body.includes('failureCode'), false);
+      }
+    });
+
+    // ---------------------------------------------------------------- Z08 ---
+    await t.test('Z08 the terminal-failure decision is what production obeys', async () => {
+      // `resolveReservationFailure` is the single operation the checkout
+      // controller uses to decide a terminal reservation failure, so the whole
+      // guarantee can be driven deterministically here: inject the concurrent
+      // reservation at the exact instant the old code was vulnerable, and
+      // assert what the decision permits - not what the worker wanted.
+      const businessId = (staged) => objectId(staged.store.businessId);
+
+      // --- the outcome is still open: the refusal is granted ---------------
+      const open = await pendingCheckout({
+        label: 'z08a',
+        quantity: 2,
+        product: { price: 20, unlimitedStock: false, stockQuantity: 1 }
+      });
+      const granted = await resolveReservationFailure({
+        businessId: businessId(open),
+        intentId: open.intent._id,
+        failureCode: 'INSUFFICIENT_STOCK'
+      });
+      assert.equal(granted.owned, true, 'nothing else owns it, so it is granted');
+      assert.equal(granted.converge, null);
+      assert.equal(
+        await ownerStock(open.store.merchant.token, open.store.productId),
+        1,
+        'a refusal never touches stock'
+      );
+
+      // --- a reservation landed first: the refusal is REFUSED --------------
+      const raced = await pendingCheckout({
+        label: 'z08b',
+        quantity: 2,
+        product: { price: 20, unlimitedStock: false, stockQuantity: 5 }
+      });
+      const injected = await attemptReservation({
+        businessId: businessId(raced),
+        intentId: raced.intent._id,
+        lines: [{ productId: raced.productId, quantity: 2, finite: true }]
+      });
+      assert.equal(injected.matched, true, 'the concurrent worker reserved');
+
+      const refused = await resolveReservationFailure({
+        businessId: businessId(raced),
+        intentId: raced.intent._id,
+        failureCode: 'INSUFFICIENT_STOCK'
+      });
+      assert.equal(refused.owned, false, 'the refusal is NOT granted');
+      assert.equal(
+        refused.converge,
+        RESERVATION_OUTCOMES.reserved,
+        'and the worker is told to converge on the reservation'
+      );
+      assert.deepEqual(
+        refused.lines.map((line) => line.quantity),
+        [2],
+        'with the quantities that were actually consumed'
+      );
+      assert.equal(
+        (await CheckoutIntent.findById(raced.intent._id)).phase,
+        'prepared',
+        'no terminal state was written'
+      );
+      assert.equal(
+        await ownerStock(raced.store.merchant.token, raced.store.productId),
+        3,
+        'and the reservation still holds exactly what it took'
+      );
+
+      // --- a refusal landed first: converge on THAT refusal ----------------
+      const already = await pendingCheckout({
+        label: 'z08c',
+        quantity: 2,
+        product: { price: 20, unlimitedStock: false, stockQuantity: 1 }
+      });
+      await claimReservationFailure({
+        businessId: businessId(already),
+        intentId: already.intent._id,
+        failureCode: 'PRODUCT_OUT_OF_STOCK'
+      });
+      const second = await resolveReservationFailure({
+        businessId: businessId(already),
+        intentId: already.intent._id,
+        failureCode: 'INSUFFICIENT_STOCK'
+      });
+      assert.equal(second.owned, false, 'a refusal is decided once');
+      assert.equal(second.converge, RESERVATION_OUTCOMES.failed);
+      assert.equal(
+        second.failureCode,
+        'PRODUCT_OUT_OF_STOCK',
+        'and every later worker answers with the recorded reason'
+      );
+
+      // --- withdrawing a refusal can never remove a live reservation -------
+      await withdrawReservationFailure({
+        businessId: businessId(raced),
+        intentId: raced.intent._id
+      });
+      assert.equal(
+        await ownerStock(raced.store.merchant.token, raced.store.productId),
+        3,
+        'the live reservation survived a withdrawal aimed at a refusal'
+      );
+      const survivors = await reservationEntries(raced.store.businessId);
+      assert.equal(survivors.length, 1);
+      assert.equal(survivors[0].state, 'reserved');
+
+      await withdrawReservationFailure({
+        businessId: businessId(already),
+        intentId: already.intent._id
+      });
+      assert.deepEqual(
+        await reservationEntries(already.store.businessId),
+        [],
+        'but its own refusal is withdrawn'
+      );
     });
   });
 }

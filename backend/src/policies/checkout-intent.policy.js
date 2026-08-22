@@ -95,6 +95,114 @@ export function isLegalTransition(from, to) {
   return (CHECKOUT_TRANSITIONS[from] ?? []).includes(to);
 }
 
+/**
+ * What a Business-side reservation entry asserts, and how it may change.
+ *
+ * This is INTERNAL inventory bookkeeping. It is not a checkout phase and it is
+ * emphatically not a public order status: nothing here ever reaches a customer
+ * or a merchant.
+ *
+ * The two states are the two mutually exclusive outcomes of one checkout's
+ * reservation attempt:
+ *
+ *   reserved - stock was decremented for this intent, and the entry records
+ *              exactly what was taken so compensation cannot guess.
+ *   failed   - the reservation was refused terminally. The entry holds no
+ *              stock; it exists so the refusal is DURABLE and so any later
+ *              reservation write for the same intent matches nothing.
+ *
+ * Neither state may become the other. A checkout that reserved cannot retro-
+ * actively fail, and one that failed cannot retroactively reserve - the whole
+ * point of putting both in the same array is that the first `$push` wins.
+ */
+export const RESERVATION_STATES = Object.freeze({
+  reserved: 'reserved',
+  failed: 'failed'
+});
+
+export const RESERVATION_STATES_LIST = Object.freeze([
+  RESERVATION_STATES.reserved,
+  RESERVATION_STATES.failed
+]);
+
+/** No edges at all: an entry is created in its final state, or removed. */
+export const RESERVATION_TRANSITIONS = Object.freeze({
+  reserved: [],
+  failed: []
+});
+
+export function isLegalReservationTransition(from, to) {
+  return (RESERVATION_TRANSITIONS[from] ?? []).includes(to);
+}
+
+/**
+ * Whether an entry is holding stock.
+ *
+ * A missing `state` means `reserved`: entries written before the field existed
+ * only ever recorded live reservations, so the negation is on `failed` rather
+ * than an equality on `reserved`. Same shape as the `$ne: false` used for
+ * legacy `unlimitedStock`, and proven against a real server the same way.
+ */
+export function isLiveReservationEntry(entry) {
+  return Boolean(entry) && entry.state !== RESERVATION_STATES.failed;
+}
+
+/** The `$elemMatch` that selects only entries actually holding stock. */
+export const LIVE_RESERVATION_MATCH = Object.freeze({
+  state: { $ne: RESERVATION_STATES.failed }
+});
+
+/** Businesses with at least one entry holding stock. Legacy-safe. */
+export const HOLDS_LIVE_RESERVATION = Object.freeze({
+  stockReservations: { $elemMatch: LIVE_RESERVATION_MATCH }
+});
+
+/**
+ * The terminal reservation failure, as ONE atomic decision.
+ *
+ * A worker may not conclude "the stock is not there" from an earlier read: a
+ * concurrent worker on the same checkout can reserve between that read and the
+ * `released` write, leaving a released intent standing against a live
+ * reservation and permanently consumed stock. So the refusal is not a
+ * conclusion at all - it is a conditional write that competes for the SAME
+ * predicate the reservation competes for:
+ *
+ *   'stockReservations.intent': { $ne: intentId }
+ *
+ * Exactly one of the two `$push`es can match. Whoever lands first owns the
+ * checkout's reservation outcome, and the loser is told so by a matched count
+ * of zero - not by a later observation it might never make.
+ *
+ * The entry holds no lines, so it can never be mistaken for consumption.
+ */
+export function buildReservationFailure({ businessId, intentId, failureCode }) {
+  return {
+    filter: {
+      _id: businessId,
+      'stockReservations.intent': { $ne: intentId }
+    },
+    update: {
+      $push: {
+        stockReservations: {
+          intent: intentId,
+          state: RESERVATION_STATES.failed,
+          failureCode,
+          lines: []
+        }
+      }
+    }
+  };
+}
+
+/** The entry recorded for this intent, whatever it asserts. */
+export function reservationEntryOf(business, intentId) {
+  return (
+    (business?.stockReservations ?? []).find(
+      (entry) => String(entry.intent) === String(intentId)
+    ) ?? null
+  );
+}
+
 export const CHECKOUT_CLAIMS = {
   finalizing: 'finalizing',
   releasing: 'releasing'
@@ -198,7 +306,7 @@ export function classifyInventoryConflict({
   // Checked before the stock pair: an outstanding reservation is the more
   // actionable answer ("wait a moment"), and a settled one always moves the
   // pair too, so it would be reported as a change anyway.
-  if ((business.stockReservations ?? []).length > 0) {
+  if ((business.stockReservations ?? []).some(isLiveReservationEntry)) {
     return INVENTORY_CONFLICTS.reserved;
   }
 
@@ -272,11 +380,13 @@ export function isTerminal(phase) {
  *
  * Two predicates carry the guarantee:
  *
- *   1. `stockReservations.0` must not exist. The array holds OUTSTANDING
- *      reservations only, so an empty array (or an absent field on a legacy
- *      document) means no checkout is holding stock right now. This is a
- *      business-wide lock, which is deliberately blunter than a per-product one
- *      and correspondingly harder to get wrong.
+ *   1. no entry may be HOLDING stock. The array carries outstanding
+ *      reservations and terminal-failure records; only the former hold
+ *      anything, so the predicate is `$not: $elemMatch: {state: {$ne:
+ *      'failed'}}` - which an empty array, an absent field on a legacy
+ *      document, and an array of pure failure records all satisfy. This is a
+ *      business-wide lock, deliberately blunter than a per-product one and
+ *      correspondingly harder to get wrong.
  *   2. the stock pair must still be what the caller observed. `normalizeStock`
  *      may derive one half of the pair from the current value, so the write
  *      only applies if that current value has not moved underneath it.
@@ -327,7 +437,10 @@ export function buildAtomicInventoryUpdate({
     owner: ownerId,
     isActive: true,
     // The whole point: evaluated by MongoDB at write time, not by us earlier.
-    'stockReservations.0': { $exists: false },
+    // Only entries HOLDING stock block a merchant edit; a `failed` entry is a
+    // record that a checkout was refused and holds nothing, so it must not
+    // freeze the merchant's inventory until it is swept.
+    stockReservations: { $not: { $elemMatch: LIVE_RESERVATION_MATCH } },
     products: { $elemMatch: productMatch }
   };
 
@@ -368,6 +481,7 @@ export function buildAtomicInventoryUpdate({
 export function reservationEntryFor({ intentId, lines }) {
   return {
     intent: intentId,
+    state: RESERVATION_STATES.reserved,
     lines: lines
       .filter((line) => line.finite)
       .map((line) => ({
@@ -478,11 +592,11 @@ export function buildIdentifiedRelease({ businessId, intentId, lines }) {
  * written beside. `finite: true` because only finite lines are ever recorded.
  */
 export function reservedLinesFromMarker(business, intentId) {
-  const entry = (business?.stockReservations ?? []).find(
-    (marker) => String(marker.intent) === String(intentId)
-  );
+  const entry = reservationEntryOf(business, intentId);
 
-  if (!entry) return null;
+  // A `failed` entry is a durable refusal, not consumption. Treating it as a
+  // reservation would invent stock to give back.
+  if (!isLiveReservationEntry(entry)) return null;
 
   return (entry.lines ?? []).map((line) => ({
     productId: line.productId,

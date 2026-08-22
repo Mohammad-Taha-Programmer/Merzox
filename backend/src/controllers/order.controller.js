@@ -16,7 +16,6 @@ import {
   CONVERGENCE_ATTEMPTS,
   CONVERGENCE_INTERVAL_MS,
   IDEMPOTENCY_ERRORS,
-  buildIdentifiedReservation,
   buildReservationSettlement,
   checkoutFingerprint,
   isAbandoned,
@@ -35,6 +34,13 @@ import {
   claimFinalization,
   confirmFinalization
 } from '../services/checkout-claim.service.js';
+import {
+  RESERVATION_OUTCOMES,
+  attemptReservation,
+  reservationOutcome,
+  resolveReservationFailure,
+  withdrawReservationFailure
+} from '../services/checkout-reservation.service.js';
 import {
   notifyOrderCancelledByCustomer,
   notifyOrderPlaced
@@ -156,35 +162,56 @@ function orderResponse(res, order, { duplicated }) {
  */
 const RESERVE_ATTEMPTS = 2;
 
+/**
+ * Re-prices what a live reservation is actually holding.
+ *
+ * Used when this worker loses the failure claim to a concurrent worker on the
+ * SAME checkout: the basket is identical by fingerprint, so the held quantities
+ * are this checkout's quantities, and the order must be built from what was
+ * genuinely consumed rather than from what this worker had hoped to consume.
+ */
+function linesForHeldReservation({ business, held }) {
+  const resolved = resolveOrderLines({
+    products: business.products,
+    items: held.map((line) => ({
+      productId: String(line.productId),
+      quantity: line.quantity
+    }))
+  });
+
+  return resolved.error ? null : resolved.lines;
+}
+
 async function reserveStock({ intent, businessId, lines, normalizedItems }) {
   let attemptLines = lines;
 
   for (let attempt = 0; attempt < RESERVE_ATTEMPTS; attempt += 1) {
-    const reservation = buildIdentifiedReservation({
+    const reserved = await attemptReservation({
       businessId,
       intentId: intent._id,
       lines: attemptLines
     });
 
-    const result = await Business.updateOne(
-      reservation.filter,
-      reservation.update,
-      reservation.arrayFilters.length > 0
-        ? { arrayFilters: reservation.arrayFilters }
-        : undefined
-    );
+    if (reserved.matched) break;
 
-    if (result.matchedCount > 0) break;
-
-    const alreadyHeld = await Business.exists({
-      _id: businessId,
-      'stockReservations.intent': intent._id
+    // One read of the single fact that decides this checkout's reservation.
+    const outcome = await reservationOutcome({
+      businessId,
+      intentId: intent._id
     });
-    if (alreadyHeld) break;
 
-    // Nothing matched and nothing is held, so the product moved underneath us.
-    // Re-read the truth before deciding whether that is a refusal or simply a
-    // different - still purchasable - shape.
+    // This intent already holds the stock - a resumed attempt, not a refusal.
+    if (outcome.state === RESERVATION_OUTCOMES.reserved) break;
+
+    // A terminal refusal is already durable for this checkout. Answer the same
+    // way it did rather than re-deciding it.
+    if (outcome.state === RESERVATION_OUTCOMES.failed) {
+      throw checkoutFailure(outcome.failureCode ?? CHECKOUT_ERRORS.outOfStock);
+    }
+
+    // Nothing matched and nothing is recorded, so the product moved underneath
+    // us. Re-read the truth before deciding whether that is a refusal or simply
+    // a different - still purchasable - shape.
     const recheck = await Business.findOne({ _id: businessId, isActive: true });
     const diagnosis = recheck
       ? resolveOrderLines({ products: recheck.products, items: normalizedItems })
@@ -203,13 +230,67 @@ async function reserveStock({ intent, businessId, lines, normalizedItems }) {
 
     const code = diagnosis.error ?? CHECKOUT_ERRORS.outOfStock;
 
-    // Terminal, and there is nothing to give back: no marker means no
-    // decrement ever happened for this intent. Conditional on the phase, so a
-    // checkout another worker already owns is never overwritten.
-    await CheckoutIntent.updateOne(
+    // The refusal is a CLAIM, not a conclusion. Everything above is an
+    // observation that a concurrent worker on this same key could already have
+    // invalidated, so the right to fail terminally has to be won atomically -
+    // against the very predicate a reservation would have to win too.
+    const decision = await resolveReservationFailure({
+      businessId,
+      intentId: intent._id,
+      failureCode: code
+    });
+
+    if (decision.converge === RESERVATION_OUTCOMES.failed) {
+      throw checkoutFailure(decision.failureCode ?? code);
+    }
+
+    if (decision.converge === RESERVATION_OUTCOMES.reserved) {
+      // A concurrent worker reserved between this worker's attempt and its
+      // decision. Converging on that reservation is the only correct answer:
+      // writing `released` here would strand consumed stock behind a
+      // terminally failed checkout.
+      const holder = await Business.findOne({ _id: businessId });
+      const held = holder
+        ? linesForHeldReservation({ business: holder, held: decision.lines })
+        : null;
+
+      if (!held) {
+        // The reservation is real but cannot be priced from the catalog as it
+        // stands. Its owner is still driving this checkout, so the truthful
+        // answer is in-progress - never a terminal failure.
+        throw checkoutFailure(IDEMPOTENCY_ERRORS.inProgress);
+      }
+
+      attemptLines = held;
+      break;
+    }
+
+    if (!decision.owned) {
+      // An outcome exists that is neither of the two above. Unreachable by
+      // construction, and reported as in-progress so it can never become a
+      // false stock error.
+      throw checkoutFailure(IDEMPOTENCY_ERRORS.inProgress);
+    }
+
+    // Only now: the refusal is durable and no reservation for this intent can
+    // ever land. Conditional on the phase, so a checkout another worker already
+    // owns is never overwritten - and the result of that write is believed.
+    const released = await CheckoutIntent.updateOne(
       { _id: intent._id, phase: { $in: CLAIMABLE_PHASES } },
       { $set: { phase: 'released', failureCode: code } }
     );
+
+    if (released.matchedCount === 0) {
+      // The checkout left the failable phases while this worker was deciding -
+      // another worker reserved, sold and settled it, which is why the refusal
+      // record could be pushed at all. Withdraw the record, which holds no
+      // stock and is scoped to this intent's refusal so it can never remove a
+      // live reservation, and let the finalization step report the truth: a
+      // customer whose order exists must not be told the stock ran out.
+      await withdrawReservationFailure({ businessId, intentId: intent._id });
+
+      break;
+    }
 
     throw checkoutFailure(code);
   }

@@ -13,6 +13,8 @@ import {
   CHECKOUT_TRANSITIONS,
   CLAIM_ERRORS,
   FINALIZABLE_PHASES,
+  RESERVATION_STATES,
+  RESERVATION_TRANSITIONS,
   RECLAIMABLE_PHASES,
   CONVERGENCE_ATTEMPTS,
   CONVERGENCE_INTERVAL_MS,
@@ -20,7 +22,11 @@ import {
   INVENTORY_CONFLICTS,
   INVENTORY_ERRORS,
   buildAtomicInventoryUpdate,
+  buildReservationFailure,
   classifyInventoryConflict,
+  isLiveReservationEntry,
+  isLegalReservationTransition,
+  reservedLinesFromMarker,
   buildIdentifiedRelease,
   buildIdentifiedReservation,
   buildReservationSettlement,
@@ -225,6 +231,154 @@ test('the checkout decision is monotonic', () => {
     assert.ok(checkoutPhases.includes(from), from);
     for (const to of targets) assert.ok(checkoutPhases.includes(to), to);
   }
+});
+
+test('a reservation outcome is decided once and never rewritten', () => {
+  assert.deepEqual(Object.keys(RESERVATION_TRANSITIONS).sort(), [
+    'failed',
+    'reserved'
+  ]);
+  // No edges in either direction: an entry is created in its final state, or
+  // removed. A checkout that reserved cannot retroactively fail, and one that
+  // failed cannot retroactively reserve.
+  assert.equal(isLegalReservationTransition('reserved', 'failed'), false);
+  assert.equal(isLegalReservationTransition('failed', 'reserved'), false);
+  assert.deepEqual(RESERVATION_TRANSITIONS.reserved, []);
+  assert.deepEqual(RESERVATION_TRANSITIONS.failed, []);
+});
+
+test('a reservation state is internal and is not a checkout phase or a status', () => {
+  const publicStatuses = [
+    'pending',
+    'confirmed',
+    'preparing',
+    'outForDelivery',
+    'delivered',
+    'cancelled'
+  ];
+
+  // `reserved` deliberately reads the same as the checkout phase of the same
+  // name - both mean "stock is held for this checkout" - but they are fields on
+  // different documents and no code path assigns one to the other. What must
+  // never happen is either of them reaching a customer.
+  for (const state of Object.values(RESERVATION_STATES)) {
+    assert.equal(publicStatuses.includes(state), false, state);
+    assert.equal(
+      Order.schema.path('status').enumValues.includes(state),
+      false,
+      state
+    );
+  }
+  // And it lives on the Business, never on anything a client is handed.
+  assert.equal(Order.schema.path('reservationState'), undefined);
+  assert.equal(Order.schema.path('stockReservations'), undefined);
+});
+
+test('a missing reservation state means the entry is holding stock', () => {
+  // Entries written before the field existed only ever recorded live
+  // reservations, so the test is a negation on `failed` - never an equality on
+  // `reserved`, which would silently ignore every legacy entry and let a
+  // merchant edit inventory a checkout is holding.
+  assert.equal(isLiveReservationEntry({ intent: 'x' }), true);
+  assert.equal(isLiveReservationEntry({ intent: 'x', state: undefined }), true);
+  assert.equal(isLiveReservationEntry({ intent: 'x', state: null }), true);
+  assert.equal(isLiveReservationEntry({ intent: 'x', state: 'reserved' }), true);
+  assert.equal(isLiveReservationEntry({ intent: 'x', state: 'failed' }), false);
+  assert.equal(isLiveReservationEntry(null), false);
+});
+
+test('a terminal reservation failure competes for the reservation predicate', () => {
+  const businessId = new mongoose.Types.ObjectId();
+  const intentId = new mongoose.Types.ObjectId();
+  const productId = new mongoose.Types.ObjectId();
+
+  const failure = buildReservationFailure({
+    businessId,
+    intentId,
+    failureCode: 'INSUFFICIENT_STOCK'
+  });
+  const reservation = buildIdentifiedReservation({
+    businessId,
+    intentId,
+    lines: [{ productId, quantity: 2, finite: true }]
+  });
+
+  // THE point of the design: both are a push into the same array, guarded by
+  // the same predicate on the same document, so exactly one can land.
+  assert.deepEqual(failure.filter['stockReservations.intent'], { $ne: intentId });
+  assert.deepEqual(reservation.filter['stockReservations.intent'], {
+    $ne: intentId
+  });
+  assert.ok(failure.update.$push.stockReservations);
+  assert.ok(reservation.update.$push.stockReservations);
+
+  // A refusal holds nothing and can never be read as consumption.
+  const entry = failure.update.$push.stockReservations;
+  assert.equal(entry.state, RESERVATION_STATES.failed);
+  assert.deepEqual(entry.lines, []);
+  assert.equal(entry.failureCode, 'INSUFFICIENT_STOCK');
+  assert.equal(failure.update.$inc, undefined, 'a refusal never touches stock');
+
+  // And the reservation still records what it actually took.
+  assert.equal(
+    reservation.update.$push.stockReservations.state,
+    RESERVATION_STATES.reserved
+  );
+});
+
+test('a refusal record is never compensated as if it were stock', () => {
+  const intentId = new mongoose.Types.ObjectId();
+  const productId = new mongoose.Types.ObjectId();
+
+  const refused = {
+    stockReservations: [
+      { intent: intentId, state: 'failed', failureCode: 'INSUFFICIENT_STOCK', lines: [] }
+    ]
+  };
+  assert.equal(reservedLinesFromMarker(refused, intentId), null);
+
+  // A live entry is still authoritative, exactly as R6 left it.
+  const held = {
+    stockReservations: [
+      { intent: intentId, state: 'reserved', lines: [{ productId, quantity: 2 }] }
+    ]
+  };
+  assert.deepEqual(reservedLinesFromMarker(held, intentId), [
+    { productId, quantity: 2, finite: true }
+  ]);
+
+  // A legacy entry with no state at all is still a live reservation.
+  const legacy = {
+    stockReservations: [{ intent: intentId, lines: [{ productId, quantity: 3 }] }]
+  };
+  assert.deepEqual(reservedLinesFromMarker(legacy, intentId), [
+    { productId, quantity: 3, finite: true }
+  ]);
+});
+
+test('a refusal record is not reported to a merchant as a reservation', () => {
+  const business = {
+    isActive: true,
+    stockReservations: [{ intent: new mongoose.Types.ObjectId(), state: 'failed', lines: [] }]
+  };
+  const product = { _id: new mongoose.Types.ObjectId(), unlimitedStock: false, stockQuantity: 4 };
+
+  // It holds no stock, so the honest answer is the compare-and-set, not
+  // "somebody is holding your inventory".
+  assert.equal(
+    classifyInventoryConflict({ business, product, observedStock: { unlimitedStock: false, stockQuantity: 9 } }),
+    INVENTORY_CONFLICTS.stockChanged
+  );
+
+  // A live one is still reported as a reservation.
+  const holding = {
+    isActive: true,
+    stockReservations: [{ intent: new mongoose.Types.ObjectId(), state: 'reserved', lines: [] }]
+  };
+  assert.equal(
+    classifyInventoryConflict({ business: holding, product, observedStock: { unlimitedStock: false, stockQuantity: 4 } }),
+    INVENTORY_CONFLICTS.reserved
+  );
 });
 
 test('a releasing checkout can never be adopted onto an order', () => {
@@ -507,7 +661,12 @@ test('the merchant inventory write carries its own reservation predicate', () =>
 
   // The whole point of R3: reservation absence is evaluated by MongoDB at
   // write time, in the same operation that changes the stock.
-  assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
+  // Only entries HOLDING stock block the write. A terminal-failure record
+  // holds nothing, so it must not freeze a merchant's inventory.
+  assert.deepEqual(atomic.filter.stockReservations, {
+    $not: { $elemMatch: { state: { $ne: 'failed' } } }
+  });
+  assert.equal(atomic.filter['stockReservations.0'], undefined);
   assert.equal(atomic.update.$set['products.$[product].stockQuantity'], 10);
   assert.equal(atomic.update.$set['products.$[product].unlimitedStock'], false);
 
@@ -541,7 +700,12 @@ test('a mixed payload is one write, so it cannot half-apply', () => {
     'products.$[product].stockQuantity'
   ]);
   assert.equal(Object.keys(atomic.update).length, 1, 'a single $set operator');
-  assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
+  // Only entries HOLDING stock block the write. A terminal-failure record
+  // holds nothing, so it must not freeze a merchant's inventory.
+  assert.deepEqual(atomic.filter.stockReservations, {
+    $not: { $elemMatch: { state: { $ne: 'failed' } } }
+  });
+  assert.equal(atomic.filter['stockReservations.0'], undefined);
 });
 
 test('an unlimited observation asserts only the mode, not a phantom quantity', () => {
@@ -564,7 +728,12 @@ test('an unlimited observation asserts only the mode, not a phantom quantity', (
     'a quantity is meaningless while unlimited'
   );
   // The reservation guard is never optional.
-  assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
+  // Only entries HOLDING stock block the write. A terminal-failure record
+  // holds nothing, so it must not freeze a merchant's inventory.
+  assert.deepEqual(atomic.filter.stockReservations, {
+    $not: { $elemMatch: { state: { $ne: 'failed' } } }
+  });
+  assert.equal(atomic.filter['stockReservations.0'], undefined);
 });
 
 test('a finite observation still asserts the exact pair', () => {
@@ -594,7 +763,12 @@ test('a legacy product without a stock pair is not refused on a phantom field', 
   assert.equal(atomic.filter.products.$elemMatch.stockQuantity, undefined);
   assert.equal(atomic.filter.products.$elemMatch.unlimitedStock, undefined);
   // ...but the reservation guard is never optional.
-  assert.deepEqual(atomic.filter['stockReservations.0'], { $exists: false });
+  // Only entries HOLDING stock block the write. A terminal-failure record
+  // holds nothing, so it must not freeze a merchant's inventory.
+  assert.deepEqual(atomic.filter.stockReservations, {
+    $not: { $elemMatch: { state: { $ne: 'failed' } } }
+  });
+  assert.equal(atomic.filter['stockReservations.0'], undefined);
 });
 
 test('the merchant conflict codes are stable and distinct', () => {
