@@ -34,6 +34,47 @@ export function isAbandoned(intent, now) {
   return now - new Date(touched).getTime() > ABANDONED_AFTER_MS;
 }
 
+/**
+ * How long a non-terminal checkout may go untouched before the autonomous
+ * reconciler presumes its client is never coming back.
+ *
+ * This is NOT the request-path convergence wait above. That one is short
+ * because a person is waiting on an HTTP response; this one is long because
+ * taking over a checkout that is merely slow would be worse than waiting.
+ */
+export const CHECKOUT_STALE_LEASE_MS = 2 * 60 * 1000;
+
+/** How often the background sweep runs. Bounded, and never a tight loop. */
+export const RECONCILE_INTERVAL_MS = 60 * 1000;
+
+/** The most intents one sweep will touch, so a backlog cannot stall a process. */
+export const RECONCILE_BATCH_LIMIT = 200;
+
+export const INVENTORY_ERRORS = {
+  /**
+   * A merchant tried to rewrite stock while a checkout still holds some of it.
+   * Refused rather than merged: the outstanding reservation will be released or
+   * settled within the lease above, and the edit succeeds on retry.
+   */
+  reserved: 'PRODUCT_INVENTORY_RESERVED'
+};
+
+/**
+ * The intents that currently hold inventory for one product.
+ *
+ * Scoped to reservations the business still lists as outstanding, so a settled
+ * or released checkout never blocks a merchant. `$elemMatch` matters: the line
+ * must be BOTH this product and finite, not two different lines that happen to
+ * satisfy one condition each.
+ */
+export function outstandingReservationFilter({ outstandingIds, productId }) {
+  return {
+    _id: { $in: outstandingIds },
+    phase: { $in: ['prepared', 'reserved'] },
+    lines: { $elemMatch: { productId, finite: true } }
+  };
+}
+
 export const IDEMPOTENCY_ERRORS = {
   keyReused: 'IDEMPOTENCY_KEY_REUSED',
   inProgress: 'CHECKOUT_IN_PROGRESS'

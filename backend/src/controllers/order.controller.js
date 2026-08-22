@@ -191,6 +191,23 @@ async function reserveStock({ intent, businessId, lines, normalizedItems }) {
 }
 
 /**
+ * Retires a settled reservation.
+ *
+ * A pull with NO increment: once an order exists the stock belongs to it, so
+ * this is bookkeeping, not a refund. Distinct from `releaseStock` on purpose -
+ * the two must never be confused. Idempotent: with the marker already gone the
+ * filter simply matches nothing.
+ */
+async function settleReservation({ intent, businessId }) {
+  const settlement = buildReservationSettlement({
+    businessId,
+    intentId: intent._id
+  });
+
+  await Business.updateOne(settlement.filter, settlement.update);
+}
+
+/**
  * Gives a reservation back, exactly once.
  *
  * The filter requires the marker to still be present, so a second release
@@ -242,17 +259,13 @@ async function finalizeCheckout({ intent, businessId, lines, orderDraft }) {
     }
   }
 
-  // From here the reservation is permanent: the quantity is NOT returned, only
-  // the outstanding-reservation marker is cleared.
+  // The intent records the durable order FIRST, so a crash before the marker
+  // comes off is recoverable rather than ambiguous.
   await CheckoutIntent.updateOne(
     { _id: intent._id, phase: { $in: ['prepared', 'reserved'] } },
     { $set: { phase: 'finalized', order: order._id, failureCode: null } }
   );
-  const settlement = buildReservationSettlement({
-    businessId,
-    intentId: intent._id
-  });
-  await Business.updateOne(settlement.filter, settlement.update);
+  await settleReservation({ intent, businessId });
 
   return order;
 }
@@ -369,7 +382,15 @@ export const createOrder = asyncHandler(async (req, res) => {
       ? await Order.findById(intent.order)
       : await findExistingOrder(req.user._id, clientOrderId);
 
-    if (existing) return orderResponse(res, existing, { duplicated: true });
+    if (existing) {
+      // CRASH-FINAL-01: the order and the intent are durable, but the process
+      // may have died before the marker came off. Clearing it here is a pull
+      // with no increment, so it can never give back stock the order owns, and
+      // it is idempotent when the marker is already gone.
+      await settleReservation({ intent, businessId: business._id });
+
+      return orderResponse(res, existing, { duplicated: true });
+    }
   }
 
   // A checkout that already failed terminally answers the same way every time,

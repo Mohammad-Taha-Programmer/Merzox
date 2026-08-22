@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import mongoose from 'mongoose';
 
 import { Business } from '../models/Business.js';
+import { CheckoutIntent } from '../models/CheckoutIntent.js';
 import { Order } from '../models/Order.js';
 import { User } from '../models/User.js';
 import {
@@ -12,6 +13,10 @@ import {
   orderStatuses as policyStatuses,
   statusGroupFor
 } from '../policies/order-status.policy.js';
+import {
+  INVENTORY_ERRORS,
+  outstandingReservationFilter
+} from '../policies/checkout-intent.policy.js';
 import { buildProductWrite } from '../policies/product.policy.js';
 import { paginationParams } from '../policies/query.policy.js';
 import { notifyOrderStatus } from '../services/notification.service.js';
@@ -254,11 +259,54 @@ export const createMyBusinessProduct = asyncHandler(async (req, res) => {
   });
 });
 
+/** Whether this request is trying to rewrite the product's stock at all. */
+function touchesInventory(body) {
+  return body.stockQuantity !== undefined || body.unlimitedStock !== undefined;
+}
+
+/**
+ * Refuses a stock rewrite while a checkout still holds some of that stock.
+ *
+ * Without this, a merchant setting stock to 10 while 2 units are reserved would
+ * later have those 2 handed back on top of the new figure - the release would
+ * turn their intended 10 into 12. Nothing merges the two decisions sensibly, so
+ * the edit is refused for the short life of the reservation instead.
+ *
+ * Only inventory fields are blocked. Name, description, price, discount,
+ * images, keywords and activation stay editable throughout, because none of
+ * them can be corrupted by a release.
+ */
+async function refuseIfInventoryReserved(business, productId) {
+  const holder = await Business.findById(business._id).select(
+    '+stockReservations'
+  );
+  const outstandingIds = holder?.stockReservations ?? [];
+  if (outstandingIds.length === 0) return;
+
+  const blocking = await CheckoutIntent.exists(
+    outstandingReservationFilter({ outstandingIds, productId })
+  );
+
+  if (blocking) {
+    // No reservation id is disclosed: a merchant is told that stock is in use,
+    // not who is buying it.
+    throw new AppError(
+      'This product has stock reserved by a checkout in progress, please retry shortly',
+      409,
+      INVENTORY_ERRORS.reserved
+    );
+  }
+}
+
 export const updateMyBusinessProduct = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);
   const product = business.products.id(req.params.productId);
   if (!product) {
     throw new AppError('Product not found', 404, 'PRODUCT_NOT_FOUND');
+  }
+
+  if (touchesInventory(req.body)) {
+    await refuseIfInventoryReserved(business, product._id);
   }
 
   const write = buildProductWrite(req.body, {

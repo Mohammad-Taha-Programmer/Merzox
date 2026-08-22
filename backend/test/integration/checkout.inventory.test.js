@@ -51,6 +51,9 @@ if (!environment.enabled) {
     buildIdentifiedRelease,
     buildIdentifiedReservation
   } = await import('../../src/policies/checkout-intent.policy.js');
+  const { reconcileIntent, reconcileStaleCheckouts } = await import(
+    '../../src/services/checkout-reconciler.service.js'
+  );
 
   const PASSWORD = 'IntegrationPass123';
   const stamp = `${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -798,6 +801,560 @@ if (!environment.enabled) {
         15,
         'and consume nothing extra'
       );
+    });
+
+    // ================================================================= R2 ===
+    // Reservation lifecycle: merchant edits, finalized-marker cleanup, and
+    // autonomous recovery for a client that never comes back.
+
+    function patchProduct(token, productId, body) {
+      return call('PATCH', `/api/v1/businesses/me/products/${productId}`, {
+        token,
+        body
+      });
+    }
+
+    async function outstandingMarkers(businessId) {
+      const stored = await Business.findById(objectId(businessId)).select(
+        '+stockReservations'
+      );
+      return (stored?.stockReservations ?? []).map(String);
+    }
+
+    /** Ages an intent so the reconciler treats it as abandoned. */
+    async function makeStale(intentId, minutes = 30) {
+      await CheckoutIntent.collection.updateOne(
+        { _id: objectId(intentId) },
+        { $set: { updatedAt: new Date(Date.now() - minutes * 60 * 1000) } }
+      );
+    }
+
+    // ---------------------------------------------------------------- M01 ---
+    await t.test('M01 a stock rewrite is refused while stock is reserved', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'm01'
+      );
+      const buyer = await seedAccount('buyer-m01');
+      const key = `${stamp}-m01`;
+
+      // Reserve 2 and stop before finalization, exactly as an in-flight
+      // checkout would leave it.
+      const first = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+      assert.equal(first.status, 201);
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      await Order.deleteOne({ _id: intent.order });
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'reserved', order: null } }
+      );
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+
+      const rewrite = await patchProduct(store.merchant.token, store.productId, {
+        stockQuantity: 10
+      });
+
+      assert.equal(rewrite.status, 409);
+      assert.equal(rewrite.code, 'PRODUCT_INVENTORY_RESERVED');
+      assert.equal(
+        JSON.stringify(rewrite.json).includes(String(intent._id)),
+        false,
+        'the reservation id must not be disclosed to the merchant'
+      );
+
+      // The stock the merchant tried to set never landed, so the later release
+      // cannot turn an intended 10 into 12.
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+      await reconcileIntent(await CheckoutIntent.findById(intent._id));
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        5,
+        'the release restores the original figure, not a corrupted one'
+      );
+    });
+
+    // ---------------------------------------------------------------- M02 ---
+    await t.test('M02 an unlimited toggle is refused while stock is reserved', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 4 },
+        'm02'
+      );
+      const buyer = await seedAccount('buyer-m02');
+      const key = `${stamp}-m02`;
+
+      const first = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 1
+      });
+      assert.equal(first.status, 201);
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      await Order.deleteOne({ _id: intent.order });
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'reserved', order: null } }
+      );
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+
+      const toggle = await patchProduct(store.merchant.token, store.productId, {
+        unlimitedStock: true
+      });
+
+      assert.equal(toggle.status, 409);
+      assert.equal(toggle.code, 'PRODUCT_INVENTORY_RESERVED');
+
+      const stored = await Business.findById(objectId(store.businessId));
+      const product = stored.products.find(
+        (entry) => entry._id.toString() === store.productId
+      );
+      assert.equal(product.unlimitedStock, false, 'the toggle did not land');
+      assert.equal(product.stockQuantity, 3, 'and no hidden stock was stranded');
+    });
+
+    // ---------------------------------------------------------------- M03 ---
+    await t.test('M03 a non-inventory edit still succeeds while reserved', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 4 },
+        'm03'
+      );
+      const buyer = await seedAccount('buyer-m03');
+      const key = `${stamp}-m03`;
+
+      const first = await placeOrder(buyer.token, { ...store, clientOrderId: key });
+      assert.equal(first.status, 201);
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'reserved', order: null } }
+      );
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+
+      // None of these can be corrupted by a release, so none of them is blocked.
+      const edit = await patchProduct(store.merchant.token, store.productId, {
+        description: 'وصف محدث أثناء الحجز',
+        price: 33,
+        discountPercent: 10
+      });
+
+      assert.equal(edit.status, 200, `expected a plain edit to pass (${edit.code})`);
+      assert.equal(edit.json.data.product.price, 33);
+      assert.equal(edit.json.data.product.discountPercent, 10);
+    });
+
+    // ----------------------------------------------------------- M04 / M05 ---
+    await t.test('M04/M05 inventory edits work again once settled', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 6 },
+        'm04'
+      );
+      const buyer = await seedAccount('buyer-m04');
+
+      // M04 - a finalized checkout leaves nothing outstanding.
+      const finalized = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: `${stamp}-m04`,
+        quantity: 1
+      });
+      assert.equal(finalized.status, 201);
+      assert.deepEqual(
+        await outstandingMarkers(store.businessId),
+        [],
+        'a finalized checkout holds nothing'
+      );
+
+      const afterFinalized = await patchProduct(
+        store.merchant.token,
+        store.productId,
+        { stockQuantity: 12 }
+      );
+      assert.equal(afterFinalized.status, 200);
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 12);
+
+      // M05 - a released checkout likewise.
+      const buyerTwo = await seedAccount('buyer-m05');
+      const releasedKey = `${stamp}-m05`;
+      const placed = await placeOrder(buyerTwo.token, {
+        ...store,
+        clientOrderId: releasedKey,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyerTwo.userId),
+        clientOrderId: releasedKey
+      });
+      await Order.deleteOne({ _id: intent.order });
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'reserved', order: null } }
+      );
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+      await reconcileIntent(await CheckoutIntent.findById(intent._id));
+
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+      const afterReleased = await patchProduct(
+        store.merchant.token,
+        store.productId,
+        { stockQuantity: 7 }
+      );
+      assert.equal(afterReleased.status, 200);
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 7);
+    });
+
+    // -------------------------------------------------------- CRASH-FINAL ---
+    await t.test('CRASH-FINAL-01 a lingering finalized marker is cleaned', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'cf01'
+      );
+      const buyer = await seedAccount('buyer-crashfinal');
+      const key = `${stamp}-cf01`;
+
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+      const orderId = placed.json.data.order.id;
+      const stockAfter = await ownerStock(store.merchant.token, store.productId);
+      assert.equal(stockAfter, 3);
+
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      assert.equal(intent.phase, 'finalized');
+
+      // The exact state a crash between finalization and cleanup leaves.
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), [
+        String(intent._id)
+      ]);
+
+      // A same-key retry both returns the order and clears the stale marker.
+      const retry = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+
+      assert.equal(retry.status, 200);
+      assert.equal(retry.json.data.order.id, orderId, 'the same order');
+      assert.deepEqual(
+        await outstandingMarkers(store.businessId),
+        [],
+        'the stale marker is gone'
+      );
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        stockAfter,
+        'and no stock was returned'
+      );
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 1);
+    });
+
+    // ---------------------------------------------------------------- M06 ---
+    await t.test('M06 markers do not accumulate over many checkouts', async () => {
+      const store = await seedStore(
+        { price: 5, unlimitedStock: false, stockQuantity: 100 },
+        'm06'
+      );
+      const buyer = await seedAccount('buyer-m06');
+
+      for (let index = 0; index < 20; index += 1) {
+        const response = await placeOrder(buyer.token, {
+          ...store,
+          clientOrderId: `${stamp}-m06-${index}`,
+          quantity: (index % 3) + 1
+        });
+        assert.equal(response.status, 201, `checkout ${index} should succeed`);
+
+        assert.deepEqual(
+          await outstandingMarkers(store.businessId),
+          [],
+          `no marker may survive checkout ${index}`
+        );
+      }
+
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 20);
+      // 20 checkouts of 1..3 units, cycling: 1+2+3 repeated.
+      const consumed = Array.from({ length: 20 }, (_, i) => (i % 3) + 1).reduce(
+        (sum, q) => sum + q,
+        0
+      );
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        100 - consumed
+      );
+    });
+
+    // ---------------------------------------------------------------- R01 ---
+    await t.test('R01 a stale PREPARED intent is settled without a retry', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'r01'
+      );
+      const buyer = await seedAccount('buyer-r01');
+
+      // Nothing was ever reserved: no marker, no order.
+      const intent = await CheckoutIntent.create({
+        user: objectId(buyer.userId),
+        clientOrderId: `${stamp}-r01`,
+        fingerprint: 'stale-prepared',
+        business: objectId(store.businessId),
+        phase: 'prepared',
+        lines: [{ productId: objectId(store.productId), quantity: 2, finite: true }]
+      });
+      await makeStale(intent._id);
+
+      const summary = await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      const settled = await CheckoutIntent.findById(intent._id);
+      assert.equal(settled.phase, 'released');
+      assert.equal(settled.failureCode, 'CHECKOUT_ABANDONED');
+      assert.ok(summary.released >= 1);
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        5,
+        'nothing was consumed, so nothing changes'
+      );
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 0);
+    });
+
+    // ---------------------------------------------------------------- R02 ---
+    await t.test('R02 a stale RESERVED intent gives its stock back', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'r02'
+      );
+      const buyer = await seedAccount('buyer-r02');
+      const key = `${stamp}-r02`;
+
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      // The customer's app closed before the order was written.
+      await Order.deleteOne({ _id: intent.order });
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'reserved', order: null } }
+      );
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+      await makeStale(intent._id);
+      assert.equal(await ownerStock(store.merchant.token, store.productId), 3);
+
+      // No same-key retry happens. The reconciler acts on its own.
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      const settled = await CheckoutIntent.findById(intent._id);
+      assert.equal(settled.phase, 'released');
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        5,
+        'the held stock is back on sale'
+      );
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 0);
+    });
+
+    // ---------------------------------------------------------------- R03 ---
+    await t.test('R03 a stale RESERVED intent whose order exists converges', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'r03'
+      );
+      const buyer = await seedAccount('buyer-r03');
+      const key = `${stamp}-r03`;
+
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+      const orderId = placed.json.data.order.id;
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+
+      // The order is durable but the intent never recorded it.
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'reserved', order: null } }
+      );
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+      await makeStale(intent._id);
+
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      const settled = await CheckoutIntent.findById(intent._id);
+      assert.equal(settled.phase, 'finalized');
+      assert.equal(String(settled.order), orderId);
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        3,
+        'the sold stock stays sold'
+      );
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 1);
+    });
+
+    // ---------------------------------------------------------------- R04 ---
+    await t.test('R04 a lingering finalized marker is cleaned, not refunded', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'r04'
+      );
+      const buyer = await seedAccount('buyer-r04');
+      const key = `${stamp}-r04`;
+
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+      await makeStale(intent._id);
+
+      const summary = await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      assert.ok(summary.markerCleaned >= 1);
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        3,
+        'cleanup must NOT restore stock'
+      );
+    });
+
+    // ---------------------------------------------------------------- R05 ---
+    await t.test('R05 reconciliation is idempotent', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 6 },
+        'r05'
+      );
+      const buyer = await seedAccount('buyer-r05');
+      const key = `${stamp}-r05`;
+
+      const placed = await placeOrder(buyer.token, {
+        ...store,
+        clientOrderId: key,
+        quantity: 2
+      });
+      assert.equal(placed.status, 201);
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+      await Order.deleteOne({ _id: intent.order });
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        { $set: { phase: 'reserved', order: null } }
+      );
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+      await makeStale(intent._id);
+
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+      const afterFirst = await ownerStock(store.merchant.token, store.productId);
+      assert.equal(afterFirst, 6);
+
+      // Age it again so the second sweep genuinely reconsiders it.
+      await makeStale(intent._id);
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      assert.equal(
+        await ownerStock(store.merchant.token, store.productId),
+        afterFirst,
+        'a second pass must not over-increment'
+      );
+      assert.equal(await Order.countDocuments({ user: objectId(buyer.userId) }), 0);
+      assert.deepEqual(await outstandingMarkers(store.businessId), []);
+    });
+
+    // ---------------------------------------------------------------- R06 ---
+    await t.test('R06 a fresh in-flight intent is left alone', async () => {
+      const store = await seedStore(
+        { price: 20, unlimitedStock: false, stockQuantity: 5 },
+        'r06'
+      );
+      const buyer = await seedAccount('buyer-r06');
+
+      // Created just now: a checkout that is still legitimately in progress.
+      const intent = await CheckoutIntent.create({
+        user: objectId(buyer.userId),
+        clientOrderId: `${stamp}-r06`,
+        fingerprint: 'fresh-intent',
+        business: objectId(store.businessId),
+        phase: 'reserved',
+        lines: [{ productId: objectId(store.productId), quantity: 2, finite: true }]
+      });
+      await Business.updateOne(
+        { _id: objectId(store.businessId) },
+        { $addToSet: { stockReservations: intent._id } }
+      );
+
+      await reconcileStaleCheckouts({ staleAfterMs: 60 * 1000 });
+
+      const untouched = await CheckoutIntent.findById(intent._id);
+      assert.equal(untouched.phase, 'reserved', 'a live checkout is not stolen');
+      assert.deepEqual(await outstandingMarkers(store.businessId), [
+        String(intent._id)
+      ]);
     });
   });
 }
