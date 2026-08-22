@@ -146,92 +146,10 @@ export function totalFor(subtotal) {
 }
 
 /**
- * The atomic reservation.
+ * NOTE: the reservation and release builders no longer live here.
  *
- * Every product of one order lives inside the SAME business document, so a
- * single `updateOne` covers the whole basket. MongoDB guarantees a single
- * document update is atomic and isolated even on a standalone server, which
- * matters here: the project's documented local database is standalone
- * (`mongodb://127.0.0.1:27017/...`) and therefore cannot run multi-document
- * transactions at all. This design needs none.
- *
- * The filter asserts, for every line at once, that the product is still active
- * and still has enough stock. If any single assertion fails the update matches
- * nothing and NOTHING is decremented - that is the all-or-nothing guarantee.
- * Two concurrent checkouts for the final unit therefore cannot both match.
- *
- * `$inc` only touches array entries the filters prove are genuinely finite, so a
- * merchant flipping a product to unlimited between read and write cannot cause a
- * decrement of a quantity that no longer means anything.
+ * An unguarded `$inc` pair could be applied twice - once by a crash replay and
+ * once by a retry - so both operations now carry a durable reservation identity
+ * and live in `checkout-intent.policy.js`. Nothing in this module may
+ * reintroduce an unconditional stock increment.
  */
-export function buildStockReservation({ businessId, lines }) {
-  const finiteLines = lines.filter((line) => line.finite);
-
-  const filter = {
-    _id: businessId,
-    isActive: true,
-    $and: lines.map((line) => ({
-      products: {
-        $elemMatch: {
-          _id: line.product._id,
-          isActive: true,
-          ...(line.finite
-            ? { unlimitedStock: false, stockQuantity: { $gte: line.quantity } }
-            : {})
-        }
-      }
-    }))
-  };
-
-  if (finiteLines.length === 0) {
-    // Nothing to consume. The filter still runs so an order is never accepted
-    // against a business or product that stopped being active mid-checkout.
-    return { filter, update: null, arrayFilters: [] };
-  }
-
-  const set = {};
-  const arrayFilters = finiteLines.map((line, index) => {
-    const alias = `line${index}`;
-    set[`products.$[${alias}].stockQuantity`] = -line.quantity;
-
-    return {
-      [`${alias}._id`]: line.product._id,
-      [`${alias}.unlimitedStock`]: false,
-      [`${alias}.stockQuantity`]: { $gte: line.quantity }
-    };
-  });
-
-  return { filter, update: { $inc: set }, arrayFilters };
-}
-
-/**
- * The compensating update for a reservation that was taken but whose order
- * could not be persisted.
- *
- * Only finite lines are released, and only by the exact amount reserved, so a
- * release can never invent inventory a merchant did not have.
- */
-export function buildStockRelease({ businessId, lines }) {
-  const finiteLines = lines.filter((line) => line.finite);
-
-  if (finiteLines.length === 0) {
-    return { filter: { _id: businessId }, update: null, arrayFilters: [] };
-  }
-
-  const set = {};
-  const arrayFilters = finiteLines.map((line, index) => {
-    const alias = `line${index}`;
-    set[`products.$[${alias}].stockQuantity`] = line.quantity;
-
-    return {
-      [`${alias}._id`]: line.product._id,
-      [`${alias}.unlimitedStock`]: false
-    };
-  });
-
-  return {
-    filter: { _id: businessId },
-    update: { $inc: set },
-    arrayFilters
-  };
-}

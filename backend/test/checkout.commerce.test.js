@@ -7,9 +7,11 @@ import { Business } from '../src/models/Business.js';
 import { Order } from '../src/models/Order.js';
 import { validateOrderCreate } from '../src/middleware/validate.js';
 import {
+  buildIdentifiedRelease,
+  buildIdentifiedReservation
+} from '../src/policies/checkout-intent.policy.js';
+import {
   CHECKOUT_ERRORS,
-  buildStockRelease,
-  buildStockReservation,
   deliveryFeeFor,
   isFiniteStockProduct,
   normalizeRequestedItems,
@@ -135,6 +137,18 @@ function matchesFilter(document, filter) {
       }
       continue;
     }
+    // Mongo array-membership semantics: `field: value` matches when the array
+    // contains value, and `$ne` matches when it does not. This is what makes
+    // the reservation marker a replay guard.
+    if (key === 'stockReservations') {
+      const held = (document.stockReservations ?? []).map(String);
+      if (condition && typeof condition === 'object' && '$ne' in condition) {
+        if (held.includes(String(condition.$ne))) return false;
+      } else if (!held.includes(String(condition))) {
+        return false;
+      }
+      continue;
+    }
     if (!matchesCondition(document[key], condition)) return false;
   }
 
@@ -157,8 +171,24 @@ function applyConditionalUpdate(document, { filter, update, arrayFilters }) {
     return { matchedCount: 1, modifiedCount: 0 };
   }
 
+  const known = ['$inc', '$addToSet', '$pull'];
+  const unknown = Object.keys(update).filter((key) => !known.includes(key));
+  if (unknown.length > 0) throw new Error(`unsupported update: ${unknown}`);
+
+  if (update.$addToSet?.stockReservations) {
+    const held = document.stockReservations ?? (document.stockReservations = []);
+    const marker = update.$addToSet.stockReservations;
+    if (!held.map(String).includes(String(marker))) held.push(marker);
+  }
+
+  if (update.$pull?.stockReservations) {
+    const marker = String(update.$pull.stockReservations);
+    document.stockReservations = (document.stockReservations ?? []).filter(
+      (entry) => String(entry) !== marker
+    );
+  }
+
   const increments = Object.entries(update.$inc ?? {});
-  if (increments.length === 0) throw new Error('unsupported update');
 
   for (const [path, delta] of increments) {
     const parsed = /^products\.\$\[(\w+)\]\.(\w+)$/.exec(path);
@@ -185,6 +215,26 @@ function applyConditionalUpdate(document, { filter, update, arrayFilters }) {
   }
 
   return { matchedCount: 1, modifiedCount: 1 };
+}
+
+/**
+ * Reservation and release now carry a durable identity, so the tests supply
+ * one. A distinct id per checkout is what makes replay detectable; passing the
+ * SAME id twice is exactly the crash-replay case, and is exercised below.
+ */
+function buildStockReservation(business, lines, intentId = new mongoose.Types.ObjectId()) {
+  return {
+    intentId,
+    ...buildIdentifiedReservation({
+      businessId: business._id,
+      intentId,
+      lines
+    })
+  };
+}
+
+function buildStockRelease(business, lines, intentId) {
+  return buildIdentifiedRelease({ businessId: business._id, intentId, lines });
 }
 
 function stockOf(business, product) {
@@ -313,7 +363,7 @@ test('B08 - a successful finite purchase consumes exactly the ordered amount', (
 
   const result = applyConditionalUpdate(
     business,
-    buildStockReservation({ businessId: business._id, lines })
+    buildStockReservation(business, lines)
   );
 
   assert.equal(result.matchedCount, 1);
@@ -329,7 +379,7 @@ test('B09 - stock reaching zero flips the public availability flag', () => {
 
   applyConditionalUpdate(
     business,
-    buildStockReservation({ businessId: business._id, lines })
+    buildStockReservation(business, lines)
   );
 
   const stored = business.products.find((entry) => sameId(entry._id, product._id));
@@ -346,9 +396,11 @@ test('B10 - unlimited stock is never decremented', () => {
   const lines = linesFor(business, [request(unlimited, 9), request(legacy, 7)]);
   assert.equal(lines.every((line) => line.finite === false), true);
 
-  const reservation = buildStockReservation({ businessId: business._id, lines });
-  // Nothing to consume at all: no $inc is even produced.
-  assert.equal(reservation.update, null);
+  const reservation = buildStockReservation(business, lines);
+  // Nothing to consume at all: the reservation records its identity but emits
+  // no decrement whatsoever.
+  assert.equal(reservation.update.$inc, undefined);
+  assert.ok(reservation.update.$addToSet.stockReservations);
 
   const result = applyConditionalUpdate(business, reservation);
   assert.equal(result.matchedCount, 1);
@@ -401,7 +453,7 @@ test('B12 - duplicate product ids cannot bypass inventory accounting', () => {
 
   applyConditionalUpdate(
     business,
-    buildStockReservation({ businessId: business._id, lines })
+    buildStockReservation(business, lines)
   );
   assert.equal(stockOf(business, product), 0);
 });
@@ -429,13 +481,14 @@ test('B13 - two checkouts for the final unit cannot both succeed', () => {
   const first = linesFor(business, [request(product, 1)]);
   const second = linesFor(business, [request(product, 1)]);
 
+  // Two different checkouts, so two different reservation identities.
   const firstResult = applyConditionalUpdate(
     business,
-    buildStockReservation({ businessId: business._id, lines: first })
+    buildStockReservation(business, first)
   );
   const secondResult = applyConditionalUpdate(
     business,
-    buildStockReservation({ businessId: business._id, lines: second })
+    buildStockReservation(business, second)
   );
 
   assert.equal(firstResult.matchedCount, 1);
@@ -454,7 +507,7 @@ test('B14 - one unavailable line consumes nothing from the others', () => {
 
   const result = applyConditionalUpdate(
     business,
-    buildStockReservation({ businessId: business._id, lines })
+    buildStockReservation(business, lines)
   );
 
   assert.equal(result.matchedCount, 0);
@@ -468,39 +521,79 @@ test('B15 - a released reservation restores the exact quantities', () => {
   const business = businessWith([finite, unlimited]);
   const lines = linesFor(business, [request(finite, 3), request(unlimited, 4)]);
 
-  applyConditionalUpdate(
-    business,
-    buildStockReservation({ businessId: business._id, lines })
-  );
+  const reservation = buildStockReservation(business, lines);
+  applyConditionalUpdate(business, reservation);
   assert.equal(stockOf(business, finite), 2);
 
   applyConditionalUpdate(
     business,
-    buildStockRelease({ businessId: business._id, lines })
+    buildStockRelease(business, lines, reservation.intentId)
   );
 
   assert.equal(stockOf(business, finite), 5, 'stock must be given back exactly');
   assert.equal(stockOf(business, unlimited), 0, 'unlimited stock is never invented');
 });
 
-test('B16 - a reserve-then-release retry leaves stock consumed only once', () => {
+test('B16 - replaying one reservation cannot consume stock twice', () => {
   const product = finiteProduct({ stock: 4 });
   const business = businessWith([product]);
   const lines = linesFor(business, [request(product, 1)]);
-  const reservation = buildStockReservation({ businessId: business._id, lines });
-  const release = buildStockRelease({ businessId: business._id, lines });
+  const reservation = buildStockReservation(business, lines);
 
-  // First attempt succeeds and keeps its unit.
+  const first = applyConditionalUpdate(business, reservation);
+  assert.equal(first.matchedCount, 1);
+  assert.equal(stockOf(business, product), 3);
+
+  // The crash-replay case: the very same intent reserves again. The marker is
+  // already on the document, so the update matches nothing at all.
+  const replay = applyConditionalUpdate(business, reservation);
+  assert.equal(replay.matchedCount, 0, 'a replay must not match');
+  assert.equal(stockOf(business, product), 3, 'and must not decrement again');
+});
+
+test('B16 - releasing one reservation twice restores it only once', () => {
+  const product = finiteProduct({ stock: 4 });
+  const business = businessWith([product]);
+  const lines = linesFor(business, [request(product, 1)]);
+  const reservation = buildStockReservation(business, lines);
+  const release = buildStockRelease(business, lines, reservation.intentId);
+
   applyConditionalUpdate(business, reservation);
   assert.equal(stockOf(business, product), 3);
 
-  // The retry reserves, loses the unique {user, clientOrderId} race, and gives
-  // its reservation straight back - which is what the controller does on E11000.
+  const firstRelease = applyConditionalUpdate(business, release);
+  assert.equal(firstRelease.matchedCount, 1);
+  assert.equal(stockOf(business, product), 4, 'the unit comes back once');
+
+  // The marker is gone, so a second release cannot match and cannot invent
+  // inventory the merchant never had.
+  const secondRelease = applyConditionalUpdate(business, release);
+  assert.equal(secondRelease.matchedCount, 0);
+  assert.equal(stockOf(business, product), 4, 'and never a second time');
+});
+
+test('B16 - a release does not over-increment a product turned unlimited', () => {
+  const product = finiteProduct({ stock: 4 });
+  const business = businessWith([product]);
+  const lines = linesFor(business, [request(product, 2)]);
+  const reservation = buildStockReservation(business, lines);
+
   applyConditionalUpdate(business, reservation);
   assert.equal(stockOf(business, product), 2);
-  applyConditionalUpdate(business, release);
 
-  assert.equal(stockOf(business, product), 3, 'a duplicate must not consume stock');
+  // The merchant switches the product to unlimited mid-checkout.
+  const stored = business.products.find((entry) => sameId(entry._id, product._id));
+  stored.unlimitedStock = true;
+
+  applyConditionalUpdate(
+    business,
+    buildStockRelease(business, lines, reservation.intentId)
+  );
+
+  // The marker is cleared, but no quantity is handed to a product that no
+  // longer counts quantity.
+  assert.equal(stockOf(business, product), 2);
+  assert.deepEqual(business.stockReservations ?? [], []);
 });
 
 test('B17 - the idempotency index makes a duplicate clientOrderId impossible', () => {

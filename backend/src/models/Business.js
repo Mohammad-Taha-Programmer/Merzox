@@ -126,6 +126,27 @@ const businessSchema = new mongoose.Schema(
     location: { type: locationSchema, index: '2dsphere' },
     contacts: { type: [contactSchema], default: [] },
     products: { type: [productSchema], default: [] },
+
+    /**
+     * Outstanding stock reservations, by CheckoutIntent id.
+     *
+     * The marker is added in the same single-document update that decrements
+     * the stock, so "inventory was consumed" and "this checkout consumed it"
+     * are one atomic fact rather than two writes with a gap between them. A
+     * replay of the same reservation is refused because the id is already
+     * present, and a release is refused unless it still is - which is what
+     * makes both operations idempotent.
+     *
+     * Entries are removed when the checkout finalizes or releases, so the set
+     * only ever holds checkouts that are genuinely in flight. It is internal
+     * and appears on no serializer.
+     */
+    stockReservations: {
+      type: [mongoose.Schema.Types.ObjectId],
+      default: [],
+      select: false
+    },
+
     ratingAverage: { type: Number, min: 0, max: 5, default: 0 },
     ratingCount: { type: Number, min: 0, default: 0 },
     followerCount: { type: Number, min: 0, default: 0 },

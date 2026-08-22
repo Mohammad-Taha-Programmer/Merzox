@@ -1,6 +1,9 @@
+import crypto from 'node:crypto';
+
 import mongoose from 'mongoose';
 
 import { Business } from '../models/Business.js';
+import { CheckoutIntent } from '../models/CheckoutIntent.js';
 import { Order } from '../models/Order.js';
 import {
   addressMutableStatuses,
@@ -8,9 +11,18 @@ import {
   orderStatusGroups as policyStatusGroups
 } from '../policies/order-status.policy.js';
 import {
+  CONVERGENCE_ATTEMPTS,
+  CONVERGENCE_INTERVAL_MS,
+  IDEMPOTENCY_ERRORS,
+  buildIdentifiedRelease,
+  buildIdentifiedReservation,
+  buildReservationSettlement,
+  checkoutFingerprint,
+  isAbandoned,
+  isTerminal
+} from '../policies/checkout-intent.policy.js';
+import {
   CHECKOUT_ERRORS,
-  buildStockRelease,
-  buildStockReservation,
   deliveryFeeFor,
   normalizeRequestedItems,
   resolveOrderLines,
@@ -67,6 +79,14 @@ const checkoutFailures = {
     // Deliberately vague about how many units remain: the exact finite stock
     // quantity is merchant-private and must not leak through an error.
     message: 'One or more products do not have enough stock'
+  },
+  [IDEMPOTENCY_ERRORS.keyReused]: {
+    status: 409,
+    message: 'This order id was already used for a different order'
+  },
+  [IDEMPOTENCY_ERRORS.inProgress]: {
+    status: 409,
+    message: 'This order is still being processed, please retry'
   }
 };
 
@@ -87,21 +107,178 @@ function isDuplicateKeyError(error) {
   return error?.code === 11000;
 }
 
-export const createOrder = asyncHandler(async (req, res) => {
-  const clientOrderId = cleanClientOrderId(req.body.clientOrderId);
+function wait(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
 
-  // First idempotency gate. A retry that arrives after the original completed
-  // returns the existing order and reserves nothing.
-  if (clientOrderId) {
-    const existing = await findExistingOrder(req.user._id, clientOrderId);
+/**
+ * Without a client-supplied idempotency key there is nothing to recover a
+ * crashed checkout by, so one is generated. It gives every order durable
+ * checkout state; it does not invent cross-request idempotency, because a later
+ * retry is a genuinely new request and generates a new key.
+ */
+function checkoutKey(value) {
+  return value ?? `srv-${crypto.randomUUID()}`;
+}
 
-    if (existing) {
-      return res.status(200).json({
-        success: true,
-        data: { order: existing.toClientJSON(), duplicated: true }
-      });
+function orderResponse(res, order, { duplicated }) {
+  return res.status(duplicated ? 200 : 201).json({
+    success: true,
+    data: { order: order.toClientJSON(), duplicated }
+  });
+}
+
+/**
+ * Reserves finite inventory for this intent, exactly once.
+ *
+ * The update carries the intent id, so replaying it after an interruption
+ * matches nothing rather than decrementing again. A non-match therefore has two
+ * possible meanings, and they are told apart by looking for the marker: either
+ * this intent already holds the reservation (resume), or the stock genuinely is
+ * not there (fail).
+ */
+async function reserveStock({ intent, businessId, lines, normalizedItems }) {
+  const reservation = buildIdentifiedReservation({
+    businessId,
+    intentId: intent._id,
+    lines
+  });
+
+  const result = await Business.updateOne(
+    reservation.filter,
+    reservation.update,
+    reservation.arrayFilters.length > 0
+      ? { arrayFilters: reservation.arrayFilters }
+      : undefined
+  );
+
+  if (result.matchedCount === 0) {
+    const alreadyHeld = await Business.exists({
+      _id: businessId,
+      stockReservations: intent._id
+    });
+
+    if (!alreadyHeld) {
+      const recheck = await Business.findOne({ _id: businessId, isActive: true });
+      const diagnosis = recheck
+        ? resolveOrderLines({
+            products: recheck.products,
+            items: normalizedItems
+          })
+        : { error: CHECKOUT_ERRORS.notAvailable };
+      const code = diagnosis.error ?? CHECKOUT_ERRORS.outOfStock;
+
+      // Terminal, and there is nothing to give back: no marker means no
+      // decrement ever happened for this intent.
+      await CheckoutIntent.updateOne(
+        { _id: intent._id, phase: 'prepared' },
+        { $set: { phase: 'released', failureCode: code } }
+      );
+
+      throw checkoutFailure(code);
     }
   }
+
+  // Only after the stock is provably held. A crash before this line leaves the
+  // intent in `prepared` with the marker set, and the branch above resumes it
+  // without decrementing a second time.
+  await CheckoutIntent.updateOne(
+    { _id: intent._id, phase: 'prepared' },
+    { $set: { phase: 'reserved' } }
+  );
+}
+
+/**
+ * Gives a reservation back, exactly once.
+ *
+ * The filter requires the marker to still be present, so a second release
+ * changes nothing. There is deliberately no unconditional increment anywhere.
+ */
+async function releaseStock({ intent, businessId, lines }) {
+  const release = buildIdentifiedRelease({
+    businessId,
+    intentId: intent._id,
+    lines
+  });
+
+  await Business.updateOne(
+    release.filter,
+    release.update,
+    release.arrayFilters.length > 0
+      ? { arrayFilters: release.arrayFilters }
+      : undefined
+  );
+}
+
+/**
+ * Writes the order and settles the reservation.
+ *
+ * A duplicate-key rejection means a concurrent worker on the SAME intent got
+ * there first; that is convergence, not failure, so the existing order is
+ * adopted rather than a second one created.
+ */
+async function finalizeCheckout({ intent, businessId, lines, orderDraft }) {
+  let order = null;
+
+  try {
+    order = await Order.create(orderDraft);
+  } catch (error) {
+    if (isDuplicateKeyError(error)) {
+      order = await findExistingOrder(orderDraft.user, orderDraft.clientOrderId);
+    }
+
+    if (!order) {
+      // The order could not be persisted at all, so the inventory this intent
+      // is holding has to go back - once.
+      await releaseStock({ intent, businessId, lines });
+      await CheckoutIntent.updateOne(
+        { _id: intent._id, phase: { $in: ['prepared', 'reserved'] } },
+        { $set: { phase: 'released', failureCode: 'CHECKOUT_FAILED' } }
+      );
+
+      throw error;
+    }
+  }
+
+  // From here the reservation is permanent: the quantity is NOT returned, only
+  // the outstanding-reservation marker is cleared.
+  await CheckoutIntent.updateOne(
+    { _id: intent._id, phase: { $in: ['prepared', 'reserved'] } },
+    { $set: { phase: 'finalized', order: order._id, failureCode: null } }
+  );
+  const settlement = buildReservationSettlement({
+    businessId,
+    intentId: intent._id
+  });
+  await Business.updateOne(settlement.filter, settlement.update);
+
+  return order;
+}
+
+/**
+ * Waits, boundedly, for another worker on the same intent to reach a terminal
+ * phase.
+ *
+ * Returns the terminal intent, or null if it is still in flight - in which case
+ * the caller takes the work over rather than waiting forever, so a worker that
+ * died mid-checkout cannot strand the key.
+ */
+async function awaitConvergence(intentId) {
+  for (let attempt = 0; attempt < CONVERGENCE_ATTEMPTS; attempt += 1) {
+    await wait(CONVERGENCE_INTERVAL_MS);
+    const current = await CheckoutIntent.findById(intentId);
+
+    if (!current) return null;
+    if (isTerminal(current.phase)) return current;
+  }
+
+  return null;
+}
+
+export const createOrder = asyncHandler(async (req, res) => {
+  const clientOrderId = checkoutKey(cleanClientOrderId(req.body.clientOrderId));
 
   const businessId = String(req.body.businessId ?? '');
   if (!mongoose.isValidObjectId(businessId)) {
@@ -131,8 +308,8 @@ export const createOrder = asyncHandler(async (req, res) => {
     req.body.deliveryAddress ?? req.user.address ?? ''
   ).trim();
 
-  // Validated before anything is reserved, so a missing address can never leave
-  // inventory held.
+  // Validated before any durable state exists, so a missing address can never
+  // leave an intent or a reservation behind.
   if (deliveryAddress.length < 3) {
     throw new AppError(
       'A delivery address is required',
@@ -141,65 +318,109 @@ export const createOrder = asyncHandler(async (req, res) => {
     );
   }
 
-  const reservation = buildStockReservation({
-    businessId: business._id,
-    lines
+  const paymentMethod = req.body.paymentMethod ?? 'cash';
+  const fingerprint = checkoutFingerprint({
+    businessId,
+    items: normalized.items,
+    deliveryAddress,
+    paymentMethod
   });
-  // A single conditional document update: either every line was still
-  // available and all finite lines were decremented together, or nothing
-  // matched and nothing changed. There is no partially consumed basket.
+  const intentLines = lines.map((line) => ({
+    productId: line.product._id,
+    quantity: line.quantity,
+    finite: line.finite
+  }));
+
+  // ---- durable identity, BEFORE anything can touch inventory ---------------
   //
-  // An all-unlimited basket consumes nothing, so it only re-asserts the same
-  // filter rather than writing to the business document for no reason.
-  const matchedCount = reservation.update
-    ? (
-        await Business.updateOne(reservation.filter, reservation.update, {
-          arrayFilters: reservation.arrayFilters
-        })
-      ).matchedCount
-    : await Business.countDocuments(reservation.filter);
+  // The unique {user, clientOrderId} index decides the single owner: whoever
+  // inserts does the work, everyone else converges on it. There is no state in
+  // which stock is consumed and nothing on disk explains why.
+  let intent = null;
+  let owned = false;
 
-  if (matchedCount === 0) {
-    const recheck = await Business.findOne({ _id: businessId, isActive: true });
-
-    if (!recheck) {
-      throw new AppError('Business is not available', 404, 'BUSINESS_NOT_FOUND');
-    }
-
-    const diagnosis = resolveOrderLines({
-      products: recheck.products,
-      items: normalized.items
+  try {
+    intent = await CheckoutIntent.create({
+      user: req.user._id,
+      clientOrderId,
+      fingerprint,
+      business: business._id,
+      phase: 'prepared',
+      lines: intentLines
     });
+    owned = true;
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) throw error;
 
-    throw checkoutFailure(diagnosis.error ?? CHECKOUT_ERRORS.outOfStock);
+    intent = await CheckoutIntent.findOne({
+      user: req.user._id,
+      clientOrderId
+    });
+    if (!intent) throw error;
   }
 
-  const items = lines.map((line) => {
-    const imageUrl =
-      [...(line.product.imageUrls ?? []), line.product.imageUrl].find(
-        Boolean
-      ) ?? '';
+  // Reusing a key for a different basket is a client bug, not a retry.
+  if (intent.fingerprint !== fingerprint) {
+    throw checkoutFailure(IDEMPOTENCY_ERRORS.keyReused);
+  }
 
-    return {
-      productId: line.product._id,
-      name: line.product.name,
-      imageUrl,
-      // The server-derived sale price, snapshotted at purchase time. A later
-      // merchant price or discount change cannot rewrite this order.
-      unitPrice: line.unitPrice,
-      quantity: line.quantity,
-      // Left empty on purpose: the catalog has no variant to copy from, and the
-      // client is not allowed to define one.
-      variant: ''
-    };
-  });
+  if (intent.phase === 'finalized') {
+    const existing = intent.order
+      ? await Order.findById(intent.order)
+      : await findExistingOrder(req.user._id, clientOrderId);
+
+    if (existing) return orderResponse(res, existing, { duplicated: true });
+  }
+
+  // A checkout that already failed terminally answers the same way every time,
+  // and never reserves a second time.
+  if (intent.phase === 'released') {
+    throw checkoutFailure(intent.failureCode ?? CHECKOUT_ERRORS.outOfStock);
+  }
+
+  if (!owned && isAbandoned(intent, Date.now())) {
+    // Nobody has touched this intent for longer than the whole convergence
+    // window, so there is no live worker to wait for. Take it over at once
+    // rather than making every crash recovery sit out the full timeout.
+    owned = true;
+  }
+
+  if (!owned) {
+    // Another request owns this exact checkout. Wait for it rather than racing
+    // it into a stock error that would misdescribe an identical retry.
+    const converged = await awaitConvergence(intent._id);
+
+    if (converged?.phase === 'finalized' && converged.order) {
+      const existing = await Order.findById(converged.order);
+      if (existing) return orderResponse(res, existing, { duplicated: true });
+    }
+    if (converged?.phase === 'released') {
+      throw checkoutFailure(converged.failureCode ?? CHECKOUT_ERRORS.outOfStock);
+    }
+
+    // Still unfinished: the owner may have died, so take the work over. Every
+    // phase transition below is conditional and idempotent, which is what makes
+    // that safe.
+    const current = await CheckoutIntent.findById(intent._id);
+    if (!current) throw checkoutFailure(IDEMPOTENCY_ERRORS.inProgress);
+    intent = current;
+  }
+
+  if (intent.phase === 'prepared') {
+    await reserveStock({
+      intent,
+      businessId: business._id,
+      lines,
+      normalizedItems: normalized.items
+    });
+  }
 
   const subtotal = subtotalFor(lines);
-  const deliveryFee = deliveryFeeFor(subtotal);
-
-  let order;
-  try {
-    order = await Order.create({
+  const order = await finalizeCheckout({
+    intent,
+    businessId: business._id,
+    lines,
+    orderDraft: {
       clientOrderId,
       user: req.user._id,
       customerName: req.user.name,
@@ -207,38 +428,31 @@ export const createOrder = asyncHandler(async (req, res) => {
       business: business._id,
       businessName: business.name,
       businessAddress: business.address,
-      items,
+      items: lines.map((line) => ({
+        productId: line.product._id,
+        name: line.product.name,
+        imageUrl:
+          [...(line.product.imageUrls ?? []), line.product.imageUrl].find(
+            Boolean
+          ) ?? '',
+        // The server-derived sale price, snapshotted at purchase time. A later
+        // merchant price or discount change cannot rewrite this order.
+        unitPrice: line.unitPrice,
+        quantity: line.quantity,
+        // Left empty on purpose: the catalog has no variant to copy from, and
+        // the client is not allowed to define one.
+        variant: ''
+      })),
       subtotal,
-      deliveryFee,
+      deliveryFee: deliveryFeeFor(subtotal),
       total: totalFor(subtotal),
       deliveryAddress,
-      paymentMethod: req.body.paymentMethod ?? 'cash'
-    });
-  } catch (error) {
-    // The reservation already happened, so it has to be given back whatever
-    // went wrong - including the idempotency race below, where a concurrent
-    // retry won the unique {user, clientOrderId} index.
-    const release = buildStockRelease({ businessId: business._id, lines });
-    if (release.update) {
-      await Business.updateOne(release.filter, release.update, {
-        arrayFilters: release.arrayFilters
-      });
+      paymentMethod
     }
+  });
 
-    if (isDuplicateKeyError(error) && clientOrderId) {
-      const existing = await findExistingOrder(req.user._id, clientOrderId);
-
-      if (existing) {
-        return res.status(200).json({
-          success: true,
-          data: { order: existing.toClientJSON(), duplicated: true }
-        });
-      }
-    }
-
-    throw error;
-  }
-
+  // Everything below is best-effort and runs AFTER the order is durable. A
+  // failure here must never release inventory or invalidate the order.
   if (business.owner) {
     await notifyOrderPlaced({
       ownerId: business.owner,
@@ -247,10 +461,7 @@ export const createOrder = asyncHandler(async (req, res) => {
     });
   }
 
-  res.status(201).json({
-    success: true,
-    data: { order: order.toClientJSON(), duplicated: false }
-  });
+  return orderResponse(res, order, { duplicated: false });
 });
 
 export const listMyOrders = asyncHandler(async (req, res) => {

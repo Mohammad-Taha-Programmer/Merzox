@@ -262,6 +262,106 @@ export function resolveIntegrationEnvironment(env = process.env) {
   return { enabled: true, apiUrl, dbUri, dbName };
 }
 
+
+/**
+ * The canonical hosts a connection string points at, credentials stripped.
+ * Local aliases collapse to `localhost:<port>`, so loopback is one comparison.
+ */
+function canonicalHostsFromUri(uri) {
+  const withoutScheme = String(uri ?? '')
+    .trim()
+    .replace(/^mongodb(\+srv)?:\/\//i, '');
+  const atIndex = withoutScheme.lastIndexOf('@');
+  const hostAndPath =
+    atIndex === -1 ? withoutScheme : withoutScheme.slice(atIndex + 1);
+  const slashIndex = hostAndPath.indexOf('/');
+  const hostSection =
+    slashIndex === -1 ? hostAndPath : hostAndPath.slice(0, slashIndex);
+
+  return hostSection.split(',').map(canonicalHost).filter(Boolean);
+}
+
+/**
+ * The DB-only gate, for a suite that starts its own loopback API in-process
+ * rather than talking to one somebody launched by hand.
+ *
+ * It keeps every safety rule of the full gate - explicit opt-in, a disposable
+ * database name, no MONGODB_URI fallback - and adds one the API-based gate got
+ * for free: the database host itself must be loopback. A suite that boots its
+ * own server has no operator to notice it was pointed somewhere remote.
+ */
+export function resolveIntegrationDatabase(env = process.env) {
+  if (String(env.MERZOX_INTEGRATION_TESTS ?? '').trim() !== 'true') {
+    return {
+      enabled: false,
+      reason:
+        'MERZOX_INTEGRATION_TESTS is not "true" (explicit opt-in is required)'
+    };
+  }
+
+  const dbUri = String(
+    env.MERZOX_TEST_MONGODB_URI ?? env.MERZOX_TEST_DB_URI ?? ''
+  ).trim();
+
+  if (dbUri.length === 0) {
+    return { enabled: false, reason: 'MERZOX_TEST_MONGODB_URI is not set' };
+  }
+
+  // An SRV record resolves to hosts this process cannot inspect, so it can
+  // never be proved local. Refused outright.
+  if (/^mongodb\+srv:/i.test(dbUri)) {
+    return {
+      enabled: false,
+      reason: 'MERZOX_TEST_MONGODB_URI must not be a mongodb+srv connection'
+    };
+  }
+
+  // Never borrow the application's own database, however it is spelled.
+  const appUri = String(env.MONGODB_URI ?? '').trim();
+  if (appUri.length > 0) {
+    const appTarget = normalizedDatabaseTarget(appUri);
+    const testTarget = normalizedDatabaseTarget(dbUri);
+
+    if (appUri === dbUri || (appTarget.length > 0 && appTarget === testTarget)) {
+      return {
+        enabled: false,
+        reason:
+          'MERZOX_TEST_MONGODB_URI resolves to the same database as MONGODB_URI (refusing to mutate the application database)'
+      };
+    }
+  }
+
+  const hosts = canonicalHostsFromUri(dbUri);
+  if (hosts.length === 0) {
+    return { enabled: false, reason: 'MERZOX_TEST_MONGODB_URI names no host' };
+  }
+
+  const remote = hosts.filter((host) => !host.startsWith('localhost:'));
+  if (remote.length > 0) {
+    return {
+      enabled: false,
+      reason: `MERZOX_TEST_MONGODB_URI must point at loopback only (${remote.length} non-loopback host)`
+    };
+  }
+
+  const dbName = databaseNameFromUri(dbUri);
+  if (dbName.length === 0) {
+    return {
+      enabled: false,
+      reason: 'MERZOX_TEST_MONGODB_URI does not name a database'
+    };
+  }
+
+  if (!isDisposableDatabaseName(dbName)) {
+    return {
+      enabled: false,
+      reason: `database "${dbName}" is not marked disposable (name must contain one of: ${TEST_DB_MARKERS.join(', ')})`
+    };
+  }
+
+  return { enabled: true, dbUri, dbName };
+}
+
 /** A collision-resistant identity so cleanup only ever removes its own rows. */
 export function fixtureId(now) {
   return `${FIXTURE_PREFIX}-${now}`;
