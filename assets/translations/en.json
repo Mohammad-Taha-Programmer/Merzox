@@ -99,7 +99,9 @@
     "invalidCartItem": "This item cannot be added because it is not linked to an available product.",
     "productReviewPublished": "Product review published",
     "addedToCart": "Product added to cart",
-    "outOfStock": "Out of stock"
+    "outOfStock": "Out of stock",
+    "productShareOpened": "Sharing option opened",
+    "productShareError": "Could not open product sharing. Please try again."
   },
   "aboutUs": {
     "title": "About us",

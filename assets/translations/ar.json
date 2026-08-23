@@ -99,7 +99,9 @@
     "invalidCartItem": "تعذر إضافة هذا العنصر لأن بياناته لا ترتبط بمنتج متاح.",
     "productReviewPublished": "تم نشر تقييم المنتج",
     "addedToCart": "تمت إضافة المنتج إلى السلة",
-    "outOfStock": "غير متوفر حالياً"
+    "outOfStock": "غير متوفر حالياً",
+    "productShareOpened": "تم فتح خيار مشاركة المنتج",
+    "productShareError": "تعذر فتح مشاركة المنتج. حاول مرة أخرى."
   },
   "aboutUs": {
     "title": "من نحن",

@@ -101,10 +101,29 @@ class _ProductDetailsView extends StatelessWidget {
                       PositionedDirectional(
                         end: 18,
                         top: MediaQuery.paddingOf(context).top + 58,
-                        child: _IconCircle(
-                          icon: Icons.share_outlined,
-                          onPressed: () {},
-                          filled: false,
+                        child: Builder(
+                          builder: (shareContext) => _IconCircle(
+                            icon: Icons.share_outlined,
+                            onPressed:
+                                state.status == ProductDetailsStatus.sharing ||
+                                    state.status ==
+                                        ProductDetailsStatus.savingReview
+                                ? null
+                                : () {
+                                    context.read<ProductDetailsBloc>().add(
+                                      ProductDetailsShareRequested(
+                                        businessName: business.name,
+                                        languageCode: Localizations.localeOf(
+                                          context,
+                                        ).languageCode,
+                                        sharePositionOrigin: _shareOriginFor(
+                                          shareContext,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                            filled: false,
+                          ),
                         ),
                       ),
                       PositionedDirectional(
@@ -912,9 +931,19 @@ class _StarRating extends StatelessWidget {
   }
 }
 
+Rect? _shareOriginFor(BuildContext context) {
+  final renderObject = context.findRenderObject();
+
+  if (renderObject is! RenderBox || !renderObject.hasSize) {
+    return null;
+  }
+
+  return renderObject.localToGlobal(Offset.zero) & renderObject.size;
+}
+
 class _IconCircle extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final bool filled;
 
   const _IconCircle({
