@@ -11,10 +11,14 @@ import 'package:merzox/features/business_profile/pages/business_profile_page.dar
 import 'package:merzox/features/home/presentation/bloc/home_bloc.dart';
 import 'package:merzox/features/home/presentation/bloc/home_event.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
+import 'package:merzox/features/notification_preferences/bloc/notification_preference_bloc.dart';
+import 'package:merzox/features/notification_preferences/bloc/notification_preference_event.dart';
+import 'package:merzox/features/notification_preferences/widgets/notification_preference_control.dart';
 import 'package:merzox/features/messages/bloc/messages_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
 import 'package:merzox/services/location_permission_service.dart';
+import 'package:merzox/services/notification_preference_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../authentication/bloc/auth_bloc.dart';
@@ -62,8 +66,16 @@ class _StoredUserProfile {
 
 class HomeScreen extends StatelessWidget {
   final bool isGuest;
+  final NotificationPreferenceGateway? notificationPreferenceGateway;
+  final NotificationPreferenceSessionReader?
+  notificationPreferenceSessionReader;
 
-  const HomeScreen({super.key, required this.isGuest});
+  const HomeScreen({
+    super.key,
+    required this.isGuest,
+    this.notificationPreferenceGateway,
+    this.notificationPreferenceSessionReader,
+  });
 
   Future<void> _logout(BuildContext context) async {
     await AuthBloc.clearStoredSession();
@@ -197,6 +209,9 @@ class HomeScreen extends StatelessWidget {
                 onSignupPressed: () => context.go('/signup'),
                 onLoginPressed: () => context.go('/login'),
                 onProtectedAction: () => _openBusinessEnrollment(context),
+                notificationPreferenceGateway: notificationPreferenceGateway,
+                notificationPreferenceSessionReader:
+                    notificationPreferenceSessionReader,
               ),
               _ => _ComingSoonTab(index: state.selectedTab),
             },
@@ -2253,6 +2268,9 @@ class _ProfileTab extends StatelessWidget {
   final VoidCallback onSignupPressed;
   final VoidCallback onLoginPressed;
   final VoidCallback onProtectedAction;
+  final NotificationPreferenceGateway? notificationPreferenceGateway;
+  final NotificationPreferenceSessionReader?
+  notificationPreferenceSessionReader;
 
   const _ProfileTab({
     required this.isGuest,
@@ -2266,6 +2284,8 @@ class _ProfileTab extends StatelessWidget {
     required this.onSignupPressed,
     required this.onLoginPressed,
     required this.onProtectedAction,
+    this.notificationPreferenceGateway,
+    this.notificationPreferenceSessionReader,
   });
 
   @override
@@ -2279,17 +2299,21 @@ class _ProfileTab extends StatelessWidget {
       );
     }
 
-    return _ProfileXdContent(
-      notificationsEnabled: true,
-      onNotificationsChanged: (_) {},
-      onProtectedAction: onProtectedAction,
-      onEditProfile: onEditProfile,
-      onOrders: onOrders,
-      onMap: onMap,
-      onFavorites: onFavorites,
-      onAboutUs: onAboutUs,
-      onShareApp: onShareApp,
-      onLogout: onLogout,
+    return BlocProvider(
+      create: (_) => NotificationPreferenceBloc(
+        gateway: notificationPreferenceGateway,
+        sessionReader: notificationPreferenceSessionReader,
+      )..add(const NotificationPreferenceStarted()),
+      child: _ProfileXdContent(
+        onProtectedAction: onProtectedAction,
+        onEditProfile: onEditProfile,
+        onOrders: onOrders,
+        onMap: onMap,
+        onFavorites: onFavorites,
+        onAboutUs: onAboutUs,
+        onShareApp: onShareApp,
+        onLogout: onLogout,
+      ),
     );
 
     // ignore: dead_code
@@ -2375,8 +2399,6 @@ class _ProfileTab extends StatelessWidget {
 }
 
 class _ProfileXdContent extends StatefulWidget {
-  final bool notificationsEnabled;
-  final ValueChanged<bool> onNotificationsChanged;
   final VoidCallback onProtectedAction;
   final VoidCallback onEditProfile;
   final VoidCallback onOrders;
@@ -2387,8 +2409,6 @@ class _ProfileXdContent extends StatefulWidget {
   final VoidCallback onLogout;
 
   const _ProfileXdContent({
-    required this.notificationsEnabled,
-    required this.onNotificationsChanged,
     required this.onProtectedAction,
     required this.onEditProfile,
     required this.onOrders,
@@ -2404,19 +2424,12 @@ class _ProfileXdContent extends StatefulWidget {
 }
 
 class _ProfileXdContentState extends State<_ProfileXdContent> {
-  late bool _notificationsEnabled;
   late final Future<_StoredUserProfile> _profileFuture;
 
   @override
   void initState() {
     super.initState();
-    _notificationsEnabled = widget.notificationsEnabled;
     _profileFuture = _StoredUserProfile.load();
-  }
-
-  void _setNotificationsEnabled(bool value) {
-    setState(() => _notificationsEnabled = value);
-    widget.onNotificationsChanged(value);
   }
 
   @override
@@ -2496,10 +2509,7 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
                     icon: Icons.info_outline_rounded,
                     onTap: widget.onAboutUs,
                   ),
-                  _ProfileXdToggleTile(
-                    value: _notificationsEnabled,
-                    onChanged: _setNotificationsEnabled,
-                  ),
+                  const NotificationPreferenceControl(),
                   _ProfileXdMenuTile(
                     title: 'shareApp.profileTitle'.tr(),
                     icon: Icons.ios_share_rounded,
@@ -2619,54 +2629,6 @@ class _ProfileXdMenuTile extends StatelessWidget {
               Icon(icon, color: MerzoxColors.kColor3D5A80, size: 18),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileXdToggleTile extends StatelessWidget {
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _ProfileXdToggleTile({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 38,
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: MerzoxColors.kColorF5F9FC,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Padding(
-        padding: const EdgeInsetsDirectional.only(start: 10, end: 12),
-        child: Row(
-          children: [
-            Transform.scale(
-              scale: 0.72,
-              child: Switch(
-                value: value,
-                activeThumbColor: Colors.white,
-                activeTrackColor: MerzoxColors.kColorEE6C4D,
-                inactiveThumbColor: Colors.white,
-                inactiveTrackColor: MerzoxColors.kColorC7C7C7,
-                onChanged: onChanged,
-              ),
-            ),
-            const Spacer(),
-            const Text(
-              'تنبيهات المنتجات والعروض',
-              style: TextStyle(fontSize: 12, color: Color(0xFF2B2B2B)),
-            ),
-            const SizedBox(width: 12),
-            Icon(
-              Icons.notifications_none_rounded,
-              color: MerzoxColors.kColor3D5A80,
-              size: 18,
-            ),
-          ],
         ),
       ),
     );

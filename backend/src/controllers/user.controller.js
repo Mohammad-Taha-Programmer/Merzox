@@ -2,9 +2,39 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { normalizeGender, normalizeIdentifier, normalizePhone } from '../utils/normalize.js';
 import { pick } from '../utils/pick.js';
+import {
+  notificationPreferenceView,
+  parseNotificationPreferencePatch,
+  updateProductOffersPreference
+} from '../services/notification-preference.service.js';
 
 const emailLabels = new Set(['personal', 'work', 'home', 'other']);
 const phoneLabels = new Set(['mobile', 'work', 'home', 'fax', 'other']);
+
+export const getMyNotificationPreferences = asyncHandler(async (req, res) => {
+  res.json({
+    success: true,
+    data: {
+      notificationPreferences: notificationPreferenceView(req.user)
+    }
+  });
+});
+
+export const updateMyNotificationPreferences = asyncHandler(
+  async (req, res) => {
+    const productOffers = parseNotificationPreferencePatch(req.body);
+
+    const notificationPreferences = await updateProductOffersPreference({
+      user: req.user,
+      productOffers
+    });
+
+    res.json({
+      success: true,
+      data: { notificationPreferences }
+    });
+  }
+);
 
 export const updateMe = asyncHandler(async (req, res) => {
   const updates = pick(req.body, [
