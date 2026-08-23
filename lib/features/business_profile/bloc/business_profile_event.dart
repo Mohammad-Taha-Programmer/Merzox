@@ -47,3 +47,8 @@ final class BusinessProfileProductsRetryRequested extends BusinessProfileEvent {
 final class BusinessProfileReviewsRetryRequested extends BusinessProfileEvent {
   const BusinessProfileReviewsRetryRequested();
 }
+
+final class BusinessProfileReviewEligibilityRetryRequested
+    extends BusinessProfileEvent {
+  const BusinessProfileReviewEligibilityRetryRequested();
+}

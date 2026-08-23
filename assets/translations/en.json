@@ -16,6 +16,14 @@
     "signup": "Create account",
     "cancel": "Cancel"
   },
+  "reviews": {
+    "signInRequired": "Sign in to verify whether you can write a review.",
+    "signIn": "Sign in",
+    "customerAccountRequired": "Reviews can only be submitted from a customer account.",
+    "deliveredPurchaseRequired": "You can review this business after receiving a delivered order from it.",
+    "productDeliveredPurchaseRequired": "You can review this product after receiving a delivered order that contains it.",
+    "eligibilityCheckFailed": "Could not verify review eligibility. Please try again."
+  },
   "nav": {
     "home": "Home",
     "stores": "Businesses",

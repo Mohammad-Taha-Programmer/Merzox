@@ -7,6 +7,8 @@ import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
+import 'package:merzox/features/reviews/widgets/review_eligibility_notice.dart';
+import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
@@ -967,7 +969,9 @@ class _ReviewsTabState extends State<_ReviewsTab> {
         // own store is a customer mutation, not a presentation detail. The
         // published reviews below remain visible, because that is exactly what
         // a customer sees.
-        if (widget.viewMode.allowsCustomerActions) ...[
+        if (widget.viewMode.allowsCustomerActions &&
+            widget.state.reviewEligibilityStatus ==
+                ReviewEligibilityStatus.eligible) ...[
           Center(
             child: _InteractiveStars(
               value: _rating,
@@ -1027,6 +1031,24 @@ class _ReviewsTabState extends State<_ReviewsTab> {
             ),
           ),
         ],
+        if (widget.viewMode.allowsCustomerActions &&
+            widget.state.reviewEligibilityStatus !=
+                ReviewEligibilityStatus.eligible)
+          ReviewEligibilityNotice(
+            status: widget.state.reviewEligibilityStatus,
+            productTarget: false,
+            onLogin: () async {
+              await context.push<void>('/login');
+              if (context.mounted) {
+                context.read<BusinessProfileBloc>().add(
+                  const BusinessProfileReviewEligibilityRetryRequested(),
+                );
+              }
+            },
+            onRetry: () => context.read<BusinessProfileBloc>().add(
+              const BusinessProfileReviewEligibilityRetryRequested(),
+            ),
+          ),
         const SizedBox(height: 18),
         const Text(
           'كل التقييمات',

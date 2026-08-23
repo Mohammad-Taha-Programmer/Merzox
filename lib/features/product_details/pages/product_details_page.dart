@@ -8,6 +8,8 @@ import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/product_details/bloc/product_details_bloc.dart';
 import 'package:merzox/features/product_details/bloc/product_details_event.dart';
 import 'package:merzox/features/product_details/bloc/product_details_state.dart';
+import 'package:merzox/features/reviews/widgets/review_eligibility_notice.dart';
+import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:merzox/services/api_service.dart';
 
 class ProductDetailsPage extends StatelessWidget {
@@ -350,11 +352,19 @@ class _Tabs extends StatelessWidget {
                       ),
                     ),
                   ),
-                  AnimatedContainer(
+                  TweenAnimationBuilder<double>(
+                    tween: Tween<double>(end: active ? 1 : 0),
                     duration: const Duration(milliseconds: 160),
-                    height: 1,
-                    width: active ? double.infinity : 0,
-                    color: MerzoxColors.kColorB9DDF3,
+                    builder: (context, widthFactor, child) {
+                      return FractionallySizedBox(
+                        widthFactor: widthFactor,
+                        child: child,
+                      );
+                    },
+                    child: Container(
+                      height: 1,
+                      color: MerzoxColors.kColorB9DDF3,
+                    ),
                   ),
                 ],
               ),
@@ -568,65 +578,85 @@ class _ReviewsTabState extends State<_ReviewsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Center(
-            child: _InteractiveStars(
-              value: _rating,
-              onChanged: (value) => setState(() => _rating = value),
-            ),
-          ),
-          const SizedBox(height: 14),
-          TextField(
-            controller: _commentController,
-            minLines: 4,
-            maxLines: 4,
-            textAlign: TextAlign.end,
-            decoration: InputDecoration(
-              hintText: 'قم بكتابة تقييمك للمنتج الذي قمت بشرائه هنا',
-              hintStyle: TextStyle(
-                color: MerzoxColors.kColorC7C7C7,
-                fontSize: 12,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(5),
-                borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(5),
-                borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
+          if (widget.state.reviewEligibilityStatus ==
+              ReviewEligibilityStatus.eligible) ...[
+            Center(
+              child: _InteractiveStars(
+                value: _rating,
+                onChanged: (value) => setState(() => _rating = value),
               ),
             ),
-          ),
-          const SizedBox(height: 10),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FilledButton(
-              onPressed: saving
-                  ? null
-                  : () async {
-                      final submitted = await AuthGate.run(
-                        context,
-                        onAuthenticated: () =>
-                            context.read<ProductDetailsBloc>().add(
-                              ProductDetailsReviewSubmitted(
-                                rating: _rating,
-                                comment: _commentController.text,
-                              ),
-                            ),
-                      );
-                      if (submitted) {
-                        _commentController.clear();
-                      }
-                    },
-              style: FilledButton.styleFrom(
-                backgroundColor: MerzoxColors.kColorEE6C4D,
-                fixedSize: const Size(58, 32),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(4),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _commentController,
+              minLines: 4,
+              maxLines: 4,
+              textAlign: TextAlign.end,
+              decoration: InputDecoration(
+                hintText: 'قم بكتابة تقييمك للمنتج الذي قمت بشرائه هنا',
+                hintStyle: TextStyle(
+                  color: MerzoxColors.kColorC7C7C7,
+                  fontSize: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(5),
+                  borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(5),
+                  borderSide: BorderSide(color: MerzoxColors.kColorB9DDF3),
                 ),
               ),
-              child: const Text('نشر', style: TextStyle(fontSize: 12)),
             ),
-          ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FilledButton(
+                onPressed: saving
+                    ? null
+                    : () async {
+                        final submitted = await AuthGate.run(
+                          context,
+                          onAuthenticated: () =>
+                              context.read<ProductDetailsBloc>().add(
+                                ProductDetailsReviewSubmitted(
+                                  rating: _rating,
+                                  comment: _commentController.text,
+                                ),
+                              ),
+                        );
+                        if (submitted) {
+                          _commentController.clear();
+                        }
+                      },
+                style: FilledButton.styleFrom(
+                  backgroundColor: MerzoxColors.kColorEE6C4D,
+                  fixedSize: const Size(58, 32),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                child: const Text('نشر', style: TextStyle(fontSize: 12)),
+              ),
+            ),
+          ],
+          if (widget.state.reviewEligibilityStatus !=
+              ReviewEligibilityStatus.eligible)
+            ReviewEligibilityNotice(
+              status: widget.state.reviewEligibilityStatus,
+              productTarget: true,
+              onLogin: () async {
+                await context.push<void>('/login');
+                if (context.mounted) {
+                  context.read<ProductDetailsBloc>().add(
+                    const ProductDetailsReviewEligibilityRetryRequested(),
+                  );
+                }
+              },
+              onRetry: () => context.read<ProductDetailsBloc>().add(
+                const ProductDetailsReviewEligibilityRetryRequested(),
+              ),
+            ),
           const SizedBox(height: 22),
           Row(
             children: [

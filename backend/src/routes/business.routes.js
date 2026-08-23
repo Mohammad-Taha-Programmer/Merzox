@@ -5,6 +5,8 @@ import {
   createBusinessReview,
   getBusiness,
   getBusinessProduct,
+  getBusinessProductReviewEligibility,
+  getBusinessReviewEligibility,
   likeBusinessProduct,
   listBusinessProductReviews,
   listBusinesses,
@@ -29,7 +31,11 @@ import {
   updateMyBusinessOrderStatus,
   updateMyBusinessProduct
 } from '../controllers/merchant.controller.js';
-import { requireAuth, requireBusinessUser } from '../middleware/auth.js';
+import {
+  requireAuth,
+  requireBusinessUser,
+  requireCustomerUser
+} from '../middleware/auth.js';
 import {
   validateBusinessEnrollment,
   validateBusinessOrderStatus,
@@ -107,16 +113,32 @@ router.delete(
 router.get('/', listBusinesses);
 router.get('/:id/products', listBusinessProducts);
 router.get('/:id/products/:productId', getBusinessProduct);
+router.get(
+  '/:id/products/:productId/review-eligibility',
+  requireAuth,
+  getBusinessProductReviewEligibility
+);
 router.get('/:id/products/:productId/reviews', listBusinessProductReviews);
 router.post(
   '/:id/products/:productId/reviews',
   requireAuth,
+  requireCustomerUser,
   createBusinessProductReview
 );
 router.post('/:id/products/:productId/like', requireAuth, likeBusinessProduct);
 router.post('/:id/favorite', requireAuth, setBusinessFavorite);
+router.get(
+  '/:id/review-eligibility',
+  requireAuth,
+  getBusinessReviewEligibility
+);
 router.get('/:id/reviews', listBusinessReviews);
-router.post('/:id/reviews', requireAuth, createBusinessReview);
+router.post(
+  '/:id/reviews',
+  requireAuth,
+  requireCustomerUser,
+  createBusinessReview
+);
 router.get('/:id', getBusiness);
 
 export default router;

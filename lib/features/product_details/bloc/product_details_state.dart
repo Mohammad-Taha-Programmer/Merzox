@@ -1,4 +1,5 @@
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/review_eligibility_service.dart';
 
 enum ProductDetailsStatus {
   initial,
@@ -26,6 +27,7 @@ final class ProductDetailsState {
   final String reviewsError;
   final String? message;
   final String? errorMessage;
+  final ReviewEligibilityStatus reviewEligibilityStatus;
 
   const ProductDetailsState({
     this.status = ProductDetailsStatus.initial,
@@ -41,6 +43,7 @@ final class ProductDetailsState {
     this.reviewsError = '',
     this.message,
     this.errorMessage,
+    this.reviewEligibilityStatus = ReviewEligibilityStatus.unchecked,
   });
 
   ProductDetailsState copyWith({
@@ -57,6 +60,7 @@ final class ProductDetailsState {
     String? reviewsError,
     String? message,
     String? errorMessage,
+    ReviewEligibilityStatus? reviewEligibilityStatus,
   }) {
     return ProductDetailsState(
       status: status ?? this.status,
@@ -72,6 +76,8 @@ final class ProductDetailsState {
       reviewsError: reviewsError ?? this.reviewsError,
       message: message,
       errorMessage: errorMessage,
+      reviewEligibilityStatus:
+          reviewEligibilityStatus ?? this.reviewEligibilityStatus,
     );
   }
 }

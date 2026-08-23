@@ -73,3 +73,8 @@ final class ProductDetailsShareRequested extends ProductDetailsEvent {
     this.sharePositionOrigin,
   });
 }
+
+final class ProductDetailsReviewEligibilityRetryRequested
+    extends ProductDetailsEvent {
+  const ProductDetailsReviewEligibilityRetryRequested();
+}

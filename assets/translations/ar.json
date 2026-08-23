@@ -16,6 +16,14 @@
     "signup": "إنشاء حساب",
     "cancel": "إلغاء"
   },
+  "reviews": {
+    "signInRequired": "سجّل الدخول للتحقق من أهليتك لكتابة تقييم.",
+    "signIn": "تسجيل الدخول",
+    "customerAccountRequired": "يمكن إرسال التقييمات من حساب عميل فقط.",
+    "deliveredPurchaseRequired": "يمكنك تقييم هذا المتجر بعد استلام طلب مكتمل منه.",
+    "productDeliveredPurchaseRequired": "يمكنك تقييم هذا المنتج بعد استلام طلب مكتمل يحتوي عليه.",
+    "eligibilityCheckFailed": "تعذر التحقق من أهلية التقييم. حاول مرة أخرى."
+  },
   "nav": {
     "home": "الرئيسية",
     "stores": "المتاجر",
