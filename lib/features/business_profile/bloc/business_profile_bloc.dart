@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/review_eligibility_service.dart';
 
 import '../business_profile_view_mode.dart';
 import 'business_profile_event.dart';
@@ -10,6 +11,7 @@ class BusinessProfileBloc
     extends Bloc<BusinessProfileEvent, BusinessProfileState> {
   final ApiService _apiService;
   final AuthSessionService _authSessionService;
+  final ReviewEligibilityGateway _reviewEligibilityGateway;
 
   /// Customer by default. The merchant preview uses the same public reads but
   /// performs no customer-side request or mutation.
@@ -18,15 +20,21 @@ class BusinessProfileBloc
   BusinessProfileBloc({
     ApiService? apiService,
     AuthSessionService authSessionService = const AuthSessionService(),
+    ReviewEligibilityGateway? reviewEligibilityGateway,
     this.viewMode = BusinessProfileViewMode.customer,
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
+       _reviewEligibilityGateway =
+           reviewEligibilityGateway ?? ReviewEligibilityService(),
        super(const BusinessProfileState()) {
     on<BusinessProfileStarted>(_onStarted);
     on<BusinessProfileMainTabChanged>(_onMainTabChanged);
     on<BusinessProfileProductFilterChanged>(_onProductFilterChanged);
     on<BusinessProfileProductLikeToggled>(_onProductLikeToggled);
     on<BusinessProfileReviewSubmitted>(_onReviewSubmitted);
+    on<BusinessProfileReviewEligibilityRetryRequested>(
+      _onReviewEligibilityRetryRequested,
+    );
     on<BusinessProfileDetailsRetryRequested>(_onDetailsRetryRequested);
     on<BusinessProfileProductsRetryRequested>(_onProductsRetryRequested);
     on<BusinessProfileReviewsRetryRequested>(_onReviewsRetryRequested);
@@ -90,9 +98,17 @@ class BusinessProfileBloc
       await _loadProducts(emit, state.productClassification);
     }
 
-    if (event.index == 2 &&
-        state.reviewsStatus == BusinessProfileSectionStatus.initial) {
-      await _loadReviews(emit);
+    if (event.index == 2) {
+      if (viewMode.allowsCustomerActions &&
+          (state.reviewEligibilityStatus == ReviewEligibilityStatus.unchecked ||
+              state.reviewEligibilityStatus ==
+                  ReviewEligibilityStatus.failure)) {
+        await _loadReviewEligibility(emit);
+      }
+
+      if (state.reviewsStatus == BusinessProfileSectionStatus.initial) {
+        await _loadReviews(emit);
+      }
     }
   }
 
@@ -157,9 +173,13 @@ class BusinessProfileBloc
     BusinessProfileReviewSubmitted event,
     Emitter<BusinessProfileState> emit,
   ) async {
-    // A merchant reviewing their own store is refused here, so hiding the
-    // composer is defence in depth rather than the only guard.
-    if (!viewMode.allowsCustomerActions) return;
+    // Review submission is refused at the event layer unless the current
+    // customer session has passed the server eligibility read. The POST still
+    // re-checks eligibility server-side and remains the actual authority.
+    if (!viewMode.allowsCustomerActions ||
+        state.reviewEligibilityStatus != ReviewEligibilityStatus.eligible) {
+      return;
+    }
 
     emit(
       state.copyWith(
@@ -208,6 +228,75 @@ class BusinessProfileBloc
         state.copyWith(
           status: BusinessProfileStatus.failure,
           errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onReviewEligibilityRetryRequested(
+    BusinessProfileReviewEligibilityRetryRequested event,
+    Emitter<BusinessProfileState> emit,
+  ) async {
+    await _loadReviewEligibility(emit);
+  }
+
+  Future<void> _loadReviewEligibility(
+    Emitter<BusinessProfileState> emit,
+  ) async {
+    if (!viewMode.allowsCustomerActions) return;
+
+    try {
+      final session = await _authSessionService.read();
+
+      if (!session.isAuthenticated) {
+        emit(
+          state.copyWith(
+            reviewEligibilityStatus: ReviewEligibilityStatus.loginRequired,
+          ),
+        );
+        return;
+      }
+
+      if (session.isBusiness) {
+        emit(
+          state.copyWith(
+            reviewEligibilityStatus:
+                ReviewEligibilityStatus.customerAccountRequired,
+          ),
+        );
+        return;
+      }
+
+      final token = session.token;
+      if (token == null || token.isEmpty) {
+        emit(
+          state.copyWith(
+            reviewEligibilityStatus: ReviewEligibilityStatus.loginRequired,
+          ),
+        );
+        return;
+      }
+
+      emit(
+        state.copyWith(
+          reviewEligibilityStatus: ReviewEligibilityStatus.checking,
+        ),
+      );
+
+      final decision = await _reviewEligibilityGateway.businessEligibility(
+        token: token,
+        businessId: state.businessId,
+      );
+
+      emit(
+        state.copyWith(
+          reviewEligibilityStatus: statusForReviewDecision(decision),
+        ),
+      );
+    } catch (_) {
+      emit(
+        state.copyWith(
+          reviewEligibilityStatus: ReviewEligibilityStatus.failure,
         ),
       );
     }

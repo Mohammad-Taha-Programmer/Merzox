@@ -6,6 +6,7 @@ import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/cart/cart_item_integrity.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/services/product_share_service.dart';
+import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../cart/cart_storage_keys.dart';
@@ -19,15 +20,19 @@ class ProductDetailsBloc
   final ApiService _apiService;
   final AuthSessionService _authSessionService;
   final ProductShareGateway _productShareGateway;
+  final ReviewEligibilityGateway _reviewEligibilityGateway;
 
   ProductDetailsBloc({
     ApiService? apiService,
     AuthSessionService authSessionService = const AuthSessionService(),
     ProductShareGateway? productShareGateway,
+    ReviewEligibilityGateway? reviewEligibilityGateway,
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
        _productShareGateway =
            productShareGateway ?? const ProductShareService(),
+       _reviewEligibilityGateway =
+           reviewEligibilityGateway ?? ReviewEligibilityService(),
        super(const ProductDetailsState()) {
     on<ProductDetailsStarted>(_onStarted);
     on<ProductDetailsImageChanged>(_onImageChanged);
@@ -36,6 +41,9 @@ class ProductDetailsBloc
     on<ProductDetailsQuantityDecremented>(_onQuantityDecremented);
     on<ProductDetailsShareRequested>(_onShareRequested);
     on<ProductDetailsReviewSubmitted>(_onReviewSubmitted);
+    on<ProductDetailsReviewEligibilityRetryRequested>(
+      _onReviewEligibilityRetryRequested,
+    );
     on<ProductDetailsAddToCartPressed>(_onAddToCartPressed);
     on<ProductDetailsBuyNowPressed>(_onBuyNowPressed);
     on<ProductDetailsReloadRequested>(_onReloadRequested);
@@ -118,11 +126,17 @@ class ProductDetailsBloc
     emit(state.copyWith(selectedImageIndex: event.index));
   }
 
-  void _onTabChanged(
+  Future<void> _onTabChanged(
     ProductDetailsTabChanged event,
     Emitter<ProductDetailsState> emit,
-  ) {
+  ) async {
     emit(state.copyWith(selectedTabIndex: event.index));
+
+    if (event.index == 1 &&
+        (state.reviewEligibilityStatus == ReviewEligibilityStatus.unchecked ||
+            state.reviewEligibilityStatus == ReviewEligibilityStatus.failure)) {
+      await _loadReviewEligibility(emit);
+    }
   }
 
   void _onQuantityIncremented(
@@ -195,7 +209,10 @@ class ProductDetailsBloc
     Emitter<ProductDetailsState> emit,
   ) async {
     final product = state.product;
-    if (product == null) return;
+    if (product == null ||
+        state.reviewEligibilityStatus != ReviewEligibilityStatus.eligible) {
+      return;
+    }
 
     emit(
       state.copyWith(
@@ -241,6 +258,75 @@ class ProductDetailsBloc
         state.copyWith(
           status: ProductDetailsStatus.failure,
           errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onReviewEligibilityRetryRequested(
+    ProductDetailsReviewEligibilityRetryRequested event,
+    Emitter<ProductDetailsState> emit,
+  ) async {
+    await _loadReviewEligibility(emit);
+  }
+
+  Future<void> _loadReviewEligibility(Emitter<ProductDetailsState> emit) async {
+    final product = state.product;
+    if (product == null) return;
+
+    try {
+      final session = await _authSessionService.read();
+
+      if (!session.isAuthenticated) {
+        emit(
+          state.copyWith(
+            reviewEligibilityStatus: ReviewEligibilityStatus.loginRequired,
+          ),
+        );
+        return;
+      }
+
+      if (session.isBusiness) {
+        emit(
+          state.copyWith(
+            reviewEligibilityStatus:
+                ReviewEligibilityStatus.customerAccountRequired,
+          ),
+        );
+        return;
+      }
+
+      final token = session.token;
+      if (token == null || token.isEmpty) {
+        emit(
+          state.copyWith(
+            reviewEligibilityStatus: ReviewEligibilityStatus.loginRequired,
+          ),
+        );
+        return;
+      }
+
+      emit(
+        state.copyWith(
+          reviewEligibilityStatus: ReviewEligibilityStatus.checking,
+        ),
+      );
+
+      final decision = await _reviewEligibilityGateway.productEligibility(
+        token: token,
+        businessId: state.businessId,
+        productId: product.id,
+      );
+
+      emit(
+        state.copyWith(
+          reviewEligibilityStatus: statusForReviewDecision(decision),
+        ),
+      );
+    } catch (_) {
+      emit(
+        state.copyWith(
+          reviewEligibilityStatus: ReviewEligibilityStatus.failure,
         ),
       );
     }

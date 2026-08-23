@@ -5,6 +5,10 @@ import { ProductReview } from '../models/ProductReview.js';
 import { requireBoolean } from './favorite.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { notifyNewReview } from '../services/notification.service.js';
+import {
+  assertReviewEligible,
+  getReviewEligibility
+} from '../services/review-eligibility.service.js';
 import { AppError } from '../utils/AppError.js';
 import {
   decimalParam,
@@ -438,6 +442,26 @@ export const listBusinessProductReviews = asyncHandler(async (req, res) => {
   });
 });
 
+export const getBusinessProductReviewEligibility = asyncHandler(
+  async (req, res) => {
+    const { business, product } = await findActiveBusinessProduct(
+      req.params.id,
+      req.params.productId
+    );
+
+    const eligibility = await getReviewEligibility({
+      user: req.user,
+      businessId: business._id,
+      productId: product._id
+    });
+
+    res.json({
+      success: true,
+      data: { eligibility }
+    });
+  }
+);
+
 export const createBusinessProductReview = asyncHandler(async (req, res) => {
   const { business, product } = await findActiveBusinessProduct(
     req.params.id,
@@ -448,6 +472,12 @@ export const createBusinessProductReview = asyncHandler(async (req, res) => {
   if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
     throw new AppError('Rating must be between 1 and 5', 400, 'INVALID_RATING');
   }
+
+  await assertReviewEligible({
+    user: req.user,
+    businessId: business._id,
+    productId: product._id
+  });
 
   const productId = String(product._id);
   const review = await ProductReview.findOneAndUpdate(
@@ -529,6 +559,30 @@ export const listBusinessReviews = asyncHandler(async (req, res) => {
   });
 });
 
+export const getBusinessReviewEligibility = asyncHandler(
+  async (req, res) => {
+    const business = await findBusiness(req.params.id);
+
+    if (!business || !business.isActive) {
+      throw new AppError(
+        'Business not found',
+        404,
+        'BUSINESS_NOT_FOUND'
+      );
+    }
+
+    const eligibility = await getReviewEligibility({
+      user: req.user,
+      businessId: business._id
+    });
+
+    res.json({
+      success: true,
+      data: { eligibility }
+    });
+  }
+);
+
 export const createBusinessReview = asyncHandler(async (req, res) => {
   const business = await findBusiness(req.params.id);
 
@@ -540,6 +594,11 @@ export const createBusinessReview = asyncHandler(async (req, res) => {
   if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
     throw new AppError('Rating must be between 1 and 5', 400, 'INVALID_RATING');
   }
+
+  await assertReviewEligible({
+    user: req.user,
+    businessId: business._id
+  });
 
   const review = await BusinessReview.findOneAndUpdate(
     { business: business._id, user: req.user._id },

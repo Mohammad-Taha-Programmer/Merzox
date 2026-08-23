@@ -1,4 +1,5 @@
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/review_eligibility_service.dart';
 
 enum BusinessProfileStatus { initial, loading, ready, savingReview, failure }
 
@@ -20,6 +21,7 @@ final class BusinessProfileState {
   final String productsError;
   final String reviewsError;
   final String errorMessage;
+  final ReviewEligibilityStatus reviewEligibilityStatus;
 
   const BusinessProfileState({
     this.status = BusinessProfileStatus.initial,
@@ -37,6 +39,7 @@ final class BusinessProfileState {
     this.productsError = '',
     this.reviewsError = '',
     this.errorMessage = '',
+    this.reviewEligibilityStatus = ReviewEligibilityStatus.unchecked,
   });
 
   BusinessProfileState copyWith({
@@ -55,6 +58,7 @@ final class BusinessProfileState {
     String? productsError,
     String? reviewsError,
     String? errorMessage,
+    ReviewEligibilityStatus? reviewEligibilityStatus,
   }) {
     return BusinessProfileState(
       status: status ?? this.status,
@@ -73,6 +77,8 @@ final class BusinessProfileState {
       productsError: productsError ?? this.productsError,
       reviewsError: reviewsError ?? this.reviewsError,
       errorMessage: errorMessage ?? this.errorMessage,
+      reviewEligibilityStatus:
+          reviewEligibilityStatus ?? this.reviewEligibilityStatus,
     );
   }
 }

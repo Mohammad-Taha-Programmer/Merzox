@@ -36,3 +36,15 @@ export function requireBusinessUser(req, _res, next) {
 
   next();
 }
+
+export function requireCustomerUser(req, _res, next) {
+  if (!req.user || req.user.userType !== 'normal') {
+    throw new AppError(
+      'A customer account is required',
+      403,
+      'CUSTOMER_ACCOUNT_REQUIRED'
+    );
+  }
+
+  next();
+}

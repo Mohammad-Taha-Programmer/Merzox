@@ -19,6 +19,7 @@ import 'package:merzox/features/business_profile/pages/business_profile_page.dar
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/review_eligibility_service.dart';
 
 import 'auth_session_fixtures.dart';
 import 'catalog_test_fixtures.dart';
@@ -142,6 +143,25 @@ class _SpyStorefrontApi extends ApiService {
   }
 }
 
+class _EligibleReviewGateway implements ReviewEligibilityGateway {
+  @override
+  Future<ReviewEligibilityDecision> businessEligibility({
+    required String token,
+    required String businessId,
+  }) async {
+    return const ReviewEligibilityDecision(eligible: true, reason: null);
+  }
+
+  @override
+  Future<ReviewEligibilityDecision> productEligibility({
+    required String token,
+    required String businessId,
+    required String productId,
+  }) async {
+    return const ReviewEligibilityDecision(eligible: true, reason: null);
+  }
+}
+
 /// Serves the merchant shell. Its owner objects deliberately carry private
 /// values so the preview's data boundary is exercised with real leak bait.
 class _SpyMerchantApi extends ApiService {
@@ -252,8 +272,13 @@ Future<BusinessProfileBloc> _startedBloc(
   _SpyStorefrontApi api, {
   required BusinessProfileViewMode viewMode,
   bool closeOnTearDown = true,
+  ReviewEligibilityGateway? reviewEligibilityGateway,
 }) async {
-  final bloc = BusinessProfileBloc(apiService: api, viewMode: viewMode);
+  final bloc = BusinessProfileBloc(
+    apiService: api,
+    viewMode: viewMode,
+    reviewEligibilityGateway: reviewEligibilityGateway,
+  );
   if (closeOnTearDown) addTearDown(bloc.close);
 
   final ready = bloc.stream.firstWhere(
@@ -464,16 +489,30 @@ void main() {
     });
 
     test(
-      'J (customer control) - a review event still reaches the API',
+      'J (customer control) - an eligible customer review reaches the API',
       () async {
+        useAuthenticatedSession(business: false);
+
         final api = _SpyStorefrontApi();
         final bloc = await _startedBloc(
           api,
           viewMode: BusinessProfileViewMode.customer,
+          reviewEligibilityGateway: _EligibleReviewGateway(),
         );
 
+        final eligible = bloc.stream.firstWhere(
+          (state) =>
+              state.reviewEligibilityStatus == ReviewEligibilityStatus.eligible,
+        );
+        bloc.add(const BusinessProfileMainTabChanged(2));
+        await eligible;
+
         final saved = bloc.stream.firstWhere(
-          (state) => state.status == BusinessProfileStatus.ready,
+          (state) =>
+              state.status == BusinessProfileStatus.ready &&
+              api.mutations.contains(
+                'POST /businesses/64b000000000000000000001/reviews',
+              ),
         );
         bloc.add(
           const BusinessProfileReviewSubmitted(rating: 5, comment: 'ممتاز'),
@@ -818,12 +857,15 @@ void main() {
     testWidgets('P - the customer storefront keeps every mutation affordance', (
       tester,
     ) async {
+      useAuthenticatedSession(business: false);
+
       final api = _SpyStorefrontApi()
         ..publicProducts = [_publicProductFromPollutedPayload()];
       final bloc = await _startedBloc(
         api,
         viewMode: BusinessProfileViewMode.customer,
         closeOnTearDown: false,
+        reviewEligibilityGateway: _EligibleReviewGateway(),
       );
 
       await pumpLocalized(
