@@ -175,12 +175,24 @@ export const HOLDS_LIVE_RESERVATION = Object.freeze({
  *
  * The entry holds no lines, so it can never be mistaken for consumption.
  */
-export function buildReservationFailure({ businessId, intentId, failureCode }) {
+
+export function buildReservationFailure({
+  businessId,
+  intentId,
+  failureCode,
+  reservationFence
+}) {
   return {
     filter: {
       _id: businessId,
-      'stockReservations.intent': { $ne: intentId }
+      'stockReservations.intent': { $ne: intentId },
+
+      // Reservation success and terminal failure must compete under the exact
+      // same Business generation. If another failure already rotated the
+      // generation, this worker no longer owns reservation authority.
+      ...reservationFenceClause(reservationFence)
     },
+
     update: {
       $push: {
         stockReservations: {
@@ -189,6 +201,12 @@ export function buildReservationFailure({ businessId, intentId, failureCode }) {
           failureCode,
           lines: []
         }
+      },
+
+      // Permanent fencing. The temporary failed entry may later be deleted,
+      // but every worker carrying the previous generation stays invalid.
+      $inc: {
+        reservationFence: 1
       }
     }
   };
@@ -491,40 +509,51 @@ export function reservationEntryFor({ intentId, lines }) {
   };
 }
 
-export function buildIdentifiedReservation({ businessId, intentId, lines }) {
+export function buildIdentifiedReservation({
+  businessId,
+  intentId,
+  lines,
+  reservationFence
+}) {
   const finiteLines = lines.filter((line) => line.finite);
 
   const filter = {
     _id: businessId,
     isActive: true,
-    // Never twice for the same intent.
+
+    // Never twice for the same checkout intent.
     'stockReservations.intent': { $ne: intentId },
+
+    // Permanent fencing:
+    // terminal failure rotates this generation. An old reservation operation
+    // therefore stays invalid even after its temporary failed marker is gone.
+    ...reservationFenceClause(reservationFence),
+
     $and: lines.map((line) => ({
       products: {
         $elemMatch: {
           _id: line.product?._id ?? line.productId,
           isActive: true,
-          // The stock-mode assertion is symmetric on purpose. A finite line
-          // must still be finite AND still have the units; a non-finite line
-          // must still be non-finite. Without the second half a checkout that
-          // read the product as unlimited could reserve after a merchant made
-          // it finite, taking the order without consuming the new inventory.
-          //
-          // `$ne: false` is exactly the negation of `isFiniteStockProduct`:
-          // it matches `true`, a missing field and `null` - the legacy shapes
-          // this project treats as unlimited - and rejects only explicit
-          // `false`. Verified against a real server for all four shapes.
+
+          // Symmetric stock-mode proof.
           ...(line.finite
-            ? { unlimitedStock: false, stockQuantity: { $gte: line.quantity } }
-            : { unlimitedStock: { $ne: false } })
+            ? {
+                unlimitedStock: false,
+                stockQuantity: { $gte: line.quantity }
+              }
+            : {
+                unlimitedStock: { $ne: false }
+              })
         }
       }
     }))
   };
 
   const increments = {};
+
   const arrayFilters = finiteLines.map((line, index) => {
     const alias = `line${index}`;
+
     increments[`products.$[${alias}].stockQuantity`] = -line.quantity;
 
     return {
@@ -534,15 +563,26 @@ export function buildIdentifiedReservation({ businessId, intentId, lines }) {
     };
   });
 
-  // The marker carries what it consumed, written in the SAME update as the
-  // decrement. Recovery therefore never has to trust metadata from a later
-  // cross-collection write that may not have happened.
+  // The marker and the finite-stock decrement remain one Business-document
+  // atomic fact.
   const update = {
-    $push: { stockReservations: reservationEntryFor({ intentId, lines }) }
+    $push: {
+      stockReservations: reservationEntryFor({
+        intentId,
+        lines
+      })
+    }
   };
-  if (finiteLines.length > 0) update.$inc = increments;
 
-  return { filter, update, arrayFilters };
+  if (finiteLines.length > 0) {
+    update.$inc = increments;
+  }
+
+  return {
+    filter,
+    update,
+    arrayFilters
+  };
 }
 
 /**
@@ -617,4 +657,22 @@ export function buildReservationSettlement({ businessId, intentId }) {
     filter: { _id: businessId, 'stockReservations.intent': intentId },
     update: { $pull: { stockReservations: { intent: intentId } } }
   };
+}
+
+export function reservationFenceClause(value) {
+  const fence =
+    Number.isSafeInteger(value) && value >= 0
+      ? value
+      : 0;
+
+  if (fence === 0) {
+    return {
+      $or: [
+        { reservationFence: 0 },
+        { reservationFence: { $exists: false } }
+      ]
+    };
+  }
+
+  return { reservationFence: fence };
 }

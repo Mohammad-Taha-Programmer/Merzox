@@ -204,16 +204,20 @@ async function continueFinalization(intent, staleAfterMs) {
  * the checkout succeeded and only the bookkeeping is missing; if it does not,
  * nothing was sold and the reservation must go back.
  */
+
 /**
- * Clears whatever a terminally released checkout still has recorded.
+ * Clears whatever temporary Business-side reservation bookkeeping a terminally
+ * released checkout still owns.
  *
- * Two things can be sitting there. A `failed` entry is the durable refusal that
- * fenced concurrent reservation writes; it holds nothing, so it is simply
- * pulled. A live reservation should not be there at all - but if a worker that
- * stalled longer than the whole lease managed to reserve after the refusal
- * record was swept, the stock it took has to come back. Both are marker-guarded
- * and therefore apply exactly once.
+ * A `failed` entry holds no stock and can therefore be pulled directly. The
+ * permanent stale-worker protection does NOT depend on keeping that entry:
+ * terminal failure already advanced Business.reservationFence, so an operation
+ * carrying the pre-failure generation remains invalid after cleanup.
+ *
+ * A live reservation is still compensated defensively if encountered, using
+ * the authoritative finite lines stored in its marker.
  */
+
 async function settleTerminalMarker(intent) {
   const holder = await Business.findById(intent.business).select(
     '+stockReservations'

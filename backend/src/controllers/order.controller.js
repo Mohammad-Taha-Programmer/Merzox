@@ -10,8 +10,8 @@ import {
   customerCancellableStatuses,
   orderStatusGroups as policyStatusGroups
 } from '../policies/order-status.policy.js';
+
 import {
-  CLAIMABLE_PHASES,
   CLAIM_ERRORS,
   CONVERGENCE_ATTEMPTS,
   CONVERGENCE_INTERVAL_MS,
@@ -37,6 +37,8 @@ import {
 import {
   RESERVATION_OUTCOMES,
   attemptReservation,
+  normalizedFence,
+  refreshReservationAuthority,
   reservationOutcome,
   resolveReservationFailure,
   withdrawReservationFailure
@@ -182,136 +184,365 @@ function linesForHeldReservation({ business, held }) {
   return resolved.error ? null : resolved.lines;
 }
 
-async function reserveStock({ intent, businessId, lines, normalizedItems }) {
+async function reserveStock({
+  intent,
+  businessId,
+  lines,
+  normalizedItems
+}) {
   let attemptLines = lines;
+  let workingIntent = intent;
+  let reservationHeld = false;
 
   for (let attempt = 0; attempt < RESERVE_ATTEMPTS; attempt += 1) {
+    const expectedFence = normalizedFence(
+      workingIntent.reservationFence
+    );
+
     const reserved = await attemptReservation({
       businessId,
-      intentId: intent._id,
-      lines: attemptLines
+      intentId: workingIntent._id,
+      lines: attemptLines,
+      reservationFence: expectedFence
     });
 
-    if (reserved.matched) break;
+    if (reserved.matched) {
+      reservationHeld = true;
+      break;
+    }
 
-    // One read of the single fact that decides this checkout's reservation.
     const outcome = await reservationOutcome({
       businessId,
-      intentId: intent._id
+      intentId: workingIntent._id
     });
 
-    // This intent already holds the stock - a resumed attempt, not a refusal.
-    if (outcome.state === RESERVATION_OUTCOMES.reserved) break;
+    if (outcome.state === RESERVATION_OUTCOMES.reserved) {
+      const holder = await Business.findOne({
+        _id: businessId
+      });
 
-    // A terminal refusal is already durable for this checkout. Answer the same
-    // way it did rather than re-deciding it.
-    if (outcome.state === RESERVATION_OUTCOMES.failed) {
-      throw checkoutFailure(outcome.failureCode ?? CHECKOUT_ERRORS.outOfStock);
-    }
-
-    // Nothing matched and nothing is recorded, so the product moved underneath
-    // us. Re-read the truth before deciding whether that is a refusal or simply
-    // a different - still purchasable - shape.
-    const recheck = await Business.findOne({ _id: businessId, isActive: true });
-    const diagnosis = recheck
-      ? resolveOrderLines({ products: recheck.products, items: normalizedItems })
-      : { error: CHECKOUT_ERRORS.notAvailable };
-
-    const stillPurchasable =
-      !diagnosis.error && attempt + 1 < RESERVE_ATTEMPTS;
-
-    if (stillPurchasable) {
-      // For example: the merchant switched the product to unlimited stock. The
-      // basket is genuinely fine now, so reserve against the new semantics
-      // rather than failing a customer for a change they never made.
-      attemptLines = diagnosis.lines;
-      continue;
-    }
-
-    const code = diagnosis.error ?? CHECKOUT_ERRORS.outOfStock;
-
-    // The refusal is a CLAIM, not a conclusion. Everything above is an
-    // observation that a concurrent worker on this same key could already have
-    // invalidated, so the right to fail terminally has to be won atomically -
-    // against the very predicate a reservation would have to win too.
-    const decision = await resolveReservationFailure({
-      businessId,
-      intentId: intent._id,
-      failureCode: code
-    });
-
-    if (decision.converge === RESERVATION_OUTCOMES.failed) {
-      throw checkoutFailure(decision.failureCode ?? code);
-    }
-
-    if (decision.converge === RESERVATION_OUTCOMES.reserved) {
-      // A concurrent worker reserved between this worker's attempt and its
-      // decision. Converging on that reservation is the only correct answer:
-      // writing `released` here would strand consumed stock behind a
-      // terminally failed checkout.
-      const holder = await Business.findOne({ _id: businessId });
       const held = holder
-        ? linesForHeldReservation({ business: holder, held: decision.lines })
+        ? linesForHeldReservation({
+            business: holder,
+            held: outcome.lines
+          })
         : null;
 
       if (!held) {
-        // The reservation is real but cannot be priced from the catalog as it
-        // stands. Its owner is still driving this checkout, so the truthful
-        // answer is in-progress - never a terminal failure.
-        throw checkoutFailure(IDEMPOTENCY_ERRORS.inProgress);
+        throw checkoutFailure(
+          IDEMPOTENCY_ERRORS.inProgress
+        );
       }
 
       attemptLines = held;
+      reservationHeld = true;
       break;
     }
 
-    if (!decision.owned) {
-      // An outcome exists that is neither of the two above. Unreachable by
-      // construction, and reported as in-progress so it can never become a
-      // false stock error.
-      throw checkoutFailure(IDEMPOTENCY_ERRORS.inProgress);
+    if (outcome.state === RESERVATION_OUTCOMES.failed) {
+      throw checkoutFailure(
+        outcome.failureCode ??
+          CHECKOUT_ERRORS.outOfStock
+      );
     }
 
-    // Only now: the refusal is durable and no reservation for this intent can
-    // ever land. Conditional on the phase, so a checkout another worker already
-    // owns is never overwritten - and the result of that write is believed.
-    const released = await CheckoutIntent.updateOne(
-      { _id: intent._id, phase: { $in: CLAIMABLE_PHASES } },
-      { $set: { phase: 'released', failureCode: code } }
-    );
+    /**
+     * No outcome exists for this intent.
+     *
+     * Refresh reservation authority only while the CheckoutIntent is still
+     * prepared. A released/finalizing/releasing/finalized checkout can never
+     * obtain a new generation.
+     */
+    const authority = await refreshReservationAuthority({
+      intentId: workingIntent._id,
+      businessId
+    });
+
+    if (!authority.owned) {
+      if (
+        authority.converge ===
+        RESERVATION_OUTCOMES.failed
+      ) {
+        throw checkoutFailure(
+          authority.failureCode ??
+            CHECKOUT_ERRORS.outOfStock
+        );
+      }
+
+      if (
+        authority.converge ===
+        RESERVATION_OUTCOMES.reserved
+      ) {
+        const settled = await reservationOutcome({
+          businessId,
+          intentId: workingIntent._id
+        });
+
+        const holder = await Business.findOne({
+          _id: businessId
+        });
+
+        const held =
+          settled.state ===
+            RESERVATION_OUTCOMES.reserved &&
+          holder
+            ? linesForHeldReservation({
+                business: holder,
+                held: settled.lines
+              })
+            : null;
+
+        if (!held) {
+          throw checkoutFailure(
+            IDEMPOTENCY_ERRORS.inProgress
+          );
+        }
+
+        attemptLines = held;
+        reservationHeld = true;
+        break;
+      }
+
+      const current =
+        await CheckoutIntent.findById(
+          workingIntent._id
+        );
+
+      if (current?.phase === 'released') {
+        throw checkoutFailure(
+          current.failureCode ??
+            CHECKOUT_ERRORS.outOfStock
+        );
+      }
+
+      throw checkoutFailure(
+        IDEMPOTENCY_ERRORS.inProgress
+      );
+    }
+
+    // From this point onward use the durable refreshed generation, never the
+    // stale in-memory intent that entered this function.
+    workingIntent = authority.intent;
+
+    const recheck = await Business.findOne({
+      _id: businessId,
+      isActive: true
+    });
+
+    const diagnosis = recheck
+      ? resolveOrderLines({
+          products: recheck.products,
+          items: normalizedItems
+        })
+      : {
+          error: CHECKOUT_ERRORS.notAvailable
+        };
+
+    if (!diagnosis.error) {
+      if (
+        attempt + 1 <
+        RESERVE_ATTEMPTS
+      ) {
+        attemptLines = diagnosis.lines;
+        continue;
+      }
+
+      // Inventory remains purchasable. Only repeated contention exhausted the
+      // bounded retry budget; that is not truthful grounds for a stock error.
+      throw checkoutFailure(
+        IDEMPOTENCY_ERRORS.inProgress
+      );
+    }
+
+    const code = diagnosis.error;
+
+    /**
+     * Terminal failure is itself a fenced Business write.
+     *
+     * Success means:
+     *   - the temporary failed outcome was recorded; and
+     *   - reservationFence was permanently advanced.
+     *
+     * Therefore every worker carrying this generation or an older one is now
+     * unable to decrement inventory.
+     */
+    const decision =
+      await resolveReservationFailure({
+        businessId,
+        intentId: workingIntent._id,
+        failureCode: code,
+        reservationFence: normalizedFence(
+          workingIntent.reservationFence
+        )
+      });
+
+    if (
+      decision.converge ===
+      RESERVATION_OUTCOMES.failed
+    ) {
+      throw checkoutFailure(
+        decision.failureCode ?? code
+      );
+    }
+
+    if (
+      decision.converge ===
+      RESERVATION_OUTCOMES.reserved
+    ) {
+      const holder = await Business.findOne({
+        _id: businessId
+      });
+
+      const held = holder
+        ? linesForHeldReservation({
+            business: holder,
+            held: decision.lines
+          })
+        : null;
+
+      if (!held) {
+        throw checkoutFailure(
+          IDEMPOTENCY_ERRORS.inProgress
+        );
+      }
+
+      attemptLines = held;
+      reservationHeld = true;
+      break;
+    }
+
+    if (
+      decision.converge ===
+        RESERVATION_OUTCOMES.staleFence ||
+      decision.converge ===
+        RESERVATION_OUTCOMES.open ||
+      !decision.owned
+    ) {
+      // An unrelated checkout may have rotated the Business generation.
+      // That is contention, not evidence that this customer's stock is gone.
+      throw checkoutFailure(
+        IDEMPOTENCY_ERRORS.inProgress
+      );
+    }
+
+    /**
+     * The Business-side terminal decision already won.
+     *
+     * Move the CheckoutIntent to released only if it is still the same prepared
+     * checkout carrying the generation under which this worker decided.
+     */
+    const released =
+      await CheckoutIntent.updateOne(
+        {
+          _id: workingIntent._id,
+          phase: 'prepared',
+          reservationFence: normalizedFence(
+            workingIntent.reservationFence
+          )
+        },
+        {
+          $set: {
+            phase: 'released',
+            failureCode: code
+          }
+        }
+      );
 
     if (released.matchedCount === 0) {
-      // The checkout left the failable phases while this worker was deciding -
-      // another worker reserved, sold and settled it, which is why the refusal
-      // record could be pushed at all. Withdraw the record, which holds no
-      // stock and is scoped to this intent's refusal so it can never remove a
-      // live reservation, and let the finalization step report the truth: a
-      // customer whose order exists must not be told the stock ran out.
-      await withdrawReservationFailure({ businessId, intentId: intent._id });
+      /**
+       * Do NOT roll reservationFence backwards.
+       *
+       * The generation rotation is permanent. Only remove this intent's
+       * temporary failure bookkeeping.
+       */
+      await withdrawReservationFailure({
+        businessId,
+        intentId: workingIntent._id
+      });
 
-      break;
+      const current =
+        await CheckoutIntent.findById(
+          workingIntent._id
+        );
+
+      if (current?.phase === 'released') {
+        throw checkoutFailure(
+          current.failureCode ?? code
+        );
+      }
+
+      throw checkoutFailure(
+        IDEMPOTENCY_ERRORS.inProgress
+      );
     }
 
     throw checkoutFailure(code);
   }
 
-  // Only after the stock is provably held. A crash before this line leaves the
-  // intent in `prepared` with the marker set, and the branch above resumes it
-  // without decrementing a second time. The stored lines are whatever was
-  // ACTUALLY reserved, so a later release can only give back exactly that.
-  await CheckoutIntent.updateOne(
-    { _id: intent._id, phase: 'prepared' },
-    {
-      $set: {
-        phase: 'reserved',
-        lines: attemptLines.map((line) => ({
-          productId: line.product._id,
-          quantity: line.quantity,
-          finite: line.finite
-        }))
+  if (!reservationHeld) {
+    throw checkoutFailure(
+      IDEMPOTENCY_ERRORS.inProgress
+    );
+  }
+
+  /**
+   * Persist the post-reservation phase.
+   *
+   * matchedCount is authoritative. A worker that cannot perform this transition
+   * must not continue toward Order creation merely because it once observed a
+   * successful Business write.
+   */
+  const reservedTransition =
+    await CheckoutIntent.updateOne(
+      {
+        _id: workingIntent._id,
+        phase: 'prepared',
+        reservationFence: normalizedFence(
+          workingIntent.reservationFence
+        )
+      },
+      {
+        $set: {
+          phase: 'reserved',
+          lines: attemptLines.map((line) => ({
+            productId: line.product._id,
+            quantity: line.quantity,
+            finite: line.finite
+          }))
+        }
       }
+    );
+
+  if (reservedTransition.matchedCount === 0) {
+    const current =
+      await CheckoutIntent.findById(
+        workingIntent._id
+      );
+
+    if (current?.phase === 'released') {
+      throw checkoutFailure(
+        current.failureCode ??
+          CHECKOUT_ERRORS.outOfStock
+      );
     }
-  );
+
+    if (
+      !current ||
+      ![
+        'reserved',
+        'finalizing',
+        'finalized'
+      ].includes(current.phase)
+    ) {
+      /**
+       * The Business-side marker remains recoverable. Do not proceed into
+       * Order creation when this worker failed to persist its intent transition.
+       */
+      throw checkoutFailure(
+        IDEMPOTENCY_ERRORS.inProgress
+      );
+    }
+  }
 
   return attemptLines;
 }
@@ -456,7 +687,11 @@ export const createOrder = asyncHandler(async (req, res) => {
     throw new AppError('Business id is invalid', 400, 'INVALID_BUSINESS_ID');
   }
 
-  const business = await Business.findOne({ _id: businessId, isActive: true });
+  const business = await Business.findOne({
+    _id: businessId,
+    isActive: true
+  }).select('+reservationFence');
+
   if (!business) {
     throw new AppError('Business is not available', 404, 'BUSINESS_NOT_FOUND');
   }
@@ -515,9 +750,12 @@ export const createOrder = asyncHandler(async (req, res) => {
       user: req.user._id,
       clientOrderId,
       fingerprint,
-      business: business._id,
-      phase: 'prepared',
-      lines: intentLines
+            business: business._id,
+            phase: 'prepared',
+            reservationFence: normalizedFence(
+              business.reservationFence
+            ),
+            lines: intentLines
     });
     owned = true;
   } catch (error) {

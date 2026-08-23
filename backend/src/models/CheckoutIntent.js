@@ -79,7 +79,11 @@ const checkoutIntentSchema = new mongoose.Schema(
       enum: checkoutPhases,
       default: 'prepared'
     },
-
+    reservationFence: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     /** The exact reservation, so a release can only give back what it took. */
     lines: { type: [intentLineSchema], default: [] },
 

@@ -291,40 +291,164 @@ test('a terminal reservation failure competes for the reservation predicate', ()
   const businessId = new mongoose.Types.ObjectId();
   const intentId = new mongoose.Types.ObjectId();
   const productId = new mongoose.Types.ObjectId();
+  const reservationFence = 7;
 
   const failure = buildReservationFailure({
     businessId,
     intentId,
-    failureCode: 'INSUFFICIENT_STOCK'
+    failureCode: 'INSUFFICIENT_STOCK',
+    reservationFence
   });
+
   const reservation = buildIdentifiedReservation({
     businessId,
     intentId,
-    lines: [{ productId, quantity: 2, finite: true }]
+    lines: [
+      {
+        productId,
+        quantity: 2,
+        finite: true
+      }
+    ],
+    reservationFence
   });
 
-  // THE point of the design: both are a push into the same array, guarded by
-  // the same predicate on the same document, so exactly one can land.
-  assert.deepEqual(failure.filter['stockReservations.intent'], { $ne: intentId });
-  assert.deepEqual(reservation.filter['stockReservations.intent'], {
-    $ne: intentId
-  });
-  assert.ok(failure.update.$push.stockReservations);
-  assert.ok(reservation.update.$push.stockReservations);
+  // Both outcomes still compete for this exact intent.
+  assert.deepEqual(
+    failure.filter['stockReservations.intent'],
+    { $ne: intentId }
+  );
 
-  // A refusal holds nothing and can never be read as consumption.
-  const entry = failure.update.$push.stockReservations;
-  assert.equal(entry.state, RESERVATION_STATES.failed);
+  assert.deepEqual(
+    reservation.filter['stockReservations.intent'],
+    { $ne: intentId }
+  );
+
+  // R9 adds a second part to the same decision: both writes must also be
+  // authorized under the exact same permanent Business generation.
+  assert.equal(
+    failure.filter.reservationFence,
+    reservationFence
+  );
+
+  assert.equal(
+    reservation.filter.reservationFence,
+    reservationFence
+  );
+
+  assert.ok(
+    failure.update.$push.stockReservations
+  );
+
+  assert.ok(
+    reservation.update.$push.stockReservations
+  );
+
+  // A refusal still holds no inventory.
+  const entry =
+    failure.update.$push.stockReservations;
+
+  assert.equal(
+    entry.state,
+    RESERVATION_STATES.failed
+  );
+
   assert.deepEqual(entry.lines, []);
-  assert.equal(entry.failureCode, 'INSUFFICIENT_STOCK');
-  assert.equal(failure.update.$inc, undefined, 'a refusal never touches stock');
 
-  // And the reservation still records what it actually took.
+  assert.equal(
+    entry.failureCode,
+    'INSUFFICIENT_STOCK'
+  );
+
+  // The only increment performed by a terminal failure is the permanent
+  // fencing generation. No product quantity is touched.
+  assert.deepEqual(
+    failure.update.$inc,
+    {
+      reservationFence: 1
+    }
+  );
+
+  assert.equal(
+    Object.keys(failure.update.$inc).some(
+      (path) => path.startsWith('products.')
+    ),
+    false,
+    'a refusal rotates authority but never changes product stock'
+  );
+
+  // A successful reservation still records the stock it actually consumed.
   assert.equal(
     reservation.update.$push.stockReservations.state,
     RESERVATION_STATES.reserved
   );
 });
+
+test('reservation authority is fenced by the exact Business generation', () => {
+  const businessId = new mongoose.Types.ObjectId();
+  const intentId = new mongoose.Types.ObjectId();
+  const productId = new mongoose.Types.ObjectId();
+
+  const generation = 11;
+
+  const reservation = buildIdentifiedReservation({
+    businessId,
+    intentId,
+    reservationFence: generation,
+    lines: [
+      {
+        productId,
+        quantity: 1,
+        finite: true
+      }
+    ]
+  });
+
+  assert.equal(
+    reservation.filter.reservationFence,
+    generation
+  );
+
+  // A terminal failure under generation 11 permanently moves the Business
+  // generation forward, so this old reservation predicate can never match
+  // generation 12.
+  assert.notEqual(
+    reservation.filter.reservationFence,
+    generation + 1
+  );
+});
+
+test('generation zero remains compatible with a legacy Business document', () => {
+  const businessId = new mongoose.Types.ObjectId();
+  const intentId = new mongoose.Types.ObjectId();
+  const productId = new mongoose.Types.ObjectId();
+
+  const reservation = buildIdentifiedReservation({
+    businessId,
+    intentId,
+    reservationFence: 0,
+    lines: [
+      {
+        productId,
+        quantity: 1,
+        finite: true
+      }
+    ]
+  });
+
+  assert.deepEqual(
+    reservation.filter.$or,
+    [
+      { reservationFence: 0 },
+      {
+        reservationFence: {
+          $exists: false
+        }
+      }
+    ]
+  );
+});
+
 
 test('a refusal record is never compensated as if it were stock', () => {
   const intentId = new mongoose.Types.ObjectId();

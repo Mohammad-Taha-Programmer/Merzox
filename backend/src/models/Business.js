@@ -193,12 +193,22 @@ const businessSchema = new mongoose.Schema(
      * only ever holds checkouts that are genuinely in flight. It is internal
      * and appears on no serializer.
      *
-     * The array is also the arbiter between a successful reservation and a
-     * terminal reservation failure for the same checkout: both are a `$push`
-     * guarded by "no entry for this intent yet", so exactly one can land. A
-     * `failed` entry holds no stock, and is therefore ignored by the merchant
-     * inventory guard and by compensation.
+     * The array arbitrates the immediate reservation outcome for one checkout.
+     * `reservationFence` adds the permanent fence: terminal failure advances
+     * this Business-wide generation, so workers authorized under an older
+     * generation remain invalid even after their temporary `failed` entry is
+     * cleaned up.
+     *
+     * The generation is one bounded scalar for the whole Business. It does not
+     * grow with the number of failed checkouts and is never serialized.
      */
+     reservationFence: {
+       type: Number,
+       default: 0,
+       min: 0,
+       select: false
+     },
+
     stockReservations: {
       type: [stockReservationSchema],
       default: [],

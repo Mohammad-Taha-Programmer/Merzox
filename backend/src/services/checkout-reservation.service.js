@@ -1,4 +1,6 @@
 import { Business } from '../models/Business.js';
+import { CheckoutIntent } from '../models/CheckoutIntent.js';
+
 import {
   RESERVATION_STATES,
   buildIdentifiedReservation,
@@ -8,57 +10,70 @@ import {
 } from '../policies/checkout-intent.policy.js';
 
 /**
- * Exclusive ownership of one checkout's RESERVATION outcome.
+ * The durable outcomes recorded in Business.stockReservations.
  *
- * A checkout's reservation can end two ways, and they are mutually exclusive
- * facts about the same inventory: either stock was decremented for this intent,
- * or the reservation was refused terminally. R7 made the finalize/release
- * decision monotonic; this makes the decision BEFORE it exclusive.
- *
- * The hazard it closes is a read-check-write. A worker used to conclude "the
- * stock is not there" from an earlier `Business.exists` and then write
- * `released` several operations later. A second worker on the same key - one
- * that took the checkout over after the convergence timeout - could reserve
- * inside that gap, leaving a released intent standing against a live
- * reservation and permanently consumed stock that no sweep would ever inspect.
- *
- * The fix is not another check. Both outcomes are a `$push` into
- * `stockReservations` guarded by the SAME predicate:
- *
- *   'stockReservations.intent': { $ne: intentId }
- *
- * so MongoDB's single-document atomicity decides. Exactly one can land, the
- * loser is told by a matched count of zero, and a stale worker that wakes up
- * later finds its reservation write matching nothing because the failure record
- * is already sitting in the array it is guarded against. No lease, no token and
- * no transaction is needed: the array itself is the arbiter.
- *
- * Every function here reports what the database actually did. A caller may
- * never treat a lost claim as permission.
+ * `reserved` and `failed` are immediate per-intent outcomes.
+ * `staleFence` is not stored: it means another terminal failure on this
+ * Business rotated the permanent generation and this worker must refresh its
+ * authority before doing reservation work again.
  */
-
-/** What the array says about this checkout, once and for all. */
 export const RESERVATION_OUTCOMES = {
-  /** Stock is decremented and held for this intent. */
   reserved: 'reserved',
-  /** The reservation was refused terminally, durably. */
   failed: 'failed',
-  /** Nothing recorded yet: the outcome is still open. */
-  open: 'open'
+  open: 'open',
+  staleFence: 'staleFence'
 };
 
+export function normalizedFence(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : 0;
+}
+
 /**
- * Attempts the reservation itself.
- *
- * Unchanged in shape from R6/R7 - the decrement and the marker recording what
- * it consumed are still one atomic write - but it is now also fenced by the
- * failure record: if a terminal refusal landed first, this matches nothing.
+ * Reads both reservation bookkeeping and the current permanent Business fence.
  */
-export async function attemptReservation({ businessId, intentId, lines }) {
+export async function loadReservationContext({
+  businessId,
+  intentId
+}) {
+  const business = await Business.findById(businessId).select(
+    '+stockReservations +reservationFence'
+  );
+
+  if (!business) {
+    return {
+      business: null,
+      fence: null,
+      outcome: null
+    };
+  }
+
+  const outcome = reservationEntryOf(business, intentId);
+
+  return {
+    business,
+    fence: normalizedFence(business.reservationFence),
+    outcome
+  };
+}
+
+/**
+ * Executes one already-authorized reservation attempt.
+ *
+ * The reservation write itself checks the permanent Business generation.
+ * Therefore a worker that becomes stale before this write cannot decrement
+ * inventory and discover the loss afterwards: Mongo simply matches nothing.
+ */
+export async function attemptReservation({
+  businessId,
+  intentId,
+  lines,
+  reservationFence
+}) {
   const reservation = buildIdentifiedReservation({
     businessId,
     intentId,
-    lines
+    lines,
+    reservationFence
   });
 
   const result = await Business.updateOne(
@@ -69,27 +84,38 @@ export async function attemptReservation({ businessId, intentId, lines }) {
       : undefined
   );
 
-  return { matched: result.matchedCount > 0 };
+  return {
+    matched: result.matchedCount > 0
+  };
 }
 
 /**
- * Reads the one durable fact that decides this checkout's reservation.
- *
- * A single read of the arbiter, so a caller never has to combine two
- * observations that could disagree.
+ * Reads the one Business-side outcome already recorded for this intent.
  */
-export async function reservationOutcome({ businessId, intentId }) {
-  const holder = await Business.findById(businessId).select(
-    '+stockReservations'
-  );
-  const entry = reservationEntryOf(holder, intentId);
+export async function reservationOutcome({
+  businessId,
+  intentId
+}) {
+  const context = await loadReservationContext({
+    businessId,
+    intentId
+  });
 
-  if (!entry) return { state: RESERVATION_OUTCOMES.open, entry: null };
+  const entry = context.outcome;
+
+  if (!entry) {
+    return {
+      state: RESERVATION_OUTCOMES.open,
+      entry: null,
+      fence: context.fence
+    };
+  }
 
   if (isLiveReservationEntry(entry)) {
     return {
       state: RESERVATION_OUTCOMES.reserved,
       entry,
+      fence: context.fence,
       lines: (entry.lines ?? []).map((line) => ({
         productId: line.productId,
         quantity: line.quantity
@@ -100,70 +126,84 @@ export async function reservationOutcome({ businessId, intentId }) {
   return {
     state: RESERVATION_OUTCOMES.failed,
     entry,
+    fence: context.fence,
     failureCode: entry.failureCode ?? null
   };
 }
 
 /**
- * Claims the right to declare this checkout's reservation terminally failed.
+ * Competes atomically with a successful reservation.
  *
- * This is the whole mutual-exclusion mechanism, and it has to BE the
- * conditional write rather than a decision taken before one. `owned: false`
- * means another worker's outcome is already recorded for this intent - and
- * `released` must not be written, because the recorded outcome may be a live
- * reservation holding real stock.
+ * If this succeeds it:
+ *   1. records this intent's temporary failed outcome; and
+ *   2. permanently rotates the Business generation.
+ *
+ * Both happen in one Business update.
  */
 export async function claimReservationFailure({
   businessId,
   intentId,
-  failureCode
+  failureCode,
+  reservationFence
 }) {
   const failure = buildReservationFailure({
     businessId,
     intentId,
-    failureCode
+    failureCode,
+    reservationFence
   });
 
-  const result = await Business.updateOne(failure.filter, failure.update);
+  const result = await Business.updateOne(
+    failure.filter,
+    failure.update
+  );
 
-  return { owned: result.matchedCount > 0 };
+  return {
+    owned: result.matchedCount > 0
+  };
 }
 
 /**
- * The complete terminal-failure decision for one checkout.
+ * Resolves a terminal reservation failure without confusing:
  *
- * The claim and the response to losing it belong together: a caller that takes
- * only the claim could still act as though a lost one were permission. So this
- * returns what the worker is ALLOWED to do, never just what it wanted to do.
- *
- *   { owned: true }                      -> the refusal is durable; release it
- *   { owned: false, converge: 'failed' } -> somebody already refused it
- *   { owned: false, converge: 'reserved' } -> somebody reserved it; sell that
- *
- * The `reserved` case is the race this whole pass exists for: a concurrent
- * worker on the same key reserved between this worker's attempt and its
- * decision. Writing `released` then would strand consumed stock behind a
- * terminally failed checkout.
+ * - another worker's successful reservation,
+ * - an already-recorded failure, and
+ * - an unrelated Business fence rotation.
  */
 export async function resolveReservationFailure({
   businessId,
   intentId,
-  failureCode
+  failureCode,
+  reservationFence
 }) {
+  const expectedFence = normalizedFence(reservationFence);
+
   const claimed = await claimReservationFailure({
     businessId,
     intentId,
-    failureCode
+    failureCode,
+    reservationFence: expectedFence
   });
 
-  if (claimed.owned) return { owned: true, converge: null };
+  if (claimed.owned) {
+    return {
+      owned: true,
+      converge: null,
+      reservationFence: expectedFence
+    };
+  }
 
-  // The push can only fail when an entry already exists, so read the one that
-  // beat this worker and obey it.
-  const settled = await reservationOutcome({ businessId, intentId });
+  const settled = await reservationOutcome({
+    businessId,
+    intentId
+  });
 
   if (settled.state === RESERVATION_OUTCOMES.reserved) {
-    return { owned: false, converge: RESERVATION_OUTCOMES.reserved, lines: settled.lines };
+    return {
+      owned: false,
+      converge: RESERVATION_OUTCOMES.reserved,
+      lines: settled.lines
+    };
   }
 
   if (settled.state === RESERVATION_OUTCOMES.failed) {
@@ -174,19 +214,33 @@ export async function resolveReservationFailure({
     };
   }
 
-  // Unreachable by construction. Reported as open rather than as a refusal, so
-  // an impossible read can never become a false stock error for a customer.
-  return { owned: false, converge: RESERVATION_OUTCOMES.open };
+  if (
+    settled.fence !== null &&
+    normalizedFence(settled.fence) !== expectedFence
+  ) {
+    return {
+      owned: false,
+      converge: RESERVATION_OUTCOMES.staleFence,
+      fence: normalizedFence(settled.fence)
+    };
+  }
+
+  return {
+    owned: false,
+    converge: RESERVATION_OUTCOMES.open
+  };
 }
 
 /**
- * Withdraws this worker's own refusal record.
+ * Removes only this intent's temporary refusal bookkeeping.
  *
- * Scoped to the intent AND to `failed`, so it can never remove a live
- * reservation. Used when the checkout left the failable phases while this
- * worker was deciding - the refusal is then simply wrong.
+ * IMPORTANT:
+ * reservationFence is deliberately NOT moved backwards here.
  */
-export async function withdrawReservationFailure({ businessId, intentId }) {
+export async function withdrawReservationFailure({
+  businessId,
+  intentId
+}) {
   await Business.updateOne(
     { _id: businessId },
     {
@@ -200,11 +254,81 @@ export async function withdrawReservationFailure({ businessId, intentId }) {
   );
 }
 
-/** Whether an intent is holding stock right now. Never counts a refusal. */
-export async function holdsLiveReservation({ businessId, intentId }) {
-  const outcome = await reservationOutcome({ businessId, intentId });
+export async function holdsLiveReservation({
+  businessId,
+  intentId
+}) {
+  const outcome = await reservationOutcome({
+    businessId,
+    intentId
+  });
 
   return outcome.state === RESERVATION_OUTCOMES.reserved;
+}
+
+/**
+ * Gives a still-prepared CheckoutIntent the newest Business generation.
+ *
+ * `$max` is intentional: two concurrent refreshers can never move the intent
+ * generation backwards.
+ *
+ * A released/releasing/finalizing/finalized checkout cannot refresh authority.
+ */
+export async function refreshReservationAuthority({
+  intentId,
+  businessId
+}) {
+  const context = await loadReservationContext({
+    businessId,
+    intentId
+  });
+
+  if (!context.business) {
+    return {
+      owned: false,
+      reason: 'BUSINESS_NOT_FOUND'
+    };
+  }
+
+  // Someone already made a durable decision for this exact intent.
+  if (context.outcome) {
+    return {
+      owned: false,
+      converge: isLiveReservationEntry(context.outcome)
+        ? RESERVATION_OUTCOMES.reserved
+        : RESERVATION_OUTCOMES.failed,
+      outcome: context.outcome,
+      failureCode: context.outcome.failureCode ?? null
+    };
+  }
+
+  const intent = await CheckoutIntent.findOneAndUpdate(
+    {
+      _id: intentId,
+      phase: 'prepared'
+    },
+    {
+      $max: {
+        reservationFence: context.fence
+      }
+    },
+    {
+      new: true
+    }
+  );
+
+  if (!intent) {
+    return {
+      owned: false,
+      reason: 'CHECKOUT_NOT_RESERVABLE'
+    };
+  }
+
+  return {
+    owned: true,
+    fence: normalizedFence(intent.reservationFence),
+    intent
+  };
 }
 
 export { RESERVATION_STATES };

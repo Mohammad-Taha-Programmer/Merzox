@@ -76,6 +76,8 @@ if (!environment.enabled) {
     RESERVATION_OUTCOMES,
     attemptReservation,
     claimReservationFailure,
+    normalizedFence,
+    refreshReservationAuthority,
     reservationOutcome,
     resolveReservationFailure,
     withdrawReservationFailure
@@ -2220,11 +2222,37 @@ if (!environment.enabled) {
      * metadata write. The intent is deliberately left saying `prepared` with
      * whatever lines it was created with.
      */
-    async function reserveThenCrash({ businessId, intentId, lines }) {
+    async function reserveThenCrash({
+      businessId,
+      intentId,
+      lines,
+      reservationFence = 0
+    }) {
       const reservation = buildIdentifiedReservation({
         businessId: objectId(businessId),
         intentId: objectId(intentId),
-        lines
+        lines,
+        reservationFence
+      });
+
+      return Business.updateOne(
+        reservation.filter,
+        reservation.update,
+        reservation.arrayFilters.length > 0
+          ? { arrayFilters: reservation.arrayFilters }
+          : undefined
+      );
+    }    async function reserveThenCrash({
+      businessId,
+      intentId,
+      lines,
+      reservationFence = 0
+    }) {
+      const reservation = buildIdentifiedReservation({
+        businessId: objectId(businessId),
+        intentId: objectId(intentId),
+        lines,
+        reservationFence
       });
 
       return Business.updateOne(
@@ -2243,7 +2271,8 @@ if (!environment.enabled) {
       businessId,
       lines,
       phase = 'prepared',
-      fingerprint
+      fingerprint,
+      reservationFence = 0
     }) {
       return CheckoutIntent.create({
         user: objectId(userId),
@@ -2251,6 +2280,7 @@ if (!environment.enabled) {
         fingerprint: fingerprint ?? `seed-${clientOrderId}`,
         business: objectId(businessId),
         phase,
+        reservationFence,
         lines
       });
     }
@@ -4199,5 +4229,1617 @@ if (!environment.enabled) {
         'but its own refusal is withdrawn'
       );
     });
+
+    // ================================================================= R9 ===
+    //
+    // Terminal reservation failure is permanently fenced.
+    //
+    // R8 made a temporary `failed` reservation record the arbiter. That was
+    // correct only while the record remained in Business.stockReservations.
+    // Once cleanup removed it, a worker paused longer than the cleanup lease
+    // could become eligible again.
+    //
+    // R9 separates:
+    //
+    //   temporary per-intent bookkeeping
+    //
+    // from:
+    //
+    //   permanent stale-worker authority fencing
+    //
+    // Business.reservationFence is one bounded monotonic scalar. A worker must
+    // carry the generation under which it was authorized. Terminal failure
+    // advances that generation atomically with its temporary failed entry.
+    // Removing the entry therefore never restores old authority.
+
+    async function currentBusinessFence(businessId) {
+      const stored = await Business.findById(
+        objectId(businessId)
+      ).select('+reservationFence');
+
+      return normalizedFence(
+        stored?.reservationFence
+      );
+    }
+
+    function reservationWriteFor(
+      staged,
+      {
+        quantity = staged.quantity,
+        finite = true,
+        reservationFence = normalizedFence(
+          staged.intent.reservationFence
+        )
+      } = {}
+    ) {
+      return buildIdentifiedReservation({
+        businessId: objectId(
+          staged.store.businessId
+        ),
+        intentId: staged.intent._id,
+        lines: [
+          {
+            productId: staged.productId,
+            quantity,
+            finite
+          }
+        ],
+        reservationFence
+      });
+    }
+
+    function executeReservationWrite(write) {
+      return Business.updateOne(
+        write.filter,
+        write.update,
+        write.arrayFilters.length > 0
+          ? {
+              arrayFilters:
+                write.arrayFilters
+            }
+          : undefined
+      );
+    }
+
+    /**
+     * Wins the production Business-side terminal-failure decision and then
+     * performs the phase transition the request path performs after that win.
+     *
+     * The Business write happens first because that is the permanent fence.
+     * A CheckoutIntent may only report `released` after old reservation workers
+     * have already been made incapable of touching inventory.
+     */
+    async function terminalFailureAndRelease(
+      staged,
+      failureCode = 'INSUFFICIENT_STOCK'
+    ) {
+      const current =
+        await CheckoutIntent.findById(
+          staged.intent._id
+        );
+
+      assert.ok(
+        current,
+        'the checkout intent must exist'
+      );
+
+      const fence = normalizedFence(
+        current.reservationFence
+      );
+
+      const decision =
+        await resolveReservationFailure({
+          businessId: objectId(
+            staged.store.businessId
+          ),
+          intentId: current._id,
+          failureCode,
+          reservationFence: fence
+        });
+
+      assert.equal(
+        decision.owned,
+        true,
+        'terminal failure should win this fixture'
+      );
+
+      const released =
+        await CheckoutIntent.updateOne(
+          {
+            _id: current._id,
+            phase: 'prepared',
+            reservationFence: fence
+          },
+          {
+            $set: {
+              phase: 'released',
+              failureCode
+            }
+          }
+        );
+
+      assert.equal(
+        released.matchedCount,
+        1,
+        'the winning failure must become released'
+      );
+
+      return {
+        fence,
+        decision
+      };
+    }
+
+    // ---------------------------------------------------------------- W01 ---
+    await t.test(
+      'W01 the rejected R8 cleanup-only fence really reopens old authority',
+      async () => {
+        const staged =
+          await pendingCheckout({
+            label: 'w01',
+            quantity: 2,
+            product: {
+              price: 20,
+              unlimitedStock: false,
+              stockQuantity: 1
+            }
+          });
+
+        const oldFence =
+          await currentBusinessFence(
+            staged.store.businessId
+          );
+
+        assert.equal(oldFence, 0);
+
+        /**
+         * Build the reservation operation while the worker is still valid.
+         *
+         * This is the operation that will be paused across the terminal
+         * failure and cleanup.
+         */
+        const staleWrite =
+          reservationWriteFor(staged, {
+            quantity: 2,
+            finite: true,
+            reservationFence: oldFence
+          });
+
+        await terminalFailureAndRelease(
+          staged
+        );
+
+        assert.equal(
+          await currentBusinessFence(
+            staged.store.businessId
+          ),
+          oldFence + 1,
+          'terminal failure rotated the permanent generation'
+        );
+
+        // R8 cleaned this temporary entry.
+        await withdrawReservationFailure({
+          businessId: objectId(
+            staged.store.businessId
+          ),
+          intentId: staged.intent._id
+        });
+
+        assert.deepEqual(
+          await reservationEntries(
+            staged.store.businessId
+          ),
+          []
+        );
+
+        const restock = await patchProduct(
+          staged.store.merchant.token,
+          staged.store.productId,
+          {
+            stockQuantity: 5
+          }
+        );
+
+        assert.equal(
+          restock.status,
+          200,
+          `restock should succeed (${restock.code})`
+        );
+
+        /**
+         * Reconstruct ONLY the rejected R8 predicate:
+         *
+         * no per-intent record
+         *
+         * with no permanent generation predicate.
+         *
+         * This is deliberately NOT production code. Its purpose is to prove
+         * non-vacuously that cleanup alone really did reopen the old race.
+         */
+        const rejectedR8Write = {
+          ...staleWrite,
+          filter: {
+            ...staleWrite.filter
+          }
+        };
+
+        delete rejectedR8Write.filter
+          .reservationFence;
+        delete rejectedR8Write.filter.$or;
+
+        const reproduced =
+          await executeReservationWrite(
+            rejectedR8Write
+          );
+
+        assert.equal(
+          reproduced.matchedCount,
+          1,
+          'without the permanent fence, the old R8 write becomes valid again'
+        );
+
+        assert.equal(
+          await ownerStock(
+            staged.store.merchant.token,
+            staged.store.productId
+          ),
+          3,
+          'the rejected old predicate consumes stock after terminal release'
+        );
+
+        assert.equal(
+          (
+            await CheckoutIntent.findById(
+              staged.intent._id
+            )
+          ).phase,
+          'released'
+        );
+
+        /**
+         * The defensive released-intent reconciliation from R8 still heals
+         * this deliberately reconstructed historical orphan. That recovery is
+         * retained, but R9 no longer relies on it for correctness.
+         */
+        await makeStale(
+          staged.intent._id
+        );
+
+        await reconcileStaleCheckouts({
+          staleAfterMs: 60 * 1000
+        });
+
+        assert.equal(
+          await ownerStock(
+            staged.store.merchant.token,
+            staged.store.productId
+          ),
+          5,
+          'defensive recovery restores the deliberately reproduced old orphan'
+        );
+
+        assert.deepEqual(
+          await reservationEntries(
+            staged.store.businessId
+          ),
+          []
+        );
+      }
+    );
+
+    // ---------------------------------------------------------------- W02 ---
+    await t.test(
+      'W02 cleanup never makes a pre-failure worker valid again',
+      async () => {
+        const staged =
+          await pendingCheckout({
+            label: 'w02',
+            quantity: 2,
+            product: {
+              price: 20,
+              unlimitedStock: false,
+              stockQuantity: 1
+            }
+          });
+
+        const oldFence =
+          await currentBusinessFence(
+            staged.store.businessId
+          );
+
+        const staleWrite =
+          reservationWriteFor(staged, {
+            reservationFence: oldFence
+          });
+
+        await terminalFailureAndRelease(
+          staged
+        );
+
+        // Remove every temporary refusal record.
+        await withdrawReservationFailure({
+          businessId: objectId(
+            staged.store.businessId
+          ),
+          intentId: staged.intent._id
+        });
+
+        assert.deepEqual(
+          await reservationEntries(
+            staged.store.businessId
+          ),
+          []
+        );
+
+        const restock = await patchProduct(
+          staged.store.merchant.token,
+          staged.store.productId,
+          {
+            stockQuantity: 5
+          }
+        );
+
+        assert.equal(restock.status, 200);
+
+        /**
+         * Headline R9 assertion:
+         *
+         * The EXACT operation constructed before terminal failure is executed
+         * after cleanup. Its generation is old forever.
+         */
+        const result =
+          await executeReservationWrite(
+            staleWrite
+          );
+
+        assert.equal(
+          result.matchedCount,
+          0,
+          'the old worker remains permanently fenced'
+        );
+
+        assert.equal(
+          await ownerStock(
+            staged.store.merchant.token,
+            staged.store.productId
+          ),
+          5
+        );
+
+        assert.deepEqual(
+          await reservationEntries(
+            staged.store.businessId
+          ),
+          []
+        );
+
+        const intent =
+          await CheckoutIntent.findById(
+            staged.intent._id
+          );
+
+        assert.equal(
+          intent.phase,
+          'released'
+        );
+
+        assert.equal(
+          await Order.countDocuments({
+            user: objectId(
+              staged.buyer.userId
+            )
+          }),
+          0
+        );
+      }
+    );
+
+    // ---------------------------------------------------------------- W03 ---
+    await t.test(
+      'W03 time and repeated cleanup never restore an old generation',
+      async () => {
+        const staged =
+          await pendingCheckout({
+            label: 'w03',
+            quantity: 2,
+            product: {
+              price: 20,
+              unlimitedStock: false,
+              stockQuantity: 1
+            }
+          });
+
+        const oldFence =
+          await currentBusinessFence(
+            staged.store.businessId
+          );
+
+        const staleWrite =
+          reservationWriteFor(staged, {
+            reservationFence: oldFence
+          });
+
+        await terminalFailureAndRelease(
+          staged
+        );
+
+        await withdrawReservationFailure({
+          businessId: objectId(
+            staged.store.businessId
+          ),
+          intentId: staged.intent._id
+        });
+
+        const restock = await patchProduct(
+          staged.store.merchant.token,
+          staged.store.productId,
+          {
+            stockQuantity: 7
+          }
+        );
+
+        assert.equal(restock.status, 200);
+
+        for (
+          let pass = 0;
+          pass < 4;
+          pass += 1
+        ) {
+          // Simulate another reconciliation interval.
+          await makeStale(
+            staged.intent._id,
+            60 + pass
+          );
+
+          await reconcileStaleCheckouts({
+            staleAfterMs: 60 * 1000
+          });
+
+          const result =
+            await executeReservationWrite(
+              staleWrite
+            );
+
+          assert.equal(
+            result.matchedCount,
+            0,
+            `pass ${pass}: elapsed time must not revive authority`
+          );
+
+          assert.equal(
+            await ownerStock(
+              staged.store.merchant.token,
+              staged.store.productId
+            ),
+            7,
+            `pass ${pass}: no stale decrement`
+          );
+        }
+
+        assert.equal(
+          await currentBusinessFence(
+            staged.store.businessId
+          ),
+          oldFence + 1
+        );
+      }
+    );
+
+    // ---------------------------------------------------------------- W04 ---
+    await t.test(
+      'W04 one hundred terminal failures leave no tombstone growth',
+      async () => {
+        const store = await seedStore(
+          {
+            price: 20,
+            unlimitedStock: false,
+            stockQuantity: 5
+          },
+          'w04'
+        );
+
+        const buyer =
+          await seedAccount('buyer-w04');
+
+        const businessId = objectId(
+          store.businessId
+        );
+
+        const productId = objectId(
+          store.productId
+        );
+
+        const startingFence =
+          await currentBusinessFence(
+            store.businessId
+          );
+
+        for (
+          let index = 0;
+          index < 100;
+          index += 1
+        ) {
+          const fence =
+            await currentBusinessFence(
+              store.businessId
+            );
+
+          const intent =
+            await seedIntent({
+              userId: buyer.userId,
+              clientOrderId:
+                `${stamp}-w04-${index}`,
+              businessId:
+                store.businessId,
+              reservationFence: fence,
+              lines: [
+                {
+                  productId,
+                  quantity: 99,
+                  finite: true
+                }
+              ],
+              phase: 'prepared'
+            });
+
+          const decision =
+            await resolveReservationFailure({
+              businessId,
+              intentId: intent._id,
+              failureCode:
+                'INSUFFICIENT_STOCK',
+              reservationFence: fence
+            });
+
+          assert.equal(
+            decision.owned,
+            true,
+            `failure ${index} should own its terminal decision`
+          );
+
+          const released =
+            await CheckoutIntent.updateOne(
+              {
+                _id: intent._id,
+                phase: 'prepared',
+                reservationFence: fence
+              },
+              {
+                $set: {
+                  phase: 'released',
+                  failureCode:
+                    'INSUFFICIENT_STOCK'
+                }
+              }
+            );
+
+          assert.equal(
+            released.matchedCount,
+            1
+          );
+
+          await withdrawReservationFailure({
+            businessId,
+            intentId: intent._id
+          });
+        }
+
+        const stored =
+          await Business.findById(
+            businessId
+          ).select(
+            '+stockReservations +reservationFence'
+          );
+
+        assert.equal(
+          (
+            stored.stockReservations ?? []
+          ).length,
+          0,
+          'temporary failures were all cleaned'
+        );
+
+        assert.equal(
+          normalizedFence(
+            stored.reservationFence
+          ),
+          startingFence + 100,
+          'one scalar advanced; no per-failure permanent records remain'
+        );
+
+        assert.equal(
+          Number.isSafeInteger(
+            stored.reservationFence
+          ),
+          true
+        );
+
+        assert.equal(
+          await ownerStock(
+            store.merchant.token,
+            store.productId
+          ),
+          5,
+          'terminal reservation failures never change product stock'
+        );
+      }
+    );
+
+    // ---------------------------------------------------------------- W05 ---
+    await t.test(
+      'W05 an unrelated active checkout refreshes after fence rotation',
+      async () => {
+        const store = await seedStore(
+          {
+            price: 20,
+            unlimitedStock: false,
+            stockQuantity: 10
+          },
+          'w05'
+        );
+
+        const buyerA =
+          await seedAccount('buyer-w05-a');
+
+        const buyerB =
+          await seedAccount('buyer-w05-b');
+
+        const productId = objectId(
+          store.productId
+        );
+
+        const businessId = objectId(
+          store.businessId
+        );
+
+        const initialFence =
+          await currentBusinessFence(
+            store.businessId
+          );
+
+        // Checkout A will fail and rotate the Business-wide generation.
+        const intentA =
+          await seedIntent({
+            userId: buyerA.userId,
+            clientOrderId:
+              `${stamp}-w05-a`,
+            businessId:
+              store.businessId,
+            reservationFence:
+              initialFence,
+            lines: [
+              {
+                productId,
+                quantity: 99,
+                finite: true
+              }
+            ]
+          });
+
+        // Checkout B is legitimate but was authorized under the same OLD fence.
+        const keyB = `${stamp}-w05-b`;
+
+        const intentB =
+          await seedIntent({
+            userId: buyerB.userId,
+            clientOrderId: keyB,
+            businessId:
+              store.businessId,
+            reservationFence:
+              initialFence,
+            lines: [
+              {
+                productId,
+                quantity: 2,
+                finite: true
+              }
+            ],
+            fingerprint: realFingerprint({
+              businessId:
+                store.businessId,
+              productId:
+                store.productId,
+              quantity: 2
+            })
+          });
+
+        const failed =
+          await resolveReservationFailure({
+            businessId,
+            intentId: intentA._id,
+            failureCode:
+              'INSUFFICIENT_STOCK',
+            reservationFence:
+              initialFence
+          });
+
+        assert.equal(
+          failed.owned,
+          true
+        );
+
+        const releasedA =
+          await CheckoutIntent.updateOne(
+            {
+              _id: intentA._id,
+              phase: 'prepared',
+              reservationFence:
+                initialFence
+            },
+            {
+              $set: {
+                phase: 'released',
+                failureCode:
+                  'INSUFFICIENT_STOCK'
+              }
+            }
+          );
+
+        assert.equal(
+          releasedA.matchedCount,
+          1
+        );
+
+        await withdrawReservationFailure({
+          businessId,
+          intentId: intentA._id
+        });
+
+        assert.equal(
+          await currentBusinessFence(
+            store.businessId
+          ),
+          initialFence + 1
+        );
+
+        // B's old authority is invalidated safely.
+        const staleB =
+          await attemptReservation({
+            businessId,
+            intentId: intentB._id,
+            reservationFence:
+              initialFence,
+            lines: [
+              {
+                productId,
+                quantity: 2,
+                finite: true
+              }
+            ]
+          });
+
+        assert.equal(
+          staleB.matched,
+          false
+        );
+
+        assert.equal(
+          await ownerStock(
+            store.merchant.token,
+            store.productId
+          ),
+          10
+        );
+
+        /**
+         * B is still prepared, so it may acquire the current generation.
+         */
+        const refreshed =
+          await refreshReservationAuthority({
+            intentId: intentB._id,
+            businessId
+          });
+
+        assert.equal(
+          refreshed.owned,
+          true
+        );
+
+        assert.equal(
+          refreshed.fence,
+          initialFence + 1
+        );
+
+        const freshB =
+          await attemptReservation({
+            businessId,
+            intentId: intentB._id,
+            reservationFence:
+              refreshed.fence,
+            lines: [
+              {
+                productId,
+                quantity: 2,
+                finite: true
+              }
+            ]
+          });
+
+        assert.equal(
+          freshB.matched,
+          true,
+          'the unrelated checkout may continue under fresh authority'
+        );
+
+        assert.equal(
+          await ownerStock(
+            store.merchant.token,
+            store.productId
+          ),
+          8
+        );
+
+        /**
+         * Finish through the actual endpoint. The existing marker is adopted;
+         * it must not consume two more units.
+         */
+        await makeStale(intentB._id);
+
+        const finished =
+          await placeOrder(
+            buyerB.token,
+            {
+              ...store,
+              clientOrderId: keyB,
+              quantity: 2
+            }
+          );
+
+        assert.equal(
+          finished.status,
+          201,
+          `B should finalize (${finished.code})`
+        );
+
+        assert.equal(
+          await ownerStock(
+            store.merchant.token,
+            store.productId
+          ),
+          8,
+          'B consumed exactly once'
+        );
+
+        assert.equal(
+          await Order.countDocuments({
+            user: objectId(
+              buyerB.userId
+            )
+          }),
+          1
+        );
+
+        assert.deepEqual(
+          await outstandingMarkers(
+            store.businessId
+          ),
+          []
+        );
+      }
+    );
+
+    // ---------------------------------------------------------------- W06 ---
+    await t.test(
+      'W06 a released checkout can never refresh reservation authority',
+      async () => {
+        const staged =
+          await pendingCheckout({
+            label: 'w06',
+            quantity: 2,
+            product: {
+              price: 20,
+              unlimitedStock: false,
+              stockQuantity: 1
+            }
+          });
+
+        const oldFence =
+          await currentBusinessFence(
+            staged.store.businessId
+          );
+
+        const staleWrite =
+          reservationWriteFor(staged, {
+            reservationFence: oldFence
+          });
+
+        await terminalFailureAndRelease(
+          staged
+        );
+
+        await withdrawReservationFailure({
+          businessId: objectId(
+            staged.store.businessId
+          ),
+          intentId: staged.intent._id
+        });
+
+        const refreshed =
+          await refreshReservationAuthority({
+            intentId: staged.intent._id,
+            businessId: objectId(
+              staged.store.businessId
+            )
+          });
+
+        assert.equal(
+          refreshed.owned,
+          false,
+          'terminal intent cannot obtain a new generation'
+        );
+
+        const oldAttempt =
+          await executeReservationWrite(
+            staleWrite
+          );
+
+        assert.equal(
+          oldAttempt.matchedCount,
+          0
+        );
+
+        const current =
+          await CheckoutIntent.findById(
+            staged.intent._id
+          );
+
+        assert.equal(
+          current.phase,
+          'released'
+        );
+
+        assert.equal(
+          normalizedFence(
+            current.reservationFence
+          ),
+          oldFence,
+          'the terminal intent itself is not refreshed'
+        );
+
+        assert.deepEqual(
+          await reservationEntries(
+            staged.store.businessId
+          ),
+          []
+        );
+
+        assert.equal(
+          await Order.countDocuments({
+            user: objectId(
+              staged.buyer.userId
+            )
+          }),
+          0
+        );
+      }
+    );
+
+    // ---------------------------------------------------------------- W07 ---
+    await t.test(
+      'W07 crash after permanent fencing converges without reopening authority',
+      async () => {
+        const staged =
+          await pendingCheckout({
+            label: 'w07',
+            quantity: 2,
+            product: {
+              price: 20,
+              unlimitedStock: false,
+              stockQuantity: 1
+            }
+          });
+
+        const oldFence =
+          await currentBusinessFence(
+            staged.store.businessId
+          );
+
+        const staleWrite =
+          reservationWriteFor(staged, {
+            reservationFence: oldFence
+          });
+
+        /**
+         * Business-side failure/fence wins...
+         */
+        const decision =
+          await resolveReservationFailure({
+            businessId: objectId(
+              staged.store.businessId
+            ),
+            intentId: staged.intent._id,
+            failureCode:
+              'INSUFFICIENT_STOCK',
+            reservationFence:
+              oldFence
+          });
+
+        assert.equal(
+          decision.owned,
+          true
+        );
+
+        assert.equal(
+          await currentBusinessFence(
+            staged.store.businessId
+          ),
+          oldFence + 1
+        );
+
+        /**
+         * ...then the process dies BEFORE CheckoutIntent becomes released.
+         */
+        assert.equal(
+          (
+            await CheckoutIntent.findById(
+              staged.intent._id
+            )
+          ).phase,
+          'prepared'
+        );
+
+        await makeStale(
+          staged.intent._id
+        );
+
+        // First sweep continues the checkout's release decision.
+        await reconcileStaleCheckouts({
+          staleAfterMs: 60 * 1000
+        });
+
+        let recovered =
+          await CheckoutIntent.findById(
+            staged.intent._id
+          );
+
+        assert.equal(
+          recovered.phase,
+          'released'
+        );
+
+        /**
+         * The temporary refusal may remain until a terminal-marker sweep.
+         */
+        await makeStale(
+          staged.intent._id
+        );
+
+        await reconcileStaleCheckouts({
+          staleAfterMs: 60 * 1000
+        });
+
+        recovered =
+          await CheckoutIntent.findById(
+            staged.intent._id
+          );
+
+        assert.equal(
+          recovered.phase,
+          'released'
+        );
+
+        assert.deepEqual(
+          await reservationEntries(
+            staged.store.businessId
+          ),
+          [],
+          'temporary refusal bookkeeping is eventually removed'
+        );
+
+        assert.equal(
+          await currentBusinessFence(
+            staged.store.businessId
+          ),
+          oldFence + 1,
+          'cleanup does not roll the permanent generation backwards'
+        );
+
+        assert.equal(
+          await ownerStock(
+            staged.store.merchant.token,
+            staged.store.productId
+          ),
+          1,
+          'no inventory was ever consumed'
+        );
+
+        /**
+         * Even after crash recovery AND cleanup, the old operation remains dead.
+         */
+        const staleResult =
+          await executeReservationWrite(
+            staleWrite
+          );
+
+        assert.equal(
+          staleResult.matchedCount,
+          0
+        );
+      }
+    );
+
+    // ---------------------------------------------------------------- W08 ---
+    await t.test(
+      'W08 reservation winning first defeats the stale terminal failure',
+      async () => {
+        const staged =
+          await pendingCheckout({
+            label: 'w08',
+            quantity: 2,
+            product: {
+              price: 25,
+              unlimitedStock: false,
+              stockQuantity: 5
+            }
+          });
+
+        const fence =
+          await currentBusinessFence(
+            staged.store.businessId
+          );
+
+        const reservation =
+          await attemptReservation({
+            businessId: objectId(
+              staged.store.businessId
+            ),
+            intentId: staged.intent._id,
+            reservationFence: fence,
+            lines: [
+              {
+                productId:
+                  staged.productId,
+                quantity: 2,
+                finite: true
+              }
+            ]
+          });
+
+        assert.equal(
+          reservation.matched,
+          true
+        );
+
+        assert.equal(
+          await ownerStock(
+            staged.store.merchant.token,
+            staged.store.productId
+          ),
+          3
+        );
+
+        const failure =
+          await resolveReservationFailure({
+            businessId: objectId(
+              staged.store.businessId
+            ),
+            intentId: staged.intent._id,
+            failureCode:
+              'INSUFFICIENT_STOCK',
+            reservationFence: fence
+          });
+
+        assert.equal(
+          failure.owned,
+          false
+        );
+
+        assert.equal(
+          failure.converge,
+          RESERVATION_OUTCOMES.reserved
+        );
+
+        // The failure lost, so no generation was rotated.
+        assert.equal(
+          await currentBusinessFence(
+            staged.store.businessId
+          ),
+          fence
+        );
+
+        assert.notEqual(
+          (
+            await CheckoutIntent.findById(
+              staged.intent._id
+            )
+          ).phase,
+          'released'
+        );
+
+        await makeStale(
+          staged.intent._id
+        );
+
+        const finished =
+          await placeOrder(
+            staged.buyer.token,
+            {
+              ...staged.store,
+              clientOrderId:
+                staged.key,
+              quantity: 2
+            }
+          );
+
+        assert.equal(
+          finished.status,
+          201,
+          `reservation winner should finalize (${finished.code})`
+        );
+
+        assert.equal(
+          await ownerStock(
+            staged.store.merchant.token,
+            staged.store.productId
+          ),
+          3
+        );
+
+        assert.equal(
+          await Order.countDocuments({
+            user: objectId(
+              staged.buyer.userId
+            )
+          }),
+          1
+        );
+
+        assert.deepEqual(
+          await outstandingMarkers(
+            staged.store.businessId
+          ),
+          []
+        );
+      }
+    );
+
+    // ---------------------------------------------------------------- W09 ---
+    await t.test(
+      'W09 a terminal fence stays effective after cleanup restock and mode changes',
+      async () => {
+        const staged =
+          await pendingCheckout({
+            label: 'w09',
+            quantity: 2,
+            product: {
+              price: 20,
+              unlimitedStock: false,
+              stockQuantity: 1
+            }
+          });
+
+        const oldFence =
+          await currentBusinessFence(
+            staged.store.businessId
+          );
+
+        const staleWrite =
+          reservationWriteFor(staged, {
+            reservationFence: oldFence
+          });
+
+        await terminalFailureAndRelease(
+          staged
+        );
+
+        await withdrawReservationFailure({
+          businessId: objectId(
+            staged.store.businessId
+          ),
+          intentId: staged.intent._id
+        });
+
+        // Age/sweep it several times first.
+        for (
+          let pass = 0;
+          pass < 3;
+          pass += 1
+        ) {
+          await makeStale(
+            staged.intent._id,
+            60 + pass
+          );
+
+          await reconcileStaleCheckouts({
+            staleAfterMs: 60 * 1000
+          });
+        }
+
+        // Restock enough that the old finite reservation would otherwise pass.
+        let edited = await patchProduct(
+          staged.store.merchant.token,
+          staged.store.productId,
+          {
+            unlimitedStock: false,
+            stockQuantity: 9
+          }
+        );
+
+        assert.equal(
+          edited.status,
+          200
+        );
+
+        let stale =
+          await executeReservationWrite(
+            staleWrite
+          );
+
+        assert.equal(
+          stale.matchedCount,
+          0,
+          'restocking cannot revive the old generation'
+        );
+
+        // Change stock mode too.
+        edited = await patchProduct(
+          staged.store.merchant.token,
+          staged.store.productId,
+          {
+            unlimitedStock: true
+          }
+        );
+
+        assert.equal(
+          edited.status,
+          200
+        );
+
+        stale =
+          await executeReservationWrite(
+            staleWrite
+          );
+
+        assert.equal(
+          stale.matchedCount,
+          0
+        );
+
+        // And return to a fully compatible finite shape again.
+        edited = await patchProduct(
+          staged.store.merchant.token,
+          staged.store.productId,
+          {
+            unlimitedStock: false,
+            stockQuantity: 9
+          }
+        );
+
+        assert.equal(
+          edited.status,
+          200
+        );
+
+        stale =
+          await executeReservationWrite(
+            staleWrite
+          );
+
+        assert.equal(
+          stale.matchedCount,
+          0,
+          'even a catalog shape compatible with the old line cannot bypass the fence'
+        );
+
+        assert.equal(
+          await ownerStock(
+            staged.store.merchant.token,
+            staged.store.productId
+          ),
+          9
+        );
+
+        assert.equal(
+          await currentBusinessFence(
+            staged.store.businessId
+          ),
+          oldFence + 1
+        );
+
+        assert.deepEqual(
+          await reservationEntries(
+            staged.store.businessId
+          ),
+          []
+        );
+
+        assert.equal(
+          await Order.countDocuments({
+            user: objectId(
+              staged.buyer.userId
+            )
+          }),
+          0
+        );
+      }
+    );
+
+    // ---------------------------------------------------------------- W10 ---
+    await t.test(
+      'W10 a lost post-reservation phase transition cannot continue to an order',
+      async () => {
+        const staged =
+          await pendingCheckout({
+            label: 'w10',
+            quantity: 2,
+            product: {
+              price: 20,
+              unlimitedStock: false,
+              stockQuantity: 5
+            }
+          });
+
+        const fence =
+          await currentBusinessFence(
+            staged.store.businessId
+          );
+
+        /**
+         * Business reservation succeeds first.
+         */
+        const reserved =
+          await attemptReservation({
+            businessId: objectId(
+              staged.store.businessId
+            ),
+            intentId: staged.intent._id,
+            reservationFence: fence,
+            lines: [
+              {
+                productId:
+                  staged.productId,
+                quantity: 2,
+                finite: true
+              }
+            ]
+          });
+
+        assert.equal(
+          reserved.matched,
+          true
+        );
+
+        assert.equal(
+          await ownerStock(
+            staged.store.merchant.token,
+            staged.store.productId
+          ),
+          3
+        );
+
+        /**
+         * Before the reservation worker can persist prepared -> reserved,
+         * another actor acquires the release decision.
+         */
+        const releaseClaim =
+          await claimRelease({
+            intentId: staged.intent._id
+          });
+
+        assert.ok(
+          releaseClaim,
+          'release decision should own the still-prepared checkout'
+        );
+
+        assert.equal(
+          releaseClaim.phase,
+          'releasing'
+        );
+
+        /**
+         * Execute the exact decisive transition predicate used by production.
+         * It must report that this worker no longer owns the transition.
+         */
+        const transition =
+          await CheckoutIntent.updateOne(
+            {
+              _id: staged.intent._id,
+              phase: 'prepared',
+              reservationFence: fence
+            },
+            {
+              $set: {
+                phase: 'reserved',
+                lines: [
+                  {
+                    productId:
+                      staged.productId,
+                    quantity: 2,
+                    finite: true
+                  }
+                ]
+              }
+            }
+          );
+
+        assert.equal(
+          transition.matchedCount,
+          0,
+          'lost phase authority is not treated as success'
+        );
+
+        /**
+         * The same-key HTTP request must not jump from `releasing` into an Order.
+         */
+        await makeStale(
+          staged.intent._id
+        );
+
+        const request =
+          await placeOrder(
+            staged.buyer.token,
+            {
+              ...staged.store,
+              clientOrderId:
+                staged.key,
+              quantity: 2
+            }
+          );
+
+        assert.equal(
+          request.status,
+          409,
+          'a release-owned checkout cannot finalize'
+        );
+
+        assert.equal(
+          await Order.countDocuments({
+            user: objectId(
+              staged.buyer.userId
+            )
+          }),
+          0
+        );
+
+        /**
+         * Recovery finishes the already-chosen release and restores the exact
+         * Business-side reservation.
+         */
+        await makeStale(
+          staged.intent._id
+        );
+
+        await reconcileIntent(
+          await CheckoutIntent.findById(
+            staged.intent._id
+          )
+        );
+
+        const finished =
+          await CheckoutIntent.findById(
+            staged.intent._id
+          );
+
+        assert.equal(
+          finished.phase,
+          'released'
+        );
+
+        assert.equal(
+          await ownerStock(
+            staged.store.merchant.token,
+            staged.store.productId
+          ),
+          5,
+          'the held two units are restored exactly once'
+        );
+
+        assert.deepEqual(
+          await outstandingMarkers(
+            staged.store.businessId
+          ),
+          []
+        );
+
+        assert.equal(
+          await Order.countDocuments({
+            user: objectId(
+              staged.buyer.userId
+            )
+          }),
+          0
+        );
+      }
+    );
   });
 }

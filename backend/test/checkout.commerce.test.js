@@ -47,6 +47,11 @@ function businessWith(products) {
     publicId: 'MXB-GAP002-0001',
     name: 'متجر الاختبار',
     category: 'مكياج',
+
+    // Explicit rather than merely relying on the schema default, because the
+    // conditional-update harness must model the durable Business generation.
+    reservationFence: 0,
+
     products
   });
 }
@@ -107,15 +112,39 @@ function sameId(left, right) {
 
 function matchesCondition(value, condition) {
   // Checked before the plain-object branch: an ObjectId is an object too.
-  if (condition instanceof mongoose.Types.ObjectId) return sameId(value, condition);
+  if (condition instanceof mongoose.Types.ObjectId) {
+    return sameId(value, condition);
+  }
 
-  if (condition !== null && typeof condition === 'object' && !Array.isArray(condition)) {
-    if ('$gte' in condition) return Number(value) >= Number(condition.$gte);
-    // Mongo semantics, verified against a real server: `$ne` matches a missing
-    // field and null as well as any differing value. That is what makes
-    // `unlimitedStock: {$ne:false}` the exact negation of isFiniteStockProduct.
-    if ('$ne' in condition) return value !== condition.$ne;
-    throw new Error(`unsupported condition: ${JSON.stringify(condition)}`);
+  if (
+    condition !== null &&
+    typeof condition === 'object' &&
+    !Array.isArray(condition)
+  ) {
+    if ('$gte' in condition) {
+      return Number(value) >= Number(condition.$gte);
+    }
+
+    // Mongo semantics:
+    // `$ne` also matches a missing field.
+    if ('$ne' in condition) {
+      return value !== condition.$ne;
+    }
+
+    // Required by the legacy-compatible reservationFence=0 predicate:
+    //
+    //   reservationFence: { $exists: false }
+    //
+    // A missing generation is treated as the original generation zero.
+    if ('$exists' in condition) {
+      return condition.$exists
+        ? value !== undefined
+        : value === undefined;
+    }
+
+    throw new Error(
+      `unsupported condition: ${JSON.stringify(condition)}`
+    );
   }
 
   return value === condition;
@@ -131,9 +160,29 @@ function matchesElement(element, criteria) {
 function matchesFilter(document, filter) {
   for (const [key, condition] of Object.entries(filter)) {
     if (key === '$and') {
-      if (!condition.every((clause) => matchesFilter(document, clause))) return false;
+      if (
+        !condition.every((clause) =>
+          matchesFilter(document, clause)
+        )
+      ) {
+        return false;
+      }
+
       continue;
     }
+
+    if (key === '$or') {
+      if (
+        !condition.some((clause) =>
+          matchesFilter(document, clause)
+        )
+      ) {
+        return false;
+      }
+
+      continue;
+    }
+
     if (key === 'products') {
       const criteria = condition.$elemMatch;
       if (!document.products.some((entry) => matchesElement(entry, criteria))) {
@@ -196,8 +245,21 @@ function applyConditionalUpdate(document, { filter, update, arrayFilters }) {
   const increments = Object.entries(update.$inc ?? {});
 
   for (const [path, delta] of increments) {
-    const parsed = /^products\.\$\[(\w+)\]\.(\w+)$/.exec(path);
-    if (!parsed) throw new Error(`unsupported update path: ${path}`);
+    // R9 terminal reservation failure rotates one Business-wide scalar
+    // generation. It is bookkeeping/fencing, not a product-stock increment.
+    if (path === 'reservationFence') {
+      document.reservationFence =
+        Number(document.reservationFence ?? 0) + delta;
+
+      continue;
+    }
+
+    const parsed =
+      /^products\.\$\[(\w+)\]\.(\w+)$/.exec(path);
+
+    if (!parsed) {
+      throw new Error(`unsupported update path: ${path}`);
+    }
 
     const [, alias, field] = parsed;
     const criteria = arrayFilters.find((entry) =>
@@ -227,13 +289,24 @@ function applyConditionalUpdate(document, { filter, update, arrayFilters }) {
  * one. A distinct id per checkout is what makes replay detectable; passing the
  * SAME id twice is exactly the crash-replay case, and is exercised below.
  */
-function buildStockReservation(business, lines, intentId = new mongoose.Types.ObjectId()) {
+function buildStockReservation(
+  business,
+  lines,
+  intentId = new mongoose.Types.ObjectId()
+) {
   return {
     intentId,
+
     ...buildIdentifiedReservation({
       businessId: business._id,
       intentId,
-      lines
+      lines,
+
+      // The test must exercise the same authority production passes to the
+      // Business write.
+      reservationFence: Number(
+        business.reservationFence ?? 0
+      )
     })
   };
 }
