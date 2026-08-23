@@ -6,53 +6,57 @@ import { requireBoolean } from './favorite.controller.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { notifyNewReview } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
+import {
+  decimalParam,
+  enumParam,
+  paginationParams as sharedPaginationParams,
+  positiveIntegerParam
+} from '../policies/query.policy.js';
 
-const validProductClassifications = new Set(['new', 'bestSelling', 'offers']);
-const validBusinessSorts = new Set(['newest', 'rating']);
+const productClassifications = ['new', 'bestSelling', 'offers'];
+const businessSorts = ['newest', 'rating'];
 
-export function paginationParams(query) {
-  const parsedPage = Number.parseInt(query.page ?? '1', 10);
-  const parsedLimit = Number.parseInt(query.limit ?? '100', 10);
-  const page = Number.isFinite(parsedPage) ? Math.max(parsedPage, 1) : 1;
-  const limit = Number.isFinite(parsedLimit)
-    ? Math.min(Math.max(parsedLimit, 1), 100)
-    : 100;
+const BUSINESS_DEFAULT_LIMIT = 100;
+const BUSINESS_MAX_LIMIT = 100;
+const REVIEW_DEFAULT_LIMIT = 20;
+const DEFAULT_RADIUS_METERS = 10000;
+const MIN_RADIUS_METERS = 100;
+const MAX_RADIUS_METERS = 50000;
 
-  return { page, limit, skip: (page - 1) * limit };
+export function paginationParams(
+  query = {},
+  { limitFallback = BUSINESS_DEFAULT_LIMIT } = {}
+) {
+  return sharedPaginationParams(query, {
+    limitFallback,
+    maxLimit: BUSINESS_MAX_LIMIT,
+    allowBlankAsFallback: false,
+    allowSurroundingWhitespace: false
+  });
 }
 
-export function discountedParam(query) {
-  const rawValue = query.discounted;
-
-  if (rawValue === undefined) {
-    return false;
-  }
-
-  if (rawValue === true || rawValue === 'true') {
-    return true;
-  }
-
-  if (rawValue === false || rawValue === 'false') {
-    return false;
-  }
-
-  throw new AppError(
-    'Discounted filter must be true or false',
-    400,
-    'INVALID_DISCOUNTED_FILTER'
+export function discountedParam(query = {}) {
+  return (
+    enumParam(query.discounted, {
+      name: 'discounted',
+      allowed: ['true', 'false'],
+      fallback: 'false',
+      code: 'INVALID_DISCOUNTED_FILTER',
+      allowBlankAsFallback: false,
+      allowSurroundingWhitespace: false
+    }) === 'true'
   );
 }
 
-export function businessSort(query) {
-  const requestedSort = String(query.sort ?? 'newest').trim();
-
-  if (!validBusinessSorts.has(requestedSort)) {
-    throw new AppError(
-      'Business sort must be newest or rating',
-      400,
-      'INVALID_BUSINESS_SORT'
-    );
-  }
+export function businessSort(query = {}) {
+  const requestedSort = enumParam(query.sort, {
+    name: 'sort',
+    allowed: businessSorts,
+    fallback: 'newest',
+    code: 'INVALID_BUSINESS_SORT',
+    allowBlankAsFallback: false,
+    allowSurroundingWhitespace: false
+  });
 
   if (requestedSort === 'rating') {
     return {
@@ -64,6 +68,35 @@ export function businessSort(query) {
   }
 
   return { subscribedAt: -1, _id: -1 };
+}
+
+export function classificationParam(query = {}) {
+  return enumParam(query.classification, {
+    name: 'classification',
+    allowed: productClassifications,
+    fallback: 'new',
+    code: 'INVALID_PRODUCT_CLASSIFICATION',
+    allowBlankAsFallback: false,
+    allowSurroundingWhitespace: false
+  });
+}
+
+export function searchParam(query = {}) {
+  const value = query.search;
+
+  if (value === undefined || value === null) {
+    return '';
+  }
+
+  if (Array.isArray(value)) {
+    throw new AppError(
+      'search is invalid',
+      400,
+      'INVALID_BUSINESS_SEARCH'
+    );
+  }
+
+  return String(value).trim().slice(0, 80);
 }
 
 export function nearbyBusinessSort() {
@@ -80,7 +113,7 @@ function applyDiscountFilter(filter, query) {
 
 export function buildBusinessFilter(query) {
   const filter = { isActive: true };
-  const search = String(query.search ?? '').trim().slice(0, 80);
+  const search = searchParam(query);
 
   if (search) {
     filter.$text = { $search: search };
@@ -91,7 +124,7 @@ export function buildBusinessFilter(query) {
 
 export function buildNearbyBusinessFilter(query) {
   const filter = { isActive: true };
-  const search = String(query.search ?? '').trim().slice(0, 80);
+  const search = searchParam(query);
 
   if (search) {
     const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -105,22 +138,72 @@ export function buildNearbyBusinessFilter(query) {
   return applyDiscountFilter(filter, query);
 }
 
-export function nearbyParams(query) {
-  const latitude = Number(query.lat ?? query.latitude);
-  const longitude = Number(query.lng ?? query.longitude);
+export function nearbyParams(query = {}) {
+  const hasLat = query.lat !== undefined;
+  const hasLatitude = query.latitude !== undefined;
+  const hasLng = query.lng !== undefined;
+  const hasLongitude = query.longitude !== undefined;
+  const hasRadius = query.radiusMeters !== undefined;
 
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+  const hasNearbyInput =
+    hasLat || hasLatitude || hasLng || hasLongitude || hasRadius;
+
+  if (!hasNearbyInput) {
     return null;
   }
 
-  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
-    return null;
+  if (
+    (hasLat && hasLatitude) ||
+    (hasLng && hasLongitude)
+  ) {
+    throw new AppError(
+      'Nearby coordinate aliases are ambiguous',
+      400,
+      'AMBIGUOUS_NEARBY_COORDINATES'
+    );
   }
 
-  const parsedRadius = Number.parseInt(query.radiusMeters ?? '10000', 10);
-  const radiusMeters = Number.isFinite(parsedRadius)
-    ? Math.min(Math.max(parsedRadius, 100), 50000)
-    : 10000;
+  const hasLatitudeValue = hasLat || hasLatitude;
+  const hasLongitudeValue = hasLng || hasLongitude;
+
+  if (!hasLatitudeValue || !hasLongitudeValue) {
+    throw new AppError(
+      'A complete latitude and longitude pair is required',
+      400,
+      'INCOMPLETE_NEARBY_COORDINATES'
+    );
+  }
+
+  const latitude = decimalParam(
+    hasLat ? query.lat : query.latitude,
+    {
+      name: 'latitude',
+      min: -90,
+      max: 90,
+      code: 'INVALID_LATITUDE'
+    }
+  );
+
+  const longitude = decimalParam(
+    hasLng ? query.lng : query.longitude,
+    {
+      name: 'longitude',
+      min: -180,
+      max: 180,
+      code: 'INVALID_LONGITUDE'
+    }
+  );
+
+  const parsedRadius = positiveIntegerParam(query.radiusMeters, {
+    name: 'radiusMeters',
+    fallback: DEFAULT_RADIUS_METERS,
+    max: MAX_RADIUS_METERS,
+    code: 'INVALID_RADIUS_METERS',
+    allowBlankAsFallback: false,
+    allowSurroundingWhitespace: false
+  });
+
+  const radiusMeters = Math.max(parsedRadius, MIN_RADIUS_METERS);
 
   return { latitude, longitude, radiusMeters };
 }
@@ -220,15 +303,12 @@ export const getBusiness = asyncHandler(async (req, res) => {
 });
 
 export const listBusinessProducts = asyncHandler(async (req, res) => {
+  const classification = classificationParam(req.query);
   const business = await findBusiness(req.params.id);
 
   if (!business || !business.isActive) {
     throw new AppError('Business not found', 404, 'BUSINESS_NOT_FOUND');
   }
-
-  const classification = validProductClassifications.has(req.query.classification)
-    ? req.query.classification
-    : 'new';
   const products = business.products
     .filter((product) => product.isActive && product.classification === classification)
     .map((product) => business.productToJSON(product));
@@ -297,9 +377,8 @@ export const likeBusinessProduct = asyncHandler(async (req, res) => {
 });
 
 export const listBusinessProductReviews = asyncHandler(async (req, res) => {
-  const { page, limit, skip } = paginationParams({
-    ...req.query,
-    limit: req.query.limit ?? '20'
+  const { page, limit, skip } = paginationParams(req.query, {
+    limitFallback: REVIEW_DEFAULT_LIMIT
   });
   const { business } = await findActiveBusinessProduct(
     req.params.id,
@@ -384,7 +463,9 @@ export const createBusinessProductReview = asyncHandler(async (req, res) => {
 });
 
 export const listBusinessReviews = asyncHandler(async (req, res) => {
-  const { page, limit, skip } = paginationParams({ ...req.query, limit: req.query.limit ?? '20' });
+  const { page, limit, skip } = paginationParams(req.query, {
+    limitFallback: REVIEW_DEFAULT_LIMIT
+  });
   const business = await findBusiness(req.params.id);
 
   if (!business || !business.isActive) {
