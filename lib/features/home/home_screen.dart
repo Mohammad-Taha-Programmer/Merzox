@@ -511,7 +511,7 @@ class _HomeTab extends StatelessWidget {
                   onProtectedAction: onProtectedAction,
                 ),
                 const SizedBox(height: 24),
-                _AdvertisementCard(onPressed: onBusinessEnrollment),
+                _MerchantEnrollmentCard(onPressed: onBusinessEnrollment),
                 const SizedBox(height: 16),
                 _SearchBox(onTap: () => context.push('/search')),
                 const SizedBox(height: 28),
@@ -700,10 +700,10 @@ class _HomeTopBar extends StatelessWidget {
   }
 }
 
-class _AdvertisementCard extends StatelessWidget {
+class _MerchantEnrollmentCard extends StatelessWidget {
   final VoidCallback onPressed;
 
-  const _AdvertisementCard({required this.onPressed});
+  const _MerchantEnrollmentCard({required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -1876,10 +1876,6 @@ class _BusinessesTabState extends State<_BusinessesTab> {
           second: index + 1 < businesses.length ? businesses[index + 1] : null,
           followedBusinessIds: widget.state.followedBusinessIds,
         ),
-        if (index % 4 == 2) ...[
-          const SizedBox(height: 14),
-          const _AllBusinessesAdvertisementSlider(),
-        ],
         const SizedBox(height: 14),
       ],
     ];
@@ -2059,172 +2055,6 @@ class _AllBusinessesRow extends StatelessWidget {
           context.read<HomeBloc>().add(HomeBusinessFollowToggled(businessId)),
     );
   }
-}
-
-class _AllBusinessesAdvertisementSlider extends StatefulWidget {
-  const _AllBusinessesAdvertisementSlider();
-
-  @override
-  State<_AllBusinessesAdvertisementSlider> createState() =>
-      _AllBusinessesAdvertisementSliderState();
-}
-
-class _AllBusinessesAdvertisementSliderState
-    extends State<_AllBusinessesAdvertisementSlider> {
-  late final PageController _pageController;
-  int _currentIndex = 0;
-
-  static const _ads = [
-    _AllBusinessesAdData(
-      brand: 'Bicto',
-      caption: 'يقوم فريق تطبيق Bicto بمساعدتك إعلانية',
-      colorValue: 0xFF3D5A80,
-    ),
-    _AllBusinessesAdData(
-      brand: 'Merzox',
-      caption: 'اكتشف عروضا جديدة من المتاجر القريبة منك',
-      colorValue: 0xFF293241,
-    ),
-    _AllBusinessesAdData(
-      brand: 'Mx',
-      caption: 'مساحة إعلانية للمتاجر والخدمات المحلية',
-      colorValue: 0xFF446B8F,
-    ),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _pageController = PageController(viewportFraction: 0.88);
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 94,
-      child: Column(
-        children: [
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() => _currentIndex = index);
-              },
-              itemBuilder: (context, index) {
-                return _MiniAdvertisementPanel(data: _ads[index]);
-              },
-              itemCount: _ads.length,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(_ads.length, (index) {
-              final selected = index == _currentIndex;
-
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                width: selected ? 16 : 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? MerzoxColors.kColorEE6C4D
-                      : MerzoxColors.kColorD8D8D8,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              );
-            }),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AllBusinessesAdData {
-  final String brand;
-  final String caption;
-  final int colorValue;
-
-  const _AllBusinessesAdData({
-    required this.brand,
-    required this.caption,
-    required this.colorValue,
-  });
-}
-
-class _MiniAdvertisementPanel extends StatelessWidget {
-  final _AllBusinessesAdData data;
-
-  const _MiniAdvertisementPanel({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        color: Color(data.colorValue),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: CustomPaint(
-        painter: _AdPatternPainter(),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                data.brand,
-                style: TextStyle(
-                  fontFamily: 'Minion',
-                  fontSize: 24,
-                  color: MerzoxColors.kColorEE6C4D,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: Text(
-                  data.caption,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 12),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _AdPatternPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.05)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    for (var x = -20.0; x < size.width; x += 24) {
-      for (var y = -20.0; y < size.height; y += 24) {
-        canvas.drawCircle(Offset(x, y), 10, paint);
-        canvas.drawLine(Offset(x - 6, y), Offset(x + 6, y), paint);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _ChatTab extends StatelessWidget {
