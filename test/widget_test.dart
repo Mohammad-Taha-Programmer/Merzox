@@ -22,6 +22,8 @@ void main() {
   });
 
   testWidgets('login renders auth and guest actions', (tester) async {
+    var forgotPasswordRequested = false;
+
     await tester.pumpWidget(
       MaterialApp(
         home: BlocProvider(
@@ -30,6 +32,9 @@ void main() {
             onAuthenticated: () {},
             onBrowseAsGuest: () {},
             onSignupRequested: () {},
+            onForgotPasswordRequested: () {
+              forgotPasswordRequested = true;
+            },
           ),
         ),
       ),
@@ -39,5 +44,11 @@ void main() {
     expect(find.text('المتابعة كضيف'), findsOneWidget);
     expect(find.text('ألا تملك حساب؟'), findsOneWidget);
     expect(find.text('قم بإنشاء حساب'), findsOneWidget);
+    expect(find.text('نسيت كلمة المرور؟'), findsOneWidget);
+
+    await tester.tap(find.text('نسيت كلمة المرور؟'));
+    await tester.pump();
+
+    expect(forgotPasswordRequested, isTrue);
   });
 }

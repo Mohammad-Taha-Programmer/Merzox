@@ -114,6 +114,20 @@ const userSchema = new mongoose.Schema(
       required: true,
       select: false
     },
+    passwordResetTokenHash: {
+      type: String,
+      select: false,
+      index: true
+    },
+    passwordResetExpiresAt: {
+      type: Date,
+      select: false
+    },
+    authVersion: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
     permissions: {
       aiPersonalization: { type: Boolean, default: false },
       location: { type: Boolean, default: false },

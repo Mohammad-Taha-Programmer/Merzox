@@ -8,6 +8,10 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 import { signAccessToken } from '../utils/jwt.js';
 import { sendVerificationEmail } from '../services/email.service.js';
 import {
+  consumePasswordReset,
+  requestPasswordReset
+} from '../services/password-recovery.service.js';
+import {
   normalizeGender,
   normalizeIdentifier,
   normalizePhone
@@ -198,6 +202,37 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   await user.save();
 
   res.json({ success: true, data: { message: 'Email verified. You can now log in.' } });
+});
+
+export const forgotPassword = asyncHandler(async (req, res) => {
+  const email = String(req.body.email).trim().toLowerCase();
+
+  // Recovery work is deliberately decoupled from the public response so a
+  // caller cannot distinguish account existence from database/SMTP latency.
+  // requestPasswordReset owns and suppresses its operational failures.
+  void requestPasswordReset({ email });
+
+  res.status(202).json({
+    success: true,
+    data: {
+      message:
+        'If an eligible account exists, password reset instructions will be sent.'
+    }
+  });
+});
+
+export const resetPassword = asyncHandler(async (req, res) => {
+  await consumePasswordReset({
+    token: req.body.token,
+    newPassword: req.body.newPassword
+  });
+
+  res.json({
+    success: true,
+    data: {
+      message: 'Password reset successful. You can now log in.'
+    }
+  });
 });
 
 export const logout = asyncHandler(async (_req, res) => {

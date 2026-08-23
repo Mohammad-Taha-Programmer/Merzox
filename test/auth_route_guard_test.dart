@@ -13,6 +13,36 @@ void main() {
     token: 'business-token',
   );
 
+  group('password recovery routes are public', () {
+    for (final route in [
+      '/forgot-password',
+      '/reset-password',
+      '/forgot-password?business=true',
+      '/reset-password?business=true',
+    ]) {
+      test('allows guest $route', () {
+        expect(
+          AuthRouteGuard.redirect(uri: Uri.parse(route), session: guest),
+          isNull,
+        );
+      });
+
+      test('allows authenticated customer $route', () {
+        expect(
+          AuthRouteGuard.redirect(uri: Uri.parse(route), session: customer),
+          isNull,
+        );
+      });
+
+      test('allows business session $route', () {
+        expect(
+          AuthRouteGuard.redirect(uri: Uri.parse(route), session: business),
+          isNull,
+        );
+      });
+    }
+  });
+
   group('protected customer routes', () {
     const protectedRoutes = [
       '/orders',
