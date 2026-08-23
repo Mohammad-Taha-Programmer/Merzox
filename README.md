@@ -9,8 +9,10 @@ customers with nearby businesses, their products, and their services. The mobile
 client is built with Flutter for Android and iOS, while the API uses Node.js,
 Express, MongoDB, and Mongoose.
 
-The project is under active development. Arabic is the default language and the
-interface also supports English, including automatic RTL/LTR layout changes.
+The project is under active development. Arabic is the default language, and
+the project includes English localization infrastructure with RTL/LTR support.
+Some screens still contain hard-coded Arabic while localization coverage is
+being completed.
 
 ## Current Features
 
@@ -21,11 +23,11 @@ interface also supports English, including automatic RTL/LTR layout changes.
 - Email verification before an email-based account is persisted.
 - Guest browsing with purchasing and account changes restricted to authenticated users.
 - Home feed for new, highly rated, discounted, and nearby businesses.
-- Paginated all-businesses catalog with advertisement sliders.
+- Paginated all-businesses catalog.
 - Search for products, services, and businesses, with local search history.
 - Business profiles with information, products, services, ratings, and reviews.
-- Product details with image galleries, variants, quantities, ratings, favorites,
-  cart actions, and direct-purchase entry points.
+- Product details with image galleries, quantities, ratings, favorites, cart
+  actions, and direct-purchase entry points. Product variants are not implemented yet.
 - Persistent cart and authenticated checkout flow.
 - Order history grouped into current, completed, and cancelled orders.
 - Favorites for businesses, products, and services.
@@ -53,10 +55,13 @@ interface also supports English, including automatic RTL/LTR layout changes.
 ### Application foundations
 
 - BLoC-based state management for application workflows.
-- Arabic and English localization with RTL/LTR support.
+- Arabic and English localization infrastructure with RTL/LTR support; full
+  string coverage is still in progress.
 - Runtime location permission handling.
 - Responsive Android and iOS UI based on the supplied Adobe XD designs.
-- Secure local session persistence and configurable API endpoints.
+- Local session persistence and configurable API endpoints.
+- GitHub Actions CI verifies pull requests and pushes to `main` with Flutter,
+  backend, and disposable-MongoDB integration test jobs.
 
 ## Technology
 
@@ -197,6 +202,8 @@ npm run check
 npm test
 ```
 
+GitHub Actions automatically verifies pull requests and pushes to `main`. The workflow runs Flutter formatting, analysis, and tests; backend syntax checks and standard tests; and the authorization and checkout/inventory integration suites against disposable loopback MongoDB databases. If either integration suite reports `SKIPPED`, the integration job fails.
+
 Build an Android debug APK:
 
 ```powershell
@@ -223,7 +230,7 @@ review, production secret management, monitoring, backups, or dependency audits.
 - Payment processing for cards, cash, bank transfers, and purchases for others.
 - Courier location on a live map during delivery.
 - Consent-based recommendation and preference analysis.
-- Production deployment, observability, automated CI, and store publication.
+- Production deployment, observability, and store publication.
 
 ## Project Status
 
