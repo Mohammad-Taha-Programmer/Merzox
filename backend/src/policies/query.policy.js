@@ -1,92 +1,193 @@
 import { AppError } from '../utils/AppError.js';
 
 /**
- * The shared query contract for list endpoints.
+ * Shared strict query parsing primitives.
  *
- * `Number.parseInt` was the problem this replaces: it stops at the first
- * non-digit, so `page=2abc` silently became `2` and `limit=5x` became `5`. A
- * malformed value must be refused, not quietly reinterpreted.
- *
- * Contract:
- *   page  - required-shape positive base-10 integer; absent means 1
- *   limit - required-shape positive base-10 integer; absent means 20;
- *           capped at MAX_LIMIT, which is a documented clamp rather than a
- *           rejection so an over-large page size stays a successful request
- *   enums - matched exactly; anything else is refused
+ * Defaults preserve the existing contracts of the endpoints that already use
+ * this policy. Endpoints that require an exact public syntax can opt out of
+ * blank/default and surrounding-whitespace coercion explicitly.
  */
 
 export const DEFAULT_PAGE = 1;
 export const DEFAULT_LIMIT = 20;
 export const MAX_LIMIT = 50;
 
-/** Only a bare run of digits is a valid integer here - no signs, no decimals. */
 const INTEGER_PATTERN = /^\d+$/;
+const DECIMAL_PATTERN = /^-?\d+(?:\.\d+)?$/;
+
+function invalidParam(name, code) {
+  throw new AppError(`${name} is invalid`, 400, code);
+}
 
 /**
- * Parses one positive-integer query parameter.
+ * Rejects supported query parameters that the global HPP middleware identified
+ * as repeated.
  *
- * Rejects `2abc`, `1.5`, `-1`, `0`, `abc`, `1e3`, ` 2 ` with a leading sign,
- * and repeated parameters (which Express surfaces as an array).
+ * hpp moves the original array to `req.queryPolluted` and leaves only the last
+ * value in `req.query`. Validators that inspect only `req.query` would therefore
+ * otherwise accept a polluted request as if the caller had supplied one value.
+ *
+ * `codeByName` is deliberately endpoint-specific so repeated unknown query
+ * parameters are not turned into a new global unknown-query rejection policy.
+ */
+export function rejectPollutedQueryParams(req, codeByName = {}) {
+  const polluted = req?.queryPolluted;
+
+  if (!polluted || typeof polluted !== 'object') {
+    return;
+  }
+
+  for (const [name, code] of Object.entries(codeByName)) {
+    if (Object.prototype.hasOwnProperty.call(polluted, name)) {
+      invalidParam(name, code);
+    }
+  }
+}
+
+/**
+ * Parses one positive base-10 integer query parameter.
+ *
+ * Partial numbers, decimal/exponent notation, signs, unsafe integers and
+ * repeated query parameters are rejected.
  */
 export function positiveIntegerParam(
   value,
-  { name, fallback, max = null, code }
+  {
+    name,
+    fallback,
+    max = null,
+    code,
+    allowBlankAsFallback = true,
+    allowSurroundingWhitespace = true
+  }
 ) {
-  if (value === undefined || value === null || value === '') {
+  if (value === undefined || value === null) {
     return fallback;
   }
 
-  // A repeated query parameter arrives as an array; there is no single answer.
-  if (Array.isArray(value)) {
-    throw new AppError(`${name} is invalid`, 400, code);
+  if (value === '') {
+    if (allowBlankAsFallback) {
+      return fallback;
+    }
+    invalidParam(name, code);
   }
 
-  const raw = String(value).trim();
+  if (Array.isArray(value)) {
+    invalidParam(name, code);
+  }
+
+  const text = String(value);
+  const raw = allowSurroundingWhitespace ? text.trim() : text;
+
   if (!INTEGER_PATTERN.test(raw)) {
-    throw new AppError(`${name} is invalid`, 400, code);
+    invalidParam(name, code);
   }
 
   const parsed = Number(raw);
   if (!Number.isSafeInteger(parsed) || parsed < 1) {
-    throw new AppError(`${name} is invalid`, 400, code);
+    invalidParam(name, code);
   }
 
-  // Clamping the upper bound is deliberate and documented: a caller asking for
-  // more than the server will serve gets the maximum, not an error.
   return max === null ? parsed : Math.min(parsed, max);
 }
 
-export function paginationParams(query = {}) {
+/**
+ * Parses a plain finite decimal number.
+ *
+ * The grammar deliberately rejects exponent notation, a leading plus sign,
+ * surrounding whitespace, partial numbers and repeated parameters.
+ */
+export function decimalParam(value, { name, min, max, code }) {
+  if (
+    value === undefined ||
+    value === null ||
+    value === '' ||
+    Array.isArray(value)
+  ) {
+    invalidParam(name, code);
+  }
+
+  const raw = String(value);
+
+  if (!DECIMAL_PATTERN.test(raw)) {
+    invalidParam(name, code);
+  }
+
+  const parsed = Number(raw);
+
+  if (
+    !Number.isFinite(parsed) ||
+    parsed < min ||
+    parsed > max
+  ) {
+    invalidParam(name, code);
+  }
+
+  return parsed;
+}
+
+export function paginationParams(
+  query = {},
+  {
+    pageFallback = DEFAULT_PAGE,
+    limitFallback = DEFAULT_LIMIT,
+    maxLimit = MAX_LIMIT,
+    allowBlankAsFallback = true,
+    allowSurroundingWhitespace = true
+  } = {}
+) {
   const page = positiveIntegerParam(query.page, {
     name: 'page',
-    fallback: DEFAULT_PAGE,
-    code: 'INVALID_PAGE'
+    fallback: pageFallback,
+    code: 'INVALID_PAGE',
+    allowBlankAsFallback,
+    allowSurroundingWhitespace
   });
+
   const limit = positiveIntegerParam(query.limit, {
     name: 'limit',
-    fallback: DEFAULT_LIMIT,
-    max: MAX_LIMIT,
-    code: 'INVALID_LIMIT'
+    fallback: limitFallback,
+    max: maxLimit,
+    code: 'INVALID_LIMIT',
+    allowBlankAsFallback,
+    allowSurroundingWhitespace
   });
 
   return { page, limit, skip: (page - 1) * limit };
 }
 
 /**
- * Matches a query value against an allowlist. An unrecognised value is refused
- * rather than folded into the default, so `filter=banana` can never be served
- * as `all`.
+ * Matches a query value against an exact allowlist.
  */
-export function enumParam(value, { name, allowed, fallback, code }) {
-  if (value === undefined || value === null || value === '') {
+export function enumParam(
+  value,
+  {
+    name,
+    allowed,
+    fallback,
+    code,
+    allowBlankAsFallback = true,
+    allowSurroundingWhitespace = true
+  }
+) {
+  if (value === undefined || value === null) {
     return fallback;
   }
 
-  if (Array.isArray(value)) {
-    throw new AppError(`${name} is invalid`, 400, code);
+  if (value === '') {
+    if (allowBlankAsFallback) {
+      return fallback;
+    }
+    invalidParam(name, code);
   }
 
-  const raw = String(value).trim();
+  if (Array.isArray(value)) {
+    invalidParam(name, code);
+  }
+
+  const text = String(value);
+  const raw = allowSurroundingWhitespace ? text.trim() : text;
+
   if (!allowed.includes(raw)) {
     throw new AppError(
       `${name} must be one of: ${allowed.join(', ')}`,
