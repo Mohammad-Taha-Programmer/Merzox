@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:merzox/services/api_service.dart';
 
 sealed class ProductDetailsEvent {
@@ -58,4 +60,16 @@ final class ProductDetailsReloadRequested extends ProductDetailsEvent {
 
 final class ProductDetailsReviewsRetryRequested extends ProductDetailsEvent {
   const ProductDetailsReviewsRetryRequested();
+}
+
+final class ProductDetailsShareRequested extends ProductDetailsEvent {
+  final String businessName;
+  final String languageCode;
+  final Rect? sharePositionOrigin;
+
+  const ProductDetailsShareRequested({
+    required this.businessName,
+    required this.languageCode,
+    this.sharePositionOrigin,
+  });
 }

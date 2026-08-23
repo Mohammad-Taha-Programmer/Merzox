@@ -5,6 +5,7 @@ import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/cart/cart_item_integrity.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/product_share_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../cart/cart_storage_keys.dart';
@@ -17,18 +18,23 @@ class ProductDetailsBloc
   static const String cartKey = CartStorageKeys.items;
   final ApiService _apiService;
   final AuthSessionService _authSessionService;
+  final ProductShareGateway _productShareGateway;
 
   ProductDetailsBloc({
     ApiService? apiService,
     AuthSessionService authSessionService = const AuthSessionService(),
+    ProductShareGateway? productShareGateway,
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
+       _productShareGateway =
+           productShareGateway ?? const ProductShareService(),
        super(const ProductDetailsState()) {
     on<ProductDetailsStarted>(_onStarted);
     on<ProductDetailsImageChanged>(_onImageChanged);
     on<ProductDetailsTabChanged>(_onTabChanged);
     on<ProductDetailsQuantityIncremented>(_onQuantityIncremented);
     on<ProductDetailsQuantityDecremented>(_onQuantityDecremented);
+    on<ProductDetailsShareRequested>(_onShareRequested);
     on<ProductDetailsReviewSubmitted>(_onReviewSubmitted);
     on<ProductDetailsAddToCartPressed>(_onAddToCartPressed);
     on<ProductDetailsBuyNowPressed>(_onBuyNowPressed);
@@ -133,6 +139,55 @@ class ProductDetailsBloc
     emit(
       state.copyWith(quantity: state.quantity <= 1 ? 1 : state.quantity - 1),
     );
+  }
+
+  Future<void> _onShareRequested(
+    ProductDetailsShareRequested event,
+    Emitter<ProductDetailsState> emit,
+  ) async {
+    final product = state.product;
+
+    if (product == null ||
+        state.status == ProductDetailsStatus.sharing ||
+        state.status == ProductDetailsStatus.savingReview) {
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        status: ProductDetailsStatus.sharing,
+        message: null,
+        errorMessage: null,
+      ),
+    );
+
+    try {
+      final outcome = await _productShareGateway.shareProduct(
+        productName: product.name,
+        businessName: event.businessName,
+        displayPrice: product.displayPrice,
+        languageCode: event.languageCode == 'en' ? 'en' : 'ar',
+        sharePositionOrigin: event.sharePositionOrigin,
+      );
+
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.ready,
+          message: outcome == ProductShareOutcome.dismissed
+              ? null
+              : 'catalog.productShareOpened',
+          errorMessage: null,
+        ),
+      );
+    } catch (_) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          message: null,
+          errorMessage: 'catalog.productShareError',
+        ),
+      );
+    }
   }
 
   Future<void> _onReviewSubmitted(

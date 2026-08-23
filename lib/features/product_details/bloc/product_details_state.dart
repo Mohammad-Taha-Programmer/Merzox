@@ -5,6 +5,7 @@ enum ProductDetailsStatus {
   loading,
   ready,
   savingReview,
+  sharing,
   action,
   failure,
 }
