@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 import {
+  RESERVATION_STATES,
+  RESERVATION_STATES_LIST
+} from '../policies/checkout-intent.policy.js';
+
+import {
   finalPriceFor,
   isProductInStock,
   LEGACY_UNLIMITED_STOCK_DEFAULT,
@@ -111,6 +116,53 @@ const socialLinksSchema = new mongoose.Schema(
   { _id: false }
 );
 
+/**
+ * One outstanding reservation, and exactly what it consumed.
+ *
+ * The consumption lives here rather than only on the CheckoutIntent because
+ * this document is written in the SAME atomic update as the decrement. A crash
+ * immediately afterwards therefore cannot leave inventory consumed with no
+ * durable record of what to give back.
+ */
+const stockReservationSchema = new mongoose.Schema(
+  {
+    intent: { type: mongoose.Schema.Types.ObjectId, required: true },
+    /**
+     * What this entry asserts about its checkout.
+     *
+     * `reserved` holds stock. `failed` holds nothing: it is the durable record
+     * that this checkout's reservation was refused, and it exists so that the
+     * refusal and a successful reservation compete for the SAME single-document
+     * predicate. Whoever pushes an entry for the intent first wins, and the
+     * loser's write matches nothing - which is the only way to make the two
+     * outcomes mutually exclusive without a transaction.
+     *
+     * Absent means `reserved`: entries written before this field existed only
+     * ever recorded live reservations.
+     */
+    state: {
+      type: String,
+      enum: RESERVATION_STATES_LIST,
+      default: RESERVATION_STATES.reserved
+    },
+    /** Set on a `failed` entry only, so a retry answers the same way. */
+    failureCode: { type: String, default: null },
+    lines: {
+      type: [
+        new mongoose.Schema(
+          {
+            productId: { type: mongoose.Schema.Types.ObjectId, required: true },
+            quantity: { type: Number, required: true, min: 1 }
+          },
+          { _id: false }
+        )
+      ],
+      default: []
+    }
+  },
+  { _id: false }
+);
+
 const businessSchema = new mongoose.Schema(
   {
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -126,6 +178,43 @@ const businessSchema = new mongoose.Schema(
     location: { type: locationSchema, index: '2dsphere' },
     contacts: { type: [contactSchema], default: [] },
     products: { type: [productSchema], default: [] },
+
+    /**
+     * Outstanding stock reservations, by CheckoutIntent id.
+     *
+     * The marker is added in the same single-document update that decrements
+     * the stock, so "inventory was consumed" and "this checkout consumed it"
+     * are one atomic fact rather than two writes with a gap between them. A
+     * replay of the same reservation is refused because the id is already
+     * present, and a release is refused unless it still is - which is what
+     * makes both operations idempotent.
+     *
+     * Entries are removed when the checkout finalizes or releases, so the set
+     * only ever holds checkouts that are genuinely in flight. It is internal
+     * and appears on no serializer.
+     *
+     * The array arbitrates the immediate reservation outcome for one checkout.
+     * `reservationFence` adds the permanent fence: terminal failure advances
+     * this Business-wide generation, so workers authorized under an older
+     * generation remain invalid even after their temporary `failed` entry is
+     * cleaned up.
+     *
+     * The generation is one bounded scalar for the whole Business. It does not
+     * grow with the number of failed checkouts and is never serialized.
+     */
+     reservationFence: {
+       type: Number,
+       default: 0,
+       min: 0,
+       select: false
+     },
+
+    stockReservations: {
+      type: [stockReservationSchema],
+      default: [],
+      select: false
+    },
+
     ratingAverage: { type: Number, min: 0, max: 5, default: 0 },
     ratingCount: { type: Number, min: 0, default: 0 },
     followerCount: { type: Number, min: 0, default: 0 },

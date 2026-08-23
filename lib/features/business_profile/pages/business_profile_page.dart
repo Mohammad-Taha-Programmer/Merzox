@@ -859,8 +859,21 @@ class _ProductCard extends StatelessWidget {
                 children: [
                   _StarRating(value: product.rating, size: 12),
                   const Spacer(),
+                  // The payable price, with the list price struck through only
+                  // when the server actually says a discount applies.
+                  if (product.hasDiscount) ...[
+                    Text(
+                      '₪ ${product.price.toStringAsFixed(0)}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: MerzoxColors.kColor8D99AE,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   Text(
-                    '₪ ${product.price.toStringAsFixed(0)}',
+                    '₪ ${product.displayPrice.toStringAsFixed(0)}',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,

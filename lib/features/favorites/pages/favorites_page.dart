@@ -507,8 +507,20 @@ class _FavoriteProductCard extends StatelessWidget {
                 children: [
                   _StarRating(value: product.rating, size: 11),
                   const Spacer(),
+                  if (product.hasDiscount) ...[
+                    Text(
+                      '₪ ${product.price.toStringAsFixed(0)}',
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(
+                        color: MerzoxColors.kColor8D99AE,
+                        fontSize: 10,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   Text(
-                    '₪ ${product.price.toStringAsFixed(0)}',
+                    '₪ ${product.displayPrice.toStringAsFixed(0)}',
                     textDirection: TextDirection.ltr,
                     style: const TextStyle(
                       color: MerzoxColors.kColor3B3B3B,

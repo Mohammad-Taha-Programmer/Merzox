@@ -12,6 +12,11 @@ import {
   orderStatuses as policyStatuses,
   statusGroupFor
 } from '../policies/order-status.policy.js';
+import {
+  buildAtomicInventoryUpdate,
+  classifyInventoryConflict,
+  inventoryConflictResponse
+} from '../policies/checkout-intent.policy.js';
 import { buildProductWrite } from '../policies/product.policy.js';
 import { paginationParams } from '../policies/query.policy.js';
 import { notifyOrderStatus } from '../services/notification.service.js';
@@ -254,6 +259,71 @@ export const createMyBusinessProduct = asyncHandler(async (req, res) => {
   });
 });
 
+/** Whether this request is trying to rewrite the product's stock at all. */
+function touchesInventory(body) {
+  return body.stockQuantity !== undefined || body.unlimitedStock !== undefined;
+}
+
+/**
+ * Applies a merchant product update whose correctness depends on inventory.
+ *
+ * The reservation check is NOT performed here and then trusted later - it is a
+ * predicate inside the very update MongoDB executes, so a checkout that
+ * reserves stock a microsecond after we read the document still causes this
+ * write to match nothing. The previous read/check/save shape could not promise
+ * that: the observation was true when made and stale when used.
+ *
+ * Only inventory-touching requests take this path. Name, description, price,
+ * discount, images, keywords and activation cannot be corrupted by a release,
+ * so they keep the ordinary document save and stay editable throughout.
+ */
+async function applyInventoryUpdate({ business, product, write, ownerId }) {
+  const atomic = buildAtomicInventoryUpdate({
+    businessId: business._id,
+    ownerId,
+    productId: product._id,
+    write,
+    observedStock: {
+      stockQuantity: product.stockQuantity,
+      unlimitedStock: product.unlimitedStock
+    }
+  });
+
+  // `new: true` so the response reports what MongoDB actually stored, never the
+  // stale in-memory subdocument this request started from.
+  const updated = await Business.findOneAndUpdate(atomic.filter, atomic.update, {
+    arrayFilters: atomic.arrayFilters,
+    new: true
+  });
+
+  if (updated) return updated;
+
+  // The write matched nothing, and the filter has several predicates that could
+  // be the reason. Read once more purely to say which - this read authorizes
+  // nothing and is followed by no second write, so the CAS above remains the
+  // only thing that ever mutates inventory.
+  const current = await Business.findOne({
+    _id: business._id,
+    owner: ownerId
+  }).select('+stockReservations');
+
+  const conflict = classifyInventoryConflict({
+    business: current,
+    product: current?.products?.id(product._id),
+    observedStock: {
+      stockQuantity: product.stockQuantity,
+      unlimitedStock: product.unlimitedStock
+    }
+  });
+
+  // The message never carries the current stock figure, a reservation id, or
+  // anything identifying a customer or their checkout. The mapping lives beside
+  // the classifier so the API and its tests cannot describe it differently.
+  const failure = inventoryConflictResponse(conflict);
+
+  throw new AppError(failure.message, failure.status, failure.code);
+}
+
 export const updateMyBusinessProduct = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);
   const product = business.products.id(req.params.productId);
@@ -265,6 +335,24 @@ export const updateMyBusinessProduct = asyncHandler(async (req, res) => {
     unlimitedStock: product.unlimitedStock,
     stockQuantity: product.stockQuantity
   });
+
+  if (touchesInventory(req.body)) {
+    // Every field of this request goes in one guarded update, so a blocked
+    // inventory change cannot leave a description or price behind it applied.
+    const updated = await applyInventoryUpdate({
+      business,
+      product,
+      write,
+      ownerId: req.user._id
+    });
+    const stored = updated.products.id(product._id);
+
+    return res.json({
+      success: true,
+      data: { product: updated.productToOwnerJSON(stored) }
+    });
+  }
+
   for (const [field, value] of Object.entries(write)) {
     product[field] = value;
   }

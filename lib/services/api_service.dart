@@ -883,11 +883,34 @@ class ApiService {
   }
 }
 
+/// The PUBLIC product contract, mirroring `Business.productToJSON` exactly.
+///
+/// It deliberately models `discountPercent`, `finalPrice` and `inStock`, and
+/// deliberately does NOT model `costPrice`, `stockQuantity`, `unlimitedStock`
+/// or `keywords`. Those are merchant-internal, live only on the owner
+/// serializer, and must never become reachable from a customer widget - which
+/// is why they are absent from the type rather than merely unread.
 class BusinessProductApiModel {
   final String id;
   final String name;
   final String description;
+
+  /// The merchant's list price. Presentation only: struck through when a
+  /// discount applies. It is never what the customer pays.
   final double price;
+
+  /// Server-derived. The client must not recompute this as authority.
+  final double discountPercent;
+
+  /// Server-derived payable price. The single source of truth for what this
+  /// product costs, and the same number the order will be priced at.
+  final double finalPrice;
+
+  /// Availability only. The exact remaining quantity is merchant-private, so
+  /// the client genuinely cannot know whether 2 or 200 units remain - which is
+  /// why exact quantity enforcement belongs to the server.
+  final bool inStock;
+
   final String imageUrl;
   final List<String> imageUrls;
   final String classification;
@@ -907,8 +930,17 @@ class BusinessProductApiModel {
     required this.rating,
     required this.ratingCount,
     required this.likeCount,
+    this.discountPercent = 0,
+    double? finalPrice,
+    this.inStock = true,
     this.isService = false,
-  });
+  }) : finalPrice = finalPrice ?? price;
+
+  /// Presentation helper only - it reports what the server already decided.
+  bool get hasDiscount => discountPercent > 0 && finalPrice < price;
+
+  /// What to show as the price, and what a cart snapshot must store.
+  double get displayPrice => finalPrice;
 
   factory BusinessProductApiModel.fromJson(Map<String, dynamic> json) {
     final rawImageUrls = json['imageUrls'] as List<dynamic>? ?? [];
@@ -928,7 +960,13 @@ class BusinessProductApiModel {
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0,
+      // Commerce fields are read strictly. A malformed or missing price, sale
+      // price or availability flag must not quietly produce a believable,
+      // purchasable product - it is a broken contract, and it fails as one.
+      price: _requiredMoney(json, 'price'),
+      discountPercent: _requiredPercent(json, 'discountPercent'),
+      finalPrice: _requiredMoney(json, 'finalPrice'),
+      inStock: _requiredFlag(json, 'inStock'),
       imageUrl: imageUrls.isEmpty ? '' : imageUrls.first,
       imageUrls: imageUrls,
       classification: json['classification'] as String? ?? '',
@@ -937,6 +975,33 @@ class BusinessProductApiModel {
       likeCount: (json['likeCount'] as num?)?.toInt() ?? 0,
       isService: json['isService'] as bool? ?? false,
     );
+  }
+
+  static double _requiredMoney(Map<String, dynamic> json, String field) {
+    final value = json[field];
+    if (value is! num || !value.isFinite || value < 0) {
+      throw ApiContractException(
+        'product',
+        '$field must be a non-negative finite number',
+      );
+    }
+    return value.toDouble();
+  }
+
+  static double _requiredPercent(Map<String, dynamic> json, String field) {
+    final value = json[field];
+    if (value is! num || !value.isFinite || value < 0 || value > 100) {
+      throw ApiContractException('product', '$field must be between 0 and 100');
+    }
+    return value.toDouble();
+  }
+
+  static bool _requiredFlag(Map<String, dynamic> json, String field) {
+    final value = json[field];
+    if (value is! bool) {
+      throw ApiContractException('product', '$field must be a boolean');
+    }
+    return value;
   }
 }
 

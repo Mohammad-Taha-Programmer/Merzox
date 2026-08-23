@@ -272,6 +272,18 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
       return;
     }
 
+    // The second cart-write site in the app, and it needs the same stock guard
+    // as the product page: an out-of-stock favourite must not enter the cart.
+    if (!favorite.product.inStock) {
+      emit(
+        state.copyWith(
+          status: FavoritesStatus.ready,
+          errorMessage: 'catalog.outOfStock',
+        ),
+      );
+      return;
+    }
+
     try {
       await _token();
       final prefs = await SharedPreferences.getInstance();
@@ -282,7 +294,8 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
           'businessId': favorite.business.id,
           'productId': favorite.product.id,
           'name': favorite.product.name,
-          'price': favorite.product.price,
+          // Same rule as the product page: the sale price, never the list one.
+          'price': favorite.product.displayPrice,
           'imageUrl': favorite.product.imageUrl,
           'quantity': 1,
           'addedAt': DateTime.now().toIso8601String(),

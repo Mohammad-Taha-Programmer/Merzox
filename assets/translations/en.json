@@ -44,7 +44,12 @@
     "loadError": "Could not load your orders. Please try again.",
     "checkoutSuccess": "Your order was created successfully",
     "checkoutError": "Could not create the order. Check the address and products, then try again.",
-    "moreItems": "+{} items"
+    "moreItems": "+{} items",
+    "checkoutOutOfStock": "One of the products is no longer in stock",
+    "checkoutInsufficientStock": "The requested quantity is not available",
+    "checkoutProductUnavailable": "One of the products is no longer available",
+    "checkoutBusinessUnavailable": "This store is not available right now",
+    "checkoutAddressRequired": "Add a delivery address to place the order"
   },
   "favorites": {
     "title": "Favorites",
@@ -93,7 +98,8 @@
     "addressUnavailable": "Address unavailable",
     "invalidCartItem": "This item cannot be added because it is not linked to an available product.",
     "productReviewPublished": "Product review published",
-    "addedToCart": "Product added to cart"
+    "addedToCart": "Product added to cart",
+    "outOfStock": "Out of stock"
   },
   "aboutUs": {
     "title": "About us",

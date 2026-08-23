@@ -8,6 +8,7 @@ import 'package:merzox/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../cart/cart_storage_keys.dart';
+import '../../cart/checkout_failure.dart';
 import 'product_details_event.dart';
 import 'product_details_state.dart';
 
@@ -235,6 +236,18 @@ class ProductDetailsBloc
       return;
     }
 
+    // Refused at the event layer, so hiding the button is defence in depth
+    // rather than the only guard. Nothing is written to the cart.
+    if (!product.inStock) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.outOfStock',
+        ),
+      );
+      return;
+    }
+
     try {
       await _token();
       final prefs = await SharedPreferences.getInstance();
@@ -245,7 +258,9 @@ class ProductDetailsBloc
           'businessId': state.businessId,
           'productId': product.id,
           'name': product.name,
-          'price': product.price,
+          // The server-derived sale price, never the list price. The backend
+          // reprices at checkout regardless, so this is the display snapshot.
+          'price': product.displayPrice,
           'imageUrl': product.imageUrl,
           'quantity': state.quantity,
           'addedAt': DateTime.now().toIso8601String(),
@@ -283,6 +298,16 @@ class ProductDetailsBloc
       return;
     }
 
+    if (!product.inStock) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.outOfStock',
+        ),
+      );
+      return;
+    }
+
     try {
       final token = await _token();
       final prefs = await SharedPreferences.getInstance();
@@ -303,11 +328,13 @@ class ProductDetailsBloc
           message: 'orders.checkoutSuccess',
         ),
       );
-    } catch (_) {
+    } catch (error) {
+      // A stock refusal is a different fact from a network failure, and the
+      // customer is told which one happened.
       emit(
         state.copyWith(
           status: ProductDetailsStatus.failure,
-          errorMessage: 'orders.checkoutError',
+          errorMessage: checkoutFailureMessage(error),
         ),
       );
     }

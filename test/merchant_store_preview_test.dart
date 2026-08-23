@@ -196,6 +196,9 @@ BusinessProductApiModel _publicProductFromPollutedPayload() {
     'name': 'منتج عام',
     'description': 'public description',
     'price': 25,
+    'discountPercent': 0,
+    'finalPrice': 25,
+    'inStock': true,
     'classification': 'new',
     'imageUrls': <String>[],
     // Owner-only keys, present in the payload and expected to be dropped.

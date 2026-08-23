@@ -14,22 +14,31 @@ class ProductDetailsPage extends StatelessWidget {
   final HomeBusiness business;
   final BusinessProductApiModel product;
 
+  /// Test seam, matching the one on the storefront page: an already-started
+  /// bloc to render against. Nothing in the app supplies it.
+  @visibleForTesting
+  final ProductDetailsBloc? bloc;
+
   const ProductDetailsPage({
     super.key,
     required this.business,
     required this.product,
+    this.bloc,
   });
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => ProductDetailsBloc()
-        ..add(
-          ProductDetailsStarted(
-            businessId: business.id,
-            initialProduct: product,
-          ),
-        ),
+      // An injected bloc has already been started by whoever built it;
+      // re-dispatching would repeat every public request.
+      create: (_) =>
+          bloc ??
+          (ProductDetailsBloc()..add(
+            ProductDetailsStarted(
+              businessId: business.id,
+              initialProduct: product,
+            ),
+          )),
       child: _ProductDetailsView(business: business),
     );
   }
@@ -115,6 +124,7 @@ class _ProductDetailsView extends StatelessWidget {
               : SafeArea(
                   top: false,
                   child: _BottomActions(
+                    inStock: product.inStock,
                     onAdd: () => AuthGate.run(
                       context,
                       onAuthenticated: () => context
@@ -231,10 +241,31 @@ class _ProductHeader extends StatelessWidget {
       child: Row(
         textDirection: TextDirection.ltr,
         children: [
-          Text(
-            '₪ ${product.price.toStringAsFixed(0)}',
-            textDirection: TextDirection.ltr,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '₪ ${product.displayPrice.toStringAsFixed(0)}',
+                textDirection: TextDirection.ltr,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              // Only when the server says a discount applies; no discount is
+              // ever invented for presentation.
+              if (product.hasDiscount)
+                Text(
+                  '₪ ${product.price.toStringAsFixed(0)}',
+                  textDirection: TextDirection.ltr,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: MerzoxColors.kColor8D99AE,
+                    decoration: TextDecoration.lineThrough,
+                  ),
+                ),
+            ],
           ),
           const Spacer(),
           Flexible(
@@ -737,10 +768,45 @@ class _BottomActions extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onBuy;
 
-  const _BottomActions({required this.onAdd, required this.onBuy});
+  /// Server truth. When the product is out of stock both actions are disabled
+  /// rather than allowed to fail later - and the bloc refuses them anyway, so
+  /// this is the visible half of a guard that exists on both sides.
+  final bool inStock;
+
+  const _BottomActions({
+    required this.onAdd,
+    required this.onBuy,
+    required this.inStock,
+  });
 
   @override
   Widget build(BuildContext context) {
+    if (!inStock) {
+      return Container(
+        height: 70,
+        alignment: Alignment.center,
+        padding: const EdgeInsets.fromLTRB(22, 8, 22, 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 16,
+              offset: const Offset(0, -6),
+            ),
+          ],
+        ),
+        child: Text(
+          'catalog.outOfStock'.tr(),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: MerzoxColors.kColor767676,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
+    }
+
     return Container(
       height: 70,
       padding: const EdgeInsets.fromLTRB(22, 8, 22, 14),

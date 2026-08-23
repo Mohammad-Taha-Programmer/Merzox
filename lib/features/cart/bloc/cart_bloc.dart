@@ -8,6 +8,7 @@ import '../../../services/api_service.dart';
 import '../../authentication/bloc/auth_bloc.dart';
 import '../cart_item_integrity.dart';
 import '../cart_storage_keys.dart';
+import '../checkout_failure.dart';
 import 'cart_event.dart';
 import 'cart_state.dart';
 
@@ -49,6 +50,19 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     Emitter<CartState> emit,
   ) async {
     if (state.items.isEmpty || state.status == CartStatus.checkingOut) return;
+
+    // The cart was revalidated against the public contract when it loaded, so
+    // this is a fact we just checked rather than a stale local guess. The
+    // server still enforces inventory independently.
+    if (state.hasUnavailableItem) {
+      emit(
+        state.copyWith(
+          status: CartStatus.failure,
+          errorMessage: 'orders.checkoutOutOfStock',
+        ),
+      );
+      return;
+    }
 
     emit(
       state.copyWith(
@@ -104,11 +118,14 @@ class CartBloc extends Bloc<CartEvent, CartState> {
           messageCode: 'orders.checkoutSuccess',
         ),
       );
-    } catch (_) {
+    } catch (error) {
+      // The cart is deliberately NOT cleared and the checkout id is kept, so a
+      // retry reuses the same clientOrderId per group: any order that already
+      // succeeded is returned as a duplicate instead of being placed twice.
       emit(
         state.copyWith(
           status: CartStatus.failure,
-          errorMessage: 'orders.checkoutError',
+          errorMessage: checkoutFailureMessage(error),
         ),
       );
     }
@@ -118,22 +135,81 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     final prefs = await SharedPreferences.getInstance();
     final storedItems = prefs.getStringList(CartStorageKeys.items) ?? [];
     final parsedItems = <CartItem>[];
-    final sanitizedItems = <String>[];
 
     for (final raw in storedItems) {
       final item = _tryParse(raw);
       if (item == null) continue;
 
       parsedItems.add(item);
-      sanitizedItems.add(item.raw);
     }
 
-    if (!_sameItems(storedItems, sanitizedItems)) {
-      await prefs.setStringList(CartStorageKeys.items, sanitizedItems);
+    final refreshedItems = await _revalidate(parsedItems);
+    final refreshedRaws = refreshedItems.map((item) => item.raw).toList();
+
+    if (!_sameItems(storedItems, refreshedRaws)) {
+      await prefs.setStringList(CartStorageKeys.items, refreshedRaws);
       await prefs.remove(CartStorageKeys.checkoutId);
     }
 
-    return parsedItems.reversed.toList();
+    return refreshedItems.reversed.toList();
+  }
+
+  /// Refreshes each line from the PUBLIC product contract.
+  ///
+  /// A stored cart entry is a snapshot, and a merchant can change a price or
+  /// sell out after it was taken. Rather than presenting that stale snapshot as
+  /// if it were current, every line is re-read before the cart is shown, and
+  /// the refreshed values are written back so what is displayed and what is
+  /// stored cannot disagree.
+  ///
+  /// A line that cannot be re-read keeps its snapshot untouched: a failed
+  /// request is not evidence about price or stock. The backend remains the
+  /// checkout authority in every case.
+  Future<List<CartItem>> _revalidate(List<CartItem> items) async {
+    final refreshed = <CartItem>[];
+
+    for (final item in items) {
+      try {
+        final product = await _apiService.businessProduct(
+          businessId: item.businessId,
+          productId: item.productId,
+        );
+        refreshed.add(
+          item.copyWith(
+            name: product.name.isEmpty ? item.name : product.name,
+            price: product.displayPrice,
+            imageUrl: product.imageUrl,
+            inStock: product.inStock,
+            raw: _rawFor(
+              item,
+              name: product.name.isEmpty ? item.name : product.name,
+              price: product.displayPrice,
+              imageUrl: product.imageUrl,
+            ),
+          ),
+        );
+      } catch (_) {
+        refreshed.add(item);
+      }
+    }
+
+    return refreshed;
+  }
+
+  String _rawFor(
+    CartItem item, {
+    required String name,
+    required double price,
+    required String imageUrl,
+  }) {
+    return jsonEncode({
+      'businessId': item.businessId,
+      'productId': item.productId,
+      'name': name,
+      'price': price,
+      'imageUrl': imageUrl,
+      'quantity': item.quantity,
+    });
   }
 
   CartItem? _tryParse(String raw) {
