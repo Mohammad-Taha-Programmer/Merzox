@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
 import test from 'node:test';
 
+import app from '../src/app.js';
 import {
   buildBusinessFilter,
   buildNearbyBusinessFilter,
@@ -436,4 +438,69 @@ test('normal and nearby catalog filters always retain active-business filtering'
     { category: { $regex: 'shop', $options: 'i' } },
     { 'products.name': { $regex: 'shop', $options: 'i' } }
   ]);
+});
+
+test('HTTP boundary rejects supported repeated business query parameters after HPP normalization', async (t) => {
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+
+  t.after(
+    () =>
+      new Promise((resolve, reject) => {
+        server.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      })
+  );
+
+  const address = server.address();
+  assert.ok(address && typeof address === 'object');
+
+  const baseUrl = `http://127.0.0.1:${address.port}`;
+
+  const cases = [
+    ['/api/v1/businesses?page=1&page=2', 'INVALID_PAGE'],
+    [
+      '/api/v1/businesses?search=phone&search=tablet',
+      'INVALID_BUSINESS_SEARCH'
+    ],
+    [
+      '/api/v1/businesses?lat=31.9&lat=32.0&lng=35.2',
+      'INVALID_LATITUDE'
+    ],
+    [
+      '/api/v1/businesses/demo/products?classification=new&classification=offers',
+      'INVALID_PRODUCT_CLASSIFICATION'
+    ],
+    [
+      '/api/v1/businesses/demo/reviews?page=1&page=2',
+      'INVALID_PAGE'
+    ],
+    [
+      '/api/v1/businesses/demo/products/demo/reviews?limit=10&limit=20',
+      'INVALID_LIMIT'
+    ]
+  ];
+
+  for (const [path, expectedCode] of cases) {
+    const response = await fetch(`${baseUrl}${path}`);
+    const payload = await response.json();
+
+    assert.equal(
+      response.status,
+      400,
+      `${path} should be rejected before any database query`
+    );
+
+    assert.equal(
+      payload.error?.code,
+      expectedCode,
+      `${path} should expose the stable validation code`
+    );
+  }
 });

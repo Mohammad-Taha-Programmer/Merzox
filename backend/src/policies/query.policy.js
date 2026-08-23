@@ -20,6 +20,31 @@ function invalidParam(name, code) {
 }
 
 /**
+ * Rejects supported query parameters that the global HPP middleware identified
+ * as repeated.
+ *
+ * hpp moves the original array to `req.queryPolluted` and leaves only the last
+ * value in `req.query`. Validators that inspect only `req.query` would therefore
+ * otherwise accept a polluted request as if the caller had supplied one value.
+ *
+ * `codeByName` is deliberately endpoint-specific so repeated unknown query
+ * parameters are not turned into a new global unknown-query rejection policy.
+ */
+export function rejectPollutedQueryParams(req, codeByName = {}) {
+  const polluted = req?.queryPolluted;
+
+  if (!polluted || typeof polluted !== 'object') {
+    return;
+  }
+
+  for (const [name, code] of Object.entries(codeByName)) {
+    if (Object.prototype.hasOwnProperty.call(polluted, name)) {
+      invalidParam(name, code);
+    }
+  }
+}
+
+/**
  * Parses one positive base-10 integer query parameter.
  *
  * Partial numbers, decimal/exponent notation, signs, unsafe integers and

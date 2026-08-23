@@ -10,7 +10,8 @@ import {
   decimalParam,
   enumParam,
   paginationParams as sharedPaginationParams,
-  positiveIntegerParam
+  positiveIntegerParam,
+  rejectPollutedQueryParams
 } from '../policies/query.policy.js';
 
 const productClassifications = ['new', 'bestSelling', 'offers'];
@@ -22,6 +23,28 @@ const REVIEW_DEFAULT_LIMIT = 20;
 const DEFAULT_RADIUS_METERS = 10000;
 const MIN_RADIUS_METERS = 100;
 const MAX_RADIUS_METERS = 50000;
+
+const BUSINESS_LIST_POLLUTED_QUERY_CODES = Object.freeze({
+  page: 'INVALID_PAGE',
+  limit: 'INVALID_LIMIT',
+  sort: 'INVALID_BUSINESS_SORT',
+  discounted: 'INVALID_DISCOUNTED_FILTER',
+  search: 'INVALID_BUSINESS_SEARCH',
+  lat: 'INVALID_LATITUDE',
+  latitude: 'INVALID_LATITUDE',
+  lng: 'INVALID_LONGITUDE',
+  longitude: 'INVALID_LONGITUDE',
+  radiusMeters: 'INVALID_RADIUS_METERS'
+});
+
+const BUSINESS_PRODUCTS_POLLUTED_QUERY_CODES = Object.freeze({
+  classification: 'INVALID_PRODUCT_CLASSIFICATION'
+});
+
+const BUSINESS_REVIEWS_POLLUTED_QUERY_CODES = Object.freeze({
+  page: 'INVALID_PAGE',
+  limit: 'INVALID_LIMIT'
+});
 
 export function paginationParams(
   query = {},
@@ -219,6 +242,8 @@ function businessListView(business) {
 }
 
 export const listBusinesses = asyncHandler(async (req, res) => {
+  rejectPollutedQueryParams(req, BUSINESS_LIST_POLLUTED_QUERY_CODES);
+
   const { page, limit, skip } = paginationParams(req.query);
   const nearby = nearbyParams(req.query);
   const sort = businessSort(req.query);
@@ -303,6 +328,11 @@ export const getBusiness = asyncHandler(async (req, res) => {
 });
 
 export const listBusinessProducts = asyncHandler(async (req, res) => {
+  rejectPollutedQueryParams(
+    req,
+    BUSINESS_PRODUCTS_POLLUTED_QUERY_CODES
+  );
+
   const classification = classificationParam(req.query);
   const business = await findBusiness(req.params.id);
 
@@ -377,6 +407,11 @@ export const likeBusinessProduct = asyncHandler(async (req, res) => {
 });
 
 export const listBusinessProductReviews = asyncHandler(async (req, res) => {
+  rejectPollutedQueryParams(
+    req,
+    BUSINESS_REVIEWS_POLLUTED_QUERY_CODES
+  );
+
   const { page, limit, skip } = paginationParams(req.query, {
     limitFallback: REVIEW_DEFAULT_LIMIT
   });
@@ -463,6 +498,11 @@ export const createBusinessProductReview = asyncHandler(async (req, res) => {
 });
 
 export const listBusinessReviews = asyncHandler(async (req, res) => {
+  rejectPollutedQueryParams(
+    req,
+    BUSINESS_REVIEWS_POLLUTED_QUERY_CODES
+  );
+
   const { page, limit, skip } = paginationParams(req.query, {
     limitFallback: REVIEW_DEFAULT_LIMIT
   });
