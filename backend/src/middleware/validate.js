@@ -52,6 +52,76 @@ export function validateLogin(req, _res, next) {
   next();
 }
 
+export function validateForgotPassword(req, _res, next) {
+  const body = req.body ?? {};
+  const keys = Object.keys(body);
+  const invalid = keys.filter((key) => key !== 'email');
+
+  if (invalid.length > 0 || keys.length !== 1) {
+    throw new AppError(
+      'Password recovery fields are invalid',
+      400,
+      'INVALID_PASSWORD_RECOVERY_FIELDS'
+    );
+  }
+
+  if (typeof body.email !== 'string') {
+    throw new AppError('Email is invalid', 400, 'INVALID_EMAIL');
+  }
+
+  const email = body.email.trim();
+
+  if (
+    email.length === 0 ||
+    email.length > 254 ||
+    !validator.isEmail(email)
+  ) {
+    throw new AppError('Email is invalid', 400, 'INVALID_EMAIL');
+  }
+
+  next();
+}
+
+export function validateResetPassword(req, _res, next) {
+  const body = req.body ?? {};
+  const keys = Object.keys(body);
+  const allowed = ['token', 'newPassword'];
+  const invalid = keys.filter((key) => !allowed.includes(key));
+
+  if (invalid.length > 0 || keys.length !== allowed.length) {
+    throw new AppError(
+      'Password reset fields are invalid',
+      400,
+      'INVALID_PASSWORD_RESET_FIELDS'
+    );
+  }
+
+  if (
+    typeof body.token !== 'string' ||
+    !/^[A-Za-z0-9_-]{43}$/.test(body.token)
+  ) {
+    throw new AppError(
+      'Password reset token is invalid or expired',
+      400,
+      'INVALID_PASSWORD_RESET_TOKEN'
+    );
+  }
+
+  if (
+    typeof body.newPassword !== 'string' ||
+    body.newPassword.length < 6 ||
+    Buffer.byteLength(body.newPassword, 'utf8') > 72
+  ) {
+    throw new AppError(
+      'Password must be at least 6 characters',
+      400,
+      'INVALID_PASSWORD'
+    );
+  }
+
+  next();
+}
+
 export function validateProfilePatch(req, _res, next) {
   const allowed = ['name', 'gender', 'address', 'emails', 'phones', 'permissions'];
   const invalid = Object.keys(req.body).filter((key) => !allowed.includes(key));

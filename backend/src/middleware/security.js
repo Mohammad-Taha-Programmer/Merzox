@@ -6,6 +6,11 @@ import helmet from 'helmet';
 import hpp from 'hpp';
 
 import { env } from '../config/env.js';
+import { AppError } from '../utils/AppError.js';
+
+export const PASSWORD_RECOVERY_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+export const FORGOT_PASSWORD_RATE_LIMIT_MAX = 5;
+export const RESET_PASSWORD_RATE_LIMIT_MAX = 20;
 
 function isOriginAllowed(origin) {
   if (!origin) {
@@ -20,6 +25,34 @@ function isOriginAllowed(origin) {
     return origin === allowed;
   });
 }
+
+function passwordRecoveryLimiter({ max, code }) {
+  return rateLimit({
+    windowMs: PASSWORD_RECOVERY_RATE_LIMIT_WINDOW_MS,
+    max,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler(_req, _res, next) {
+      next(
+        new AppError(
+          'Too many password recovery attempts. Try again later.',
+          429,
+          code
+        )
+      );
+    }
+  });
+}
+
+export const forgotPasswordLimiter = passwordRecoveryLimiter({
+  max: FORGOT_PASSWORD_RATE_LIMIT_MAX,
+  code: 'PASSWORD_RECOVERY_RATE_LIMITED'
+});
+
+export const resetPasswordLimiter = passwordRecoveryLimiter({
+  max: RESET_PASSWORD_RATE_LIMIT_MAX,
+  code: 'PASSWORD_RESET_RATE_LIMITED'
+});
 
 export function applySecurityMiddleware(app) {
   app.disable('x-powered-by');

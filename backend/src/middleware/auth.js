@@ -1,7 +1,10 @@
 import { User } from '../models/User.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { verifyAccessToken } from '../utils/jwt.js';
+import {
+  isAccessTokenCurrent,
+  verifyAccessToken
+} from '../utils/jwt.js';
 
 export const requireAuth = asyncHandler(async (req, _res, next) => {
   const header = req.get('authorization') ?? '';
@@ -14,7 +17,11 @@ export const requireAuth = asyncHandler(async (req, _res, next) => {
   const payload = verifyAccessToken(token);
   const user = await User.findById(payload.sub);
 
-  if (!user || !user.isActive) {
+  if (
+    !user ||
+    !user.isActive ||
+    !isAccessTokenCurrent(payload, user)
+  ) {
     throw new AppError('User account is not available', 401, 'AUTH_INVALID');
   }
 

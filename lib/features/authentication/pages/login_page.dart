@@ -9,6 +9,7 @@ class LoginPage extends StatefulWidget {
   final VoidCallback onAuthenticated;
   final VoidCallback onBrowseAsGuest;
   final VoidCallback onSignupRequested;
+  final VoidCallback onForgotPasswordRequested;
   final bool businessMode;
 
   const LoginPage({
@@ -16,6 +17,7 @@ class LoginPage extends StatefulWidget {
     required this.onAuthenticated,
     required this.onBrowseAsGuest,
     required this.onSignupRequested,
+    required this.onForgotPasswordRequested,
     this.businessMode = false,
   });
 
@@ -196,7 +198,9 @@ class _LoginPageState extends State<LoginPage> {
                                 ),
                                 const Spacer(),
                                 TextButton(
-                                  onPressed: () {},
+                                  onPressed: isLoading
+                                      ? null
+                                      : widget.onForgotPasswordRequested,
                                   child: const Text(
                                     'نسيت كلمة المرور؟',
                                     style: TextStyle(fontSize: 13),

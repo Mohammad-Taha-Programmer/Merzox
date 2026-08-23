@@ -10,6 +10,9 @@ import '../features/about_us/pages/about_us_page.dart';
 import '../features/authentication/bloc/auth_bloc.dart';
 import '../features/authentication/pages/login_page.dart';
 import '../features/authentication/pages/signup_page.dart';
+import '../features/authentication/password_recovery/bloc/password_recovery_bloc.dart';
+import '../features/authentication/password_recovery/pages/forgot_password_page.dart';
+import '../features/authentication/password_recovery/pages/reset_password_page.dart';
 import '../features/business/enrollment/business_enrollment_bloc.dart';
 import '../features/business/messages/merchant_messages_page.dart';
 import '../features/business/enrollment/business_enrollment_page.dart';
@@ -87,8 +90,42 @@ class AppRouter {
             onAuthenticated: () => _goAfterLogin(context),
             onBrowseAsGuest: () => context.go('/home?guest=true'),
             onSignupRequested: () => context.go('/signup'),
+            onForgotPasswordRequested: () => context.go('/forgot-password'),
           ),
         ),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) {
+          final businessMode = state.uri.queryParameters['business'] == 'true';
+          final loginRoute = businessMode ? '/business/login' : '/login';
+          final resetRoute = businessMode
+              ? '/reset-password?business=true'
+              : '/reset-password';
+
+          return BlocProvider(
+            create: (_) => PasswordRecoveryBloc(),
+            child: ForgotPasswordPage(
+              onRequestAccepted: () => context.go(resetRoute),
+              onBackToLogin: () => context.go(loginRoute),
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) {
+          final businessMode = state.uri.queryParameters['business'] == 'true';
+          final loginRoute = businessMode ? '/business/login' : '/login';
+
+          return BlocProvider(
+            create: (_) => PasswordRecoveryBloc(),
+            child: ResetPasswordPage(
+              onResetSucceeded: () => context.go(loginRoute),
+              onBackToLogin: () => context.go(loginRoute),
+            ),
+          );
+        },
       ),
       GoRoute(
         path: '/business/enroll',
@@ -108,6 +145,8 @@ class AppRouter {
             onAuthenticated: () => context.go('/business'),
             onBrowseAsGuest: () => context.go('/login'),
             onSignupRequested: () => context.go('/login'),
+            onForgotPasswordRequested: () =>
+                context.go('/forgot-password?business=true'),
           ),
         ),
       ),

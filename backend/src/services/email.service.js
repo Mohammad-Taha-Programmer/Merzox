@@ -84,3 +84,62 @@ export async function sendVerificationEmail({ to, name, link }) {
 
   return { sent: true };
 }
+
+export async function sendPasswordResetEmail({
+  to,
+  token,
+  expiresInMinutes
+}) {
+  const mailer = getTransporter();
+
+  if (!mailer) {
+    const status = smtpStatus();
+
+    console.warn(
+      'SMTP is not configured for password reset email. Missing settings:',
+      {
+        SMTP_HOST: !status.hostConfigured,
+        SMTP_USER: !status.userConfigured,
+        SMTP_PASS: !status.passConfigured,
+        SMTP_FROM: !status.fromConfigured
+      }
+    );
+
+    // Deliberately do not log `to`, `token`, or a reset URL.
+    return { sent: false, reason: 'SMTP_NOT_CONFIGURED' };
+  }
+
+  await mailer.sendMail({
+    from: env.smtp.from,
+    to,
+    subject: 'Reset your Merzox password',
+    text: [
+      'A password reset was requested for your Merzox account.',
+      '',
+      'Enter this reset code in the Merzox application:',
+      token,
+      '',
+      `This code expires in ${expiresInMinutes} minutes.`,
+      '',
+      'If you did not request this change, ignore this email.',
+      '',
+      'Merzox'
+    ].join('\n'),
+    html: `
+      <div dir="ltr" style="font-family:Arial,sans-serif;line-height:1.6;color:#2b2b2b">
+        <h2>Reset your Merzox password</h2>
+        <p>A password reset was requested for your Merzox account.</p>
+        <p>Enter this reset code in the Merzox application:</p>
+        <p>
+          <code style="display:inline-block;padding:10px;background:#f4f4f4;border-radius:4px">
+            ${token}
+          </code>
+        </p>
+        <p>This code expires in ${expiresInMinutes} minutes.</p>
+        <p>If you did not request this change, ignore this email.</p>
+      </div>
+    `
+  });
+
+  return { sent: true };
+}
