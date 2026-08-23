@@ -1,0 +1,285 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter:
+    name: Flutter
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: '3.44.4'
+
+      - name: Show Flutter toolchain
+        run: flutter --version
+
+      - name: Install Flutter dependencies from lockfile
+        run: flutter pub get --enforce-lockfile
+
+      - name: Verify Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze Flutter
+        run: flutter analyze --no-pub
+
+      - name: Run Flutter tests
+        run: flutter test --no-pub
+
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      NODE_ENV: test
+      JWT_SECRET: ci-unit-jwt-secret-not-for-production
+      MONGODB_URI: mongodb://127.0.0.1:27017/merzox_ci_unit_unused
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.13.1'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Show Node.js toolchain
+        run: |
+          node --version
+          npm --version
+
+      - name: Install backend dependencies from lockfile
+        run: npm ci
+
+      - name: Check backend JavaScript syntax
+        run: npm run check
+
+      - name: Run backend standard test suite
+        run: npm test
+
+  backend-integration:
+    name: Backend integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: backend
+
+    services:
+      mongodb:
+        image: mongo:8.0
+        ports:
+          - 27017:27017
+
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      NODE_ENV: test
+      JWT_SECRET: ci-integration-jwt-secret-not-for-production
+      MERZOX_INTEGRATION_TESTS: 'true'
+      MERZOX_TEST_API_URL: http://127.0.0.1:4100/api/v1
+      MERZOX_TEST_DB_URI: mongodb://127.0.0.1:27017/merzox_test
+      MERZOX_TEST_MONGODB_URI: mongodb://127.0.0.1:27017/merzox_integration
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.13.1'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies from lockfile
+        run: npm ci
+
+      - name: Wait for MongoDB service
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ready=0
+
+          for attempt in $(seq 1 30); do
+            if (echo > /dev/tcp/127.0.0.1/27017) >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "MongoDB service did not become reachable on loopback."
+            exit 1
+          fi
+
+          echo "MongoDB service is reachable on loopback."
+
+      - name: Verify tracked integration suite inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cat > "$RUNNER_TEMP/expected-integration-tests.txt" <<'EOF'
+          test/integration/authorization.matrix.test.js
+          test/integration/checkout.inventory.test.js
+          EOF
+
+          find test/integration \
+            -maxdepth 1 \
+            -type f \
+            -name '*.test.js' \
+            -print |
+            sort > "$RUNNER_TEMP/actual-integration-tests.txt"
+
+          diff -u \
+            "$RUNNER_TEMP/expected-integration-tests.txt" \
+            "$RUNNER_TEMP/actual-integration-tests.txt"
+
+      - name: Verify integration safety gates are enabled
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node --input-type=module <<'NODE'
+          import {
+            resolveIntegrationDatabase,
+            resolveIntegrationEnvironment,
+          } from './test/integration/test-environment.js';
+
+          const checks = [
+            ['authorization', resolveIntegrationEnvironment()],
+            ['inventory', resolveIntegrationDatabase()],
+          ];
+
+          let failed = false;
+
+          for (const [name, result] of checks) {
+            if (!result.enabled) {
+              console.error(
+                `${name} integration gate is disabled: ${result.reason}`,
+              );
+              failed = true;
+              continue;
+            }
+
+            console.log(
+              `${name} integration gate enabled for disposable database: ${result.dbName}`,
+            );
+          }
+
+          if (failed) {
+            process.exit(1);
+          }
+          NODE
+
+      - name: Run authorization integration against disposable MongoDB
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          API_LOG="$RUNNER_TEMP/merzox-authz-api.log"
+          TEST_LOG="$RUNNER_TEMP/merzox-authz-test.log"
+
+          MONGODB_URI="$MERZOX_TEST_DB_URI" \
+          PORT=4100 \
+          PUBLIC_BASE_URL="http://127.0.0.1:4100" \
+          RATE_LIMIT_MAX=100000 \
+          node src/server.js >"$API_LOG" 2>&1 &
+
+          API_PID=$!
+
+          cleanup() {
+            kill "$API_PID" >/dev/null 2>&1 || true
+            wait "$API_PID" >/dev/null 2>&1 || true
+          }
+
+          trap cleanup EXIT
+
+          ready=0
+
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4100/health >/dev/null; then
+              ready=1
+              break
+            fi
+
+            sleep 1
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "Authorization integration API failed to become ready."
+            cat "$API_LOG"
+            exit 1
+          fi
+
+          node \
+            --test \
+            --test-reporter=spec \
+            test/integration/authorization.matrix.test.js |
+            tee "$TEST_LOG"
+
+          if grep -Fq 'INTEGRATION_AUTHZ=SKIPPED' "$TEST_LOG"; then
+            echo "Authorization integration reported SKIPPED."
+            exit 1
+          fi
+
+          echo "Authorization integration executed without a skip."
+
+      - name: Run inventory integration against disposable MongoDB
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_LOG="$RUNNER_TEMP/merzox-inventory-test.log"
+
+          node \
+            --test \
+            --test-reporter=spec \
+            test/integration/checkout.inventory.test.js |
+            tee "$TEST_LOG"
+
+          if grep -Fq 'INTEGRATION_INVENTORY=SKIPPED' "$TEST_LOG"; then
+            echo "Inventory integration reported SKIPPED."
+            exit 1
+          fi
+
+          echo "Inventory integration executed without a skip."
+
+      - name: Show authorization API log on failure
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f "$RUNNER_TEMP/merzox-authz-api.log" ]; then
+            cat "$RUNNER_TEMP/merzox-authz-api.log"
+          fi
