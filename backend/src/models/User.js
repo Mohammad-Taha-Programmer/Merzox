@@ -138,6 +138,9 @@ const userSchema = new mongoose.Schema(
       aiPersonalization: { type: permissionConsentSchema, default: () => ({}) },
       contacts: { type: permissionConsentSchema, default: () => ({}) }
     },
+    notificationPreferences: {
+      productOffers: { type: Boolean, default: true }
+    },
     isActive: { type: Boolean, default: true }
   },
   { timestamps: true }
