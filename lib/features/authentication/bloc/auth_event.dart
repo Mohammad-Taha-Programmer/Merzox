@@ -6,11 +6,13 @@ final class LoginSubmitted extends AuthEvent {
   final String identifier;
   final String password;
   final String? requiredUserType;
+  final bool rememberMe;
 
   const LoginSubmitted({
     required this.identifier,
     required this.password,
     this.requiredUserType,
+    this.rememberMe = true,
   });
 }
 

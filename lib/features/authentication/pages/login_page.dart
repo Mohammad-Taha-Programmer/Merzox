@@ -54,6 +54,7 @@ class _LoginPageState extends State<LoginPage> {
         identifier: identifier,
         password: _passwordController.text,
         requiredUserType: widget.businessMode ? 'business' : null,
+        rememberMe: _rememberMe,
       ),
     );
   }
