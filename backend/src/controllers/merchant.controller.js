@@ -17,7 +17,10 @@ import {
   classifyInventoryConflict,
   inventoryConflictResponse
 } from '../policies/checkout-intent.policy.js';
-import { buildProductWrite } from '../policies/product.policy.js';
+import {
+  buildProductWrite,
+  PRODUCT_VARIANT_ERRORS
+} from '../policies/product.policy.js';
 import { paginationParams } from '../policies/query.policy.js';
 import { notifyOrderStatus } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
@@ -235,6 +238,22 @@ export const listMyBusinessProducts = asyncHandler(async (req, res) => {
   res.json({ success: true, data: { products } });
 });
 
+function productWriteOrThrow(body, current = {}) {
+  try {
+    return buildProductWrite(body, current);
+  } catch (error) {
+    if (error?.code === PRODUCT_VARIANT_ERRORS.unknownId) {
+      throw new AppError(
+        'Product variant id is invalid',
+        400,
+        PRODUCT_VARIANT_ERRORS.unknownId
+      );
+    }
+
+    throw error;
+  }
+}
+
 export const createMyBusinessProduct = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);
 
@@ -247,7 +266,7 @@ export const createMyBusinessProduct = asyncHandler(async (req, res) => {
     classification: 'new',
     isService: false,
     isActive: true,
-    ...buildProductWrite(req.body)
+    ...productWriteOrThrow(req.body)
   });
 
   const product = business.products[business.products.length - 1];
@@ -261,7 +280,11 @@ export const createMyBusinessProduct = asyncHandler(async (req, res) => {
 
 /** Whether this request is trying to rewrite the product's stock at all. */
 function touchesInventory(body) {
-  return body.stockQuantity !== undefined || body.unlimitedStock !== undefined;
+  return (
+    body.stockQuantity !== undefined ||
+    body.unlimitedStock !== undefined ||
+    body.variants !== undefined
+  );
 }
 
 /**
@@ -286,7 +309,11 @@ async function applyInventoryUpdate({ business, product, write, ownerId }) {
     observedStock: {
       stockQuantity: product.stockQuantity,
       unlimitedStock: product.unlimitedStock
-    }
+    },
+    observedVariants:
+      write.variants !== undefined
+        ? product.variants
+        : undefined
   });
 
   // `new: true` so the response reports what MongoDB actually stored, never the
@@ -331,9 +358,10 @@ export const updateMyBusinessProduct = asyncHandler(async (req, res) => {
     throw new AppError('Product not found', 404, 'PRODUCT_NOT_FOUND');
   }
 
-  const write = buildProductWrite(req.body, {
+  const write = productWriteOrThrow(req.body, {
     unlimitedStock: product.unlimitedStock,
-    stockQuantity: product.stockQuantity
+    stockQuantity: product.stockQuantity,
+    variants: product.variants
   });
 
   if (touchesInventory(req.body)) {

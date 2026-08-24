@@ -14,7 +14,13 @@
  * executed here, which keeps this module free of I/O and directly testable.
  */
 
-import { finalPriceFor, isProductInStock, roundMoney } from './product.policy.js';
+import {
+  finalPriceFor,
+  hasProductVariants,
+  isProductInStock,
+  roundMoney,
+  variantFinalPriceFor
+} from './product.policy.js';
 
 /** Matches the per-item bound the order validator already enforces. */
 export const MAX_ITEM_QUANTITY = 100;
@@ -22,6 +28,8 @@ export const MAX_ITEM_QUANTITY = 100;
 export const CHECKOUT_ERRORS = {
   duplicateQuantity: 'INVALID_QUANTITY',
   notAvailable: 'PRODUCT_NOT_AVAILABLE',
+  variantRequired: 'PRODUCT_VARIANT_REQUIRED',
+  variantNotAvailable: 'PRODUCT_VARIANT_NOT_AVAILABLE',
   outOfStock: 'PRODUCT_OUT_OF_STOCK',
   insufficientStock: 'INSUFFICIENT_STOCK'
 };
@@ -38,7 +46,10 @@ export function isFiniteStockProduct(product) {
 }
 
 /**
- * Collapses repeated product ids into one line.
+ * Collapses repeated sellable identities into one line.
+ *
+ * A simple product identity is `(productId)`. A variant product identity is
+ * `(productId, variantId)`, so sibling variants can never be merged together.
  *
  * This is not hypothetical: adding the same product to the cart twice appends
  * two entries, so a real checkout can carry the same id more than once.
@@ -53,24 +64,48 @@ export function normalizeRequestedItems(requestedItems) {
 
   for (const requested of requestedItems ?? []) {
     const productId = String(requested?.productId ?? '');
+    const rawVariantId = requested?.variantId;
+    const variantId =
+      rawVariantId === undefined ||
+      rawVariantId === null ||
+      String(rawVariantId).trim().length === 0
+        ? null
+        : String(rawVariantId).trim();
+
+    const identity = `${productId}\u0000${variantId ?? ''}`;
     const quantity = Number(requested?.quantity);
-    const running = merged.get(productId);
+    const running = merged.get(identity);
 
-    merged.set(productId, (running ?? 0) + quantity);
+    if (running) {
+      running.quantity += quantity;
+    } else {
+      merged.set(identity, {
+        productId,
+        ...(variantId ? { variantId } : {}),
+        quantity
+      });
+    }
   }
 
-  for (const [productId, quantity] of merged) {
-    if (!Number.isInteger(quantity) || quantity < 1) {
-      return { error: CHECKOUT_ERRORS.duplicateQuantity, productId };
+  for (const item of merged.values()) {
+    if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+      return {
+        error: CHECKOUT_ERRORS.duplicateQuantity,
+        productId: item.productId,
+        ...(item.variantId ? { variantId: item.variantId } : {})
+      };
     }
-    if (quantity > MAX_ITEM_QUANTITY) {
-      return { error: CHECKOUT_ERRORS.duplicateQuantity, productId };
+
+    if (item.quantity > MAX_ITEM_QUANTITY) {
+      return {
+        error: CHECKOUT_ERRORS.duplicateQuantity,
+        productId: item.productId,
+        ...(item.variantId ? { variantId: item.variantId } : {})
+      };
     }
   }
 
-  return {
-    items: [...merged].map(([productId, quantity]) => ({ productId, quantity }))
-  };
+  return { items: [...merged.values()] };
 }
 
 /**
@@ -92,34 +127,96 @@ export function resolveOrderLines({ products, items }) {
   );
   const lines = [];
 
-  for (const { productId, quantity } of items) {
+  for (const item of items) {
+    const productId = item.productId;
+    const quantity = item.quantity;
+    const variantId = item.variantId
+      ? String(item.variantId).trim()
+      : null;
+
     const product = byId.get(productId);
 
     if (!product) {
       return { error: CHECKOUT_ERRORS.notAvailable, productId };
     }
 
-    if (!isProductInStock(product)) {
-      return { error: CHECKOUT_ERRORS.outOfStock, productId };
+    const variantMode = hasProductVariants(product);
+    let variant = null;
+    let inventoryTarget = product;
+
+    if (variantMode) {
+      if (!variantId) {
+        return {
+          error: CHECKOUT_ERRORS.variantRequired,
+          productId
+        };
+      }
+
+      variant =
+        (product.variants ?? []).find(
+          (entry) =>
+            entry?.isActive !== false &&
+            String(entry?._id ?? '') === variantId
+        ) ?? null;
+
+      if (!variant) {
+        return {
+          error: CHECKOUT_ERRORS.variantNotAvailable,
+          productId,
+          variantId
+        };
+      }
+
+      inventoryTarget = variant;
+    } else if (variantId) {
+      // A variant identity can never turn a simple product into a variant
+      // product. The catalog stored on the server owns that decision.
+      return {
+        error: CHECKOUT_ERRORS.variantNotAvailable,
+        productId,
+        variantId
+      };
     }
 
-    const finite = isFiniteStockProduct(product);
+    if (!isProductInStock(inventoryTarget)) {
+      return {
+        error: CHECKOUT_ERRORS.outOfStock,
+        productId,
+        ...(variantId ? { variantId } : {})
+      };
+    }
 
-    if (finite && quantity > (Number(product.stockQuantity) || 0)) {
-      // Deliberately no available-quantity figure: the exact remaining count is
-      // merchant-private and must not leak through an error response.
-      return { error: CHECKOUT_ERRORS.insufficientStock, productId };
+    const finite = isFiniteStockProduct(inventoryTarget);
+
+    if (
+      finite &&
+      quantity > (Number(inventoryTarget.stockQuantity) || 0)
+    ) {
+      return {
+        error: CHECKOUT_ERRORS.insufficientStock,
+        productId,
+        ...(variantId ? { variantId } : {})
+      };
     }
 
     lines.push({
       product,
       productId,
+      ...(variant
+        ? {
+            variant,
+            variantId: String(variant._id),
+            variantLabel: String(variant.label ?? '').trim()
+          }
+        : {}),
       quantity,
       finite,
-      unitPrice: finalPriceFor({
-        price: product.price ?? 0,
-        discountPercent: product.discountPercent ?? 0
-      })
+      unitPrice: variant
+        ? variantFinalPriceFor(product, variant)
+        : finalPriceFor({
+            price: product.price ?? 0,
+            discountPercent: product.discountPercent ?? 0
+          })
     });
   }
 

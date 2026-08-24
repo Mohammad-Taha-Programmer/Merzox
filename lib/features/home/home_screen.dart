@@ -1740,6 +1740,20 @@ class _CartItemTile extends StatelessWidget {
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                if (item.variantLabel.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    item.variantLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textDirection: TextDirection.rtl,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: MerzoxColors.kColor8D99AE,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 6),
                 Text(
                   'الكمية: ${item.quantity}',

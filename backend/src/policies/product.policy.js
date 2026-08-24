@@ -19,6 +19,7 @@ export const merchantWritableProductFields = [
   'keywords',
   'imageUrl',
   'imageUrls',
+  'variants',
   'classification',
   'isService',
   'isActive'
@@ -34,8 +35,14 @@ export const PRODUCT_LIMITS = {
   maxImages: 8,
   maxKeywords: 20,
   keywordMax: 40,
+  maxVariants: 50,
+  variantLabelMax: 80,
   maxStockQuantity: 1000000,
   maxPrice: 10000000
+};
+
+export const PRODUCT_VARIANT_ERRORS = {
+  unknownId: 'INVALID_PRODUCT_VARIANT_ID'
 };
 
 /**
@@ -94,6 +101,114 @@ export function isProductInStock(product) {
   if (unlimited === true) return true;
 
   return (finiteNumber(product?.stockQuantity) ?? 0) > 0;
+}
+
+/**
+ * A product enters variant mode as soon as it owns at least one variant.
+ *
+ * Inactive variants still keep the product in variant mode. If all variants
+ * become inactive, the parent stock must never silently become sellable.
+ */
+export function hasProductVariants(product) {
+  return Array.isArray(product?.variants) && product.variants.length > 0;
+}
+
+/** The effective list price represented by this exact variant. */
+export function variantListPriceFor(product, variant) {
+  const rawOverride = variant?.priceOverride;
+
+  // `null` means inherit the product price. It must be handled before
+  // `finiteNumber`, because JavaScript's Number(null) is 0 and would otherwise
+  // turn an inherited price into an invented free variant.
+  const override =
+    rawOverride === null || rawOverride === undefined || rawOverride === ''
+      ? null
+      : finiteNumber(rawOverride);
+
+  return roundMoney(
+    override === null ? product?.price ?? 0 : Math.max(0, override)
+  );
+}
+
+/** Product discount remains server-owned and applies to the variant price. */
+export function variantFinalPriceFor(product, variant) {
+  return finalPriceFor({
+    price: variantListPriceFor(product, variant),
+    discountPercent: product?.discountPercent ?? 0
+  });
+}
+
+/**
+ * Customer-visible truth for one variant.
+ *
+ * Cost and exact stock deliberately remain private.
+ */
+export function variantCommerceFacts(product, variant) {
+  const identity = variant?._id ?? variant?.id;
+
+  return {
+    id: identity ? String(identity) : '',
+    label: String(variant?.label ?? '').trim(),
+    price: variantListPriceFor(product, variant),
+    finalPrice: variantFinalPriceFor(product, variant),
+    inStock: isProductInStock(variant)
+  };
+}
+
+/**
+ * Product-level public commerce summary.
+ *
+ * Simple products retain their existing parent price and inventory semantics.
+ * Variant products derive availability and price ranges only from active
+ * variants.
+ */
+export function productVariantSummary(product) {
+  const basePrice = roundMoney(product?.price ?? 0);
+  const baseFinalPrice = finalPriceFor({
+    price: basePrice,
+    discountPercent: product?.discountPercent ?? 0
+  });
+
+  if (!hasProductVariants(product)) {
+    return {
+      hasVariants: false,
+      variants: [],
+      inStock: isProductInStock(product),
+      minPrice: basePrice,
+      maxPrice: basePrice,
+      minFinalPrice: baseFinalPrice,
+      maxFinalPrice: baseFinalPrice
+    };
+  }
+
+  const variants = (product.variants ?? [])
+    .filter((variant) => variant?.isActive !== false)
+    .map((variant) => variantCommerceFacts(product, variant));
+
+  if (variants.length === 0) {
+    return {
+      hasVariants: true,
+      variants: [],
+      inStock: false,
+      minPrice: null,
+      maxPrice: null,
+      minFinalPrice: null,
+      maxFinalPrice: null
+    };
+  }
+
+  const prices = variants.map((variant) => variant.price);
+  const finalPrices = variants.map((variant) => variant.finalPrice);
+
+  return {
+    hasVariants: true,
+    variants,
+    inStock: variants.some((variant) => variant.inStock),
+    minPrice: Math.min(...prices),
+    maxPrice: Math.max(...prices),
+    minFinalPrice: Math.min(...finalPrices),
+    maxFinalPrice: Math.max(...finalPrices)
+  };
 }
 
 /**
@@ -156,6 +271,67 @@ export function normalizeStock({ unlimitedStock, stockQuantity }, current = {}) 
 }
 
 /**
+ * Converts a merchant variant array into persistent variant state.
+ *
+ * Existing ids may only preserve ids already owned by this exact product.
+ * New variants carry no id here; Mongoose owns generation of their identities.
+ */
+export function normalizeVariants(variants, currentVariants = []) {
+  if (variants === undefined) return undefined;
+
+  const currentById = new Map(
+    (currentVariants ?? [])
+      .filter((variant) => variant?._id)
+      .map((variant) => [String(variant._id), variant])
+  );
+
+  return variants.map((variant) => {
+    const id = String(variant?.id ?? '').trim();
+    const current = id ? currentById.get(id) : undefined;
+
+    if (id && !current) {
+      const error = new Error('Product variant id is invalid');
+      error.code = PRODUCT_VARIANT_ERRORS.unknownId;
+      throw error;
+    }
+
+    const priceOverride =
+      variant.priceOverride === undefined
+        ? current?.priceOverride ?? null
+        : variant.priceOverride === null || variant.priceOverride === ''
+          ? null
+          : roundMoney(variant.priceOverride);
+
+    const costPrice =
+      variant.costPrice === undefined
+        ? current?.costPrice ?? null
+        : variant.costPrice === null || variant.costPrice === ''
+          ? null
+          : roundMoney(variant.costPrice);
+
+    const stock = normalizeStock(
+      {
+        unlimitedStock: variant.unlimitedStock,
+        stockQuantity: variant.stockQuantity
+      },
+      current ?? {}
+    );
+
+    return {
+      ...(current?._id ? { _id: current._id } : {}),
+      label: String(variant.label ?? '').trim(),
+      priceOverride,
+      costPrice,
+      ...stock,
+      isActive:
+        variant.isActive === undefined
+          ? current?.isActive ?? true
+          : variant.isActive === true
+    };
+  });
+}
+
+/**
  * Builds the exact set of fields to persist from an already-validated payload.
  *
  * This is the only place a merchant payload becomes product state; the caller
@@ -187,6 +363,9 @@ export function buildProductWrite(body, current = {}) {
     write.imageUrls = body.imageUrls
       .map((url) => String(url).trim())
       .filter((url) => url.length > 0);
+  }
+  if (body.variants !== undefined) {
+    write.variants = normalizeVariants(body.variants, current.variants ?? []);
   }
   if (body.classification !== undefined) {
     write.classification = body.classification;

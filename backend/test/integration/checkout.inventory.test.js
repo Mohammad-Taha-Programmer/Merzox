@@ -183,7 +183,8 @@ if (!environment.enabled) {
     return {
       merchant,
       businessId,
-      productId: productResponse.json?.data?.product?.id
+      productId: productResponse.json?.data?.product?.id,
+      product: productResponse.json?.data?.product
     };
   }
 
@@ -208,6 +209,30 @@ if (!environment.enabled) {
       (entry) => entry.id === productId
     );
     return product?.stockQuantity;
+  }
+
+  async function ownerVariantStock(
+    merchantToken,
+    productId,
+    variantId
+  ) {
+    const response = await call(
+      'GET',
+      '/api/v1/businesses/me/products',
+      {
+        token: merchantToken
+      }
+    );
+
+    const product = (
+      response.json?.data?.products ?? []
+    ).find((entry) => entry.id === productId);
+
+    const variant = (
+      product?.variants ?? []
+    ).find((entry) => entry.id === variantId);
+
+    return variant?.stockQuantity;
   }
 
   function objectId(value) {
@@ -828,6 +853,459 @@ if (!environment.enabled) {
       );
     });
 
+    // --------------------------------------------------------------- I18 ---
+    await t.test('I18 sibling variants reserve exact stock and retry idempotently', async () => {
+      const store = await seedStore(
+        {
+          price: 100,
+          discountPercent: 10,
+          unlimitedStock: true,
+          variants: [
+            {
+              label: 'Black / M',
+              priceOverride: 120,
+              costPrice: 50,
+              unlimitedStock: false,
+              stockQuantity: 2,
+              isActive: true
+            },
+            {
+              label: 'White / M',
+              priceOverride: null,
+              costPrice: 40,
+              unlimitedStock: false,
+              stockQuantity: 4,
+              isActive: true
+            }
+          ]
+        },
+        'i18'
+      );
+
+      const black = store.product?.variants?.find(
+        (variant) => variant.label === 'Black / M'
+      );
+      const white = store.product?.variants?.find(
+        (variant) => variant.label === 'White / M'
+      );
+
+      assert.ok(black?.id);
+      assert.ok(white?.id);
+
+      const buyer = await seedAccount('buyer-i18');
+      const key = `${stamp}-i18`;
+
+      const first = await placeOrder(
+        buyer.token,
+        {
+          businessId: store.businessId,
+          clientOrderId: key,
+          items: [
+            {
+              productId: store.productId,
+              variantId: black.id,
+              quantity: 1
+            },
+            {
+              productId: store.productId,
+              variantId: white.id,
+              quantity: 2
+            }
+          ]
+        }
+      );
+
+      assert.equal(
+        first.status,
+        201,
+        `variant order should succeed (${first.code})`
+      );
+
+      const blackItem =
+        first.json.data.order.items.find(
+          (item) => item.variantId === black.id
+        );
+      const whiteItem =
+        first.json.data.order.items.find(
+          (item) => item.variantId === white.id
+        );
+
+      assert.ok(blackItem);
+      assert.ok(whiteItem);
+
+      assert.equal(blackItem.variant, 'Black / M');
+      assert.equal(blackItem.unitPrice, 108);
+      assert.equal(whiteItem.variant, 'White / M');
+      assert.equal(whiteItem.unitPrice, 90);
+
+      assert.equal(
+        await ownerVariantStock(
+          store.merchant.token,
+          store.productId,
+          black.id
+        ),
+        1
+      );
+
+      assert.equal(
+        await ownerVariantStock(
+          store.merchant.token,
+          store.productId,
+          white.id
+        ),
+        2
+      );
+
+      // Same semantic basket, reversed input order: one physical checkout.
+      const retry = await placeOrder(
+        buyer.token,
+        {
+          businessId: store.businessId,
+          clientOrderId: key,
+          items: [
+            {
+              productId: store.productId,
+              variantId: white.id,
+              quantity: 2
+            },
+            {
+              productId: store.productId,
+              variantId: black.id,
+              quantity: 1
+            }
+          ]
+        }
+      );
+
+      assert.equal(retry.status, 200);
+      assert.equal(retry.json.data.duplicated, true);
+      assert.equal(
+        retry.json.data.order.id,
+        first.json.data.order.id
+      );
+
+      assert.equal(
+        await ownerVariantStock(
+          store.merchant.token,
+          store.productId,
+          black.id
+        ),
+        1,
+        'retry cannot consume Black twice'
+      );
+
+      assert.equal(
+        await ownerVariantStock(
+          store.merchant.token,
+          store.productId,
+          white.id
+        ),
+        2,
+        'retry cannot consume White twice'
+      );
+
+      assert.deepEqual(
+        await outstandingMarkers(store.businessId),
+        []
+      );
+    });
+
+    // --------------------------------------------------------------- I19 ---
+    await t.test('I19 two buyers cannot oversell the last unit of one variant', async () => {
+      const store = await seedStore(
+        {
+          price: 50,
+          unlimitedStock: true,
+          variants: [
+            {
+              label: 'Last',
+              unlimitedStock: false,
+              stockQuantity: 1,
+              isActive: true
+            },
+            {
+              label: 'Sibling',
+              unlimitedStock: false,
+              stockQuantity: 5,
+              isActive: true
+            }
+          ]
+        },
+        'i19'
+      );
+
+      const last = store.product?.variants?.find(
+        (variant) => variant.label === 'Last'
+      );
+      const sibling = store.product?.variants?.find(
+        (variant) => variant.label === 'Sibling'
+      );
+
+      assert.ok(last?.id);
+      assert.ok(sibling?.id);
+
+      const buyerA = await seedAccount('buyer-i19-a');
+      const buyerB = await seedAccount('buyer-i19-b');
+
+      const [first, second] = await Promise.all([
+        placeOrder(
+          buyerA.token,
+          {
+            businessId: store.businessId,
+            clientOrderId: `${stamp}-i19-a`,
+            items: [
+              {
+                productId: store.productId,
+                variantId: last.id,
+                quantity: 1
+              }
+            ]
+          }
+        ),
+        placeOrder(
+          buyerB.token,
+          {
+            businessId: store.businessId,
+            clientOrderId: `${stamp}-i19-b`,
+            items: [
+              {
+                productId: store.productId,
+                variantId: last.id,
+                quantity: 1
+              }
+            ]
+          }
+        )
+      ]);
+
+      const won = [first, second].filter(
+        (response) => response.status === 201
+      );
+      const lost = [first, second].filter(
+        (response) => response.status === 409
+      );
+
+      assert.equal(won.length, 1);
+      assert.equal(lost.length, 1);
+
+      assert.ok(
+        [
+          'PRODUCT_OUT_OF_STOCK',
+          'INSUFFICIENT_STOCK'
+        ].includes(lost[0].code),
+        `expected variant stock refusal, got ${lost[0].code}`
+      );
+
+      assert.equal(
+        await ownerVariantStock(
+          store.merchant.token,
+          store.productId,
+          last.id
+        ),
+        0
+      );
+
+      assert.equal(
+        await ownerVariantStock(
+          store.merchant.token,
+          store.productId,
+          sibling.id
+        ),
+        5,
+        'sibling inventory is never consumed'
+      );
+
+      assert.equal(
+        await Order.countDocuments({
+          business: objectId(store.businessId)
+        }),
+        1
+      );
+    });
+
+    // --------------------------------------------------------------- I20 ---
+    await t.test('I20 abandoned variant reservation releases only its exact variant', async () => {
+      const store = await seedStore(
+        {
+          price: 80,
+          unlimitedStock: true,
+          variants: [
+            {
+              label: 'Reserved',
+              unlimitedStock: false,
+              stockQuantity: 4,
+              isActive: true
+            },
+            {
+              label: 'Untouched',
+              unlimitedStock: false,
+              stockQuantity: 5,
+              isActive: true
+            }
+          ]
+        },
+        'i20'
+      );
+
+      const reserved = store.product?.variants?.find(
+        (variant) => variant.label === 'Reserved'
+      );
+      const untouched = store.product?.variants?.find(
+        (variant) => variant.label === 'Untouched'
+      );
+
+      assert.ok(reserved?.id);
+      assert.ok(untouched?.id);
+
+      const buyer = await seedAccount('buyer-i20');
+      const key = `${stamp}-i20`;
+
+      const placed = await placeOrder(
+        buyer.token,
+        {
+          businessId: store.businessId,
+          clientOrderId: key,
+          items: [
+            {
+              productId: store.productId,
+              variantId: reserved.id,
+              quantity: 2
+            }
+          ]
+        }
+      );
+
+      assert.equal(placed.status, 201);
+
+      assert.equal(
+        await ownerVariantStock(
+          store.merchant.token,
+          store.productId,
+          reserved.id
+        ),
+        2
+      );
+
+      const intent = await CheckoutIntent.findOne({
+        user: objectId(buyer.userId),
+        clientOrderId: key
+      });
+
+      assert.equal(
+        String(intent.lines[0].variantId),
+        reserved.id
+      );
+
+      // Reproduce the durable state after reservation but before an order:
+      // sold stock remains consumed; marker says exactly which nested variant.
+      await Order.deleteOne({ _id: intent.order });
+
+      await CheckoutIntent.updateOne(
+        { _id: intent._id },
+        {
+          $set: {
+            phase: 'reserved',
+            order: null
+          }
+        }
+      );
+
+      await attachMarker(
+        store.businessId,
+        intent._id,
+        [
+          {
+            productId: objectId(store.productId),
+            variantId: objectId(reserved.id),
+            quantity: 2
+          }
+        ]
+      );
+
+      assert.deepEqual(
+        await markerLines(
+          store.businessId,
+          intent._id
+        ),
+        [
+          {
+            productId: store.productId,
+            variantId: reserved.id,
+            quantity: 2
+          }
+        ]
+      );
+
+      // Variant arrays are inventory-touching merchant state. They cannot be
+      // rewritten while this reservation owns part of one.
+      const blocked = await patchProduct(
+        store.merchant.token,
+        store.productId,
+        {
+          variants: store.product.variants.map(
+            (variant) => ({
+              id: variant.id,
+              label: variant.label,
+              priceOverride:
+                variant.priceOverride ?? null,
+              costPrice:
+                variant.costPrice ?? null,
+              unlimitedStock:
+                variant.unlimitedStock,
+              stockQuantity:
+                variant.id === reserved.id
+                  ? 99
+                  : variant.stockQuantity,
+              isActive:
+                variant.isActive
+            })
+          )
+        }
+      );
+
+      assert.equal(blocked.status, 409);
+      assert.equal(
+        blocked.code,
+        'PRODUCT_INVENTORY_RESERVED'
+      );
+
+      await reconcileIntent(
+        await CheckoutIntent.findById(intent._id)
+      );
+
+      assert.equal(
+        await ownerVariantStock(
+          store.merchant.token,
+          store.productId,
+          reserved.id
+        ),
+        4,
+        'release restores exactly the held variant'
+      );
+
+      assert.equal(
+        await ownerVariantStock(
+          store.merchant.token,
+          store.productId,
+          untouched.id
+        ),
+        5,
+        'release never touches the sibling'
+      );
+
+      assert.deepEqual(
+        await outstandingMarkers(store.businessId),
+        []
+      );
+
+      assert.equal(
+        await Order.countDocuments({
+          user: objectId(buyer.userId)
+        }),
+        0
+      );
+    });
+
     // ================================================================= R2 ===
     // Reservation lifecycle: merchant edits, finalized-marker cleanup, and
     // autonomous recovery for a client that never comes back.
@@ -857,6 +1335,11 @@ if (!environment.enabled) {
       return entry
         ? entry.lines.map((line) => ({
             productId: String(line.productId),
+            ...(line.variantId
+              ? {
+                  variantId: String(line.variantId)
+                }
+              : {}),
             quantity: line.quantity
           }))
         : null;
@@ -1672,7 +2155,8 @@ if (!environment.enabled) {
       businessId,
       productId,
       write,
-      observedStock
+      observedStock,
+      observedVariants
     ) {
       const owner = (await Business.findById(objectId(businessId))).owner;
       const atomic = buildAtomicInventoryUpdate({
@@ -1680,7 +2164,8 @@ if (!environment.enabled) {
         ownerId: owner,
         productId: objectId(productId),
         write,
-        observedStock
+        observedStock,
+        observedVariants
       });
 
       const updated = await Business.findOneAndUpdate(atomic.filter, atomic.update, {
@@ -1785,6 +2270,121 @@ if (!environment.enabled) {
       assert.equal(product.price, 20);
       assert.equal(product.unlimitedStock, false);
     });
+
+    // -------------------------------------------------------------- M11V ---
+    await t.test(
+      'M11V two variant edits from one observation cannot both apply',
+      async () => {
+        const store = await seedStore(
+          {
+            price: 20,
+            unlimitedStock: true,
+            variants: [
+              {
+                label: 'Black / M',
+                priceOverride: 25,
+                costPrice: 10,
+                unlimitedStock: false,
+                stockQuantity: 5,
+                isActive: true
+              }
+            ]
+          },
+          'm11v'
+        );
+
+        const before = await Business.findById(
+          objectId(store.businessId)
+        );
+
+        const product = before.products.id(
+          objectId(store.productId)
+        );
+
+        const observedStock = {
+          stockQuantity: product.stockQuantity,
+          unlimitedStock: product.unlimitedStock
+        };
+
+        const observedVariants = product.variants.map(
+          (variant) => ({
+            _id: variant._id,
+            label: variant.label,
+            priceOverride:
+              variant.priceOverride ?? null,
+            costPrice:
+              variant.costPrice ?? null,
+            stockQuantity:
+              variant.stockQuantity,
+            unlimitedStock:
+              variant.unlimitedStock,
+            isActive:
+              variant.isActive
+          })
+        );
+
+        const writeWithStock = (stockQuantity) => ({
+          variants: observedVariants.map(
+            (variant) => ({
+              ...variant,
+              stockQuantity
+            })
+          )
+        });
+
+        const first = await patchWithObservedStock(
+          store.businessId,
+          store.productId,
+          writeWithStock(8),
+          observedStock,
+          observedVariants
+        );
+
+        const second = await patchWithObservedStock(
+          store.businessId,
+          store.productId,
+          writeWithStock(12),
+          observedStock,
+          observedVariants
+        );
+
+        assert.equal(
+          first.matched,
+          true,
+          'first variant write applies against the observation'
+        );
+
+        assert.equal(
+          second.matched,
+          false,
+          'stale variant replacement must not overwrite the winner'
+        );
+
+        assert.equal(second.status, 409);
+        assert.equal(
+          second.code,
+          'PRODUCT_INVENTORY_CHANGED'
+        );
+
+        const variantId =
+          String(observedVariants[0]._id);
+
+        assert.equal(
+          await ownerVariantStock(
+            store.merchant.token,
+            store.productId,
+            variantId
+          ),
+          8,
+          'the stale replacement never overwrites winning variant stock'
+        );
+
+        assert.deepEqual(
+          await outstandingMarkers(store.businessId),
+          []
+        );
+      }
+    );
 
     // ---------------------------------------------------------------- M12 ---
     await t.test('M12 a finalized checkout makes a stale merchant write a change', async () => {
@@ -2223,26 +2823,6 @@ if (!environment.enabled) {
      * whatever lines it was created with.
      */
     async function reserveThenCrash({
-      businessId,
-      intentId,
-      lines,
-      reservationFence = 0
-    }) {
-      const reservation = buildIdentifiedReservation({
-        businessId: objectId(businessId),
-        intentId: objectId(intentId),
-        lines,
-        reservationFence
-      });
-
-      return Business.updateOne(
-        reservation.filter,
-        reservation.update,
-        reservation.arrayFilters.length > 0
-          ? { arrayFilters: reservation.arrayFilters }
-          : undefined
-      );
-    }    async function reserveThenCrash({
       businessId,
       intentId,
       lines,

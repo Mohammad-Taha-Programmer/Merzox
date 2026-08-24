@@ -101,6 +101,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
               .map(
                 (item) => OrderItemRequest(
                   productId: item.productId,
+                  variantId: item.variantId,
                   quantity: item.quantity,
                 ),
               )
@@ -174,21 +175,84 @@ class CartBloc extends Bloc<CartEvent, CartState> {
           businessId: item.businessId,
           productId: item.productId,
         );
+
+        final name = product.name.isEmpty ? item.name : product.name;
+        final imageUrl = product.imageUrl;
+        final variantId = item.variantId;
+
+        if (product.hasVariants) {
+          // A product that became variant-mode after this cart line was stored
+          // cannot choose a variant for the customer.
+          if (variantId == null) {
+            refreshed.add(
+              _identityUnavailable(item, name: name, imageUrl: imageUrl),
+            );
+            continue;
+          }
+
+          BusinessProductVariantApiModel? selectedVariant;
+
+          for (final variant in product.variants) {
+            if (variant.id == variantId) {
+              selectedVariant = variant;
+              break;
+            }
+          }
+
+          // Removed/inactive variants are absent from the public list. Never
+          // substitute a sibling variant with a similar label or price.
+          if (selectedVariant == null) {
+            refreshed.add(
+              _identityUnavailable(item, name: name, imageUrl: imageUrl),
+            );
+            continue;
+          }
+
+          refreshed.add(
+            item.copyWith(
+              name: name,
+              variantLabel: selectedVariant.label,
+              price: selectedVariant.finalPrice,
+              imageUrl: imageUrl,
+              inStock: selectedVariant.inStock,
+              raw: _rawFor(
+                item,
+                name: name,
+                variantLabel: selectedVariant.label,
+                price: selectedVariant.finalPrice,
+                imageUrl: imageUrl,
+              ),
+            ),
+          );
+          continue;
+        }
+
+        // The inverse identity change is equally unsafe: a line that selected a
+        // variant cannot silently degrade into the parent simple product.
+        if (variantId != null) {
+          refreshed.add(
+            _identityUnavailable(item, name: name, imageUrl: imageUrl),
+          );
+          continue;
+        }
+
         refreshed.add(
           item.copyWith(
-            name: product.name.isEmpty ? item.name : product.name,
+            name: name,
             price: product.displayPrice,
-            imageUrl: product.imageUrl,
+            imageUrl: imageUrl,
             inStock: product.inStock,
             raw: _rawFor(
               item,
-              name: product.name.isEmpty ? item.name : product.name,
+              name: name,
               price: product.displayPrice,
-              imageUrl: product.imageUrl,
+              imageUrl: imageUrl,
             ),
           ),
         );
       } catch (_) {
+        // A failed refresh is not evidence of a stock/identity change. Keep
+        // the last known snapshot and let the backend remain checkout authority.
         refreshed.add(item);
       }
     }
@@ -196,15 +260,39 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     return refreshed;
   }
 
+  CartItem _identityUnavailable(
+    CartItem item, {
+    required String name,
+    required String imageUrl,
+  }) {
+    return item.copyWith(
+      name: name,
+      imageUrl: imageUrl,
+      inStock: false,
+      raw: _rawFor(
+        item,
+        name: name,
+        variantLabel: item.variantLabel,
+        price: item.price,
+        imageUrl: imageUrl,
+      ),
+    );
+  }
+
   String _rawFor(
     CartItem item, {
     required String name,
+    String? variantLabel,
     required double price,
     required String imageUrl,
   }) {
+    final variantId = item.variantId;
+
     return jsonEncode({
       'businessId': item.businessId,
       'productId': item.productId,
+      if (variantId != null) 'variantId': variantId,
+      if (variantId != null) 'variantLabel': variantLabel ?? item.variantLabel,
       'name': name,
       'price': price,
       'imageUrl': imageUrl,
@@ -223,6 +311,20 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       final price = (decoded['price'] as num?)?.toDouble();
       final quantity = (decoded['quantity'] as num?)?.toInt();
 
+      String? variantId;
+      final rawVariantId = decoded['variantId'];
+
+      if (rawVariantId != null) {
+        if (rawVariantId is! String) return null;
+
+        final normalized = rawVariantId.trim();
+
+        if (normalized.isNotEmpty) {
+          if (!isMongoBackedEntityId(normalized)) return null;
+          variantId = normalized;
+        }
+      }
+
       if (!isMongoBackedEntityId(productId) ||
           !isMongoBackedEntityId(businessId) ||
           name.isEmpty ||
@@ -236,9 +338,16 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       }
 
       final imageUrl = (decoded['imageUrl'] as String? ?? '').trim();
+
+      final variantLabel = variantId == null
+          ? ''
+          : (decoded['variantLabel'] as String? ?? '').trim();
+
       final sanitizedRaw = jsonEncode({
         'businessId': businessId,
         'productId': productId,
+        if (variantId != null) 'variantId': variantId,
+        if (variantId != null) 'variantLabel': variantLabel,
         'name': name,
         'price': price,
         'imageUrl': imageUrl,
@@ -248,6 +357,8 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       return CartItem(
         raw: sanitizedRaw,
         productId: productId,
+        variantId: variantId,
+        variantLabel: variantLabel,
         businessId: businessId,
         name: name,
         price: price,

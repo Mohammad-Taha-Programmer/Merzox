@@ -11,6 +11,8 @@ const Map<String, String> checkoutFailureMessages = {
   'PRODUCT_OUT_OF_STOCK': 'orders.checkoutOutOfStock',
   'INSUFFICIENT_STOCK': 'orders.checkoutInsufficientStock',
   'PRODUCT_NOT_AVAILABLE': 'orders.checkoutProductUnavailable',
+  'PRODUCT_VARIANT_REQUIRED': 'catalog.selectVariant',
+  'PRODUCT_VARIANT_NOT_AVAILABLE': 'catalog.variantUnavailable',
   'BUSINESS_NOT_FOUND': 'orders.checkoutBusinessUnavailable',
   'DELIVERY_ADDRESS_REQUIRED': 'orders.checkoutAddressRequired',
 };

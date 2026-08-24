@@ -535,7 +535,7 @@ class _FavoriteProductCard extends StatelessWidget {
             SizedBox(
               height: 36,
               child: FilledButton(
-                onPressed: onAddToCart,
+                onPressed: product.hasVariants ? onOpen : onAddToCart,
                 style: FilledButton.styleFrom(
                   padding: EdgeInsets.zero,
                   backgroundColor: MerzoxColors.kColorEE6C4D,
@@ -547,7 +547,9 @@ class _FavoriteProductCard extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  'favorites.addToCart'.tr(),
+                  product.hasVariants
+                      ? 'catalog.selectVariantPrompt'.tr()
+                      : 'favorites.addToCart'.tr(),
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,

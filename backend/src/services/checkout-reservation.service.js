@@ -118,6 +118,9 @@ export async function reservationOutcome({
       fence: context.fence,
       lines: (entry.lines ?? []).map((line) => ({
         productId: line.productId,
+        ...(line.variantId
+          ? { variantId: line.variantId }
+          : {}),
         quantity: line.quantity
       }))
     };

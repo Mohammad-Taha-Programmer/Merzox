@@ -79,6 +79,14 @@ const checkoutFailures = {
     status: 400,
     message: 'Product quantity is invalid'
   },
+  [CHECKOUT_ERRORS.variantRequired]: {
+    status: 400,
+    message: 'A product variant must be selected'
+  },
+  [CHECKOUT_ERRORS.variantNotAvailable]: {
+    status: 409,
+    message: 'The selected product variant is not available'
+  },
   [CHECKOUT_ERRORS.notAvailable]: {
     status: 409,
     message: 'One or more products are not available'
@@ -177,6 +185,9 @@ function linesForHeldReservation({ business, held }) {
     products: business.products,
     items: held.map((line) => ({
       productId: String(line.productId),
+      ...(line.variantId
+        ? { variantId: String(line.variantId) }
+        : {}),
       quantity: line.quantity
     }))
   });
@@ -506,6 +517,7 @@ async function reserveStock({
           phase: 'reserved',
           lines: attemptLines.map((line) => ({
             productId: line.product._id,
+            variantId: line.variantId ?? null,
             quantity: line.quantity,
             finite: line.finite
           }))
@@ -733,6 +745,7 @@ export const createOrder = asyncHandler(async (req, res) => {
   });
   const intentLines = lines.map((line) => ({
     productId: line.product._id,
+    variantId: line.variantId ?? null,
     quantity: line.quantity,
     finite: line.finite
   }));
@@ -857,9 +870,10 @@ export const createOrder = asyncHandler(async (req, res) => {
         // merchant price or discount change cannot rewrite this order.
         unitPrice: line.unitPrice,
         quantity: line.quantity,
-        // Left empty on purpose: the catalog has no variant to copy from, and
-        // the client is not allowed to define one.
-        variant: ''
+        // Both values come from the selected server-owned variant. `variantId`
+        // preserves identity; `variant` preserves the purchase-time label.
+        variantId: line.variantId ?? null,
+        variant: line.variantLabel ?? ''
       })),
       subtotal,
       deliveryFee: deliveryFeeFor(subtotal),

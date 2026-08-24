@@ -44,6 +44,9 @@ export const checkoutPhases = [
 const intentLineSchema = new mongoose.Schema(
   {
     productId: { type: mongoose.Schema.Types.ObjectId, required: true },
+    // Optional for legacy/simple products. Variant subdocuments are owned by
+    // Business, so this is an identity snapshot rather than a model ref.
+    variantId: { type: mongoose.Schema.Types.ObjectId, default: null },
     quantity: { type: Number, required: true, min: 1 },
     /** Only finite lines ever consumed stock, so only they can be released. */
     finite: { type: Boolean, required: true }

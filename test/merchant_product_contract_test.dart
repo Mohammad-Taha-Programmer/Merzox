@@ -317,6 +317,12 @@ void main() {
         'discountPercent': 15,
         'finalPrice': 29.75,
         'inStock': true,
+        'hasVariants': false,
+        'variants': <Map<String, dynamic>>[],
+        'minPrice': 35,
+        'maxPrice': 35,
+        'minFinalPrice': 29.75,
+        'maxFinalPrice': 29.75,
         // Merchant-internal keys, present in the payload and expected to be
         // dropped rather than stored anywhere reachable.
         'costPrice': 20,

@@ -87,6 +87,44 @@ function legacyProduct({ price = 25 } = {}) {
   return product;
 }
 
+function variantProduct({
+  price = 100,
+  discountPercent = 0,
+  variants = []
+} = {}) {
+  return {
+    _id: productId(),
+    name: 'منتج متعدد الخيارات',
+    price,
+    discountPercent,
+    // Parent inventory is deliberately irrelevant while variants exist.
+    unlimitedStock: true,
+    stockQuantity: 0,
+    isActive: true,
+    variants: variants.map((variant) => ({
+      _id: variant._id ?? productId(),
+      label: variant.label,
+      priceOverride:
+        Object.hasOwn(variant, 'priceOverride')
+          ? variant.priceOverride
+          : null,
+      costPrice: variant.costPrice ?? null,
+      unlimitedStock: variant.unlimitedStock ?? false,
+      stockQuantity:
+        variant.stockQuantity ?? variant.stock ?? 0,
+      isActive: variant.isActive ?? true
+    }))
+  };
+}
+
+function variantRequest(product, variant, quantity) {
+  return {
+    productId: product._id.toString(),
+    variantId: variant._id.toString(),
+    quantity
+  };
+}
+
 function linesFor(business, items) {
   const normalized = normalizeRequestedItems(items);
   assert.equal(normalized.error, undefined, 'fixture items should normalize');
@@ -392,6 +430,229 @@ test('B04 - a client cannot supply a price of its own', () => {
     items: [{ productId: id, quantity: 1, unitPrice: 1, price: 1 }]
   });
   assert.equal(resolved.lines[0].unitPrice, 50);
+});
+
+// ------------------------------------------------------------- variants
+
+test('B04V0 - HTTP checkout accepts only server variant identity, never client display truth', () => {
+  const businessIdValue = new mongoose.Types.ObjectId().toString();
+  const productIdValue = new mongoose.Types.ObjectId().toString();
+  const variantIdValue = new mongoose.Types.ObjectId().toString();
+
+  let accepted = false;
+
+  validateOrderCreate(
+    {
+      body: {
+        businessId: businessIdValue,
+        items: [
+          {
+            productId: productIdValue,
+            variantId: variantIdValue,
+            quantity: 1
+          }
+        ]
+      }
+    },
+    undefined,
+    () => {
+      accepted = true;
+    }
+  );
+
+  assert.equal(accepted, true);
+
+  assert.throws(
+    () =>
+      validateOrderCreate(
+        {
+          body: {
+            businessId: businessIdValue,
+            items: [
+              {
+                productId: productIdValue,
+                variantId: 'not-an-object-id',
+                quantity: 1
+              }
+            ]
+          }
+        },
+        undefined,
+        () => {}
+      ),
+    (error) => error.code === 'INVALID_PRODUCT_VARIANT_ID'
+  );
+
+  assert.throws(
+    () =>
+      validateOrderCreate(
+        {
+          body: {
+            businessId: businessIdValue,
+            items: [
+              {
+                productId: productIdValue,
+                variantId: variantIdValue,
+                variant: 'client invented label',
+                quantity: 1
+              }
+            ]
+          }
+        },
+        undefined,
+        () => {}
+      ),
+    (error) => error.code === 'UNSUPPORTED_PRODUCT_VARIANT'
+  );
+});
+
+test('B04V1 - selected variant price and label are derived from server state', () => {
+  const raw = variantProduct({
+    price: 100,
+    discountPercent: 25,
+    variants: [
+      {
+        label: 'Standard',
+        priceOverride: null,
+        stock: 5
+      },
+      {
+        label: 'Premium',
+        priceOverride: 140,
+        stock: 3
+      }
+    ]
+  });
+  const business = businessWith([raw]);
+  const product = business.products.id(raw._id);
+  const premium = product.variants[1];
+
+  const normalized = normalizeRequestedItems([
+    {
+      ...variantRequest(product, premium, 1),
+      // Neither field is authoritative or preserved by normalization.
+      unitPrice: 1,
+      variant: 'client invented'
+    }
+  ]);
+
+  assert.equal(normalized.error, undefined);
+
+  const resolved = resolveOrderLines({
+    products: business.products,
+    items: normalized.items
+  });
+
+  assert.equal(resolved.error, undefined);
+  assert.equal(resolved.lines.length, 1);
+
+  const [line] = resolved.lines;
+
+  assert.equal(line.variantId, premium._id.toString());
+  assert.equal(line.variantLabel, 'Premium');
+  assert.equal(line.unitPrice, 105);
+  assert.notEqual(line.unitPrice, 1);
+});
+
+test('B04V2 - variant mode requires an exact active server-owned variant identity', () => {
+  const raw = variantProduct({
+    variants: [
+      { label: 'Active', stock: 2 },
+      { label: 'Inactive', stock: 9, isActive: false }
+    ]
+  });
+  const business = businessWith([raw]);
+  const product = business.products.id(raw._id);
+  const inactive = product.variants[1];
+
+  const missing = resolveOrderLines({
+    products: business.products,
+    items: [{ productId: product._id.toString(), quantity: 1 }]
+  });
+
+  assert.equal(missing.error, CHECKOUT_ERRORS.variantRequired);
+
+  const foreign = resolveOrderLines({
+    products: business.products,
+    items: [
+      {
+        productId: product._id.toString(),
+        variantId: new mongoose.Types.ObjectId().toString(),
+        quantity: 1
+      }
+    ]
+  });
+
+  assert.equal(foreign.error, CHECKOUT_ERRORS.variantNotAvailable);
+
+  const inactiveResult = resolveOrderLines({
+    products: business.products,
+    items: [variantRequest(product, inactive, 1)]
+  });
+
+  assert.equal(
+    inactiveResult.error,
+    CHECKOUT_ERRORS.variantNotAvailable
+  );
+});
+
+test('B04V3 - sibling variants are distinct checkout identities while repeats merge', () => {
+  const raw = variantProduct({
+    variants: [
+      { label: 'Black / M', stock: 10 },
+      { label: 'Black / L', stock: 10 }
+    ]
+  });
+  const business = businessWith([raw]);
+  const product = business.products.id(raw._id);
+  const first = product.variants[0];
+  const second = product.variants[1];
+
+  const normalized = normalizeRequestedItems([
+    variantRequest(product, first, 1),
+    variantRequest(product, second, 4),
+    variantRequest(product, first, 2)
+  ]);
+
+  assert.equal(normalized.error, undefined);
+  assert.deepEqual(normalized.items, [
+    {
+      productId: product._id.toString(),
+      variantId: first._id.toString(),
+      quantity: 3
+    },
+    {
+      productId: product._id.toString(),
+      variantId: second._id.toString(),
+      quantity: 4
+    }
+  ]);
+});
+
+test('B04V4 - variant stock is authoritative even when the parent is unlimited', () => {
+  const raw = variantProduct({
+    variants: [
+      {
+        label: 'Scarce',
+        unlimitedStock: false,
+        stock: 1
+      }
+    ]
+  });
+  const business = businessWith([raw]);
+  const product = business.products.id(raw._id);
+  const variant = product.variants[0];
+
+  const resolved = resolveOrderLines({
+    products: business.products,
+    items: [variantRequest(product, variant, 2)]
+  });
+
+  assert.equal(
+    resolved.error,
+    CHECKOUT_ERRORS.insufficientStock
+  );
+  assert.equal(Object.hasOwn(resolved, 'stockQuantity'), false);
 });
 
 // --------------------------------------------------------------------- stock
@@ -731,6 +992,67 @@ test('B18 - a stored order keeps its purchase-time price', () => {
   assert.equal(business.productToJSON(stored).finalPrice, 500);
   assert.equal(order.items[0].unitPrice, 75);
   assert.equal(order.total, 85);
+});
+
+test('B18V - an order snapshots variant identity, label, and price independently of later catalog edits', () => {
+  const raw = variantProduct({
+    price: 100,
+    discountPercent: 10,
+    variants: [
+      {
+        label: 'Black / M',
+        priceOverride: 120,
+        stock: 5
+      }
+    ]
+  });
+  const business = businessWith([raw]);
+  const product = business.products.id(raw._id);
+  const variant = product.variants[0];
+
+  const resolved = resolveOrderLines({
+    products: business.products,
+    items: [variantRequest(product, variant, 1)]
+  });
+  assert.equal(resolved.error, undefined);
+
+  const [line] = resolved.lines;
+
+  const order = new Order({
+    user: new mongoose.Types.ObjectId(),
+    business: business._id,
+    businessName: business.name,
+    items: [
+      {
+        productId: line.product._id,
+        variantId: line.variantId,
+        variant: line.variantLabel,
+        name: line.product.name,
+        unitPrice: line.unitPrice,
+        quantity: line.quantity
+      }
+    ],
+    subtotal: subtotalFor([line]),
+    deliveryFee: deliveryFeeFor(subtotalFor([line])),
+    total: totalFor(subtotalFor([line])),
+    deliveryAddress: 'عنوان التوصيل'
+  });
+
+  const storedVariant = product.variants.id(variant._id);
+  storedVariant.label = 'Renamed later';
+  storedVariant.priceOverride = 999;
+
+  assert.equal(order.items[0].variantId.toString(), variant._id.toString());
+  assert.equal(order.items[0].variant, 'Black / M');
+  assert.equal(order.items[0].unitPrice, 108);
+
+  const client = order.toClientJSON();
+  const merchant = order.toMerchantJSON();
+
+  assert.equal(client.items[0].variantId, variant._id.toString());
+  assert.equal(client.items[0].variant, 'Black / M');
+  assert.equal(merchant.items[0].variantId, variant._id.toString());
+  assert.equal(merchant.items[0].variant, 'Black / M');
 });
 
 // -------------------------------------------------------- merchant privacy

@@ -219,6 +219,12 @@ BusinessProductApiModel _publicProductFromPollutedPayload() {
     'discountPercent': 0,
     'finalPrice': 25,
     'inStock': true,
+    'hasVariants': false,
+    'variants': <Map<String, dynamic>>[],
+    'minPrice': 25,
+    'maxPrice': 25,
+    'minFinalPrice': 25,
+    'maxFinalPrice': 25,
     'classification': 'new',
     'imageUrls': <String>[],
     // Owner-only keys, present in the payload and expected to be dropped.
