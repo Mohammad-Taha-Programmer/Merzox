@@ -7,6 +7,7 @@ import 'auth_state.dart';
 
 class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static const String sessionKey = 'auth_session_active';
+  static const String rememberSessionKey = 'auth_remember_session';
   static const String _legacyGuestKey = 'auth_guest_session';
   static const String nameKey = 'auth_user_name';
   static const String addressKey = 'auth_user_address';
@@ -72,7 +73,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         );
         return;
       }
-      await _persistAuthenticatedSession(auth);
+      await _persistAuthenticatedSession(auth, rememberMe: event.rememberMe);
       emit(
         state.copyWith(
           status: AuthStatus.authenticated,
@@ -174,6 +175,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static Future<void> clearStoredSession() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(sessionKey, false);
+    await prefs.remove(rememberSessionKey);
     await prefs.remove(_legacyGuestKey);
     await prefs.remove(tokenKey);
     await prefs.remove(userIdKey);
@@ -187,14 +189,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await prefs.remove(locationPromptPendingKey);
   }
 
-  Future<void> _persistAuthenticatedSession(AuthApiResponse auth) async {
+  Future<void> _persistAuthenticatedSession(
+    AuthApiResponse auth, {
+    required bool rememberMe,
+  }) async {
     if (auth.token.isEmpty || auth.user.id.isEmpty) {
       throw StateError('Invalid authentication response from server');
     }
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(sessionKey, true);
     await prefs.remove(_legacyGuestKey);
+    await prefs.setBool(rememberSessionKey, rememberMe);
     await prefs.setString(tokenKey, auth.token);
     await prefs.setString(userIdKey, auth.user.id);
     await prefs.setString(nameKey, auth.user.name);
@@ -214,6 +219,10 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       locationPromptPendingKey,
       !auth.user.permissions.location && !locationPromptAsked,
     );
+
+    // Publish the session as active only after all of its required data and
+    // durability choice have been written.
+    await prefs.setBool(sessionKey, true);
   }
 
   bool _isValidIdentifier(String value) {

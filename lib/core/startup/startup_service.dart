@@ -10,6 +10,10 @@ class StartupService {
     : _authSessionService = authSessionService ?? const AuthSessionService();
 
   Future<StartupDestination> initialize() async {
+    // Resolve cold-start session durability before any startup route is chosen.
+    // This also purges an explicitly unremembered session from the previous
+    // process before the router or authenticated features can observe it.
+    final session = await _authSessionService.readForStartup();
     final prefs = await SharedPreferences.getInstance();
 
     final bool onboardingCompleted =
@@ -19,7 +23,6 @@ class StartupService {
       return StartupDestination.onboarding;
     }
 
-    final session = await _authSessionService.read();
     if (!session.isAuthenticated) {
       return StartupDestination.guestHome;
     }
