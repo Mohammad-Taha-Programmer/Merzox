@@ -27,7 +27,8 @@ being completed.
 - Search for products, services, and businesses, with local search history.
 - Business profiles with information, products, services, ratings, and reviews.
 - Product details with image galleries, quantities, ratings, favorites, cart
-  actions, and direct-purchase entry points. Product variants are not implemented yet.
+  actions, direct-purchase entry points, and product variant selection with
+  variant-specific pricing, stock, and availability.
 - Persistent cart and authenticated checkout flow.
 - Order history grouped into current, completed, and cancelled orders.
 - Favorites for businesses, products, and services.
