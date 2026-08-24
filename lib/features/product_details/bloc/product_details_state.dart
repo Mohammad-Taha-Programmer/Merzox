@@ -14,6 +14,8 @@ enum ProductDetailsStatus {
 enum ProductDetailsSectionStatus { initial, loading, ready, failure }
 
 final class ProductDetailsState {
+  static const Object _keepSelectedVariantId = Object();
+
   final ProductDetailsStatus status;
   final String businessId;
   final BusinessProductApiModel? product;
@@ -21,6 +23,13 @@ final class ProductDetailsState {
   final int selectedImageIndex;
   final int selectedTabIndex;
   final int quantity;
+
+  /// Null means no variant has been selected.
+  ///
+  /// For simple products this must remain null. For variant products an exact
+  /// active PUBLIC variant must be selected before a purchase action.
+  final String? selectedVariantId;
+
   final ProductDetailsSectionStatus detailsStatus;
   final ProductDetailsSectionStatus reviewsStatus;
   final String detailsError;
@@ -37,6 +46,7 @@ final class ProductDetailsState {
     this.selectedImageIndex = 0,
     this.selectedTabIndex = 0,
     this.quantity = 1,
+    this.selectedVariantId,
     this.detailsStatus = ProductDetailsSectionStatus.initial,
     this.reviewsStatus = ProductDetailsSectionStatus.initial,
     this.detailsError = '',
@@ -46,6 +56,42 @@ final class ProductDetailsState {
     this.reviewEligibilityStatus = ReviewEligibilityStatus.unchecked,
   });
 
+  BusinessProductVariantApiModel? get selectedVariant {
+    final currentProduct = product;
+    final id = selectedVariantId;
+
+    if (currentProduct == null || !currentProduct.hasVariants || id == null) {
+      return null;
+    }
+
+    for (final variant in currentProduct.variants) {
+      if (variant.id == id) return variant;
+    }
+
+    return null;
+  }
+
+  /// Selection is requested only when there is at least one purchasable
+  /// variant. An all-sold-out product reports stock truth instead.
+  bool get variantSelectionRequired {
+    final currentProduct = product;
+
+    return currentProduct != null &&
+        currentProduct.hasVariants &&
+        currentProduct.inStock &&
+        selectedVariant == null;
+  }
+
+  /// Availability of the exact sellable identity represented by this state.
+  bool get selectedSellableInStock {
+    final currentProduct = product;
+
+    if (currentProduct == null) return false;
+    if (!currentProduct.hasVariants) return currentProduct.inStock;
+
+    return selectedVariant?.inStock ?? false;
+  }
+
   ProductDetailsState copyWith({
     ProductDetailsStatus? status,
     String? businessId,
@@ -54,6 +100,7 @@ final class ProductDetailsState {
     int? selectedImageIndex,
     int? selectedTabIndex,
     int? quantity,
+    Object? selectedVariantId = _keepSelectedVariantId,
     ProductDetailsSectionStatus? detailsStatus,
     ProductDetailsSectionStatus? reviewsStatus,
     String? detailsError,
@@ -70,6 +117,9 @@ final class ProductDetailsState {
       selectedImageIndex: selectedImageIndex ?? this.selectedImageIndex,
       selectedTabIndex: selectedTabIndex ?? this.selectedTabIndex,
       quantity: quantity ?? this.quantity,
+      selectedVariantId: identical(selectedVariantId, _keepSelectedVariantId)
+          ? this.selectedVariantId
+          : selectedVariantId as String?,
       detailsStatus: detailsStatus ?? this.detailsStatus,
       reviewsStatus: reviewsStatus ?? this.reviewsStatus,
       detailsError: detailsError ?? this.detailsError,

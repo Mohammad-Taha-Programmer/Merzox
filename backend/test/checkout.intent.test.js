@@ -55,6 +55,8 @@ import {
 
 const ID_A = '64c000000000000000000001';
 const ID_B = '64c000000000000000000002';
+const VARIANT_A = '64d000000000000000000001';
+const VARIANT_B = '64d000000000000000000002';
 
 function basePayload(overrides = {}) {
   return {
@@ -101,6 +103,88 @@ test('a repeated product id fingerprints as its normalized summed line', () => {
     checkoutFingerprint(basePayload({ items: repeated.items })),
     checkoutFingerprint(basePayload({ items: summed.items }))
   );
+});
+
+test('sibling variants are different fingerprints and input order is irrelevant', () => {
+  const first = normalizeRequestedItems([
+    { productId: ID_A, variantId: VARIANT_A, quantity: 1 },
+    { productId: ID_A, variantId: VARIANT_B, quantity: 2 }
+  ]);
+  const reversed = normalizeRequestedItems([
+    { productId: ID_A, variantId: VARIANT_B, quantity: 2 },
+    { productId: ID_A, variantId: VARIANT_A, quantity: 1 }
+  ]);
+  const onlyOtherVariant = normalizeRequestedItems([
+    { productId: ID_A, variantId: VARIANT_B, quantity: 1 }
+  ]);
+
+  assert.equal(first.error, undefined);
+  assert.equal(reversed.error, undefined);
+  assert.equal(onlyOtherVariant.error, undefined);
+
+  assert.equal(
+    checkoutFingerprint(basePayload({ items: first.items })),
+    checkoutFingerprint(basePayload({ items: reversed.items }))
+  );
+
+  assert.notEqual(
+    checkoutFingerprint(
+      basePayload({
+        items: [
+          {
+            productId: ID_A,
+            variantId: VARIANT_A,
+            quantity: 1
+          }
+        ]
+      })
+    ),
+    checkoutFingerprint(
+      basePayload({ items: onlyOtherVariant.items })
+    )
+  );
+});
+
+test('simple-product canonical payload keeps the pre-variant item shape', () => {
+  const canonical = canonicalCheckoutPayload(basePayload());
+
+  assert.deepEqual(canonical.items, [
+    { productId: ID_A, quantity: 2 },
+    { productId: ID_B, quantity: 1 }
+  ]);
+
+  assert.deepEqual(Object.keys(canonical.items[0]), [
+    'productId',
+    'quantity'
+  ]);
+});
+
+test('canonical payload preserves variant identity but never variant display truth', () => {
+  const canonical = canonicalCheckoutPayload({
+    ...basePayload(),
+    items: [
+      {
+        productId: ID_A,
+        variantId: VARIANT_A,
+        quantity: 2,
+        variant: 'client label',
+        unitPrice: 1
+      }
+    ]
+  });
+
+  assert.deepEqual(canonical.items, [
+    {
+      productId: ID_A,
+      variantId: VARIANT_A,
+      quantity: 2
+    }
+  ]);
+
+  const serialized = JSON.stringify(canonical);
+
+  assert.equal(serialized.includes('client label'), false);
+  assert.equal(serialized.includes('unitPrice'), false);
 });
 
 test('surrounding whitespace does not change the request', () => {
@@ -683,6 +767,212 @@ test('an unlimited-only basket records identity but decrements nothing', () => {
   assert.equal(String(reservation.update.$push.stockReservations.intent), String(intentId));
 });
 
+test('variant reservation targets exact nested stock and records exact identity', () => {
+  const productId = new mongoose.Types.ObjectId();
+  const variantId = new mongoose.Types.ObjectId();
+
+  const reservation = buildIdentifiedReservation({
+    businessId,
+    intentId,
+    lines: [
+      {
+        productId,
+        variantId,
+        quantity: 2,
+        finite: true
+      }
+    ]
+  });
+
+  const criteria =
+    reservation.filter.$and[0].products.$elemMatch;
+
+  assert.equal(criteria._id, productId);
+  assert.equal(criteria.unlimitedStock, undefined);
+  assert.equal(criteria.stockQuantity, undefined);
+
+  assert.deepEqual(
+    criteria.variants.$elemMatch,
+    {
+      _id: variantId,
+      isActive: true,
+      unlimitedStock: false,
+      stockQuantity: { $gte: 2 }
+    }
+  );
+
+  assert.deepEqual(
+    reservation.update.$push.stockReservations.lines,
+    [
+      {
+        productId,
+        variantId,
+        quantity: 2
+      }
+    ]
+  );
+
+  assert.deepEqual(
+    reservation.update.$inc,
+    {
+      'products.$[line0].variants.$[variant0].stockQuantity': -2
+    }
+  );
+
+  assert.deepEqual(
+    reservation.arrayFilters,
+    [
+      {
+        'line0._id': productId
+      },
+      {
+        'variant0._id': variantId,
+        'variant0.unlimitedStock': false,
+        'variant0.isActive': true,
+        'variant0.stockQuantity': { $gte: 2 }
+      }
+    ]
+  );
+});
+
+test('variant release restores only the exact finite variant identity', () => {
+  const productId = new mongoose.Types.ObjectId();
+  const variantId = new mongoose.Types.ObjectId();
+
+  const release = buildIdentifiedRelease({
+    businessId,
+    intentId,
+    lines: [
+      {
+        productId,
+        variantId,
+        quantity: 3,
+        finite: true
+      }
+    ]
+  });
+
+  assert.deepEqual(
+    release.update.$inc,
+    {
+      'products.$[line0].variants.$[variant0].stockQuantity': 3
+    }
+  );
+
+  assert.deepEqual(
+    release.arrayFilters,
+    [
+      {
+        'line0._id': productId
+      },
+      {
+        'variant0._id': variantId,
+        'variant0.unlimitedStock': false
+      }
+    ]
+  );
+
+  assert.deepEqual(
+    release.update.$pull,
+    {
+      stockReservations: {
+        intent: intentId
+      }
+    }
+  );
+});
+
+test('simple reservation proves the product is still variant-free at write time', () => {
+  const productId = new mongoose.Types.ObjectId();
+
+  const reservation = buildIdentifiedReservation({
+    businessId,
+    intentId,
+    lines: [
+      {
+        productId,
+        quantity: 1,
+        finite: true
+      }
+    ]
+  });
+
+  const criteria =
+    reservation.filter.$and[0].products.$elemMatch;
+
+  assert.deepEqual(
+    criteria['variants.0'],
+    { $exists: false }
+  );
+  assert.equal(criteria.unlimitedStock, false);
+  assert.deepEqual(
+    criteria.stockQuantity,
+    { $gte: 1 }
+  );
+});
+
+test('marker recovery preserves variant identity but legacy simple markers stay compatible', () => {
+  const productId = new mongoose.Types.ObjectId();
+  const variantId = new mongoose.Types.ObjectId();
+  const variantIntent = new mongoose.Types.ObjectId();
+  const simpleIntent = new mongoose.Types.ObjectId();
+
+  assert.deepEqual(
+    reservedLinesFromMarker(
+      {
+        stockReservations: [
+          {
+            intent: variantIntent,
+            state: 'reserved',
+            lines: [
+              {
+                productId,
+                variantId,
+                quantity: 2
+              }
+            ]
+          }
+        ]
+      },
+      variantIntent
+    ),
+    [
+      {
+        productId,
+        variantId,
+        quantity: 2,
+        finite: true
+      }
+    ]
+  );
+
+  assert.deepEqual(
+    reservedLinesFromMarker(
+      {
+        stockReservations: [
+          {
+            intent: simpleIntent,
+            lines: [
+              {
+                productId,
+                quantity: 1
+              }
+            ]
+          }
+        ]
+      },
+      simpleIntent
+    ),
+    [
+      {
+        productId,
+        quantity: 1,
+        finite: true
+      }
+    ]
+  );
+});
+
 // ------------------------------------------------- stock-mode symmetry (R5)
 
 test('U01/U02 a finite line asserts it is still finite and still stocked', () => {
@@ -750,8 +1040,14 @@ test('U06 no line can reserve on identity and activity alone', () => {
     assert.deepEqual(
       Object.keys(criteria).sort(),
       finite
-        ? ['_id', 'isActive', 'stockQuantity', 'unlimitedStock']
-        : ['_id', 'isActive', 'unlimitedStock'],
+        ? [
+            '_id',
+            'isActive',
+            'stockQuantity',
+            'unlimitedStock',
+            'variants.0'
+          ]
+        : ['_id', 'isActive', 'unlimitedStock', 'variants.0'],
       `finite=${finite}`
     );
   }
@@ -803,6 +1099,91 @@ test('the merchant inventory write carries its own reservation predicate', () =>
   assert.equal(atomic.filter.products.$elemMatch.stockQuantity, 5);
   assert.equal(atomic.filter.products.$elemMatch.unlimitedStock, false);
   assert.deepEqual(atomic.arrayFilters, [{ 'product._id': productId }]);
+});
+
+test('a variant replacement asserts the exact observed variant set', () => {
+  const productId = new mongoose.Types.ObjectId();
+  const variantId = new mongoose.Types.ObjectId();
+
+  const observedVariants = [
+    {
+      _id: variantId,
+      label: 'Black / M',
+      priceOverride: 120,
+      costPrice: 50,
+      stockQuantity: 5,
+      unlimitedStock: false,
+      isActive: true
+    }
+  ];
+
+  const atomic = buildAtomicInventoryUpdate({
+    businessId,
+    ownerId: new mongoose.Types.ObjectId(),
+    productId,
+    write: {
+      variants: [
+        {
+          ...observedVariants[0],
+          stockQuantity: 8
+        }
+      ]
+    },
+    observedStock: {
+      stockQuantity: 0,
+      unlimitedStock: true
+    },
+    observedVariants
+  });
+
+  const criteria =
+    atomic.filter.products.$elemMatch.variants;
+
+  assert.equal(criteria.$size, 1);
+
+  assert.deepEqual(criteria.$all, [
+    {
+      $elemMatch: {
+        _id: variantId,
+        label: 'Black / M',
+        priceOverride: 120,
+        costPrice: 50,
+        stockQuantity: 5,
+        unlimitedStock: false,
+        isActive: true
+      }
+    }
+  ]);
+});
+
+test('creating variants asserts the product stayed variant-empty', () => {
+  const atomic = buildAtomicInventoryUpdate({
+    businessId,
+    ownerId: new mongoose.Types.ObjectId(),
+    productId: new mongoose.Types.ObjectId(),
+    write: {
+      variants: [
+        {
+          label: 'Black / M',
+          priceOverride: null,
+          costPrice: null,
+          stockQuantity: 5,
+          unlimitedStock: false,
+          isActive: true
+        }
+      ]
+    },
+    observedStock: {
+      stockQuantity: 0,
+      unlimitedStock: true
+    },
+    observedVariants: []
+  });
+
+  assert.deepEqual(
+    atomic.filter.products.$elemMatch['variants.0'],
+    { $exists: false }
+  );
 });
 
 test('a mixed payload is one write, so it cannot half-apply', () => {

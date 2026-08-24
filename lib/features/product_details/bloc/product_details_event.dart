@@ -36,6 +36,12 @@ final class ProductDetailsQuantityDecremented extends ProductDetailsEvent {
   const ProductDetailsQuantityDecremented();
 }
 
+final class ProductDetailsVariantSelected extends ProductDetailsEvent {
+  final String variantId;
+
+  const ProductDetailsVariantSelected(this.variantId);
+}
+
 final class ProductDetailsReviewSubmitted extends ProductDetailsEvent {
   final int rating;
   final String comment;

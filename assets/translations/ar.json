@@ -108,6 +108,11 @@
     "productReviewPublished": "تم نشر تقييم المنتج",
     "addedToCart": "تمت إضافة المنتج إلى السلة",
     "outOfStock": "غير متوفر حالياً",
+    "selectVariant": "اختر أحد الخيارات قبل إضافة المنتج أو شرائه",
+    "selectVariantPrompt": "اختر الخيار",
+    "variantUnavailable": "الخيار المحدد لم يعد متاحاً",
+    "noVariantsAvailable": "لا توجد خيارات متاحة للاختيار حالياً",
+    "priceUnavailable": "السعر غير متوفر",
     "productShareOpened": "تم فتح خيار مشاركة المنتج",
     "productShareError": "تعذر فتح مشاركة المنتج. حاول مرة أخرى."
   },
@@ -282,7 +287,20 @@
     "invalidDiscount": "نسبة التخفيض بين 0 و 100",
     "invalidQuantity": "الكمية يجب أن تكون رقماً صحيحاً غير سالب",
     "tooManyImages": "الحد الأقصى 8 صور",
-    "tooManyKeywords": "الحد الأقصى 20 كلمة دلالية"
+    "tooManyKeywords": "الحد الأقصى 20 كلمة دلالية",
+    "variants": "الخيارات / المتغيرات",
+    "variantsHint": "لكل خيار سعر وتكلفة ومخزون وتوفر خاص به. اترك سعر الخيار فارغاً ليستخدم سعر المنتج الأساسي.",
+    "addVariant": "إضافة خيار",
+    "variantNumber": "الخيار {}",
+    "variantLabel": "اسم الخيار",
+    "variantLabelHint": "مثال: أسود / M",
+    "priceOverride": "سعر الخيار",
+    "priceOverrideHint": "اتركه فارغاً لاستخدام سعر المنتج",
+    "variantActive": "متاح في كتالوج المتجر",
+    "removeVariant": "حذف الخيار",
+    "invalidVariantLabel": "اسم الخيار يجب أن يكون بين 1 و 80 حرفاً",
+    "duplicateVariantLabel": "يجب ألا تتكرر أسماء الخيارات",
+    "variantLimit": "الحد الأقصى 50 خياراً"
   },
   "merchantPreview": {
     "title": "معاينة المتجر",

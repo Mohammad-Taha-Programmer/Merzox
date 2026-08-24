@@ -7,9 +7,10 @@ import {
 
 import {
   finalPriceFor,
-  isProductInStock,
   LEGACY_UNLIMITED_STOCK_DEFAULT,
-  PRODUCT_LIMITS
+  PRODUCT_LIMITS,
+  productVariantSummary,
+  variantCommerceFacts
 } from '../policies/product.policy.js';
 
 const contactSchema = new mongoose.Schema(
@@ -37,6 +38,38 @@ const locationSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const productVariantSchema = new mongoose.Schema({
+  label: {
+    type: String,
+    required: true,
+    trim: true,
+    maxlength: PRODUCT_LIMITS.variantLabelMax
+  },
+  priceOverride: {
+    type: Number,
+    min: 0,
+    max: PRODUCT_LIMITS.maxPrice,
+    default: null
+  },
+  costPrice: {
+    type: Number,
+    min: 0,
+    max: PRODUCT_LIMITS.maxPrice,
+    default: null
+  },
+  stockQuantity: {
+    type: Number,
+    min: 0,
+    max: PRODUCT_LIMITS.maxStockQuantity,
+    default: 0
+  },
+  unlimitedStock: {
+    type: Boolean,
+    default: LEGACY_UNLIMITED_STOCK_DEFAULT
+  },
+  isActive: { type: Boolean, default: true }
+});
+
 const productSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 120 },
@@ -58,6 +91,22 @@ const productSchema = new mongoose.Schema(
     unlimitedStock: {
       type: Boolean,
       default: LEGACY_UNLIMITED_STOCK_DEFAULT
+    },
+    variants: {
+      type: [productVariantSchema],
+      default: [],
+      validate: {
+        validator(value) {
+          if (value.length > PRODUCT_LIMITS.maxVariants) return false;
+
+          const labels = value.map((variant) =>
+            String(variant.label ?? '').trim().toLocaleLowerCase()
+          );
+
+          return new Set(labels).size === labels.length;
+        },
+        message: 'Product variants are invalid'
+      }
     },
     // A bounded percentage, never a free-text badge: the final price is derived
     // from it so a discount cannot describe a price the server did not compute.
@@ -152,6 +201,12 @@ const stockReservationSchema = new mongoose.Schema(
         new mongoose.Schema(
           {
             productId: { type: mongoose.Schema.Types.ObjectId, required: true },
+            // Null/absent means the parent product inventory was consumed.
+            // Present means the exact nested variant inventory was consumed.
+            variantId: {
+              type: mongoose.Schema.Types.ObjectId,
+              default: null
+            },
             quantity: { type: Number, required: true, min: 1 }
           },
           { _id: false }
@@ -301,6 +356,7 @@ businessSchema.methods.productToJSON = function productToJSON(product) {
     new Set([...(product.imageUrls ?? []), product.imageUrl].filter(Boolean))
   );
   const discountPercent = product.discountPercent ?? 0;
+  const variantSummary = productVariantSummary(product);
 
   return {
     discountPercent,
@@ -310,7 +366,13 @@ businessSchema.methods.productToJSON = function productToJSON(product) {
       price: product.price ?? 0,
       discountPercent
     }),
-    inStock: isProductInStock(product),
+    inStock: variantSummary.inStock,
+    hasVariants: variantSummary.hasVariants,
+    variants: variantSummary.variants,
+    minPrice: variantSummary.minPrice,
+    maxPrice: variantSummary.maxPrice,
+    minFinalPrice: variantSummary.minFinalPrice,
+    maxFinalPrice: variantSummary.maxFinalPrice,
     id: product._id.toString(),
     business: this._id.toString(),
     name: product.name,
@@ -342,7 +404,16 @@ businessSchema.methods.productToOwnerJSON = function productToOwnerJSON(
     costPrice: product.costPrice ?? null,
     stockQuantity: product.stockQuantity ?? 0,
     unlimitedStock: product.unlimitedStock ?? LEGACY_UNLIMITED_STOCK_DEFAULT,
-    keywords: [...(product.keywords ?? [])]
+    keywords: [...(product.keywords ?? [])],
+    variants: (product.variants ?? []).map((variant) => ({
+      ...variantCommerceFacts(product, variant),
+      priceOverride: variant.priceOverride ?? null,
+      costPrice: variant.costPrice ?? null,
+      stockQuantity: variant.stockQuantity ?? 0,
+      unlimitedStock:
+        variant.unlimitedStock ?? LEGACY_UNLIMITED_STOCK_DEFAULT,
+      isActive: variant.isActive ?? true
+    }))
   };
 };
 

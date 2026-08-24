@@ -47,6 +47,38 @@ BusinessListApiResponse businessPage({
   );
 }
 
+BusinessProductVariantApiModel catalogVariant({
+  String id = '64d000000000000000000001',
+  String label = 'Variant',
+  double price = 25,
+  double? finalPrice,
+  bool inStock = true,
+}) {
+  return BusinessProductVariantApiModel(
+    id: id,
+    label: label,
+    price: price,
+    finalPrice: finalPrice ?? price,
+    inStock: inStock,
+  );
+}
+
+Map<String, dynamic> catalogVariantJson({
+  String id = '64d000000000000000000001',
+  String label = 'Variant',
+  double price = 25,
+  double? finalPrice,
+  bool inStock = true,
+}) {
+  return <String, dynamic>{
+    'id': id,
+    'label': label,
+    'price': price,
+    'finalPrice': finalPrice ?? price,
+    'inStock': inStock,
+  };
+}
+
 BusinessProductApiModel catalogProduct({
   String id = '64c000000000000000000001',
   String name = 'Test product',
@@ -55,15 +87,29 @@ BusinessProductApiModel catalogProduct({
   double discountPercent = 0,
   double? finalPrice,
   bool inStock = true,
+  bool hasVariants = false,
+  List<BusinessProductVariantApiModel> variants = const [],
+  double? minPrice,
+  double? maxPrice,
+  double? minFinalPrice,
+  double? maxFinalPrice,
 }) {
+  final payable = finalPrice ?? price;
+
   return BusinessProductApiModel(
     id: id,
     name: name,
     description: description,
     price: price,
     discountPercent: discountPercent,
-    finalPrice: finalPrice,
+    finalPrice: payable,
     inStock: inStock,
+    hasVariants: hasVariants,
+    variants: variants,
+    minPrice: hasVariants ? minPrice : (minPrice ?? price),
+    maxPrice: hasVariants ? maxPrice : (maxPrice ?? price),
+    minFinalPrice: hasVariants ? minFinalPrice : (minFinalPrice ?? payable),
+    maxFinalPrice: hasVariants ? maxFinalPrice : (maxFinalPrice ?? payable),
     imageUrl: '',
     imageUrls: const [],
     classification: 'new',
@@ -74,10 +120,6 @@ BusinessProductApiModel catalogProduct({
 }
 
 /// A PUBLIC product payload exactly as `Business.productToJSON` emits it.
-///
-/// Tests parse this rather than constructing the model, so a change to the
-/// required commerce contract is caught here instead of being papered over by
-/// constructor defaults.
 Map<String, dynamic> catalogProductJson({
   String id = '64c000000000000000000001',
   String name = 'Test product',
@@ -85,15 +127,29 @@ Map<String, dynamic> catalogProductJson({
   double discountPercent = 0,
   double? finalPrice,
   bool inStock = true,
+  bool hasVariants = false,
+  List<Map<String, dynamic>> variants = const [],
+  double? minPrice,
+  double? maxPrice,
+  double? minFinalPrice,
+  double? maxFinalPrice,
 }) {
+  final payable = finalPrice ?? price;
+
   return <String, dynamic>{
     'id': id,
     'name': name,
     'description': '',
     'price': price,
     'discountPercent': discountPercent,
-    'finalPrice': finalPrice ?? price,
+    'finalPrice': payable,
     'inStock': inStock,
+    'hasVariants': hasVariants,
+    'variants': variants,
+    'minPrice': hasVariants ? minPrice : (minPrice ?? price),
+    'maxPrice': hasVariants ? maxPrice : (maxPrice ?? price),
+    'minFinalPrice': hasVariants ? minFinalPrice : (minFinalPrice ?? payable),
+    'maxFinalPrice': hasVariants ? maxFinalPrice : (maxFinalPrice ?? payable),
     'imageUrl': '',
     'imageUrls': const <String>[],
     'classification': 'new',

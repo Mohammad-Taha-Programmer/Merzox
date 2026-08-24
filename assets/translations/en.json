@@ -108,6 +108,11 @@
     "productReviewPublished": "Product review published",
     "addedToCart": "Product added to cart",
     "outOfStock": "Out of stock",
+    "selectVariant": "Select an option before adding or buying this product",
+    "selectVariantPrompt": "Select an option",
+    "variantUnavailable": "The selected option is no longer available",
+    "noVariantsAvailable": "No selectable options are available right now",
+    "priceUnavailable": "Price unavailable",
     "productShareOpened": "Sharing option opened",
     "productShareError": "Could not open product sharing. Please try again."
   },
@@ -282,7 +287,20 @@
     "invalidDiscount": "Discount must be between 0 and 100",
     "invalidQuantity": "Quantity must be a whole, non-negative number",
     "tooManyImages": "At most 8 images",
-    "tooManyKeywords": "At most 20 keywords"
+    "tooManyKeywords": "At most 20 keywords",
+    "variants": "Options / variants",
+    "variantsHint": "Each option owns its own price, cost, stock and availability. Leave the option price blank to inherit the product price.",
+    "addVariant": "Add option",
+    "variantNumber": "Option {}",
+    "variantLabel": "Option label",
+    "variantLabelHint": "Example: Black / M",
+    "priceOverride": "Option price",
+    "priceOverrideHint": "Leave blank to use the product price",
+    "variantActive": "Available in the catalog",
+    "removeVariant": "Remove option",
+    "invalidVariantLabel": "Option label must be between 1 and 80 characters",
+    "duplicateVariantLabel": "Option labels must be unique",
+    "variantLimit": "At most 50 options"
   },
   "merchantPreview": {
     "title": "Store preview",

@@ -85,15 +85,21 @@ final class BusinessEnrollmentResult {
 }
 
 final class OwnerOrderItem {
+  final String productId;
+  final String? variantId;
   final String name;
   final int quantity;
   final double unitPrice;
   final String imageUrl;
+
+  /// Immutable purchase-time variant label snapshot.
   final String variant;
 
   const OwnerOrderItem({
     required this.name,
     required this.quantity,
+    this.productId = '',
+    this.variantId,
     this.unitPrice = 0,
     this.imageUrl = '',
     this.variant = '',
@@ -101,13 +107,20 @@ final class OwnerOrderItem {
 
   double get lineTotal => unitPrice * quantity;
 
-  factory OwnerOrderItem.fromJson(Map<String, dynamic> json) => OwnerOrderItem(
-    name: json['name'] as String? ?? '',
-    quantity: (json['quantity'] as num?)?.toInt() ?? 0,
-    unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0,
-    imageUrl: json['imageUrl'] as String? ?? '',
-    variant: json['variant'] as String? ?? '',
-  );
+  factory OwnerOrderItem.fromJson(Map<String, dynamic> json) {
+    final rawVariantId = json['variantId'];
+    final variantId = rawVariantId is String ? rawVariantId.trim() : '';
+
+    return OwnerOrderItem(
+      productId: (json['productId'] as String? ?? '').trim(),
+      variantId: variantId.isEmpty ? null : variantId,
+      name: json['name'] as String? ?? '',
+      quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+      unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0,
+      imageUrl: json['imageUrl'] as String? ?? '',
+      variant: json['variant'] as String? ?? '',
+    );
+  }
 }
 
 final class OwnerOrderCourier {
@@ -251,28 +264,115 @@ final class BusinessDashboardData {
   }
 }
 
-/// The merchant view of a product.
+/// One owner-visible product variant.
 ///
-/// Deliberately separate from the customer-facing `BusinessProductApiModel`:
-/// `costPrice`, exact `stockQuantity`, and `keywords` are merchant-internal and
-/// must never be introduced into a model the customer surfaces deserialize.
+/// Exact stock and cost remain merchant-only. Effective [price], [finalPrice]
+/// and [inStock] are server-derived facts.
+final class OwnerProductVariant {
+  final String id;
+  final String label;
+  final double? priceOverride;
+  final double? costPrice;
+  final int stockQuantity;
+  final bool unlimitedStock;
+  final bool isActive;
+  final double price;
+  final double finalPrice;
+  final bool inStock;
+
+  const OwnerProductVariant({
+    required this.id,
+    required this.label,
+    required this.price,
+    required this.finalPrice,
+    required this.inStock,
+    this.priceOverride,
+    this.costPrice,
+    this.stockQuantity = 0,
+    this.unlimitedStock = true,
+    this.isActive = true,
+  });
+
+  factory OwnerProductVariant.fromJson(Map<String, dynamic> json) {
+    final price = (json['price'] as num?)?.toDouble() ?? 0;
+
+    return OwnerProductVariant(
+      id: (json['id'] as String? ?? '').trim(),
+      label: (json['label'] as String? ?? '').trim(),
+      priceOverride: (json['priceOverride'] as num?)?.toDouble(),
+      costPrice: (json['costPrice'] as num?)?.toDouble(),
+      stockQuantity: (json['stockQuantity'] as num?)?.toInt() ?? 0,
+      unlimitedStock: json['unlimitedStock'] as bool? ?? true,
+      isActive: json['isActive'] as bool? ?? true,
+      price: price,
+      finalPrice: (json['finalPrice'] as num?)?.toDouble() ?? price,
+      inStock: json['inStock'] as bool? ?? true,
+    );
+  }
+}
+
+/// Exact merchant-writable variant state.
 ///
-/// Every field tolerates absence so products stored before FIX4 still parse:
-/// a legacy document carries no stock fields at all, and is treated as
-/// unlimited rather than out of stock.
+/// Existing variants retain the server-owned id. Newly added variants omit id.
+final class OwnerProductVariantDraft {
+  final String? id;
+  final String label;
+  final double? priceOverride;
+  final double? costPrice;
+  final int stockQuantity;
+  final bool unlimitedStock;
+  final bool isActive;
+
+  const OwnerProductVariantDraft({
+    required this.label,
+    required this.stockQuantity,
+    required this.unlimitedStock,
+    required this.isActive,
+    this.id,
+    this.priceOverride,
+    this.costPrice,
+  });
+
+  factory OwnerProductVariantDraft.fromOwner(OwnerProductVariant variant) {
+    return OwnerProductVariantDraft(
+      id: variant.id,
+      label: variant.label,
+      priceOverride: variant.priceOverride,
+      costPrice: variant.costPrice,
+      stockQuantity: variant.stockQuantity,
+      unlimitedStock: variant.unlimitedStock,
+      isActive: variant.isActive,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final normalizedId = id?.trim();
+
+    return {
+      if (normalizedId != null && normalizedId.isNotEmpty) 'id': normalizedId,
+      'label': label.trim(),
+      'priceOverride': priceOverride,
+      'costPrice': costPrice,
+      'unlimitedStock': unlimitedStock,
+      if (!unlimitedStock) 'stockQuantity': stockQuantity,
+      'isActive': isActive,
+    };
+  }
+}
+
+/// Merchant-facing product truth.
+///
+/// Private cost/inventory/variant fields stay outside the public customer model.
 final class OwnerProduct {
   final String id;
   final String name;
   final String description;
   final double price;
-
-  /// Merchant-internal margin data. Null when the merchant has not set one.
   final double? costPrice;
   final int stockQuantity;
   final bool unlimitedStock;
   final double discountPercent;
-
-  /// Server-derived; never sent when saving.
+  final List<OwnerProductVariant> variants;
   final double finalPrice;
   final bool inStock;
   final List<String> keywords;
@@ -290,6 +390,7 @@ final class OwnerProduct {
     this.stockQuantity = 0,
     this.unlimitedStock = true,
     this.discountPercent = 0,
+    this.variants = const [],
     this.finalPrice = 0,
     this.inStock = true,
     this.keywords = const [],
@@ -303,6 +404,9 @@ final class OwnerProduct {
 
   bool get hasDiscount => discountPercent > 0;
 
+  /// Stored variants define variant mode even when every one is inactive.
+  bool get hasVariants => variants.isNotEmpty;
+
   factory OwnerProduct.fromJson(Map<String, dynamic> json) {
     final rawImages = json['imageUrls'] as List<dynamic>? ?? const [];
     final images = rawImages
@@ -310,12 +414,14 @@ final class OwnerProduct {
         .map((url) => url.trim())
         .where((url) => url.isNotEmpty)
         .toList();
+
     final legacyImage = (json['imageUrl'] as String? ?? '').trim();
     if (legacyImage.isNotEmpty && !images.contains(legacyImage)) {
       images.add(legacyImage);
     }
 
     final rawKeywords = json['keywords'] as List<dynamic>? ?? const [];
+    final rawVariants = json['variants'] as List<dynamic>? ?? const [];
     final price = (json['price'] as num?)?.toDouble() ?? 0;
 
     return OwnerProduct(
@@ -325,10 +431,12 @@ final class OwnerProduct {
       price: price,
       costPrice: (json['costPrice'] as num?)?.toDouble(),
       stockQuantity: (json['stockQuantity'] as num?)?.toInt() ?? 0,
-      // Absent on legacy documents: those predate inventory and stayed
-      // purchasable, so unlimited is the honest reading.
       unlimitedStock: json['unlimitedStock'] as bool? ?? true,
       discountPercent: (json['discountPercent'] as num?)?.toDouble() ?? 0,
+      variants: rawVariants
+          .whereType<Map<String, dynamic>>()
+          .map(OwnerProductVariant.fromJson)
+          .toList(growable: false),
       finalPrice: (json['finalPrice'] as num?)?.toDouble() ?? price,
       inStock: json['inStock'] as bool? ?? true,
       keywords: rawKeywords

@@ -138,7 +138,12 @@ export function validateProfilePatch(req, _res, next) {
  * older client sending `variant: ''` is not rejected outright.
  */
 const variantLikeItemFields = ['variant', 'degree', 'option'];
-const allowedItemFields = ['productId', 'quantity', ...variantLikeItemFields];
+const allowedItemFields = [
+  'productId',
+  'variantId',
+  'quantity',
+  ...variantLikeItemFields
+];
 
 export function validateOrderCreate(req, _res, next) {
   const allowed = [
@@ -176,28 +181,40 @@ export function validateOrderCreate(req, _res, next) {
     }
 
     const itemFields = Object.keys(item);
-    // Business.products models no variant, degree, or option, so a supplied
-    // value cannot be validated against anything. An explicit code is returned
-    // rather than a generic field error so a client can tell "this product has
-    // no variants yet" apart from "you sent a malformed item".
+    // Legacy label-shaped fields never carry sellable identity authority.
+    // They remain accepted only when empty for compatibility with older
+    // clients. A customer selects a variant solely by its server-owned id.
     for (const key of variantLikeItemFields) {
       if (String(item[key] ?? '').trim().length > 0) {
         throw new AppError(
-          'This product does not support variants',
+          'Variant labels are not accepted; select the server variant id',
           400,
           'UNSUPPORTED_PRODUCT_VARIANT'
         );
       }
     }
 
-    // An absent or empty variant is normalized away, so the key may be present
-    // as long as it carries nothing.
+    // Empty legacy fields are normalized away. `variantId`, when present, is
+    // only an identity claim; price, label and stock are resolved from Business.
     if (itemFields.some((key) => !allowedItemFields.includes(key))) {
       throw new AppError('Order item contains unsupported fields', 400, 'INVALID_ORDER_ITEM');
     }
 
     if (!/^[a-f\d]{24}$/i.test(String(item.productId ?? ''))) {
       throw new AppError('Product id is invalid', 400, 'INVALID_PRODUCT_ID');
+    }
+
+    if (
+      item.variantId !== undefined &&
+      item.variantId !== null &&
+      String(item.variantId).trim().length > 0 &&
+      !/^[a-f\d]{24}$/i.test(String(item.variantId).trim())
+    ) {
+      throw new AppError(
+        'Product variant id is invalid',
+        400,
+        'INVALID_PRODUCT_VARIANT_ID'
+      );
     }
 
     if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 100) {
@@ -376,7 +393,151 @@ export function validateBusinessProfilePatch(req, _res, next) {
   next();
 }
 
-function validateBusinessProductBody(body, { partial }) {
+function validateProductVariants(variants, { allowIds }) {
+  if (!Array.isArray(variants) || variants.length > PRODUCT_LIMITS.maxVariants) {
+    throw new AppError(
+      'Product variants are invalid',
+      400,
+      'INVALID_PRODUCT_VARIANTS'
+    );
+  }
+
+  const allowedFields = [
+    'id',
+    'label',
+    'priceOverride',
+    'costPrice',
+    'stockQuantity',
+    'unlimitedStock',
+    'isActive'
+  ];
+
+  const ids = new Set();
+  const labels = new Set();
+
+  for (const variant of variants) {
+    if (!variant || typeof variant !== 'object' || Array.isArray(variant)) {
+      throw new AppError(
+        'Product variant is invalid',
+        400,
+        'INVALID_PRODUCT_VARIANT'
+      );
+    }
+
+    const invalidFields = Object.keys(variant).filter(
+      (key) => !allowedFields.includes(key)
+    );
+
+    if (invalidFields.length > 0) {
+      throw new AppError(
+        'Product variant fields are invalid',
+        400,
+        'INVALID_PRODUCT_VARIANT_FIELDS'
+      );
+    }
+
+    if (variant.id !== undefined) {
+      const id = String(variant.id ?? '').trim();
+
+      if (!allowIds || !/^[a-f\d]{24}$/i.test(id) || ids.has(id)) {
+        throw new AppError(
+          'Product variant id is invalid',
+          400,
+          'INVALID_PRODUCT_VARIANT_ID'
+        );
+      }
+
+      ids.add(id);
+    }
+
+    const label = String(variant.label ?? '').trim();
+    const normalizedLabel = label.toLocaleLowerCase();
+
+    if (
+      label.length < 1 ||
+      label.length > PRODUCT_LIMITS.variantLabelMax ||
+      labels.has(normalizedLabel)
+    ) {
+      throw new AppError(
+        'Product variant label is invalid',
+        400,
+        'INVALID_PRODUCT_VARIANT_LABEL'
+      );
+    }
+
+    labels.add(normalizedLabel);
+
+    for (const [field, code] of [
+      ['priceOverride', 'INVALID_PRODUCT_VARIANT_PRICE'],
+      ['costPrice', 'INVALID_PRODUCT_VARIANT_COST_PRICE']
+    ]) {
+      const value = variant[field];
+
+      if (value === undefined || value === null || value === '') continue;
+
+      if (!isNumericInput(value)) {
+        throw new AppError('Product variant price is invalid', 400, code);
+      }
+
+      const parsed = Number(value);
+
+      if (
+        !Number.isFinite(parsed) ||
+        parsed < 0 ||
+        parsed > PRODUCT_LIMITS.maxPrice
+      ) {
+        throw new AppError('Product variant price is invalid', 400, code);
+      }
+    }
+
+    // Every variant states its stock mode explicitly. This prevents a supplied
+    // finite quantity from being interpreted under the legacy unlimited default.
+    if (typeof variant.unlimitedStock !== 'boolean') {
+      throw new AppError(
+        'Product variant stock mode is invalid',
+        400,
+        'INVALID_PRODUCT_VARIANT_STOCK_MODE'
+      );
+    }
+
+    if (variant.stockQuantity !== undefined && variant.unlimitedStock !== true) {
+      if (!isNumericInput(variant.stockQuantity)) {
+        throw new AppError(
+          'Product variant stock is invalid',
+          400,
+          'INVALID_PRODUCT_VARIANT_STOCK'
+        );
+      }
+
+      const stock = Number(variant.stockQuantity);
+
+      if (
+        !Number.isInteger(stock) ||
+        stock < 0 ||
+        stock > PRODUCT_LIMITS.maxStockQuantity
+      ) {
+        throw new AppError(
+          'Product variant stock is invalid',
+          400,
+          'INVALID_PRODUCT_VARIANT_STOCK'
+        );
+      }
+    }
+
+    if (
+      variant.isActive !== undefined &&
+      typeof variant.isActive !== 'boolean'
+    ) {
+      throw new AppError(
+        'Product variant activity is invalid',
+        400,
+        'INVALID_PRODUCT_VARIANT_BOOLEAN'
+      );
+    }
+  }
+}
+
+function validateBusinessProductBody(body, { partial, allowVariantIds }) {
   // Sourced from the shared contract: identity, ratings, likes, and timestamps
   // are absent from it, so injecting them is rejected here rather than being
   // silently dropped later.
@@ -484,6 +645,12 @@ function validateBusinessProductBody(body, { partial }) {
       throw new AppError('Product image URLs are invalid', 400, 'INVALID_PRODUCT_IMAGE_URLS');
     }
   }
+  if (body.variants !== undefined) {
+    validateProductVariants(body.variants, {
+      allowIds: allowVariantIds === true
+    });
+  }
+
   if (
     body.classification !== undefined &&
     !productClassifications.includes(body.classification)
@@ -520,12 +687,18 @@ function isOptionalHttpUrl(value) {
 }
 
 export function validateBusinessProductCreate(req, _res, next) {
-  validateBusinessProductBody(req.body, { partial: false });
+  validateBusinessProductBody(req.body, {
+    partial: false,
+    allowVariantIds: false
+  });
   next();
 }
 
 export function validateBusinessProductPatch(req, _res, next) {
-  validateBusinessProductBody(req.body, { partial: true });
+  validateBusinessProductBody(req.body, {
+    partial: true,
+    allowVariantIds: true
+  });
   next();
 }
 

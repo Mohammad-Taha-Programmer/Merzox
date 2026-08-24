@@ -88,7 +88,10 @@ class _ProductDetailsView extends StatelessWidget {
                                   .read<ProductDetailsBloc>()
                                   .add(const ProductDetailsReloadRequested()),
                             ),
-                          _ProductHeader(product: product),
+                          _ProductHeader(
+                            product: product,
+                            selectedVariant: state.selectedVariant,
+                          ),
                           _Tabs(selectedIndex: state.selectedTabIndex),
                           if (state.selectedTabIndex == 0)
                             _DescriptionTab(
@@ -145,7 +148,8 @@ class _ProductDetailsView extends StatelessWidget {
               : SafeArea(
                   top: false,
                   child: _BottomActions(
-                    inStock: product.inStock,
+                    selectionRequired: state.variantSelectionRequired,
+                    inStock: state.selectedSellableInStock,
                     onAdd: () => AuthGate.run(
                       context,
                       onAuthenticated: () => context
@@ -252,11 +256,39 @@ class _ImageSliderState extends State<_ImageSlider> {
 
 class _ProductHeader extends StatelessWidget {
   final BusinessProductApiModel product;
+  final BusinessProductVariantApiModel? selectedVariant;
 
-  const _ProductHeader({required this.product});
+  const _ProductHeader({required this.product, required this.selectedVariant});
 
   @override
   Widget build(BuildContext context) {
+    final selected = selectedVariant;
+
+    final String priceText;
+
+    if (product.hasVariants && product.variants.isEmpty) {
+      priceText = 'catalog.priceUnavailable'.tr();
+    } else if (selected != null) {
+      priceText = '₪ ${selected.finalPrice.toStringAsFixed(0)}';
+    } else if (product.hasVariants && product.hasPriceRange) {
+      priceText =
+          '₪ ${product.minFinalPrice!.toStringAsFixed(0)}'
+          ' – '
+          '₪ ${product.maxFinalPrice!.toStringAsFixed(0)}';
+    } else {
+      priceText = '₪ ${product.displayPrice.toStringAsFixed(0)}';
+    }
+
+    final double? listPrice;
+
+    if (selected != null && selected.hasDiscount) {
+      listPrice = selected.price;
+    } else if (!product.hasVariants && product.hasDiscount) {
+      listPrice = product.price;
+    } else {
+      listPrice = null;
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
       child: Row(
@@ -267,18 +299,16 @@ class _ProductHeader extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '₪ ${product.displayPrice.toStringAsFixed(0)}',
+                priceText,
                 textDirection: TextDirection.ltr,
                 style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                 ),
               ),
-              // Only when the server says a discount applies; no discount is
-              // ever invented for presentation.
-              if (product.hasDiscount)
+              if (listPrice != null)
                 Text(
-                  '₪ ${product.price.toStringAsFixed(0)}',
+                  '₪ ${listPrice.toStringAsFixed(0)}',
                   textDirection: TextDirection.ltr,
                   style: TextStyle(
                     fontSize: 13,
@@ -406,11 +436,82 @@ class _DescriptionTab extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+          if (product.hasVariants) ...[
+            _VariantSelector(
+              product: product,
+              selectedVariantId: state.selectedVariantId,
+            ),
+            const SizedBox(height: 24),
+          ],
           _QuantityRow(quantity: state.quantity),
           const SizedBox(height: 28),
           _SellerDetails(business: business),
         ],
       ),
+    );
+  }
+}
+
+class _VariantSelector extends StatelessWidget {
+  final BusinessProductApiModel product;
+  final String? selectedVariantId;
+
+  const _VariantSelector({
+    required this.product,
+    required this.selectedVariantId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'catalog.selectVariantPrompt'.tr(),
+          textAlign: TextAlign.end,
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 12),
+        if (product.variants.isEmpty)
+          Text(
+            'catalog.noVariantsAvailable'.tr(),
+            textAlign: TextAlign.end,
+            style: TextStyle(color: MerzoxColors.kColor767676, fontSize: 13),
+          )
+        else
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            runSpacing: 8,
+            children: product.variants.map((variant) {
+              final selected = selectedVariantId == variant.id;
+
+              return ChoiceChip(
+                label: Text(
+                  variant.inStock
+                      ? variant.label
+                      : '${variant.label} — ${'catalog.outOfStock'.tr()}',
+                ),
+                selected: selected,
+                onSelected: variant.inStock
+                    ? (value) {
+                        if (!value) return;
+
+                        context.read<ProductDetailsBloc>().add(
+                          ProductDetailsVariantSelected(variant.id),
+                        );
+                      }
+                    : null,
+                selectedColor: MerzoxColors.kColor98C1D9,
+                side: BorderSide(
+                  color: selected
+                      ? MerzoxColors.kColor3D5A80
+                      : MerzoxColors.kColorC7C7C7,
+                ),
+              );
+            }).toList(),
+          ),
+      ],
     );
   }
 }
@@ -816,59 +917,30 @@ class _ProductLoadFailure extends StatelessWidget {
 class _BottomActions extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onBuy;
-
-  /// Server truth. When the product is out of stock both actions are disabled
-  /// rather than allowed to fail later - and the bloc refuses them anyway, so
-  /// this is the visible half of a guard that exists on both sides.
   final bool inStock;
+  final bool selectionRequired;
 
   const _BottomActions({
     required this.onAdd,
     required this.onBuy,
     required this.inStock,
+    required this.selectionRequired,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (selectionRequired) {
+      return _BottomStatusMessage(message: 'catalog.selectVariant'.tr());
+    }
+
     if (!inStock) {
-      return Container(
-        height: 70,
-        alignment: Alignment.center,
-        padding: const EdgeInsets.fromLTRB(22, 8, 22, 14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16,
-              offset: const Offset(0, -6),
-            ),
-          ],
-        ),
-        child: Text(
-          'catalog.outOfStock'.tr(),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: MerzoxColors.kColor767676,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
+      return _BottomStatusMessage(message: 'catalog.outOfStock'.tr());
     }
 
     return Container(
       height: 70,
       padding: const EdgeInsets.fromLTRB(22, 8, 22, 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 16,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
+      decoration: _bottomActionDecoration(),
       child: Row(
         textDirection: TextDirection.ltr,
         children: [
@@ -911,6 +983,43 @@ class _BottomActions extends StatelessWidget {
       ),
     );
   }
+}
+
+class _BottomStatusMessage extends StatelessWidget {
+  final String message;
+
+  const _BottomStatusMessage({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 70,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.fromLTRB(22, 8, 22, 14),
+      decoration: _bottomActionDecoration(),
+      child: Text(
+        message,
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: MerzoxColors.kColor767676,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+BoxDecoration _bottomActionDecoration() {
+  return BoxDecoration(
+    color: Colors.white,
+    boxShadow: [
+      BoxShadow(
+        color: Colors.black.withValues(alpha: 0.05),
+        blurRadius: 16,
+        offset: const Offset(0, -6),
+      ),
+    ],
+  );
 }
 
 class _InteractiveStars extends StatelessWidget {

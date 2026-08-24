@@ -272,8 +272,19 @@ class FavoritesBloc extends Bloc<FavoritesEvent, FavoritesState> {
       return;
     }
 
-    // The second cart-write site in the app, and it needs the same stock guard
-    // as the product page: an out-of-stock favourite must not enter the cart.
+    // Favorites has no variant-selection state. Variant products must open
+    // Product Details and obtain an explicit customer selection.
+    if (favorite.product.hasVariants) {
+      emit(
+        state.copyWith(
+          status: FavoritesStatus.ready,
+          errorMessage: 'catalog.selectVariant',
+        ),
+      );
+      return;
+    }
+
+    // Simple products retain the historical direct-cart path.
     if (!favorite.product.inStock) {
       emit(
         state.copyWith(

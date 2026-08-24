@@ -423,6 +423,19 @@ class _OrderCard extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if ((firstItem?.variant ?? '').trim().isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        firstItem!.variant,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: MerzoxColors.kColor8D99AE,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                     if (order.items.length > 1) ...[
                       const SizedBox(height: 2),
                       Text(

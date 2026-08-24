@@ -7,6 +7,7 @@ import {
   canCustomerCancel,
   canReviewOrder
 } from '../policies/order-status.policy.js';
+import { PRODUCT_LIMITS } from '../policies/product.policy.js';
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -14,11 +15,19 @@ const orderItemSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       required: true
     },
+    // Stable identity of the purchased variant. Null means a simple product.
+    variantId: { type: mongoose.Schema.Types.ObjectId, default: null },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     imageUrl: { type: String, trim: true, maxlength: 1000, default: '' },
     unitPrice: { type: Number, required: true, min: 0 },
     quantity: { type: Number, required: true, min: 1, max: 100 },
-    variant: { type: String, trim: true, maxlength: 40, default: '' }
+    // Historical display snapshot; identity lives in variantId.
+    variant: {
+      type: String,
+      trim: true,
+      maxlength: PRODUCT_LIMITS.variantLabelMax,
+      default: ''
+    }
   },
   { _id: false }
 );
@@ -213,6 +222,7 @@ orderSchema.methods.toClientJSON = function toClientJSON() {
     },
     items: this.items.map((item) => ({
       productId: item.productId.toString(),
+      variantId: item.variantId ? item.variantId.toString() : null,
       name: item.name,
       imageUrl: item.imageUrl,
       unitPrice: item.unitPrice,
@@ -246,6 +256,7 @@ orderSchema.methods.toMerchantJSON = function toMerchantJSON() {
     customerPhone: this.customerPhone,
     items: this.items.map((item) => ({
       productId: item.productId.toString(),
+      variantId: item.variantId ? item.variantId.toString() : null,
       name: item.name,
       imageUrl: item.imageUrl,
       unitPrice: item.unitPrice,

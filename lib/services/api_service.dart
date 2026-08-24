@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 
-final String ipAddress = "192.168.1.8";
+final String ipAddress = "192.168.1.11";
 
 /// Raised when a 2xx response does not carry the entity its endpoint promises.
 ///
@@ -883,33 +883,116 @@ class ApiService {
   }
 }
 
+/// One PUBLIC sellable variant from `Business.productToJSON`.
+///
+/// The type deliberately has no `costPrice`, `stockQuantity` or
+/// `unlimitedStock`. A customer receives identity, display label, effective
+/// server price and availability only.
+class BusinessProductVariantApiModel {
+  final String id;
+  final String label;
+  final double price;
+  final double finalPrice;
+  final bool inStock;
+
+  const BusinessProductVariantApiModel({
+    required this.id,
+    required this.label,
+    required this.price,
+    required this.finalPrice,
+    required this.inStock,
+  });
+
+  bool get hasDiscount => finalPrice < price;
+
+  factory BusinessProductVariantApiModel.fromJson(Map<String, dynamic> json) {
+    final rawId = json['id'];
+    final rawLabel = json['label'];
+
+    if (rawId is! String || !_objectIdPattern.hasMatch(rawId.trim())) {
+      throw const ApiContractException(
+        'product.variant',
+        'id must be a MongoDB object id',
+      );
+    }
+
+    if (rawLabel is! String || rawLabel.trim().isEmpty) {
+      throw const ApiContractException(
+        'product.variant',
+        'label must be a non-empty string',
+      );
+    }
+
+    return BusinessProductVariantApiModel(
+      id: rawId.trim(),
+      label: rawLabel.trim(),
+      price: _requiredMoney(json, 'price'),
+      finalPrice: _requiredMoney(json, 'finalPrice'),
+      inStock: _requiredFlag(json, 'inStock'),
+    );
+  }
+
+  static final RegExp _objectIdPattern = RegExp(r'^[a-fA-F0-9]{24}$');
+
+  static double _requiredMoney(Map<String, dynamic> json, String field) {
+    final value = json[field];
+
+    if (value is! num || !value.isFinite || value < 0) {
+      throw ApiContractException(
+        'product.variant',
+        '$field must be a non-negative finite number',
+      );
+    }
+
+    return value.toDouble();
+  }
+
+  static bool _requiredFlag(Map<String, dynamic> json, String field) {
+    final value = json[field];
+
+    if (value is! bool) {
+      throw ApiContractException('product.variant', '$field must be a boolean');
+    }
+
+    return value;
+  }
+}
+
 /// The PUBLIC product contract, mirroring `Business.productToJSON` exactly.
 ///
-/// It deliberately models `discountPercent`, `finalPrice` and `inStock`, and
-/// deliberately does NOT model `costPrice`, `stockQuantity`, `unlimitedStock`
-/// or `keywords`. Those are merchant-internal, live only on the owner
-/// serializer, and must never become reachable from a customer widget - which
-/// is why they are absent from the type rather than merely unread.
+/// Merchant-private cost and exact inventory do not exist on this type.
+/// Variant products expose only active variant identities plus server-derived
+/// effective prices, availability and product-level price ranges.
 class BusinessProductApiModel {
   final String id;
   final String name;
   final String description;
 
-  /// The merchant's list price. Presentation only: struck through when a
-  /// discount applies. It is never what the customer pays.
+  /// Parent/list price. For a simple product this is the sole list price.
+  /// For a variant product it remains product metadata; sellable price comes
+  /// from the selected server variant.
   final double price;
 
-  /// Server-derived. The client must not recompute this as authority.
   final double discountPercent;
-
-  /// Server-derived payable price. The single source of truth for what this
-  /// product costs, and the same number the order will be priced at.
   final double finalPrice;
-
-  /// Availability only. The exact remaining quantity is merchant-private, so
-  /// the client genuinely cannot know whether 2 or 200 units remain - which is
-  /// why exact quantity enforcement belongs to the server.
   final bool inStock;
+
+  /// `true` means the server says this product is variant-mode.
+  ///
+  /// A customer must select one of [variants]; the client may not fall back to
+  /// parent inventory when this is true.
+  final bool hasVariants;
+
+  /// Active PUBLIC variants only. Exact stock and merchant cost never appear.
+  final List<BusinessProductVariantApiModel> variants;
+
+  /// Server-derived public ranges.
+  ///
+  /// They are null only for a variant product with no active sellable variant.
+  final double? minPrice;
+  final double? maxPrice;
+  final double? minFinalPrice;
+  final double? maxFinalPrice;
 
   final String imageUrl;
   final List<String> imageUrls;
@@ -933,14 +1016,29 @@ class BusinessProductApiModel {
     this.discountPercent = 0,
     double? finalPrice,
     this.inStock = true,
+    this.hasVariants = false,
+    this.variants = const [],
+    this.minPrice,
+    this.maxPrice,
+    this.minFinalPrice,
+    this.maxFinalPrice,
     this.isService = false,
   }) : finalPrice = finalPrice ?? price;
 
-  /// Presentation helper only - it reports what the server already decided.
   bool get hasDiscount => discountPercent > 0 && finalPrice < price;
 
-  /// What to show as the price, and what a cart snapshot must store.
-  double get displayPrice => finalPrice;
+  /// Existing simple products retain their old display semantics.
+  ///
+  /// A variant product exposes its lowest payable price only as a preview.
+  /// Cart/checkout must use the exact selected variant instead.
+  double get displayPrice =>
+      hasVariants ? (minFinalPrice ?? finalPrice) : finalPrice;
+
+  bool get hasPriceRange =>
+      hasVariants &&
+      minFinalPrice != null &&
+      maxFinalPrice != null &&
+      minFinalPrice != maxFinalPrice;
 
   factory BusinessProductApiModel.fromJson(Map<String, dynamic> json) {
     final rawImageUrls = json['imageUrls'] as List<dynamic>? ?? [];
@@ -949,6 +1047,7 @@ class BusinessProductApiModel {
         .where((url) => url.trim().isNotEmpty)
         .toList();
     final legacyImageUrl = json['imageUrl'] as String? ?? '';
+
     final imageUrls = <String>[
       ...parsedImageUrls,
       if (legacyImageUrl.isNotEmpty &&
@@ -956,17 +1055,65 @@ class BusinessProductApiModel {
         legacyImageUrl,
     ];
 
+    final price = _requiredMoney(json, 'price');
+    final finalPrice = _requiredMoney(json, 'finalPrice');
+    final inStock = _requiredFlag(json, 'inStock');
+    final hasVariants = _requiredFlag(json, 'hasVariants');
+
+    final rawVariants = json['variants'];
+
+    if (rawVariants is! List) {
+      throw const ApiContractException('product', 'variants must be a list');
+    }
+
+    final variants = <BusinessProductVariantApiModel>[];
+
+    for (final rawVariant in rawVariants) {
+      if (rawVariant is! Map) {
+        throw const ApiContractException(
+          'product',
+          'each variant must be an object',
+        );
+      }
+
+      variants.add(
+        BusinessProductVariantApiModel.fromJson(
+          Map<String, dynamic>.from(rawVariant),
+        ),
+      );
+    }
+
+    final minPrice = _requiredNullableMoney(json, 'minPrice');
+    final maxPrice = _requiredNullableMoney(json, 'maxPrice');
+    final minFinalPrice = _requiredNullableMoney(json, 'minFinalPrice');
+    final maxFinalPrice = _requiredNullableMoney(json, 'maxFinalPrice');
+
+    _validateVariantSummary(
+      hasVariants: hasVariants,
+      variants: variants,
+      price: price,
+      finalPrice: finalPrice,
+      inStock: inStock,
+      minPrice: minPrice,
+      maxPrice: maxPrice,
+      minFinalPrice: minFinalPrice,
+      maxFinalPrice: maxFinalPrice,
+    );
+
     return BusinessProductApiModel(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
       description: json['description'] as String? ?? '',
-      // Commerce fields are read strictly. A malformed or missing price, sale
-      // price or availability flag must not quietly produce a believable,
-      // purchasable product - it is a broken contract, and it fails as one.
-      price: _requiredMoney(json, 'price'),
+      price: price,
       discountPercent: _requiredPercent(json, 'discountPercent'),
-      finalPrice: _requiredMoney(json, 'finalPrice'),
-      inStock: _requiredFlag(json, 'inStock'),
+      finalPrice: finalPrice,
+      inStock: inStock,
+      hasVariants: hasVariants,
+      variants: List.unmodifiable(variants),
+      minPrice: minPrice,
+      maxPrice: maxPrice,
+      minFinalPrice: minFinalPrice,
+      maxFinalPrice: maxFinalPrice,
       imageUrl: imageUrls.isEmpty ? '' : imageUrls.first,
       imageUrls: imageUrls,
       classification: json['classification'] as String? ?? '',
@@ -979,29 +1126,145 @@ class BusinessProductApiModel {
 
   static double _requiredMoney(Map<String, dynamic> json, String field) {
     final value = json[field];
+
     if (value is! num || !value.isFinite || value < 0) {
       throw ApiContractException(
         'product',
         '$field must be a non-negative finite number',
       );
     }
+
+    return value.toDouble();
+  }
+
+  static double? _requiredNullableMoney(
+    Map<String, dynamic> json,
+    String field,
+  ) {
+    if (!json.containsKey(field)) {
+      throw ApiContractException('product', '$field must be present');
+    }
+
+    final value = json[field];
+
+    if (value == null) return null;
+
+    if (value is! num || !value.isFinite || value < 0) {
+      throw ApiContractException(
+        'product',
+        '$field must be null or a non-negative finite number',
+      );
+    }
+
     return value.toDouble();
   }
 
   static double _requiredPercent(Map<String, dynamic> json, String field) {
     final value = json[field];
+
     if (value is! num || !value.isFinite || value < 0 || value > 100) {
       throw ApiContractException('product', '$field must be between 0 and 100');
     }
+
     return value.toDouble();
   }
 
   static bool _requiredFlag(Map<String, dynamic> json, String field) {
     final value = json[field];
+
     if (value is! bool) {
       throw ApiContractException('product', '$field must be a boolean');
     }
+
     return value;
+  }
+
+  static void _validateVariantSummary({
+    required bool hasVariants,
+    required List<BusinessProductVariantApiModel> variants,
+    required double price,
+    required double finalPrice,
+    required bool inStock,
+    required double? minPrice,
+    required double? maxPrice,
+    required double? minFinalPrice,
+    required double? maxFinalPrice,
+  }) {
+    Never fail(String detail) {
+      throw ApiContractException('product', detail);
+    }
+
+    if (!hasVariants) {
+      if (variants.isNotEmpty) {
+        fail('a simple product cannot expose variants');
+      }
+
+      if (minPrice == null ||
+          maxPrice == null ||
+          minFinalPrice == null ||
+          maxFinalPrice == null) {
+        fail('a simple product must expose complete price bounds');
+      }
+
+      if (minPrice != price ||
+          maxPrice != price ||
+          minFinalPrice != finalPrice ||
+          maxFinalPrice != finalPrice) {
+        fail('simple-product price bounds must match its prices');
+      }
+
+      return;
+    }
+
+    if (variants.isEmpty) {
+      if (inStock ||
+          minPrice != null ||
+          maxPrice != null ||
+          minFinalPrice != null ||
+          maxFinalPrice != null) {
+        fail('a variant product with no active variants must be unavailable');
+      }
+
+      return;
+    }
+
+    if (minPrice == null ||
+        maxPrice == null ||
+        minFinalPrice == null ||
+        maxFinalPrice == null) {
+      fail('a sellable variant product must expose price bounds');
+    }
+
+    var expectedMinPrice = variants.first.price;
+    var expectedMaxPrice = variants.first.price;
+    var expectedMinFinalPrice = variants.first.finalPrice;
+    var expectedMaxFinalPrice = variants.first.finalPrice;
+
+    for (final variant in variants.skip(1)) {
+      if (variant.price < expectedMinPrice) {
+        expectedMinPrice = variant.price;
+      }
+      if (variant.price > expectedMaxPrice) {
+        expectedMaxPrice = variant.price;
+      }
+      if (variant.finalPrice < expectedMinFinalPrice) {
+        expectedMinFinalPrice = variant.finalPrice;
+      }
+      if (variant.finalPrice > expectedMaxFinalPrice) {
+        expectedMaxFinalPrice = variant.finalPrice;
+      }
+    }
+
+    if (minPrice != expectedMinPrice ||
+        maxPrice != expectedMaxPrice ||
+        minFinalPrice != expectedMinFinalPrice ||
+        maxFinalPrice != expectedMaxFinalPrice) {
+      fail('variant price bounds disagree with server variant facts');
+    }
+
+    if (inStock != variants.any((variant) => variant.inStock)) {
+      fail('variant availability disagrees with server variant facts');
+    }
   }
 }
 
@@ -1350,14 +1613,27 @@ class FavoriteStatusApiResponse {
 
 class OrderItemRequest {
   final String productId;
+  final String? variantId;
   final int quantity;
 
-  const OrderItemRequest({required this.productId, required this.quantity});
+  const OrderItemRequest({
+    required this.productId,
+    required this.quantity,
+    this.variantId,
+  });
 
-  /// No variant is sent: the catalog models none, and the API refuses an order
-  /// item that carries anything beyond a product and a quantity.
+  /// Only sellable identity and quantity leave the client.
+  ///
+  /// Variant label, price and stock are server facts and are never submitted.
   Map<String, dynamic> toJson() {
-    return {'productId': productId, 'quantity': quantity};
+    final normalizedVariantId = variantId?.trim();
+
+    return {
+      'productId': productId,
+      if (normalizedVariantId != null && normalizedVariantId.isNotEmpty)
+        'variantId': normalizedVariantId,
+      'quantity': quantity,
+    };
   }
 }
 
@@ -1626,10 +1902,16 @@ class OrderBusinessApiModel {
 
 class OrderItemApiModel {
   final String productId;
+
+  /// Stable purchased variant identity. Null means a legacy/simple product.
+  final String? variantId;
+
   final String name;
   final String imageUrl;
   final double unitPrice;
   final int quantity;
+
+  /// Historical purchase-time display snapshot.
   final String variant;
 
   const OrderItemApiModel({
@@ -1639,11 +1921,18 @@ class OrderItemApiModel {
     required this.unitPrice,
     required this.quantity,
     required this.variant,
+    this.variantId,
   });
 
   factory OrderItemApiModel.fromJson(Map<String, dynamic> json) {
+    final rawVariantId = json['variantId'];
+    final normalizedVariantId = rawVariantId is String
+        ? rawVariantId.trim()
+        : '';
+
     return OrderItemApiModel(
       productId: json['productId'] as String? ?? '',
+      variantId: normalizedVariantId.isEmpty ? null : normalizedVariantId,
       name: json['name'] as String? ?? '',
       imageUrl: json['imageUrl'] as String? ?? '',
       unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0,

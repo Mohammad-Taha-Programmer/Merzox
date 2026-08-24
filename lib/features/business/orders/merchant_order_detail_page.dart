@@ -593,7 +593,22 @@ class _InvoiceSheet extends StatelessWidget {
                     children: [
                       Expanded(
                         flex: 4,
-                        child: Text(item.name, style: _tableCellStyle),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item.name, style: _tableCellStyle),
+                            if (item.variant.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                item.variant,
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  color: MerzoxColors.kColor8D99AE,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                       Expanded(
                         child: Text(

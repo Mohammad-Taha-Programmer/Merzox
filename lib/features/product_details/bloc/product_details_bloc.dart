@@ -39,6 +39,7 @@ class ProductDetailsBloc
     on<ProductDetailsTabChanged>(_onTabChanged);
     on<ProductDetailsQuantityIncremented>(_onQuantityIncremented);
     on<ProductDetailsQuantityDecremented>(_onQuantityDecremented);
+    on<ProductDetailsVariantSelected>(_onVariantSelected);
     on<ProductDetailsShareRequested>(_onShareRequested);
     on<ProductDetailsReviewSubmitted>(_onReviewSubmitted);
     on<ProductDetailsReviewEligibilityRetryRequested>(
@@ -59,6 +60,7 @@ class ProductDetailsBloc
         status: ProductDetailsStatus.loading,
         businessId: event.businessId,
         product: event.initialProduct,
+        selectedVariantId: null,
         detailsStatus: ProductDetailsSectionStatus.loading,
         reviewsStatus: ProductDetailsSectionStatus.loading,
         detailsError: '',
@@ -106,10 +108,13 @@ class ProductDetailsBloc
     final product = await productFuture;
     final reviews = await reviewsFuture;
 
+    final resolvedProduct = product.value ?? knownProduct;
+
     emit(
       state.copyWith(
         status: ProductDetailsStatus.ready,
-        product: product.value ?? knownProduct,
+        product: resolvedProduct,
+        selectedVariantId: _selectionForProduct(resolvedProduct),
         reviews: reviews.value ?? const [],
         detailsStatus: product.status,
         reviewsStatus: reviews.status,
@@ -152,6 +157,53 @@ class ProductDetailsBloc
   ) {
     emit(
       state.copyWith(quantity: state.quantity <= 1 ? 1 : state.quantity - 1),
+    );
+  }
+
+  void _onVariantSelected(
+    ProductDetailsVariantSelected event,
+    Emitter<ProductDetailsState> emit,
+  ) {
+    final product = state.product;
+
+    if (product == null || !product.hasVariants) return;
+
+    BusinessProductVariantApiModel? selected;
+
+    for (final variant in product.variants) {
+      if (variant.id == event.variantId) {
+        selected = variant;
+        break;
+      }
+    }
+
+    if (selected == null) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.variantUnavailable',
+        ),
+      );
+      return;
+    }
+
+    if (!selected.inStock) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.outOfStock',
+        ),
+      );
+      return;
+    }
+
+    emit(
+      state.copyWith(
+        status: ProductDetailsStatus.ready,
+        selectedVariantId: selected.id,
+        message: null,
+        errorMessage: null,
+      ),
     );
   }
 
@@ -247,6 +299,7 @@ class ProductDetailsBloc
         state.copyWith(
           status: ProductDetailsStatus.ready,
           product: response.product,
+          selectedVariantId: _selectionForProduct(response.product),
           reviews: knownReviews,
           reviewsStatus: reviews.status,
           reviewsError: reviews.errorMessage,
@@ -377,9 +430,39 @@ class ProductDetailsBloc
       return;
     }
 
-    // Refused at the event layer, so hiding the button is defence in depth
-    // rather than the only guard. Nothing is written to the cart.
     if (!product.inStock) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.outOfStock',
+        ),
+      );
+      return;
+    }
+
+    final selectedVariant = state.selectedVariant;
+
+    if (product.hasVariants && selectedVariant == null) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.selectVariant',
+        ),
+      );
+      return;
+    }
+
+    if (selectedVariant != null && !isMongoBackedEntityId(selectedVariant.id)) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.invalidCartItem',
+        ),
+      );
+      return;
+    }
+
+    if (selectedVariant != null && !selectedVariant.inStock) {
       emit(
         state.copyWith(
           status: ProductDetailsStatus.failure,
@@ -391,23 +474,32 @@ class ProductDetailsBloc
 
     try {
       await _token();
+
       final prefs = await SharedPreferences.getInstance();
       final items = prefs.getStringList(cartKey) ?? [];
+
       await prefs.remove(CartStorageKeys.checkoutId);
+
       items.add(
         jsonEncode({
           'businessId': state.businessId,
           'productId': product.id,
+          if (selectedVariant != null) 'variantId': selectedVariant.id,
+          if (selectedVariant != null) 'variantLabel': selectedVariant.label,
           'name': product.name,
-          // The server-derived sale price, never the list price. The backend
-          // reprices at checkout regardless, so this is the display snapshot.
-          'price': product.displayPrice,
+
+          // Display snapshot only. The backend independently resolves this
+          // exact product/variant identity at checkout.
+          'price': selectedVariant?.finalPrice ?? product.displayPrice,
+
           'imageUrl': product.imageUrl,
           'quantity': state.quantity,
           'addedAt': DateTime.now().toIso8601String(),
         }),
       );
+
       await prefs.setStringList(cartKey, items);
+
       emit(
         state.copyWith(
           status: ProductDetailsStatus.action,
@@ -429,6 +521,7 @@ class ProductDetailsBloc
     Emitter<ProductDetailsState> emit,
   ) async {
     final product = state.product;
+
     if (product == null || !_hasRealCommerceIds(product.id)) {
       emit(
         state.copyWith(
@@ -449,10 +542,43 @@ class ProductDetailsBloc
       return;
     }
 
+    final selectedVariant = state.selectedVariant;
+
+    if (product.hasVariants && selectedVariant == null) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.selectVariant',
+        ),
+      );
+      return;
+    }
+
+    if (selectedVariant != null && !isMongoBackedEntityId(selectedVariant.id)) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.invalidCartItem',
+        ),
+      );
+      return;
+    }
+
+    if (selectedVariant != null && !selectedVariant.inStock) {
+      emit(
+        state.copyWith(
+          status: ProductDetailsStatus.failure,
+          errorMessage: 'catalog.outOfStock',
+        ),
+      );
+      return;
+    }
+
     try {
       final token = await _token();
       final prefs = await SharedPreferences.getInstance();
       final address = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
+
       await _apiService.createOrder(
         token: token,
         businessId: state.businessId,
@@ -460,9 +586,14 @@ class ProductDetailsBloc
         clientOrderId:
             'buy-${DateTime.now().microsecondsSinceEpoch}-${product.id}',
         items: [
-          OrderItemRequest(productId: product.id, quantity: state.quantity),
+          OrderItemRequest(
+            productId: product.id,
+            variantId: selectedVariant?.id,
+            quantity: state.quantity,
+          ),
         ],
       );
+
       emit(
         state.copyWith(
           status: ProductDetailsStatus.action,
@@ -470,8 +601,6 @@ class ProductDetailsBloc
         ),
       );
     } catch (error) {
-      // A stock refusal is a different fact from a network failure, and the
-      // customer is told which one happened.
       emit(
         state.copyWith(
           status: ProductDetailsStatus.failure,
@@ -479,6 +608,20 @@ class ProductDetailsBloc
         ),
       );
     }
+  }
+
+  String? _selectionForProduct(BusinessProductApiModel product) {
+    if (!product.hasVariants) return null;
+
+    final currentId = state.selectedVariantId;
+    if (currentId == null) return null;
+
+    for (final variant in product.variants) {
+      if (variant.id == currentId) return currentId;
+    }
+
+    // Never substitute another variant after a reload.
+    return null;
   }
 
   bool _hasRealCommerceIds(String productId) {

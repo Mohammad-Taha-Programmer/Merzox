@@ -358,14 +358,38 @@ export function canonicalCheckoutPayload({
 }) {
   return {
     businessId: String(businessId ?? '').trim(),
-    // Already duplicate-merged by `normalizeRequestedItems`; sorting makes the
-    // fingerprint independent of the order the client happened to send.
+
+    // `normalizeRequestedItems` has already merged identical sellable
+    // identities. A simple-product item deliberately keeps the historical
+    // `{productId, quantity}` shape so fingerprints written before variants
+    // existed remain retry-compatible.
     items: [...(items ?? [])]
-      .map((item) => ({
-        productId: String(item.productId ?? '').trim(),
-        quantity: Number(item.quantity)
-      }))
-      .sort((left, right) => left.productId.localeCompare(right.productId)),
+      .map((item) => {
+        const productId = String(item.productId ?? '').trim();
+        const rawVariantId = item.variantId;
+        const variantId =
+          rawVariantId === undefined ||
+          rawVariantId === null ||
+          String(rawVariantId).trim().length === 0
+            ? null
+            : String(rawVariantId).trim();
+
+        return {
+          productId,
+          ...(variantId ? { variantId } : {}),
+          quantity: Number(item.quantity)
+        };
+      })
+      .sort((left, right) => {
+        const productOrder =
+          left.productId.localeCompare(right.productId);
+
+        if (productOrder !== 0) return productOrder;
+
+        return String(left.variantId ?? '').localeCompare(
+          String(right.variantId ?? '')
+        );
+      }),
     deliveryAddress: String(deliveryAddress ?? '').trim(),
     paymentMethod: String(paymentMethod ?? 'cash').trim()
   };
@@ -385,6 +409,57 @@ export function isResumable(phase) {
 
 export function isTerminal(phase) {
   return phase === 'finalized' || phase === 'released';
+}
+
+/**
+ * Converts one already-observed variant into the exact state that matters to
+ * a merchant replacement write.
+ *
+ * This is deliberately not a public serializer. It exists only so MongoDB can
+ * reject a stale full-array variant replacement instead of allowing the last
+ * merchant write to erase a concurrent one.
+ */
+function variantCasSnapshot(variant) {
+  const identity = variant?._id ?? variant?.id;
+
+  return {
+    ...(identity ? { _id: identity } : {}),
+    label: String(variant?.label ?? '').trim(),
+    priceOverride: variant?.priceOverride ?? null,
+    costPrice: variant?.costPrice ?? null,
+    stockQuantity: variant?.stockQuantity ?? 0,
+    unlimitedStock: variant?.unlimitedStock ?? true,
+    isActive: variant?.isActive ?? true
+  };
+}
+
+/**
+ * Adds a compare-and-set assertion for the complete observed variant set.
+ *
+ * Empty is special: legacy/simple products may physically omit `variants`, so
+ * `variants.0 does not exist` accepts both missing and empty arrays.
+ *
+ * Non-empty arrays are matched by size plus one identity/state elemMatch for
+ * every observed variant. Variant ids are unique, so this proves the exact
+ * observed set still exists without relying on BSON embedded-document field
+ * order.
+ */
+function guardObservedVariants(productMatch, observedVariants) {
+  if (observedVariants === undefined) return;
+
+  const observed = [...(observedVariants ?? [])];
+
+  if (observed.length === 0) {
+    productMatch['variants.0'] = { $exists: false };
+    return;
+  }
+
+  productMatch.variants = {
+    $size: observed.length,
+    $all: observed.map((variant) => ({
+      $elemMatch: variantCasSnapshot(variant)
+    }))
+  };
 }
 
 /**
@@ -418,7 +493,8 @@ export function buildAtomicInventoryUpdate({
   ownerId,
   productId,
   write,
-  observedStock
+  observedStock,
+  observedVariants
 }) {
   const productMatch = { _id: productId };
 
@@ -448,6 +524,10 @@ export function buildAtomicInventoryUpdate({
   } else if (observedStock?.unlimitedStock !== undefined) {
     productMatch.unlimitedStock = { $ne: false };
   }
+
+  // A variant PATCH replaces the array. Assert the exact array the merchant
+  // write was derived from so two stale variant edits can never both apply.
+  guardObservedVariants(productMatch, observedVariants);
 
   const filter = {
     _id: businessId,
@@ -490,22 +570,134 @@ export function buildAtomicInventoryUpdate({
 /**
  * The consumption an outstanding reservation is holding.
  *
- * Only finite lines ever take stock, so only they are recorded. This travels
- * INSIDE the reservation marker, in the same atomic Business update as the
- * decrement, which is what makes it recoverable: there is no window in which
- * inventory is consumed but the record of what it consumed lives in another
- * document that may never have been written.
+ * Only finite lines ever take stock, so only they are recorded. Variant
+ * identity travels inside the marker in the same Business-document atomic
+ * update as its decrement.
  */
+function reservationProductId(line) {
+  return line.product?._id ?? line.productId;
+}
+
+function reservationVariantId(line) {
+  return line.variant?._id ?? line.variantId ?? null;
+}
+
+function reservationStockCriteria(line) {
+  return line.finite
+    ? {
+        unlimitedStock: false,
+        stockQuantity: { $gte: line.quantity }
+      }
+    : {
+        unlimitedStock: { $ne: false }
+      };
+}
+
+/**
+ * The exact catalog identity that must still exist at reservation time.
+ *
+ * Simple products assert that they are STILL simple. This closes the race where
+ * a merchant could add variants after checkout resolution but before the
+ * reservation write, which would otherwise let the stale checkout consume the
+ * now-irrelevant parent stock.
+ */
+function reservationProductCriteria(line) {
+  const productId = reservationProductId(line);
+  const variantId = reservationVariantId(line);
+
+  if (variantId) {
+    return {
+      _id: productId,
+      isActive: true,
+      variants: {
+        $elemMatch: {
+          _id: variantId,
+          isActive: true,
+          ...reservationStockCriteria(line)
+        }
+      }
+    };
+  }
+
+  return {
+    _id: productId,
+    isActive: true,
+    // Missing and empty variant arrays both satisfy this.
+    'variants.0': { $exists: false },
+    ...reservationStockCriteria(line)
+  };
+}
+
+/**
+ * Builds the exact finite inventory path and its array filters.
+ *
+ * Existing simple-product aliases stay `lineN`, preserving the historical
+ * builder shape. Variant lines add one nested `variantN` identity.
+ */
+function finiteStockTarget(line, index, { reserve }) {
+  const productId = reservationProductId(line);
+  const variantId = reservationVariantId(line);
+  const productAlias = `line${index}`;
+
+  if (variantId) {
+    const variantAlias = `variant${index}`;
+
+    return {
+      path:
+        `products.$[${productAlias}].variants.$[${variantAlias}].stockQuantity`,
+      arrayFilters: [
+        {
+          [`${productAlias}._id`]: productId
+        },
+        {
+          [`${variantAlias}._id`]: variantId,
+          [`${variantAlias}.unlimitedStock`]: false,
+          ...(reserve
+            ? {
+                [`${variantAlias}.isActive`]: true,
+                [`${variantAlias}.stockQuantity`]: {
+                  $gte: line.quantity
+                }
+              }
+            : {})
+        }
+      ]
+    };
+  }
+
+  return {
+    path: `products.$[${productAlias}].stockQuantity`,
+    arrayFilters: [
+      {
+        [`${productAlias}._id`]: productId,
+        [`${productAlias}.unlimitedStock`]: false,
+        ...(reserve
+          ? {
+              [`${productAlias}.stockQuantity`]: {
+                $gte: line.quantity
+              }
+            }
+          : {})
+      }
+    ]
+  };
+}
+
 export function reservationEntryFor({ intentId, lines }) {
   return {
     intent: intentId,
     state: RESERVATION_STATES.reserved,
     lines: lines
       .filter((line) => line.finite)
-      .map((line) => ({
-        productId: line.product?._id ?? line.productId,
-        quantity: line.quantity
-      }))
+      .map((line) => {
+        const variantId = reservationVariantId(line);
+
+        return {
+          productId: reservationProductId(line),
+          ...(variantId ? { variantId } : {}),
+          quantity: line.quantity
+        };
+      })
   };
 }
 
@@ -524,47 +716,31 @@ export function buildIdentifiedReservation({
     // Never twice for the same checkout intent.
     'stockReservations.intent': { $ne: intentId },
 
-    // Permanent fencing:
-    // terminal failure rotates this generation. An old reservation operation
-    // therefore stays invalid even after its temporary failed marker is gone.
+    // Permanent fencing.
     ...reservationFenceClause(reservationFence),
 
+    // Every requested sellable identity must still have the same stock mode
+    // and enough quantity when MongoDB evaluates this write.
     $and: lines.map((line) => ({
       products: {
-        $elemMatch: {
-          _id: line.product?._id ?? line.productId,
-          isActive: true,
-
-          // Symmetric stock-mode proof.
-          ...(line.finite
-            ? {
-                unlimitedStock: false,
-                stockQuantity: { $gte: line.quantity }
-              }
-            : {
-                unlimitedStock: { $ne: false }
-              })
-        }
+        $elemMatch: reservationProductCriteria(line)
       }
     }))
   };
 
   const increments = {};
+  const arrayFilters = [];
 
-  const arrayFilters = finiteLines.map((line, index) => {
-    const alias = `line${index}`;
+  finiteLines.forEach((line, index) => {
+    const target = finiteStockTarget(line, index, {
+      reserve: true
+    });
 
-    increments[`products.$[${alias}].stockQuantity`] = -line.quantity;
-
-    return {
-      [`${alias}._id`]: line.product?._id ?? line.productId,
-      [`${alias}.unlimitedStock`]: false,
-      [`${alias}.stockQuantity`]: { $gte: line.quantity }
-    };
+    increments[target.path] = -line.quantity;
+    arrayFilters.push(...target.arrayFilters);
   });
 
-  // The marker and the finite-stock decrement remain one Business-document
-  // atomic fact.
+  // Marker + every finite decrement are one Business-document atomic fact.
   const update = {
     $push: {
       stockReservations: reservationEntryFor({
@@ -588,15 +764,10 @@ export function buildIdentifiedReservation({
 /**
  * The compensating release, guarded by the same identity.
  *
- * `$pull` and `$inc` are one update, and the filter requires the marker to
- * still be present, so a second release matches nothing and changes nothing.
- * That is the whole double-release guarantee - there is no unconditional
- * `$inc stockQuantity + quantity` anywhere.
- *
- * The array filters keep `unlimitedStock: false`. If a merchant switched the
- * product to unlimited while the checkout was in flight, the marker is still
- * cleared but no quantity is added back: giving stock to a product that no
- * longer counts stock would invent inventory the merchant never had.
+ * A variant reservation is returned only to that exact variant. If the
+ * inventory target was removed or changed to unlimited outside the supported
+ * merchant path, its quantity is not invented somewhere else: the marker is
+ * still retired, matching the existing simple-product safety rule.
  */
 export function buildIdentifiedRelease({ businessId, intentId, lines }) {
   const finiteLines = lines.filter((line) => line.finite);
@@ -608,20 +779,34 @@ export function buildIdentifiedRelease({ businessId, intentId, lines }) {
   };
 
   const increments = {};
-  const arrayFilters = finiteLines.map((line, index) => {
-    const alias = `line${index}`;
-    increments[`products.$[${alias}].stockQuantity`] = line.quantity;
+  const arrayFilters = [];
 
-    return {
-      [`${alias}._id`]: line.product?._id ?? line.productId,
-      [`${alias}.unlimitedStock`]: false
-    };
+  finiteLines.forEach((line, index) => {
+    const target = finiteStockTarget(line, index, {
+      reserve: false
+    });
+
+    increments[target.path] = line.quantity;
+    arrayFilters.push(...target.arrayFilters);
   });
 
-  const update = { $pull: { stockReservations: { intent: intentId } } };
-  if (finiteLines.length > 0) update.$inc = increments;
+  const update = {
+    $pull: {
+      stockReservations: {
+        intent: intentId
+      }
+    }
+  };
 
-  return { filter, update, arrayFilters };
+  if (finiteLines.length > 0) {
+    update.$inc = increments;
+  }
+
+  return {
+    filter,
+    update,
+    arrayFilters
+  };
 }
 
 /**
@@ -640,6 +825,9 @@ export function reservedLinesFromMarker(business, intentId) {
 
   return (entry.lines ?? []).map((line) => ({
     productId: line.productId,
+    ...(line.variantId
+      ? { variantId: line.variantId }
+      : {}),
     quantity: line.quantity,
     finite: true
   }));
