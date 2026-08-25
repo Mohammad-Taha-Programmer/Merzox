@@ -296,7 +296,7 @@ class _TopBar extends StatelessWidget {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: IconButton(
-              tooltip: 'رجوع',
+              tooltip: 'common.back'.tr(),
               onPressed: onBack,
               icon: Icon(
                 isRtl
@@ -444,13 +444,13 @@ class _Stats extends StatelessWidget {
       children: [
         _Stat(
           value: '$followerCount',
-          label: 'متابع',
+          label: 'businessProfile.followers'.tr(),
           icon: Icons.person_add_alt_1_outlined,
         ),
         const SizedBox(width: 28),
         _Stat(
           value: '$productCount',
-          label: 'منتج',
+          label: 'businessProfile.products'.tr(),
           icon: Icons.inventory_2_outlined,
         ),
       ],
@@ -484,7 +484,11 @@ class _MainTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labels = ['عن المتجر', 'المنتجات', 'التقييمات'];
+    final labels = [
+      'businessProfile.tabs.about'.tr(),
+      'favorites.products'.tr(),
+      'reviews.title'.tr(),
+    ];
 
     return Container(
       height: 46,
@@ -729,9 +733,9 @@ class _ProductFilters extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const filters = {
-      'new': 'الجديدة',
-      'bestSelling': 'الأكثر مبيعاً',
-      'offers': 'عروض',
+      'new': 'businessProfile.filters.new',
+      'bestSelling': 'merchantProduct.classifications.bestSelling',
+      'offers': 'merchantProduct.classifications.offers',
     };
 
     return Row(
@@ -745,7 +749,7 @@ class _ProductFilters extends StatelessWidget {
             );
           },
           child: Text(
-            entry.value,
+            entry.value.tr(),
             style: TextStyle(
               color: active
                   ? MerzoxColors.kColor2B2B2B
@@ -901,9 +905,9 @@ class _ProductCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                child: const Text(
-                  'أضف إلى السلة',
-                  style: TextStyle(fontSize: 12),
+                child: Text(
+                  'favorites.addToCart'.tr(),
+                  style: const TextStyle(fontSize: 12),
                 ),
               ),
             ),
@@ -984,7 +988,7 @@ class _ReviewsTabState extends State<_ReviewsTab> {
             minLines: 1,
             maxLines: 3,
             decoration: InputDecoration(
-              hintText: 'اكتب تقييمك هنا',
+              hintText: 'tracking.reviewHint'.tr(),
               hintStyle: TextStyle(
                 fontSize: 12,
                 color: MerzoxColors.kColorC7C7C7,
@@ -1027,7 +1031,10 @@ class _ReviewsTabState extends State<_ReviewsTab> {
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
-              child: const Text('نشر', style: TextStyle(fontSize: 12)),
+              child: Text(
+                'reviews.publish'.tr(),
+                style: const TextStyle(fontSize: 12),
+              ),
             ),
           ),
         ],
@@ -1050,9 +1057,9 @@ class _ReviewsTabState extends State<_ReviewsTab> {
             ),
           ),
         const SizedBox(height: 18),
-        const Text(
-          'كل التقييمات',
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+        Text(
+          'reviews.allReviews'.tr(),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
         if (widget.state.reviewsStatus == BusinessProfileSectionStatus.loading)

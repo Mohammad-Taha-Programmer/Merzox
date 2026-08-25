@@ -292,8 +292,18 @@ class _ProductHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
       child: Row(
-        textDirection: TextDirection.ltr,
         children: [
+          Flexible(
+            flex: 2,
+            child: Text(
+              product.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.start,
+              style: const TextStyle(fontSize: 20, color: Color(0xFF2B2B2B)),
+            ),
+          ),
+          const Spacer(),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -318,17 +328,6 @@ class _ProductHeader extends StatelessWidget {
                 ),
             ],
           ),
-          const Spacer(),
-          Flexible(
-            flex: 2,
-            child: Text(
-              product.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.end,
-              style: const TextStyle(fontSize: 20, color: Color(0xFF2B2B2B)),
-            ),
-          ),
         ],
       ),
     );
@@ -342,7 +341,10 @@ class _Tabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['الوصف', 'التقييمات'];
+    final labels = [
+      'productDetails.tabs.description'.tr(),
+      'reviews.title'.tr(),
+    ];
 
     return Container(
       height: 50,
@@ -428,7 +430,7 @@ class _DescriptionTab extends StatelessWidget {
             product.description.isEmpty
                 ? 'catalog.noProductDescription'.tr()
                 : product.description,
-            textAlign: TextAlign.end,
+            textAlign: TextAlign.start,
             style: TextStyle(
               color: MerzoxColors.kColor666666,
               fontSize: 15,
@@ -468,19 +470,19 @@ class _VariantSelector extends StatelessWidget {
       children: [
         Text(
           'catalog.selectVariantPrompt'.tr(),
-          textAlign: TextAlign.end,
+          textAlign: TextAlign.start,
           style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 12),
         if (product.variants.isEmpty)
           Text(
             'catalog.noVariantsAvailable'.tr(),
-            textAlign: TextAlign.end,
+            textAlign: TextAlign.start,
             style: TextStyle(color: MerzoxColors.kColor767676, fontSize: 13),
           )
         else
           Wrap(
-            alignment: WrapAlignment.end,
+            alignment: WrapAlignment.start,
             spacing: 8,
             runSpacing: 8,
             children: product.variants.map((variant) {
@@ -524,36 +526,47 @@ class _QuantityRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      textDirection: TextDirection.ltr,
       children: [
-        _StepperButton(
-          icon: Icons.remove_rounded,
-          onPressed: () => context.read<ProductDetailsBloc>().add(
-            const ProductDetailsQuantityDecremented(),
-          ),
-        ),
-        Container(
-          width: 58,
-          height: 32,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            border: Border.symmetric(
-              horizontal: BorderSide(color: MerzoxColors.kColor3D5A80),
-            ),
-          ),
-          child: Text(
-            '$quantity',
-            style: TextStyle(color: MerzoxColors.kColor666666, fontSize: 15),
-          ),
-        ),
-        _StepperButton(
-          icon: Icons.add_rounded,
-          onPressed: () => context.read<ProductDetailsBloc>().add(
-            const ProductDetailsQuantityIncremented(),
-          ),
+        Text(
+          'merchantProduct.quantity'.tr(),
+          style: const TextStyle(fontSize: 15),
         ),
         const Spacer(),
-        const Text('الكمية', style: TextStyle(fontSize: 15)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          textDirection: TextDirection.ltr,
+          children: [
+            _StepperButton(
+              icon: Icons.remove_rounded,
+              onPressed: () => context.read<ProductDetailsBloc>().add(
+                const ProductDetailsQuantityDecremented(),
+              ),
+            ),
+            Container(
+              width: 58,
+              height: 32,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                border: Border.symmetric(
+                  horizontal: BorderSide(color: MerzoxColors.kColor3D5A80),
+                ),
+              ),
+              child: Text(
+                '$quantity',
+                style: TextStyle(
+                  color: MerzoxColors.kColor666666,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            _StepperButton(
+              icon: Icons.add_rounded,
+              onPressed: () => context.read<ProductDetailsBloc>().add(
+                const ProductDetailsQuantityIncremented(),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
@@ -591,33 +604,29 @@ class _SellerDetails extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('تفاصيل البائع', style: TextStyle(fontSize: 16)),
+        Text(
+          'productDetails.sellerDetails'.tr(),
+          style: const TextStyle(fontSize: 16),
+        ),
         const SizedBox(height: 13),
         Row(
-          textDirection: TextDirection.ltr,
           children: [
-            _IconSquare(
-              icon: Icons.chat_bubble_outline_rounded,
-              onPressed: () => AuthGate.run(
-                context,
-                // The chat route opens an existing thread with this store or
-                // creates one, so only the store identity travels with the tap.
-                onAuthenticated: () => context.push(
-                  Uri(
-                    path: '/chat',
-                    queryParameters: {
-                      'businessId': business.id,
-                      'title': business.name,
-                    },
-                  ).toString(),
+            CircleAvatar(
+              radius: 28,
+              backgroundColor: MerzoxColors.kColorEEF6FB,
+              child: Text(
+                business.name.isEmpty ? 'M' : business.name.characters.first,
+                style: TextStyle(
+                  color: MerzoxColors.kColor3D5A80,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 12),
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(business.name, style: const TextStyle(fontSize: 13)),
                 const SizedBox(height: 4),
@@ -632,15 +641,21 @@ class _SellerDetails extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(width: 12),
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: MerzoxColors.kColorEEF6FB,
-              child: Text(
-                business.name.isEmpty ? 'M' : business.name.characters.first,
-                style: TextStyle(
-                  color: MerzoxColors.kColor3D5A80,
-                  fontWeight: FontWeight.w800,
+            const Spacer(),
+            _IconSquare(
+              icon: Icons.chat_bubble_outline_rounded,
+              onPressed: () => AuthGate.run(
+                context,
+                // The chat route opens an existing thread with this store or
+                // creates one, so only the store identity travels with the tap.
+                onAuthenticated: () => context.push(
+                  Uri(
+                    path: '/chat',
+                    queryParameters: {
+                      'businessId': business.id,
+                      'title': business.name,
+                    },
+                  ).toString(),
                 ),
               ),
             ),
@@ -692,9 +707,9 @@ class _ReviewsTabState extends State<_ReviewsTab> {
               controller: _commentController,
               minLines: 4,
               maxLines: 4,
-              textAlign: TextAlign.end,
+              textAlign: TextAlign.start,
               decoration: InputDecoration(
-                hintText: 'قم بكتابة تقييمك للمنتج الذي قمت بشرائه هنا',
+                hintText: 'productDetails.reviewHint'.tr(),
                 hintStyle: TextStyle(
                   color: MerzoxColors.kColorC7C7C7,
                   fontSize: 12,
@@ -737,7 +752,10 @@ class _ReviewsTabState extends State<_ReviewsTab> {
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
-                child: const Text('نشر', style: TextStyle(fontSize: 12)),
+                child: Text(
+                  'reviews.publish'.tr(),
+                  style: const TextStyle(fontSize: 12),
+                ),
               ),
             ),
           ],
@@ -762,16 +780,21 @@ class _ReviewsTabState extends State<_ReviewsTab> {
           Row(
             children: [
               Text(
-                '(${widget.state.reviews.length} تقييم)',
+                'reviews.count'.tr(
+                  args: [widget.state.reviews.length.toString()],
+                ),
                 style: TextStyle(
                   color: MerzoxColors.kColor9F9F9F,
                   fontSize: 12,
                 ),
               ),
               const Spacer(),
-              const Text(
-                'كل التقييمات',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+              Text(
+                'reviews.allReviews'.tr(),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
           ),
@@ -827,42 +850,8 @@ class _ReviewTile extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
       child: Row(
-        textDirection: TextDirection.ltr,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Text(
-                      '(${review.rating.toStringAsFixed(1)})',
-                      textDirection: TextDirection.ltr,
-                      style: TextStyle(
-                        color: MerzoxColors.kColor9F9F9F,
-                        fontSize: 11,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _StarRating(value: review.rating, size: 16),
-                  ],
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  review.comment,
-                  textAlign: TextAlign.end,
-                  style: TextStyle(
-                    color: MerzoxColors.kColor5E5E5E,
-                    fontSize: 12,
-                    height: 1.55,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
           Column(
             children: [
               CircleAvatar(
@@ -873,6 +862,39 @@ class _ReviewTile extends StatelessWidget {
               if (review.userName.trim().isNotEmpty)
                 Text(review.userName, style: const TextStyle(fontSize: 12)),
             ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    _StarRating(value: review.rating, size: 16),
+                    const SizedBox(width: 8),
+                    Text(
+                      '(${review.rating.toStringAsFixed(1)})',
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(
+                        color: MerzoxColors.kColor9F9F9F,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  review.comment,
+                  textAlign: TextAlign.start,
+                  style: TextStyle(
+                    color: MerzoxColors.kColor5E5E5E,
+                    fontSize: 12,
+                    height: 1.55,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -942,8 +964,24 @@ class _BottomActions extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(22, 8, 22, 14),
       decoration: _bottomActionDecoration(),
       child: Row(
-        textDirection: TextDirection.ltr,
         children: [
+          Expanded(
+            child: FilledButton(
+              onPressed: onAdd,
+              style: FilledButton.styleFrom(
+                backgroundColor: MerzoxColors.kColorEE6C4D,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadiusDirectional.horizontal(
+                    start: Radius.circular(4),
+                  ),
+                ),
+              ),
+              child: Text(
+                'favorites.addToCart'.tr(),
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
           Expanded(
             child: OutlinedButton(
               onPressed: onBuy,
@@ -952,30 +990,13 @@ class _BottomActions extends StatelessWidget {
                 side: BorderSide(color: MerzoxColors.kColorEE6C4D),
                 shape: const RoundedRectangleBorder(
                   borderRadius: BorderRadiusDirectional.horizontal(
-                    start: Radius.circular(4),
-                  ),
-                ),
-              ),
-              child: const Text(
-                'شراء الآن',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-          ),
-          Expanded(
-            child: FilledButton(
-              onPressed: onAdd,
-              style: FilledButton.styleFrom(
-                backgroundColor: MerzoxColors.kColorEE6C4D,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadiusDirectional.horizontal(
                     end: Radius.circular(4),
                   ),
                 ),
               ),
-              child: const Text(
-                'أضف إلى السلة',
-                style: TextStyle(fontWeight: FontWeight.w800),
+              child: Text(
+                'productDetails.buyNow'.tr(),
+                style: const TextStyle(fontWeight: FontWeight.w800),
               ),
             ),
           ),
