@@ -24,7 +24,7 @@ class BusinessShellPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: BlocConsumer<BusinessBloc, BusinessState>(
         listener: (context, state) {
           if (state.status == BusinessStatus.failure &&
@@ -148,15 +148,15 @@ class _Dashboard extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           _PageHeader(
-            title: 'مرحباً، ${state.business!.name}',
-            subtitle: 'ملخص نشاط متجرك',
+            title: 'businessShell.welcome'.tr(args: [state.business!.name]),
+            subtitle: 'businessShell.dashboardSummary'.tr(),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: TextField(
               readOnly: true,
               decoration: InputDecoration(
-                hintText: 'رقم الطلب، اسم المستخدم...',
+                hintText: 'businessShell.orderSearchHint'.tr(),
                 prefixIcon: const Icon(Icons.search_rounded),
                 filled: true,
                 fillColor: Colors.white,
@@ -174,14 +174,24 @@ class _Dashboard extends StatelessWidget {
               children: [
                 Expanded(
                   child: _Metric(
-                    'المبيعات',
+                    'businessShell.sales'.tr(),
                     '${data?.sales.toStringAsFixed(0) ?? '0'} ₪',
                   ),
                 ),
                 const SizedBox(width: 10),
-                Expanded(child: _Metric('الطلبات', '${data?.orderCount ?? 0}')),
+                Expanded(
+                  child: _Metric(
+                    'businessShell.orders'.tr(),
+                    '${data?.orderCount ?? 0}',
+                  ),
+                ),
                 const SizedBox(width: 10),
-                Expanded(child: _Metric('الزيارات', '${data?.viewCount ?? 0}')),
+                Expanded(
+                  child: _Metric(
+                    'businessShell.visits'.tr(),
+                    '${data?.viewCount ?? 0}',
+                  ),
+                ),
               ],
             ),
           ),
@@ -190,8 +200,8 @@ class _Dashboard extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                const Text(
-                  'أحدث الطلبات',
+                Text(
+                  'businessShell.latestOrders'.tr(),
                   style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
                 ),
                 const Spacer(),
@@ -199,13 +209,13 @@ class _Dashboard extends StatelessWidget {
                   onPressed: () => context.read<BusinessBloc>().add(
                     const BusinessTabChanged(1),
                   ),
-                  child: const Text('المزيد'),
+                  child: Text('businessShell.more'.tr()),
                 ),
               ],
             ),
           ),
           if (data == null || data.recentOrders.isEmpty)
-            const _Empty(message: 'لا توجد طلبات حديثة')
+            _Empty(message: 'businessShell.noRecentOrders'.tr())
           else
             ...data.recentOrders.map(
               (order) => _OrderTile(order: order, compact: true),
@@ -252,9 +262,9 @@ class _Orders extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Column(
     children: [
-      const _PageHeader(
-        title: 'الطلبات الواردة',
-        subtitle: 'تابع حالة طلبات عملائك',
+      _PageHeader(
+        title: 'businessShell.incomingOrders'.tr(),
+        subtitle: 'businessShell.ordersSubtitle'.tr(),
       ),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -262,15 +272,27 @@ class _Orders extends StatelessWidget {
           segments: [
             ButtonSegment(
               value: 'current',
-              label: Text('الحالية ${state.orderCounts['current'] ?? ''}'),
+              label: Text(
+                'businessShell.orderGroups.current'.tr(
+                  args: [state.orderCounts['current']?.toString() ?? ''],
+                ),
+              ),
             ),
             ButtonSegment(
               value: 'completed',
-              label: Text('المكتملة ${state.orderCounts['completed'] ?? ''}'),
+              label: Text(
+                'businessShell.orderGroups.completed'.tr(
+                  args: [state.orderCounts['completed']?.toString() ?? ''],
+                ),
+              ),
             ),
             ButtonSegment(
               value: 'cancelled',
-              label: Text('الملغاة ${state.orderCounts['cancelled'] ?? ''}'),
+              label: Text(
+                'businessShell.orderGroups.cancelled'.tr(
+                  args: [state.orderCounts['cancelled']?.toString() ?? ''],
+                ),
+              ),
             ),
           ],
           selected: {state.orderGroup},
@@ -286,9 +308,7 @@ class _Orders extends StatelessWidget {
               context.read<BusinessBloc>().add(const BusinessRefreshed()),
           child: state.orders.isEmpty
               ? ListView(
-                  children: const [
-                    _Empty(message: 'لا توجد طلبات في هذه القائمة'),
-                  ],
+                  children: [_Empty(message: 'businessShell.noOrders'.tr())],
                 )
               : ListView.builder(
                   padding: const EdgeInsets.only(bottom: 20),
@@ -408,7 +428,12 @@ class _OrderTile extends StatelessWidget {
                       style: const TextStyle(fontSize: 12),
                     ),
                     Text(
-                      '${order.items.length} منتجات • ${order.total.toStringAsFixed(0)} ₪',
+                      'businessShell.orderSummary'.tr(
+                        args: [
+                          order.items.length.toString(),
+                          order.total.toStringAsFixed(0),
+                        ],
+                      ),
                       style: TextStyle(
                         fontSize: 12,
                         color: MerzoxColors.kColor767676,
@@ -450,12 +475,12 @@ class _OrderTile extends StatelessWidget {
 }
 
 String _statusLabel(String status) => switch (status) {
-  'pending' => 'جديد',
-  'confirmed' => 'تم التأكيد',
-  'preparing' => 'قيد التجهيز',
-  'outForDelivery' => 'في الطريق',
-  'delivered' => 'تم التسليم',
-  'cancelled' => 'ملغي',
+  'pending' => 'merchantOrder.statuses.pending'.tr(),
+  'confirmed' => 'businessShell.statuses.confirmed'.tr(),
+  'preparing' => 'merchantOrder.statuses.preparing'.tr(),
+  'outForDelivery' => 'merchantOrder.statuses.outForDelivery'.tr(),
+  'delivered' => 'merchantOrder.statuses.delivered'.tr(),
+  'cancelled' => 'merchantOrder.statuses.cancelled'.tr(),
   _ => status,
 };
 
@@ -481,17 +506,19 @@ class _Products extends StatelessWidget {
   Widget build(BuildContext context) => Column(
     children: [
       _PageHeader(
-        title: 'منتجاتي',
-        subtitle: '${state.products.length} منتجاً وخدمة',
+        title: 'businessShell.productsTitle'.tr(),
+        subtitle: 'businessShell.productsSummary'.tr(
+          args: [state.products.length.toString()],
+        ),
       ),
       Expanded(
         child: state.products.isEmpty
             ? _Empty(
-                message: 'لم تضف منتجات بعد',
+                message: 'businessShell.noProducts'.tr(),
                 action: FilledButton.icon(
                   onPressed: () => _showProductEditor(context),
                   icon: const Icon(Icons.add),
-                  label: const Text('إضافة منتج'),
+                  label: Text('businessShell.addProduct'.tr()),
                 ),
               )
             : ListView.builder(
@@ -509,7 +536,8 @@ class _Products extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       subtitle: Text(
-                        '${product.price.toStringAsFixed(0)} ₪ • ${product.isService ? 'خدمة' : 'منتج'}',
+                        '${product.price.toStringAsFixed(0)} ₪ • '
+                        '${product.isService ? 'businessShell.service'.tr() : 'businessShell.product'.tr()}',
                       ),
                       trailing: PopupMenuButton<String>(
                         onSelected: (action) {
@@ -521,9 +549,15 @@ class _Products extends StatelessWidget {
                             );
                           }
                         },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(value: 'edit', child: Text('تعديل')),
-                          PopupMenuItem(value: 'delete', child: Text('حذف')),
+                        itemBuilder: (_) => [
+                          PopupMenuItem(
+                            value: 'edit',
+                            child: Text('common.edit'.tr()),
+                          ),
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Text('common.delete'.tr()),
+                          ),
                         ],
                       ),
                       onTap: () =>
@@ -622,7 +656,7 @@ class _Profile extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: () => _showProfileEditor(context, business),
                   icon: const Icon(Icons.edit_outlined),
-                  label: const Text('تعديل ملف الأعمال'),
+                  label: Text('businessShell.editProfile'.tr()),
                   style: FilledButton.styleFrom(
                     backgroundColor: MerzoxColors.kColor3D5A80,
                   ),
@@ -661,7 +695,7 @@ class _Profile extends StatelessWidget {
               TextButton.icon(
                 onPressed: onLogout,
                 icon: const Icon(Icons.logout_rounded),
-                label: const Text('تسجيل الخروج'),
+                label: Text('businessShell.logout'.tr()),
               ),
             ],
           ),
@@ -691,7 +725,7 @@ class _ProfileLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
     leading: Icon(icon, color: MerzoxColors.kColor3D5A80),
-    title: Text(text.isEmpty ? 'غير محدد' : text),
+    title: Text(text.isEmpty ? 'businessShell.unspecified'.tr() : text),
   );
 }
 
@@ -812,9 +846,9 @@ class _Failure extends StatelessWidget {
     child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('تعذر تحميل حساب الأعمال'),
+        Text('businessShell.loadFailed'.tr()),
         const SizedBox(height: 10),
-        FilledButton(onPressed: onRetry, child: const Text('إعادة المحاولة')),
+        FilledButton(onPressed: onRetry, child: Text('common.retry'.tr())),
       ],
     ),
   );
@@ -1115,7 +1149,7 @@ class _ProductEditorState extends State<_ProductEditor> {
         final saving = _submitted && state.status == BusinessStatus.saving;
 
         return Directionality(
-          textDirection: TextDirection.rtl,
+          textDirection: Directionality.of(context),
           child: Padding(
             padding: EdgeInsets.fromLTRB(
               20,
@@ -1254,13 +1288,25 @@ class _ProductEditorState extends State<_ProductEditor> {
                         labelText: 'merchantProduct.classification'.tr(),
                         border: const OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'new', child: Text('جديد')),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'new',
+                          child: Text(
+                            'merchantProduct.classifications.new'.tr(),
+                          ),
+                        ),
                         DropdownMenuItem(
                           value: 'bestSelling',
-                          child: Text('الأكثر مبيعاً'),
+                          child: Text(
+                            'merchantProduct.classifications.bestSelling'.tr(),
+                          ),
                         ),
-                        DropdownMenuItem(value: 'offers', child: Text('عروض')),
+                        DropdownMenuItem(
+                          value: 'offers',
+                          child: Text(
+                            'merchantProduct.classifications.offers'.tr(),
+                          ),
+                        ),
                       ],
                       onChanged: (value) {
                         _classification = value ?? 'new';
@@ -1577,20 +1623,20 @@ class _ProfileEditorState extends State<_ProfileEditor> {
 
   @override
   Widget build(BuildContext context) => Directionality(
-    textDirection: TextDirection.rtl,
+    textDirection: Directionality.of(context),
     child: AlertDialog(
-      title: const Text('تعديل ملف الأعمال'),
+      title: Text('businessShell.editProfile'.tr()),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
           child: Column(
             children: [
-              _field(_name, 'اسم المتجر'),
-              _field(_english, 'الاسم بالإنجليزية'),
-              _field(_description, 'النبذة', maxLines: 3),
-              _field(_category, 'التصنيف'),
-              _field(_address, 'العنوان'),
-              _field(_attachment, 'رابط مرفق سجل المتجر'),
+              _field(_name, 'business.storeName'.tr()),
+              _field(_english, 'business.englishName'.tr()),
+              _field(_description, 'business.description'.tr(), maxLines: 3),
+              _field(_category, 'business.category'.tr()),
+              _field(_address, 'business.address'.tr()),
+              _field(_attachment, 'business.attachmentUrl'.tr()),
             ],
           ),
         ),
@@ -1598,7 +1644,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('إلغاء'),
+          child: Text('common.cancel'.tr()),
         ),
         FilledButton(
           onPressed: () {
@@ -1614,7 +1660,7 @@ class _ProfileEditorState extends State<_ProfileEditor> {
             );
             Navigator.pop(context);
           },
-          child: const Text('حفظ'),
+          child: Text('common.save'.tr()),
         ),
       ],
     ),

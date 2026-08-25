@@ -1278,4 +1278,94 @@ void main() {
       }
     });
   });
+
+  for (final language in ['ar', 'en']) {
+    group('GAP-015B business shell localization $language', () {
+      // Reading the JSON catalogues inside testWidgets would run under the
+      // fake clock and can stall indefinitely.
+      setUpAll(() async {
+        await loadAppTranslations(languageCode: language);
+      });
+
+      testWidgets('renders shell and nested editors in app direction', (
+        tester,
+      ) async {
+        final isArabic = language == 'ar';
+        final direction = isArabic ? TextDirection.rtl : TextDirection.ltr;
+
+        final bloc = BusinessBloc(apiService: _SpyMerchantApi());
+
+        final ready = bloc.stream.firstWhere(
+          (state) => state.status == BusinessStatus.ready,
+        );
+
+        bloc.add(const BusinessStarted());
+        await ready;
+
+        // Directionality must wrap the Navigator itself, not only `home`.
+        // Modal bottom sheets and dialogs are inserted into Navigator overlays
+        // and otherwise fall outside a home-only Directionality wrapper.
+        await tester.pumpWidget(
+          MaterialApp(
+            builder: (context, child) => Directionality(
+              textDirection: direction,
+              child: child ?? const SizedBox.shrink(),
+            ),
+            home: BlocProvider<BusinessBloc>.value(
+              value: bloc,
+              child: BusinessShellPage(onLoggedOut: () {}),
+            ),
+          ),
+        );
+        await settleFrames(tester);
+
+        final welcome = isArabic
+            ? 'مرحباً، $_ownerName'
+            : 'Welcome, $_ownerName';
+
+        final summary = isArabic ? 'ملخص نشاط متجرك' : 'Store activity summary';
+
+        expect(find.text(welcome), findsOneWidget);
+        expect(find.text(summary), findsOneWidget);
+
+        expect(
+          Directionality.of(tester.element(find.text(welcome))),
+          direction,
+        );
+
+        // Product editor owns a nested Directionality wrapper.
+        final addButton = find.byIcon(Icons.add_rounded);
+        expect(addButton, findsOneWidget);
+
+        await tester.tap(addButton);
+        await settleFrames(tester);
+
+        final productField = find.byType(TextFormField).first;
+        expect(productField, findsOneWidget);
+
+        expect(Directionality.of(tester.element(productField)), direction);
+
+        Navigator.of(tester.element(productField)).pop();
+        await settleFrames(tester);
+
+        // Profile editor owns the third shell Directionality wrapper.
+        bloc.add(const BusinessTabChanged(4));
+        await settleFrames(tester);
+
+        final editButton = find.byIcon(Icons.edit_outlined);
+        expect(editButton, findsOneWidget);
+
+        await tester.tap(editButton);
+        await settleFrames(tester);
+
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+
+        expect(Directionality.of(tester.element(dialog)), direction);
+
+        Navigator.of(tester.element(dialog)).pop();
+        await settleFrames(tester);
+      });
+    });
+  }
 }

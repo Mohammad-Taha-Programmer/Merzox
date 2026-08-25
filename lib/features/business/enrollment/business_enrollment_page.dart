@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -45,7 +46,7 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
   }
 
   String? _required(String? value) =>
-      value == null || value.trim().isEmpty ? 'هذا الحقل مطلوب' : null;
+      value == null || value.trim().isEmpty ? 'validation.required'.tr() : null;
 
   String get _normalizedPhone {
     final raw = _phone.text.trim();
@@ -58,43 +59,43 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
 
   String? _phoneValidator(String? value) {
     final raw = value?.trim() ?? '';
-    if (raw.isEmpty) return 'هذا الحقل مطلوب';
+    if (raw.isEmpty) return 'validation.required'.tr();
     final normalized = raw.startsWith('+') ? raw : _normalizedPhone;
     return RegExp(r'^\+?[0-9]{7,15}$').hasMatch(normalized)
         ? null
-        : 'أدخل رقم جوال صحيحاً';
+        : 'validation.invalidPhone'.tr();
   }
 
   String? _emailValidator(String? value) {
     final email = value?.trim() ?? '';
-    if (email.isEmpty) return 'هذا الحقل مطلوب';
+    if (email.isEmpty) return 'validation.required'.tr();
     return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)
         ? null
-        : 'أدخل بريداً إلكترونياً صحيحاً';
+        : 'validation.invalidEmail'.tr();
   }
 
   String? _passwordValidator(String? value) {
     if ((value ?? '').length < 6) {
-      return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+      return 'validation.passwordMin6'.tr();
     }
     return null;
   }
 
   String? _urlValidator(String? value) {
     final raw = value?.trim() ?? '';
-    if (raw.isEmpty) return 'هذا الحقل مطلوب';
+    if (raw.isEmpty) return 'validation.required'.tr();
     final uri = Uri.tryParse(raw);
     return uri != null &&
             (uri.scheme == 'https' || uri.scheme == 'http') &&
             uri.host.isNotEmpty
         ? null
-        : 'أدخل رابطاً صحيحاً يبدأ بـ https://';
+        : 'businessEnrollment.invalidAttachmentUrl'.tr();
   }
 
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: BlocConsumer<BusinessEnrollmentBloc, BusinessEnrollmentState>(
         listener: (context, state) {
           if (state.status == BusinessEnrollmentStatus.success) {
@@ -102,7 +103,9 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
           } else if (state.status == BusinessEnrollmentStatus.failure) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(state.errorMessage ?? 'تعذر إنشاء حساب الأعمال'),
+                content: Text(
+                  state.errorMessage ?? 'businessEnrollment.createFailed'.tr(),
+                ),
               ),
             );
           }
@@ -111,7 +114,7 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
           backgroundColor: Colors.white,
           appBar: AppBar(
             backgroundColor: Colors.white,
-            title: const Text('إنشاء حساب الأعمال'),
+            title: Text('businessEnrollment.title'.tr()),
             leading: state.step == 1
                 ? IconButton(
                     onPressed: () => context.read<BusinessEnrollmentBloc>().add(
@@ -138,7 +141,7 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
     children: [
       Image.asset('assets/images/MERZOX_LOGO.png', height: 78),
       const SizedBox(height: 18),
-      const Text('ابدأ في إنشاء حسابك بخطوتين'),
+      Text('businessEnrollment.subtitle'.tr()),
       const SizedBox(height: 18),
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -174,25 +177,25 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
         _header(0),
         _field(
           _phone,
-          'رقم الجوال',
+          'businessEnrollment.phoneLabel'.tr(),
           keyboardType: TextInputType.phone,
           validator: _phoneValidator,
           hintText: '+972 59 000 0000',
         ),
         _field(
           _email,
-          'البريد الإلكتروني',
+          'businessEnrollment.emailLabel'.tr(),
           keyboardType: TextInputType.emailAddress,
           validator: _emailValidator,
         ),
         _field(
           _password,
-          'كلمة المرور الحالية',
+          'businessEnrollment.currentPasswordLabel'.tr(),
           obscure: true,
           validator: _passwordValidator,
         ),
         const SizedBox(height: 22),
-        _button('التالي', () {
+        _button('businessEnrollment.next'.tr(), () {
           if (_firstKey.currentState?.validate() != true) return;
           context.read<BusinessEnrollmentBloc>().add(
             BusinessEnrollmentFirstStepSaved(
@@ -213,21 +216,25 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _header(1),
-            _field(_name, 'اسم المتجر'),
-            _field(_englishName, 'اسم المتجر باللغة الإنجليزية'),
-            _field(_description, 'نبذة عن المتجر', maxLines: 3),
-            _field(_category, 'نوع المنتجات التي تبيعها'),
-            _field(_address, 'عنوان المتجر'),
+            _field(_name, 'business.storeName'.tr()),
+            _field(_englishName, 'businessEnrollment.storeEnglishName'.tr()),
+            _field(
+              _description,
+              'businessEnrollment.storeDescription'.tr(),
+              maxLines: 3,
+            ),
+            _field(_category, 'businessEnrollment.productCategory'.tr()),
+            _field(_address, 'businessEnrollment.storeAddress'.tr()),
             _field(
               _attachment,
-              'رابط مرفق سجل المتجر',
+              'business.attachmentUrl'.tr(),
               keyboardType: TextInputType.url,
               validator: _urlValidator,
               hintText: 'https://example.com/document.pdf',
             ),
             const SizedBox(height: 22),
             _button(
-              'إنشاء الحساب',
+              'auth.createAccountButton'.tr(),
               state.status == BusinessEnrollmentStatus.submitting
                   ? null
                   : () {
