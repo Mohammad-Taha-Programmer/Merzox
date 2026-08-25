@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -42,7 +43,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: BlocConsumer<PasswordRecoveryBloc, PasswordRecoveryState>(
         listener: (context, state) {
           if (state.status == PasswordRecoveryStatus.requestAccepted) {
@@ -62,7 +63,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
           return Scaffold(
             appBar: AppBar(
-              title: const Text('استعادة كلمة المرور'),
+              title: Text('passwordRecovery.recoveryTitle'.tr()),
               centerTitle: true,
             ),
             body: SafeArea(
@@ -76,18 +77,17 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       const SizedBox(height: 24),
                       const Icon(Icons.lock_reset_outlined, size: 72),
                       const SizedBox(height: 24),
-                      const Text(
-                        'نسيت كلمة المرور؟',
+                      Text(
+                        'passwordRecovery.forgotTitle'.tr(),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       const SizedBox(height: 12),
-                      const Text(
-                        'أدخل البريد الإلكتروني المرتبط بحسابك. '
-                        'إذا كان الحساب مؤهلاً للاستعادة فسنرسل إليه رمزاً مؤقتاً.',
+                      Text(
+                        'passwordRecovery.forgotDescription'.tr(),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 32),
@@ -97,23 +97,23 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                         textInputAction: TextInputAction.done,
                         enabled: !isLoading,
                         onFieldSubmitted: (_) => _submit(),
-                        decoration: const InputDecoration(
-                          labelText: 'البريد الإلكتروني',
+                        decoration: InputDecoration(
+                          labelText: 'passwordRecovery.emailLabel'.tr(),
                           hintText: 'name@example.com',
-                          border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (value) {
                           final email = value?.trim() ?? '';
 
                           if (email.isEmpty) {
-                            return 'البريد الإلكتروني مطلوب';
+                            return 'passwordRecovery.emailRequired'.tr();
                           }
 
                           if (email.length > 254 ||
                               !RegExp(
                                 r'^[^\s@]+@[^\s@]+\.[^\s@]+$',
                               ).hasMatch(email)) {
-                            return 'أدخل بريداً إلكترونياً صحيحاً';
+                            return 'validation.invalidEmail'.tr();
                           }
 
                           return null;
@@ -130,12 +130,12 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('إرسال تعليمات الاستعادة'),
+                            : Text('passwordRecovery.sendInstructions'.tr()),
                       ),
                       const SizedBox(height: 12),
                       TextButton(
                         onPressed: isLoading ? null : widget.onBackToLogin,
-                        child: const Text('العودة إلى تسجيل الدخول'),
+                        child: Text('passwordRecovery.backToLogin'.tr()),
                       ),
                     ],
                   ),

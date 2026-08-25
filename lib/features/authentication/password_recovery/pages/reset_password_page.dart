@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
@@ -55,11 +56,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
     final password = value ?? '';
 
     if (password.length < 6) {
-      return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+      return 'validation.passwordMin6'.tr();
     }
 
     if (utf8.encode(password).length > 72) {
-      return 'كلمة المرور طويلة جداً';
+      return 'passwordRecovery.passwordTooLong'.tr();
     }
 
     return null;
@@ -68,12 +69,12 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: BlocConsumer<PasswordRecoveryBloc, PasswordRecoveryState>(
         listener: (context, state) {
           if (state.status == PasswordRecoveryStatus.resetSucceeded) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('تم تغيير كلمة المرور بنجاح')),
+              SnackBar(content: Text('passwordRecovery.resetSuccess'.tr())),
             );
             widget.onResetSucceeded();
             return;
@@ -91,7 +92,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
 
           return Scaffold(
             appBar: AppBar(
-              title: const Text('تعيين كلمة مرور جديدة'),
+              title: Text('passwordRecovery.newPasswordTitle'.tr()),
               centerTitle: true,
             ),
             body: SafeArea(
@@ -102,9 +103,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(
-                        'إذا كان البريد الإلكتروني مرتبطاً بحساب مؤهل، '
-                        'ستصلك رسالة تحتوي على رمز استعادة صالح لمدة محدودة.',
+                      Text(
+                        'passwordRecovery.resetDescription'.tr(),
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 28),
@@ -114,15 +114,15 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         textInputAction: TextInputAction.next,
                         autocorrect: false,
                         enableSuggestions: false,
-                        decoration: const InputDecoration(
-                          labelText: 'رمز الاستعادة',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: 'passwordRecovery.tokenLabel'.tr(),
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (value) {
                           final token = value?.trim() ?? '';
 
                           if (!RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(token)) {
-                            return 'رمز الاستعادة غير صالح';
+                            return 'passwordRecovery.invalidToken'.tr();
                           }
 
                           return null;
@@ -135,7 +135,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         obscureText: _obscurePassword,
                         textInputAction: TextInputAction.next,
                         decoration: InputDecoration(
-                          labelText: 'كلمة المرور الجديدة',
+                          labelText: 'passwordRecovery.newPasswordLabel'.tr(),
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -160,7 +160,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _submit(),
                         decoration: InputDecoration(
-                          labelText: 'تأكيد كلمة المرور',
+                          labelText: 'passwordRecovery.confirmPasswordLabel'
+                              .tr(),
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             onPressed: () {
@@ -177,7 +178,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                         ),
                         validator: (value) {
                           if (value != _passwordController.text) {
-                            return 'كلمتا المرور غير متطابقتين';
+                            return 'passwordRecovery.passwordMismatch'.tr();
                           }
 
                           return _validatePassword(value);
@@ -194,12 +195,12 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('تغيير كلمة المرور'),
+                            : Text('passwordRecovery.changePassword'.tr()),
                       ),
                       const SizedBox(height: 12),
                       TextButton(
                         onPressed: isLoading ? null : widget.onBackToLogin,
-                        child: const Text('العودة إلى تسجيل الدخول'),
+                        child: Text('passwordRecovery.backToLogin'.tr()),
                       ),
                     ],
                   ),

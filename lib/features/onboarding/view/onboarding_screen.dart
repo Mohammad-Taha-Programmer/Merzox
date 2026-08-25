@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
@@ -40,7 +41,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: BlocConsumer<OnboardingBloc, OnboardingState>(
         listener: (context, state) {
           if (state.isCompleted) {
@@ -64,7 +65,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             child: TextButton(
                               onPressed: () => _finish(bloc),
                               child: Text(
-                                'تخطي',
+                                'onboarding.skip'.tr(),
                                 style: TextStyle(
                                   fontSize: 14,
                                   color: MerzoxColors.kColor3B3B3B,
@@ -79,24 +80,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: PageView(
                       controller: _pageController,
                       onPageChanged: (page) => bloc.add(NextPage(page)),
-                      children: const [
+                      children: [
                         OnboardingPage(
                           imagePath: 'assets/images/Onboarding/onboarding1.png',
-                          title: 'أفضل العروض القريبة منك',
-                          subtitle:
-                              'اكتشف المتاجر والخدمات في منطقتك واحصل على عروض تناسب احتياجاتك اليومية.',
+                          title: 'onboarding.page1Title'.tr(),
+                          subtitle: 'onboarding.page1Subtitle'.tr(),
                         ),
                         OnboardingPage(
                           imagePath: 'assets/images/Onboarding/onboarding2.png',
-                          title: 'متاجر على الخريطة',
-                          subtitle:
-                              'اعثر على الأعمال القريبة منك بسهولة، وتواصل معها أو انتقل إليها مباشرة.',
+                          title: 'onboarding.page2Title'.tr(),
+                          subtitle: 'onboarding.page2Subtitle'.tr(),
                         ),
                         OnboardingPage(
                           imagePath: 'assets/images/Onboarding/onboarding3.png',
-                          title: 'دفع وطلبات بمرونة',
-                          subtitle:
-                              'اطلب المنتجات والخدمات، وتتبع طلباتك، واختر طريقة الدفع المناسبة لك.',
+                          title: 'onboarding.page3Title'.tr(),
+                          subtitle: 'onboarding.page3Subtitle'.tr(),
                         ),
                       ],
                     ),

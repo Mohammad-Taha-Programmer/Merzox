@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
@@ -76,19 +77,25 @@ class _SignupPageState extends State<SignupPage> {
     return BlocConsumer<AuthBloc, AuthState>(
       listener: (context, state) {
         if (state.status == AuthStatus.signupCreated) {
-          if (state.successMessage != null) {
+          final message = state.successMessageKey?.tr() ?? state.successMessage;
+
+          if (message != null) {
             ScaffoldMessenger.of(
               context,
-            ).showSnackBar(SnackBar(content: Text(state.successMessage!)));
+            ).showSnackBar(SnackBar(content: Text(message)));
           }
 
           widget.onSignupCreated();
         }
 
-        if (state.status == AuthStatus.failure && state.errorMessage != null) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+        if (state.status == AuthStatus.failure) {
+          final message = state.errorMessageKey?.tr() ?? state.errorMessage;
+
+          if (message != null) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text(message)));
+          }
         }
       },
       builder: (context, state) {
@@ -116,10 +123,10 @@ class _SignupPageState extends State<SignupPage> {
                       const SizedBox(height: 24),
                       const _Logo(),
                       const SizedBox(height: 28),
-                      const Text(
-                        'إنشاء حساب',
+                      Text(
+                        'authGate.signup'.tr(),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF2B2B2B),
@@ -127,7 +134,7 @@ class _SignupPageState extends State<SignupPage> {
                       ),
                       const SizedBox(height: 22),
                       Text(
-                        'يرجى ملء التفاصيل وإنشاء حساب لاستخدام التطبيق',
+                        'auth.signupSubtitle'.tr(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 13,
@@ -137,20 +144,20 @@ class _SignupPageState extends State<SignupPage> {
                       ),
                       const SizedBox(height: 26),
                       _LabeledField(
-                        label: 'الاسم كاملاً',
+                        label: 'auth.fullNameLabel'.tr(),
                         child: TextFormField(
                           controller: _nameController,
                           textInputAction: TextInputAction.next,
                           textAlign: TextAlign.start,
                           decoration: _fieldDecoration(
-                            hintText: 'قم بإدخال الاسم كامل',
+                            hintText: 'auth.fullNameHint'.tr(),
                           ),
                           validator: _requiredValidator,
                         ),
                       ),
                       const SizedBox(height: 16),
                       _LabeledField(
-                        label: 'البريد الإلكتروني أو رقم الجوال',
+                        label: 'auth.signupIdentifierLabel'.tr(),
                         child: TextFormField(
                           controller: _identifierController,
                           keyboardType: TextInputType.emailAddress,
@@ -158,7 +165,7 @@ class _SignupPageState extends State<SignupPage> {
                           textAlign: TextAlign.start,
                           onChanged: (_) => setState(() {}),
                           decoration: _fieldDecoration(
-                            hintText: 'أدخل البريد الإلكتروني أو رقم الجوال',
+                            hintText: 'auth.signupIdentifierHint'.tr(),
                             prefixIcon: _identifierIsEmail
                                 ? null
                                 : _DialCodeDropdown(
@@ -176,7 +183,7 @@ class _SignupPageState extends State<SignupPage> {
                             prefixIconConstraints: _identifierIsEmail
                                 ? null
                                 : const BoxConstraints.tightFor(
-                                    width: 96,
+                                    width: 120,
                                     height: 46,
                                   ),
                           ),
@@ -185,18 +192,18 @@ class _SignupPageState extends State<SignupPage> {
                       ),
                       const SizedBox(height: 16),
                       _LabeledField(
-                        label: 'كلمة المرور',
+                        label: 'auth.password'.tr(),
                         child: TextFormField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
                           textInputAction: TextInputAction.done,
                           textAlign: TextAlign.start,
                           decoration: _fieldDecoration(
-                            hintText: 'الرجاء قم بإدخال كلمة المرور',
+                            hintText: 'auth.passwordHint'.tr(),
                             prefixIcon: IconButton(
                               tooltip: _obscurePassword
-                                  ? 'إظهار كلمة المرور'
-                                  : 'إخفاء كلمة المرور',
+                                  ? 'auth.showPassword'.tr()
+                                  : 'auth.hidePassword'.tr(),
                               onPressed: () {
                                 setState(() {
                                   _obscurePassword = !_obscurePassword;
@@ -212,11 +219,11 @@ class _SignupPageState extends State<SignupPage> {
                           ),
                           validator: (value) {
                             if (value == null || value.trim().isEmpty) {
-                              return 'هذا الحقل مطلوب';
+                              return 'validation.required'.tr();
                             }
 
                             if (value.trim().length < 6) {
-                              return 'كلمة المرور يجب أن تكون 6 أحرف على الأقل';
+                              return 'validation.passwordMin6'.tr();
                             }
 
                             return null;
@@ -224,10 +231,10 @@ class _SignupPageState extends State<SignupPage> {
                         ),
                       ),
                       const SizedBox(height: 20),
-                      const Text(
-                        'الجنس',
+                      Text(
+                        'auth.gender'.tr(),
                         textAlign: TextAlign.start,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF2B2B2B),
@@ -240,7 +247,7 @@ class _SignupPageState extends State<SignupPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             _GenderRadio(
-                              label: 'أنثى',
+                              label: 'auth.female'.tr(),
                               value: _Gender.female,
                               groupValue: _gender,
                               onChanged: (value) {
@@ -251,7 +258,7 @@ class _SignupPageState extends State<SignupPage> {
                             ),
                             const SizedBox(width: 28),
                             _GenderRadio(
-                              label: 'ذكر',
+                              label: 'auth.male'.tr(),
                               value: _Gender.male,
                               groupValue: _gender,
                               onChanged: (value) {
@@ -285,9 +292,9 @@ class _SignupPageState extends State<SignupPage> {
                                       color: Colors.white,
                                     ),
                                   )
-                                : const Text(
-                                    'إنشاء الحساب',
-                                    style: TextStyle(
+                                : Text(
+                                    'auth.createAccountButton'.tr(),
+                                    style: const TextStyle(
                                       fontSize: 15,
                                       fontWeight: FontWeight.w700,
                                     ),
@@ -300,7 +307,7 @@ class _SignupPageState extends State<SignupPage> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
-                            'تملك حساب؟',
+                            'auth.haveAccount'.tr(),
                             style: TextStyle(
                               fontSize: 14,
                               color: MerzoxColors.kColor8D99AE,
@@ -309,7 +316,7 @@ class _SignupPageState extends State<SignupPage> {
                           TextButton(
                             onPressed: widget.onLoginRequested,
                             child: Text(
-                              'قم بتسجيل الدخول',
+                              'auth.signInAction'.tr(),
                               style: TextStyle(
                                 fontSize: 14,
                                 color: MerzoxColors.kColor3D5A80,
@@ -332,7 +339,7 @@ class _SignupPageState extends State<SignupPage> {
 
   String? _requiredValidator(String? value) {
     if (value == null || value.trim().isEmpty) {
-      return 'هذا الحقل مطلوب';
+      return 'validation.required'.tr();
     }
 
     return null;
@@ -341,14 +348,14 @@ class _SignupPageState extends State<SignupPage> {
   String? _identifierValidator(String? value) {
     final trimmed = value?.trim() ?? '';
     if (trimmed.isEmpty) {
-      return 'هذا الحقل مطلوب';
+      return 'validation.required'.tr();
     }
 
     if (trimmed.contains('@')) {
       final emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
       return emailPattern.hasMatch(trimmed)
           ? null
-          : 'أدخل بريدًا إلكترونيًا صحيحًا';
+          : 'validation.invalidEmail'.tr();
     }
 
     final digits = trimmed.replaceAll(RegExp(r'\D'), '');
@@ -360,7 +367,7 @@ class _SignupPageState extends State<SignupPage> {
 
     return RegExp(r'^\+?[0-9]{7,15}$').hasMatch(normalized)
         ? null
-        : 'أدخل رقم هاتف صحيحًا';
+        : 'validation.invalidPhone'.tr();
   }
 }
 
@@ -376,9 +383,9 @@ class _SignupHeader extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          const Text(
-            'إنشاء الحساب',
-            style: TextStyle(
+          Text(
+            'auth.createAccountButton'.tr(),
+            style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
               color: Color(0xFF2B2B2B),
@@ -387,7 +394,7 @@ class _SignupHeader extends StatelessWidget {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: IconButton(
-              tooltip: 'رجوع',
+              tooltip: 'common.back'.tr(),
               onPressed: onBack,
               icon: const Icon(
                 Icons.arrow_forward_ios_rounded,
@@ -474,7 +481,7 @@ class _DialCodeDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 96,
+      width: 120,
       height: 46,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -490,6 +497,7 @@ class _DialCodeDropdown extends StatelessWidget {
               child: DropdownButton<_DialCode>(
                 value: value,
                 isDense: true,
+                isExpanded: true,
                 iconSize: 16,
                 dropdownColor: Colors.white,
                 onChanged: onChanged,

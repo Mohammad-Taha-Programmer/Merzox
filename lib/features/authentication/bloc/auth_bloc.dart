@@ -42,7 +42,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         state.copyWith(
           status: AuthStatus.failure,
-          errorMessage: 'أدخل بريدًا إلكترونيًا أو رقم هاتف صحيحًا',
+          errorMessageKey: 'validation.invalidIdentifier',
         ),
       );
       return;
@@ -52,7 +52,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         state.copyWith(
           status: AuthStatus.failure,
-          errorMessage: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
+          errorMessageKey: 'validation.passwordMin6',
         ),
       );
       return;
@@ -68,7 +68,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         emit(
           state.copyWith(
             status: AuthStatus.failure,
-            errorMessage: 'هذا الحساب ليس حساب أعمال',
+            errorMessageKey: 'auth.businessAccountRequired',
           ),
         );
         return;
@@ -100,7 +100,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         state.copyWith(
           status: AuthStatus.failure,
-          errorMessage: 'أدخل الاسم بشكل صحيح',
+          errorMessageKey: 'validation.invalidName',
         ),
       );
       return;
@@ -111,7 +111,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         state.copyWith(
           status: AuthStatus.failure,
-          errorMessage: 'أدخل بريدًا إلكترونيًا أو رقم هاتف صحيحًا',
+          errorMessageKey: 'validation.invalidIdentifier',
         ),
       );
       return;
@@ -121,7 +121,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       emit(
         state.copyWith(
           status: AuthStatus.failure,
-          errorMessage: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل',
+          errorMessageKey: 'validation.passwordMin6',
         ),
       );
       return;
@@ -139,15 +139,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         gender: event.gender,
       );
       await _clearAuthenticatedSession();
-      final message = signup.requiresEmailVerification && signup.emailSent
-          ? 'تم إرسال رابط التحقق إلى بريدك الإلكتروني.'
+      final successMessageKey =
+          signup.requiresEmailVerification && signup.emailSent
+          ? 'auth.signupVerificationEmailSent'
           : signup.requiresEmailVerification
-          ? 'تم إنشاء رابط التحقق، لكن إعدادات البريد غير مكتملة على الخادم.'
-          : 'تم إنشاء الحساب. سجل الدخول للمتابعة.';
+          ? 'auth.signupVerificationEmailUnavailable'
+          : 'auth.signupCreatedLoginPrompt';
       emit(
         state.copyWith(
           status: AuthStatus.signupCreated,
-          successMessage: message,
+          successMessageKey: successMessageKey,
         ),
       );
     } catch (error) {

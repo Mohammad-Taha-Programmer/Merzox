@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
@@ -80,18 +81,21 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: BlocConsumer<AuthBloc, AuthState>(
         listener: (context, state) {
           if (state.status == AuthStatus.authenticated) {
             widget.onAuthenticated();
           }
 
-          if (state.status == AuthStatus.failure &&
-              state.errorMessage != null) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+          if (state.status == AuthStatus.failure) {
+            final message = state.errorMessageKey?.tr() ?? state.errorMessage;
+
+            if (message != null) {
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(message)));
+            }
           }
         },
         builder: (context, state) {
@@ -114,19 +118,18 @@ class _LoginPageState extends State<LoginPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const _AuthTopBar(title: 'تسجيل الدخول'),
+                            _AuthTopBar(title: 'authGate.login'.tr()),
                             const SizedBox(height: 34),
                             const _AuthLogo(),
                             const SizedBox(height: 34),
-                            const _AuthTitleBlock(
-                              title: 'تسجيل الدخول',
-                              subtitle:
-                                  'الرجاء تسجيل الدخول لمواصلة استخدام التطبيق',
+                            _AuthTitleBlock(
+                              title: 'authGate.login'.tr(),
+                              subtitle: 'auth.loginSubtitle'.tr(),
                             ),
                             const SizedBox(height: 26),
                             _XdField(
-                              label: 'رقم الجوال أو البريد الإلكتروني',
-                              hint: 'قم بإدخال رقم الجوال أو البريد الإلكتروني',
+                              label: 'auth.loginIdentifierLabel'.tr(),
+                              hint: 'auth.loginIdentifierHint'.tr(),
                               controller: _identifierController,
                               keyboardType: TextInputType.emailAddress,
                               textInputAction: TextInputAction.next,
@@ -144,23 +147,23 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               validator: (value) {
                                 if (value == null || value.trim().isEmpty) {
-                                  return 'هذا الحقل مطلوب';
+                                  return 'validation.required'.tr();
                                 }
                                 return null;
                               },
                             ),
                             const SizedBox(height: 16),
                             _XdField(
-                              label: 'كلمة المرور',
-                              hint: 'الرجاء قم بإدخال كلمة المرور',
+                              label: 'auth.password'.tr(),
+                              hint: 'auth.passwordHint'.tr(),
                               controller: _passwordController,
                               obscureText: _obscurePassword,
                               textInputAction: TextInputAction.done,
                               onSubmitted: (_) => _submit(bloc),
                               trailing: IconButton(
                                 tooltip: _obscurePassword
-                                    ? 'إظهار كلمة المرور'
-                                    : 'إخفاء كلمة المرور',
+                                    ? 'auth.showPassword'.tr()
+                                    : 'auth.hidePassword'.tr(),
                                 onPressed: () {
                                   setState(() {
                                     _obscurePassword = !_obscurePassword;
@@ -176,7 +179,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'هذا الحقل مطلوب';
+                                  return 'validation.required'.tr();
                                 }
                                 return null;
                               },
@@ -193,25 +196,25 @@ class _LoginPageState extends State<LoginPage> {
                                     });
                                   },
                                 ),
-                                const Text(
-                                  'تذكرني لاحقاً',
-                                  style: TextStyle(fontSize: 13),
+                                Text(
+                                  'auth.rememberMe'.tr(),
+                                  style: const TextStyle(fontSize: 13),
                                 ),
                                 const Spacer(),
                                 TextButton(
                                   onPressed: isLoading
                                       ? null
                                       : widget.onForgotPasswordRequested,
-                                  child: const Text(
-                                    'نسيت كلمة المرور؟',
-                                    style: TextStyle(fontSize: 13),
+                                  child: Text(
+                                    'auth.forgotPassword'.tr(),
+                                    style: const TextStyle(fontSize: 13),
                                   ),
                                 ),
                               ],
                             ),
                             const SizedBox(height: 26),
                             _PrimaryAuthButton(
-                              label: 'تسجيل الدخول',
+                              label: 'authGate.login'.tr(),
                               isLoading: isLoading,
                               onPressed: () => _submit(bloc),
                             ),
@@ -221,13 +224,13 @@ class _LoginPageState extends State<LoginPage> {
                                 onPressed: isLoading
                                     ? null
                                     : widget.onBrowseAsGuest,
-                                child: const Text('المتابعة كضيف'),
+                                child: Text('auth.continueAsGuest'.tr()),
                               ),
                             const SizedBox(height: 18),
                             if (!widget.businessMode)
                               _SwitchAuthMode(
-                                prompt: 'ألا تملك حساب؟',
-                                action: 'قم بإنشاء حساب',
+                                prompt: 'auth.noAccount'.tr(),
+                                action: 'auth.createAccountAction'.tr(),
                                 onPressed: widget.onSignupRequested,
                               ),
                             const SizedBox(height: 22),
