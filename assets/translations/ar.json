@@ -7,7 +7,8 @@
     "search": "بحث",
     "currency": "₪",
     "save": "حفظ",
-    "edit": "تعديل"
+    "edit": "تعديل",
+    "delete": "حذف"
   },
   "authGate": {
     "title": "تسجيل الدخول مطلوب",
@@ -300,7 +301,12 @@
     "removeVariant": "حذف الخيار",
     "invalidVariantLabel": "اسم الخيار يجب أن يكون بين 1 و 80 حرفاً",
     "duplicateVariantLabel": "يجب ألا تتكرر أسماء الخيارات",
-    "variantLimit": "الحد الأقصى 50 خياراً"
+    "variantLimit": "الحد الأقصى 50 خياراً",
+    "classifications": {
+      "new": "جديد",
+      "bestSelling": "الأكثر مبيعاً",
+      "offers": "عروض"
+    }
   },
   "merchantPreview": {
     "title": "معاينة المتجر",
@@ -374,5 +380,60 @@
     "page2Subtitle": "اعثر على الأعمال القريبة منك بسهولة، وتواصل معها أو انتقل إليها مباشرة.",
     "page3Title": "دفع وطلبات بمرونة",
     "page3Subtitle": "اطلب المنتجات والخدمات، وتتبع طلباتك، واختر طريقة الدفع المناسبة لك."
+  },
+  "business": {
+    "storeName": "اسم المتجر",
+    "attachmentUrl": "رابط مرفق سجل المتجر",
+    "address": "العنوان",
+    "category": "التصنيف",
+    "englishName": "الاسم بالإنجليزية",
+    "description": "النبذة"
+  },
+  "businessEnrollment": {
+    "title": "إنشاء حساب الأعمال",
+    "subtitle": "ابدأ في إنشاء حسابك بخطوتين",
+    "phoneLabel": "رقم الجوال",
+    "emailLabel": "البريد الإلكتروني",
+    "currentPasswordLabel": "كلمة المرور الحالية",
+    "next": "التالي",
+    "storeEnglishName": "اسم المتجر باللغة الإنجليزية",
+    "storeDescription": "نبذة عن المتجر",
+    "productCategory": "نوع المنتجات التي تبيعها",
+    "storeAddress": "عنوان المتجر",
+    "invalidAttachmentUrl": "أدخل رابطاً صحيحاً يبدأ بـ https://",
+    "createFailed": "تعذر إنشاء حساب الأعمال"
+  },
+  "businessShell": {
+    "welcome": "مرحباً، {}",
+    "dashboardSummary": "ملخص نشاط متجرك",
+    "orderSearchHint": "رقم الطلب، اسم المستخدم...",
+    "sales": "المبيعات",
+    "orders": "الطلبات",
+    "visits": "الزيارات",
+    "latestOrders": "أحدث الطلبات",
+    "more": "المزيد",
+    "noRecentOrders": "لا توجد طلبات حديثة",
+    "incomingOrders": "الطلبات الواردة",
+    "ordersSubtitle": "تابع حالة طلبات عملائك",
+    "orderGroups": {
+      "current": "الحالية {}",
+      "completed": "المكتملة {}",
+      "cancelled": "الملغاة {}"
+    },
+    "noOrders": "لا توجد طلبات في هذه القائمة",
+    "orderSummary": "{} منتجات • {} ₪",
+    "productsTitle": "منتجاتي",
+    "productsSummary": "{} منتجاً وخدمة",
+    "noProducts": "لم تضف منتجات بعد",
+    "addProduct": "إضافة منتج",
+    "service": "خدمة",
+    "product": "منتج",
+    "editProfile": "تعديل ملف الأعمال",
+    "logout": "تسجيل الخروج",
+    "unspecified": "غير محدد",
+    "loadFailed": "تعذر تحميل حساب الأعمال",
+    "statuses": {
+      "confirmed": "تم التأكيد"
+    }
   }
 }

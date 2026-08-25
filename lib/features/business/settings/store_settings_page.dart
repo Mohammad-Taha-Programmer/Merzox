@@ -5,7 +5,7 @@ import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
 
-/// The "إعدادات المتجر" flow from the design: one page with the three sections
+/// Store settings flow from the design: one page with the three sections
 /// the artboards split across tabs — logo, description, and social links.
 class StoreSettingsPage extends StatefulWidget {
   final OwnerBusiness business;
@@ -91,7 +91,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
     final logoUrl = _logoUrl.text.trim();
 
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
@@ -164,14 +164,20 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                     const SizedBox(height: 22),
                     _Section('storeSettings.description'.tr()),
                     const SizedBox(height: 12),
-                    _Field(controller: _name, label: 'اسم المتجر'),
+                    _Field(controller: _name, label: 'business.storeName'.tr()),
                     _Field(
                       controller: _description,
                       label: 'storeSettings.description'.tr(),
                       maxLines: 4,
                     ),
-                    _Field(controller: _address, label: 'العنوان'),
-                    _Field(controller: _category, label: 'التصنيف'),
+                    _Field(
+                      controller: _address,
+                      label: 'business.address'.tr(),
+                    ),
+                    _Field(
+                      controller: _category,
+                      label: 'business.category'.tr(),
+                    ),
                     const SizedBox(height: 22),
                     _Section('storeSettings.socialLinks'.tr()),
                     const SizedBox(height: 12),
