@@ -8,7 +8,9 @@
     "currency": "₪",
     "save": "حفظ",
     "edit": "تعديل",
-    "delete": "حذف"
+    "delete": "حذف",
+    "logout": "تسجيل الخروج",
+    "remove": "إزالة"
   },
   "authGate": {
     "title": "تسجيل الدخول مطلوب",
@@ -435,5 +437,104 @@
     "statuses": {
       "confirmed": "تم التأكيد"
     }
+  },
+  "profile": {
+    "title": "الملف الشخصي"
+  },
+  "profileEdit": {
+    "title": "تعديل الملف الشخصي",
+    "saved": "تم حفظ التعديلات",
+    "nameTooShort": "الاسم قصير جداً",
+    "nameChangeUsed": "تم استخدام فرصة تعديل الاسم",
+    "addEmail": "إضافة بريد آخر",
+    "addPhone": "إضافة رقم آخر",
+    "addressHint": "قم بإدخال العنوان",
+    "gender": "الجنس",
+    "genderFemale": "أنثى",
+    "genderMale": "ذكر",
+    "genderChangeUsed": "تم استخدام فرصة تعديل الجنس",
+    "birthDate": "تاريخ الميلاد",
+    "changeLanguage": "تغيير اللغة",
+    "emailHint": "قم بإدخال البريد الإلكتروني",
+    "phoneHint": "قم بإدخال رقم الجوال",
+    "phoneTooShort": "رقم الهاتف قصير",
+    "day": "اليوم",
+    "month": "الشهر",
+    "year": "السنة",
+    "contactLabels": {
+      "personal": "شخصي",
+      "work": "عمل",
+      "home": "منزل",
+      "other": "آخر",
+      "mobile": "جوال",
+      "fax": "فاكس"
+    }
+  },
+  "search": {
+    "noResults": "لا توجد نتائج",
+    "title": "البحث",
+    "hint": "أي متجر أو منتج تريد البحث عنه",
+    "clear": "مسح",
+    "defaultHistory": {
+      "womensShoes": "حذاء حريمي",
+      "jumiaStore": "متجر جوميا",
+      "womensBoots": "بوت حريمي"
+    },
+    "clearAll": "مسح الجميع",
+    "previousSearches": "تم البحث عنه سابقاً",
+    "productFallback": "منتج",
+    "businessFallback": "متجر"
+  },
+  "home": {
+    "defaultUser": "مستخدم Merzox",
+    "locationPermission": {
+      "title": "السماح باستخدام موقعك؟",
+      "nearbyReason": "نحتاج موقعك لعرض المتاجر القريبة منك وترتيب النتائج حسب المسافة.",
+      "genericReason": "نطلب إذنك مرة واحدة حتى نتمكن من تخصيص المتاجر والخدمات القريبة عند الحاجة.",
+      "later": "لاحقاً",
+      "allow": "السماح",
+      "disabledMessage": "تم إيقاف إذن الموقع من إعدادات الجهاز. يمكنك تفعيله من إعدادات التطبيق.",
+      "settings": "الإعدادات"
+    },
+    "sections": {
+      "newBusinesses": "متاجر جديدة",
+      "bestBusinesses": "أفضل المتاجر",
+      "offers": "المتاجر التي يوجد فيها عروض",
+      "nearbyBusinesses": "المتاجر القريبة منك"
+    },
+    "guestGreeting": "أهلاً، ضيف",
+    "userGreeting": "أهلاً، {}",
+    "browseOnly": "تصفح فقط",
+    "welcomeToMerzox": "مرحباً بك في Merzox",
+    "notificationsTooltip": "الإشعارات",
+    "merchantEnrollment": {
+      "title": "ادخل وكن من أفضل التجار",
+      "subtitle": "اشترك في عضوية التجار واعرض منتجاتك لجيرانك."
+    },
+    "searchHint": "ابحث عن أي متجر أو منتج تريده",
+    "follow": "متابعة النشاطات",
+    "unfollow": "إلغاء المتابعة",
+    "enableLocationHint": "فعّل الموقع للحصول على نتائج أدق للمتاجر القريبة منك.",
+    "noResultsInSection": "لا توجد نتائج في {}",
+    "cart": {
+      "guestMessage": "لعرض محتويات السلة الخاصة بك، يرجى تسجيل الدخول أولا",
+      "emptyTitle": "عذراً، السلة فارغة",
+      "emptyBody": "لا يوجد منتجات في السلة، استكمل التسوق\nواضف أي شيء تريده",
+      "exploreShopping": "استكشف التسوق",
+      "quantity": "الكمية: {}",
+      "subtotal": "المجموع الفرعي",
+      "deliveryCalculatedLater": "يحسب لاحقا",
+      "total": "الإجمالي",
+      "checkout": "إكمال الطلب"
+    },
+    "businesses": {
+      "noResultsMessage": "جرّب البحث باسم متجر أو منتج آخر.",
+      "swipeForMore": "مرر لعرض المزيد من المتاجر"
+    },
+    "profileGuestMessage": "لعرض حسابك وتعديل بياناتك، يرجى تسجيل الدخول أولا",
+    "profileGreeting": "{} ، أهلا",
+    "registerAsMerchant": "التسجيل كتاجر",
+    "ordersLabel": "الطلبات",
+    "comingSoon": "{} قريباً"
   }
 }

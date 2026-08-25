@@ -8,7 +8,9 @@
     "currency": "₪",
     "save": "Save",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "logout": "Log out",
+    "remove": "Remove"
   },
   "authGate": {
     "title": "Login required",
@@ -435,5 +437,104 @@
     "statuses": {
       "confirmed": "Confirmed"
     }
+  },
+  "profile": {
+    "title": "Profile"
+  },
+  "profileEdit": {
+    "title": "Edit profile",
+    "saved": "Changes saved",
+    "nameTooShort": "Name is too short",
+    "nameChangeUsed": "Your name change has already been used",
+    "addEmail": "Add another email",
+    "addPhone": "Add another number",
+    "addressHint": "Enter the address",
+    "gender": "Gender",
+    "genderFemale": "Female",
+    "genderMale": "Male",
+    "genderChangeUsed": "Your gender change has already been used",
+    "birthDate": "Date of birth",
+    "changeLanguage": "Change language",
+    "emailHint": "Enter your email address",
+    "phoneHint": "Enter your mobile number",
+    "phoneTooShort": "Phone number is too short",
+    "day": "Day",
+    "month": "Month",
+    "year": "Year",
+    "contactLabels": {
+      "personal": "Personal",
+      "work": "Work",
+      "home": "Home",
+      "other": "Other",
+      "mobile": "Mobile",
+      "fax": "Fax"
+    }
+  },
+  "search": {
+    "noResults": "No results",
+    "title": "Search",
+    "hint": "Search for any business or product",
+    "clear": "Clear",
+    "defaultHistory": {
+      "womensShoes": "Women's shoes",
+      "jumiaStore": "Jumia store",
+      "womensBoots": "Women's boots"
+    },
+    "clearAll": "Clear all",
+    "previousSearches": "Previously searched",
+    "productFallback": "Product",
+    "businessFallback": "Business"
+  },
+  "home": {
+    "defaultUser": "Merzox user",
+    "locationPermission": {
+      "title": "Allow access to your location?",
+      "nearbyReason": "We need your location to show nearby businesses and sort results by distance.",
+      "genericReason": "We ask for permission once so we can personalize nearby businesses and services when needed.",
+      "later": "Later",
+      "allow": "Allow",
+      "disabledMessage": "Location permission was disabled in your device settings. You can enable it from the app settings.",
+      "settings": "Settings"
+    },
+    "sections": {
+      "newBusinesses": "New businesses",
+      "bestBusinesses": "Top businesses",
+      "offers": "Businesses with offers",
+      "nearbyBusinesses": "Businesses near you"
+    },
+    "guestGreeting": "Hello, guest",
+    "userGreeting": "Hello, {}",
+    "browseOnly": "Browse only",
+    "welcomeToMerzox": "Welcome to Merzox",
+    "notificationsTooltip": "Notifications",
+    "merchantEnrollment": {
+      "title": "Join and become one of the top merchants",
+      "subtitle": "Join the merchant membership and showcase your products to your neighbors."
+    },
+    "searchHint": "Search for any business or product you want",
+    "follow": "Follow activities",
+    "unfollow": "Unfollow",
+    "enableLocationHint": "Enable location for more accurate results for businesses near you.",
+    "noResultsInSection": "No results in {}",
+    "cart": {
+      "guestMessage": "To view your cart contents, please log in first",
+      "emptyTitle": "Sorry, your cart is empty",
+      "emptyBody": "There are no products in your cart. Continue shopping\nand add anything you want",
+      "exploreShopping": "Explore shopping",
+      "quantity": "Quantity: {}",
+      "subtotal": "Subtotal",
+      "deliveryCalculatedLater": "Calculated later",
+      "total": "Total",
+      "checkout": "Complete order"
+    },
+    "businesses": {
+      "noResultsMessage": "Try searching for another business or product name.",
+      "swipeForMore": "Scroll to view more businesses"
+    },
+    "profileGuestMessage": "To view your account and edit your details, please log in first",
+    "profileGreeting": "Hello, {}",
+    "registerAsMerchant": "Register as a merchant",
+    "ordersLabel": "Orders",
+    "comingSoon": "{} coming soon"
   }
 }

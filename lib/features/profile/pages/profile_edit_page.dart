@@ -157,7 +157,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
         if (state.status == ProfileEditStatus.success) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(const SnackBar(content: Text('تم حفظ التعديلات')));
+          ).showSnackBar(SnackBar(content: Text('profileEdit.saved'.tr())));
           context.go('/home');
         }
 
@@ -179,9 +179,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             state.status == ProfileEditStatus.saving;
 
         return Directionality(
-          textDirection: context.locale.languageCode == 'ar'
-              ? ui.TextDirection.rtl
-              : ui.TextDirection.ltr,
+          textDirection: Directionality.of(context),
           child: Scaffold(
             backgroundColor: Colors.white,
             body: SafeArea(
@@ -197,24 +195,26 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             onToggleLanguage: _toggleLanguage,
                           ),
                           const SizedBox(height: 34),
-                          _ProfileLabel(text: 'الاسم كامل'),
+                          _ProfileLabel(text: 'auth.fullNameLabel'.tr()),
                           _ProfileTextField(
                             controller: _nameController,
-                            hintText: 'قم بإدخال الاسم كامل',
+                            hintText: 'auth.fullNameHint'.tr(),
                             enabled: _canChangeName && !isBusy,
                             validator: (value) {
                               if (!_canChangeName) return null;
                               return (value?.trim().length ?? 0) >= 2
                                   ? null
-                                  : 'الاسم قصير جداً';
+                                  : 'profileEdit.nameTooShort'.tr();
                             },
                           ),
                           if (!_canChangeName)
-                            const _RestrictionText(
-                              text: 'تم استخدام فرصة تعديل الاسم',
+                            _RestrictionText(
+                              text: 'profileEdit.nameChangeUsed'.tr(),
                             ),
                           const SizedBox(height: 18),
-                          _ProfileLabel(text: 'البريد الإلكتروني'),
+                          _ProfileLabel(
+                            text: 'businessEnrollment.emailLabel'.tr(),
+                          ),
                           ..._emails.asMap().entries.map(
                             (entry) => _EmailInputRow(
                               data: entry.value,
@@ -229,11 +229,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             ),
                           ),
                           _AddLineButton(
-                            text: 'إضافة بريد آخر',
+                            text: 'profileEdit.addEmail'.tr(),
                             onTap: _addEmail,
                           ),
                           const SizedBox(height: 18),
-                          _ProfileLabel(text: 'رقم الجوال'),
+                          _ProfileLabel(
+                            text: 'businessEnrollment.phoneLabel'.tr(),
+                          ),
                           ..._phones.asMap().entries.map(
                             (entry) => _PhoneInputRow(
                               data: entry.value,
@@ -248,23 +250,23 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             ),
                           ),
                           _AddLineButton(
-                            text: 'إضافة رقم آخر',
+                            text: 'profileEdit.addPhone'.tr(),
                             onTap: _addPhone,
                           ),
                           const SizedBox(height: 18),
-                          _ProfileLabel(text: 'العنوان'),
+                          _ProfileLabel(text: 'business.address'.tr()),
                           _ProfileTextField(
                             controller: _addressController,
-                            hintText: 'قم بإدخال العنوان',
+                            hintText: 'profileEdit.addressHint'.tr(),
                             enabled: !isBusy,
                           ),
                           const SizedBox(height: 18),
-                          _ProfileLabel(text: 'الجنس'),
+                          _ProfileLabel(text: 'profileEdit.gender'.tr()),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
                             children: [
                               _GenderChoice(
-                                label: 'أنثى',
+                                label: 'profileEdit.genderFemale'.tr(),
                                 value: 'female',
                                 groupValue: _gender,
                                 enabled: _canChangeGender && !isBusy,
@@ -274,7 +276,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                               ),
                               const SizedBox(width: 28),
                               _GenderChoice(
-                                label: 'ذكر',
+                                label: 'profileEdit.genderMale'.tr(),
                                 value: 'male',
                                 groupValue: _gender,
                                 enabled: _canChangeGender && !isBusy,
@@ -285,11 +287,11 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             ],
                           ),
                           if (!_canChangeGender)
-                            const _RestrictionText(
-                              text: 'تم استخدام فرصة تعديل الجنس',
+                            _RestrictionText(
+                              text: 'profileEdit.genderChangeUsed'.tr(),
                             ),
                           const SizedBox(height: 20),
-                          _ProfileLabel(text: 'تاريخ الميلاد'),
+                          _ProfileLabel(text: 'profileEdit.birthDate'.tr()),
                           const _BirthdayPlaceholders(),
                           const SizedBox(height: 124),
                           Center(
@@ -313,9 +315,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Text(
-                                        'حفظ',
-                                        style: TextStyle(
+                                    : Text(
+                                        'common.save'.tr(),
+                                        style: const TextStyle(
                                           fontSize: 17,
                                           fontWeight: FontWeight.w700,
                                         ),
@@ -353,9 +355,9 @@ class _ProfileEditHeader extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          const Center(
+          Center(
             child: Text(
-              'تعديل الملف الشخصي',
+              'profileEdit.title'.tr(),
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
@@ -366,7 +368,7 @@ class _ProfileEditHeader extends StatelessWidget {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: IconButton(
-              tooltip: 'رجوع',
+              tooltip: 'common.back'.tr(),
               onPressed: onBack,
               icon: Icon(
                 isRtl
@@ -380,7 +382,7 @@ class _ProfileEditHeader extends StatelessWidget {
           Align(
             alignment: AlignmentDirectional.centerEnd,
             child: IconButton(
-              tooltip: 'تغيير اللغة',
+              tooltip: 'profileEdit.changeLanguage'.tr(),
               onPressed: onToggleLanguage,
               icon: Icon(
                 Icons.language_rounded,
@@ -459,7 +461,7 @@ class _EmailInputRow extends StatelessWidget {
       controller: data.controller,
       label: data.label,
       labels: _emailLabels,
-      hintText: 'قم بإدخال البريد الإلكتروني',
+      hintText: 'profileEdit.emailHint'.tr(),
       enabled: enabled,
       canRemove: canRemove,
       keyboardType: TextInputType.emailAddress,
@@ -470,7 +472,7 @@ class _EmailInputRow extends StatelessWidget {
         if (trimmed.isEmpty) return null;
         return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(trimmed)
             ? null
-            : 'البريد الإلكتروني غير صحيح';
+            : 'validation.invalidEmail'.tr();
       },
     );
   }
@@ -495,7 +497,7 @@ class _PhoneInputRow extends StatelessWidget {
       controller: data.controller,
       label: data.label,
       labels: _phoneLabels,
-      hintText: 'قم بإدخال رقم الجوال',
+      hintText: 'profileEdit.phoneHint'.tr(),
       enabled: enabled,
       canRemove: canRemove,
       keyboardType: TextInputType.phone,
@@ -504,7 +506,7 @@ class _PhoneInputRow extends StatelessWidget {
       validator: (value) {
         final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
         if (digits.isEmpty) return null;
-        return digits.length >= 7 ? null : 'رقم الهاتف قصير';
+        return digits.length >= 7 ? null : 'profileEdit.phoneTooShort'.tr();
       },
     );
   }
@@ -545,6 +547,7 @@ class _LabeledContactRow extends StatelessWidget {
             width: 112,
             height: 54,
             child: DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: labels.containsKey(label)
                   ? label
                   : labels.keys.first,
@@ -552,7 +555,10 @@ class _LabeledContactRow extends StatelessWidget {
                   .map(
                     (entry) => DropdownMenuItem(
                       value: entry.key,
-                      child: Text(entry.value),
+                      child: Text(
+                        entry.value.tr(),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   )
                   .toList(),
@@ -582,7 +588,7 @@ class _LabeledContactRow extends StatelessWidget {
             width: 42,
             child: canRemove
                 ? IconButton(
-                    tooltip: 'حذف',
+                    tooltip: 'common.delete'.tr(),
                     onPressed: enabled ? onRemove : null,
                     icon: Icon(
                       Icons.remove_circle_outline_rounded,
@@ -677,13 +683,13 @@ class _BirthdayPlaceholders extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
-        Expanded(child: _PlaceholderDropdown(text: 'اليوم')),
-        SizedBox(width: 18),
-        Expanded(child: _PlaceholderDropdown(text: 'الشهر')),
-        SizedBox(width: 18),
-        Expanded(child: _PlaceholderDropdown(text: 'السنة')),
+        Expanded(child: _PlaceholderDropdown(text: 'profileEdit.day'.tr())),
+        const SizedBox(width: 18),
+        Expanded(child: _PlaceholderDropdown(text: 'profileEdit.month'.tr())),
+        const SizedBox(width: 18),
+        Expanded(child: _PlaceholderDropdown(text: 'profileEdit.year'.tr())),
       ],
     );
   }
@@ -777,16 +783,16 @@ class _PhoneFieldData {
 }
 
 const _emailLabels = {
-  'personal': 'شخصي',
-  'work': 'عمل',
-  'home': 'منزل',
-  'other': 'آخر',
+  'personal': 'profileEdit.contactLabels.personal',
+  'work': 'profileEdit.contactLabels.work',
+  'home': 'profileEdit.contactLabels.home',
+  'other': 'profileEdit.contactLabels.other',
 };
 
 const _phoneLabels = {
-  'mobile': 'جوال',
-  'work': 'عمل',
-  'home': 'منزل',
-  'fax': 'فاكس',
-  'other': 'آخر',
+  'mobile': 'profileEdit.contactLabels.mobile',
+  'work': 'profileEdit.contactLabels.work',
+  'home': 'profileEdit.contactLabels.home',
+  'fax': 'profileEdit.contactLabels.fax',
+  'other': 'profileEdit.contactLabels.other',
 };
