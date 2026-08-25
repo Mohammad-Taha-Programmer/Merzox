@@ -62,7 +62,9 @@ class _ChatPageState extends State<ChatPage> {
             if (state.errorMessage.isNotEmpty) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
-                ..showSnackBar(SnackBar(content: Text(state.errorMessage)));
+                ..showSnackBar(
+                  SnackBar(content: Text(_localizedError(state.errorMessage))),
+                );
             }
           },
           builder: (context, state) {
@@ -184,7 +186,7 @@ class _ChatBody extends StatelessWidget {
               Text(
                 state.errorMessage.isEmpty
                     ? 'messages.loadError'.tr()
-                    : state.errorMessage,
+                    : _localizedError(state.errorMessage),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: MerzoxColors.kColor5E5E5E,
@@ -278,11 +280,11 @@ class _MessageBubble extends StatelessWidget {
                 color: isMine
                     ? MerzoxColors.kColorEE6C4D
                     : MerzoxColors.kColorF3F7FA,
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(14),
-                  topRight: const Radius.circular(14),
-                  bottomLeft: Radius.circular(isMine ? 14 : 2),
-                  bottomRight: Radius.circular(isMine ? 2 : 14),
+                borderRadius: BorderRadiusDirectional.only(
+                  topStart: const Radius.circular(14),
+                  topEnd: const Radius.circular(14),
+                  bottomStart: Radius.circular(isMine ? 14 : 2),
+                  bottomEnd: Radius.circular(isMine ? 2 : 14),
                 ),
               ),
               child: Column(
@@ -412,7 +414,7 @@ class _ChatAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initial = label.trim().isEmpty ? '؟' : label.trim().characters.first;
+    final initial = label.trim().isEmpty ? '?' : label.trim().characters.first;
 
     return Container(
       width: size,
@@ -449,6 +451,10 @@ class _ChatAvatar extends StatelessWidget {
             ),
     );
   }
+}
+
+String _localizedError(String message) {
+  return message.startsWith('messages.') ? message.tr() : message;
 }
 
 String _formatTime(DateTime? value) {

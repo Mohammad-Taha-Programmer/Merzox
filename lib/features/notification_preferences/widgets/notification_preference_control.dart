@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
@@ -21,7 +22,7 @@ class NotificationPreferenceControl extends StatelessWidget {
       listener: (context, state) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(SnackBar(content: Text(state.errorMessage)));
+          ..showSnackBar(SnackBar(content: Text(state.errorMessage.tr())));
       },
       builder: (context, state) {
         return Container(
@@ -35,18 +36,25 @@ class NotificationPreferenceControl extends StatelessWidget {
             padding: const EdgeInsetsDirectional.only(start: 10, end: 12),
             child: Row(
               children: [
-                _leadingControl(context, state),
-                const Spacer(),
-                const Text(
-                  'تنبيهات المنتجات والعروض',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF2B2B2B)),
-                ),
-                const SizedBox(width: 12),
                 const Icon(
                   Icons.notifications_none_rounded,
                   color: MerzoxColors.kColor3D5A80,
                   size: 18,
                 ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'notificationPreferences.productOffers'.tr(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF2B2B2B),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _leadingControl(context, state),
               ],
             ),
           ),
@@ -86,7 +94,7 @@ class NotificationPreferenceControl extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4),
           minimumSize: const Size(0, 32),
         ),
-        child: const Text('إعادة المحاولة', style: TextStyle(fontSize: 10)),
+        child: Text('common.retry'.tr(), style: const TextStyle(fontSize: 10)),
       );
     }
 
