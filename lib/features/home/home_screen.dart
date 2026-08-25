@@ -51,7 +51,7 @@ class _StoredUserProfile {
 
     return _StoredUserProfile(
       name: storedName == null || storedName.isEmpty
-          ? 'مستخدم Merzox'
+          ? 'home.defaultUser'.tr()
           : storedName,
       address: storedAddress ?? '',
       userType: storedUserType == null || storedUserType.isEmpty
@@ -109,20 +109,20 @@ class HomeScreen extends StatelessWidget {
         return Directionality(
           textDirection: Directionality.of(context),
           child: AlertDialog(
-            title: const Text('السماح باستخدام موقعك؟'),
+            title: Text('home.locationPermission.title'.tr()),
             content: Text(
               reason == 'nearby'
-                  ? 'نحتاج موقعك لعرض المتاجر القريبة منك وترتيب النتائج حسب المسافة.'
-                  : 'نطلب إذنك مرة واحدة حتى نتمكن من تخصيص المتاجر والخدمات القريبة عند الحاجة.',
+                  ? 'home.locationPermission.nearbyReason'.tr()
+                  : 'home.locationPermission.genericReason'.tr(),
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('لاحقاً'),
+                child: Text('home.locationPermission.later'.tr()),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(dialogContext).pop(true),
-                child: const Text('السماح'),
+                child: Text('home.locationPermission.allow'.tr()),
               ),
             ],
           ),
@@ -142,11 +142,9 @@ class HomeScreen extends StatelessWidget {
         status == MerzoxLocationPermissionStatus.permanentlyDenied) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text(
-            'تم إيقاف إذن الموقع من إعدادات الجهاز. يمكنك تفعيله من إعدادات التطبيق.',
-          ),
+          content: Text('home.locationPermission.disabledMessage'.tr()),
           action: SnackBarAction(
-            label: 'الإعدادات',
+            label: 'home.locationPermission.settings'.tr(),
             onPressed: service.openAppSettingsPage,
           ),
         ),
@@ -243,27 +241,27 @@ class _HomeBottomNavigationBar extends StatelessWidget {
 
   static const _items = [
     _HomeNavData(
-      label: 'الرئيسية',
+      label: 'nav.home',
       icon: Icons.home_outlined,
       selectedIcon: Icons.home_rounded,
     ),
     _HomeNavData(
-      label: 'المتاجر',
+      label: 'nav.stores',
       icon: Icons.storefront_outlined,
       selectedIcon: Icons.storefront_rounded,
     ),
     _HomeNavData(
-      label: 'السلة',
+      label: 'nav.cart',
       icon: Icons.shopping_bag_outlined,
       selectedIcon: Icons.shopping_bag_rounded,
     ),
     _HomeNavData(
-      label: 'الرسائل',
+      label: 'nav.messages',
       icon: Icons.chat_bubble_outline_rounded,
       selectedIcon: Icons.chat_bubble_rounded,
     ),
     _HomeNavData(
-      label: 'الحساب',
+      label: 'nav.profile',
       icon: Icons.person_outline_rounded,
       selectedIcon: Icons.person_rounded,
     ),
@@ -394,7 +392,7 @@ class _HomeNavItem extends StatelessWidget {
     final inactiveColor = MerzoxColors.kColor8D99AE;
 
     return Semantics(
-      label: data.label,
+      label: data.label.tr(),
       button: true,
       selected: selected,
       child: InkWell(
@@ -435,7 +433,7 @@ class _CenterStoreButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: data.label,
+      label: data.label.tr(),
       button: true,
       selected: selected,
       child: InkWell(
@@ -520,7 +518,7 @@ class _HomeTab extends StatelessWidget {
           ),
         ),
         _BusinessSection(
-          title: 'متاجر جديدة',
+          title: 'home.sections.newBusinesses'.tr(),
           businesses: newBusinesses,
           status: state.newBusinessesStatus,
           errorMessage: state.newBusinessesError,
@@ -530,7 +528,7 @@ class _HomeTab extends StatelessWidget {
           followedBusinessIds: state.followedBusinessIds,
         ),
         _BusinessSection(
-          title: 'أفضل المتاجر',
+          title: 'home.sections.bestBusinesses'.tr(),
           businesses: bestBusinesses,
           status: state.bestBusinessesStatus,
           errorMessage: state.bestBusinessesError,
@@ -540,7 +538,7 @@ class _HomeTab extends StatelessWidget {
           followedBusinessIds: state.followedBusinessIds,
         ),
         _BusinessSection(
-          title: 'المتاجر التي يوجد فيها عروض',
+          title: 'home.sections.offers'.tr(),
           businesses: discountedBusinesses,
           status: state.discountedBusinessesStatus,
           errorMessage: state.discountedBusinessesError,
@@ -557,7 +555,7 @@ class _HomeTab extends StatelessWidget {
           ),
         ),
         _BusinessSection(
-          title: 'المتاجر القريبة منك',
+          title: 'home.sections.nearbyBusinesses'.tr(),
           businesses: nearbyBusinesses,
           status: state.nearbyBusinessesStatus,
           errorMessage: state.nearbyBusinessesError,
@@ -615,8 +613,8 @@ class _HomeTopBar extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (isGuest)
-                      const Text(
-                        'أهلاً، ضيف',
+                      Text(
+                        'home.guestGreeting'.tr(),
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.w700,
@@ -627,10 +625,11 @@ class _HomeTopBar extends StatelessWidget {
                       FutureBuilder<_StoredUserProfile>(
                         future: _StoredUserProfile.load(),
                         builder: (context, snapshot) {
-                          final name = snapshot.data?.name ?? 'مستخدم Merzox';
+                          final name =
+                              snapshot.data?.name ?? 'home.defaultUser'.tr();
 
                           return Text(
-                            'أهلاً، $name',
+                            'home.userGreeting'.tr(args: [name]),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
@@ -642,7 +641,9 @@ class _HomeTopBar extends StatelessWidget {
                         },
                       ),
                     Text(
-                      isGuest ? 'تصفح فقط' : 'مرحباً بك في Merzox',
+                      isGuest
+                          ? 'home.browseOnly'.tr()
+                          : 'home.welcomeToMerzox'.tr(),
                       style: TextStyle(
                         fontSize: 12,
                         color: MerzoxColors.kColor8D99AE,
@@ -656,7 +657,7 @@ class _HomeTopBar extends StatelessWidget {
           Align(
             alignment: AlignmentDirectional.centerEnd,
             child: IconButton(
-              tooltip: 'الإشعارات',
+              tooltip: 'home.notificationsTooltip'.tr(),
               onPressed: isGuest ? onProtectedAction : () {},
               icon: Stack(
                 clipBehavior: Clip.none,
@@ -685,7 +686,7 @@ class _HomeTopBar extends StatelessWidget {
                 width: 44,
                 height: 44,
                 child: IconButton(
-                  tooltip: 'تسجيل الخروج',
+                  tooltip: 'common.logout'.tr(),
                   onPressed: onLogout,
                   icon: Icon(
                     Icons.logout_rounded,
@@ -721,8 +722,8 @@ class _MerchantEnrollmentCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
-                  'ادخل وكن من أفضل التجار',
+                Text(
+                  'home.merchantEnrollment.title'.tr(),
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 17,
@@ -733,7 +734,7 @@ class _MerchantEnrollmentCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'اشترك في عضوية التجار واعرض منتجاتك لجيرانك.',
+                  'home.merchantEnrollment.subtitle'.tr(),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.82),
                     fontSize: 12,
@@ -753,7 +754,7 @@ class _MerchantEnrollmentCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
-                    child: const Text('إنشاء حساب'),
+                    child: Text('authGate.signup'.tr()),
                   ),
                 ),
               ],
@@ -793,7 +794,7 @@ class _SearchBox extends StatelessWidget {
         onTap: onTap,
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
-          hintText: 'ابحث عن أي متجر أو منتج تريده',
+          hintText: 'home.searchHint'.tr(),
           hintStyle: TextStyle(color: MerzoxColors.kColor9F9F9F, fontSize: 14),
           prefixIcon: Icon(
             Icons.search_rounded,
@@ -1115,7 +1116,7 @@ class _FollowButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Tooltip(
-      message: followed ? 'إلغاء المتابعة' : 'متابعة النشاطات',
+      message: followed ? 'home.unfollow'.tr() : 'home.follow'.tr(),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
         onTap: onPressed,
@@ -1179,9 +1180,9 @@ class _LocationStatusCard extends StatelessWidget {
                   color: MerzoxColors.kColorEE6C4D,
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'فعّل الموقع للحصول على نتائج أدق للمتاجر القريبة منك.',
+                    'home.enableLocationHint'.tr(),
                     style: TextStyle(fontSize: 13, height: 1.35),
                   ),
                 ),
@@ -1213,7 +1214,7 @@ class _EmptySearchResult extends StatelessWidget {
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
-        'لا توجد نتائج في $title',
+        'home.noResultsInSection'.tr(args: [title]),
         style: TextStyle(color: MerzoxColors.kColor767676),
       ),
     );
@@ -1325,8 +1326,8 @@ class _GuestLoginTabState extends StatelessWidget {
                 SizedBox(height: constraints.maxHeight < 680 ? 62 : 108),
                 const _GuestAvatarMark(),
                 const SizedBox(height: 34),
-                const Text(
-                  'يرجى تسجيل الدخول',
+                Text(
+                  'authGate.title'.tr(),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 18,
@@ -1355,8 +1356,8 @@ class _GuestLoginTabState extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                   ),
-                  child: const Text(
-                    'حساب إنشاء',
+                  child: Text(
+                    'authGate.signup'.tr(),
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -1371,8 +1372,8 @@ class _GuestLoginTabState extends StatelessWidget {
                       borderRadius: BorderRadius.circular(6),
                     ),
                   ),
-                  child: const Text(
-                    'تسجيل دخول',
+                  child: Text(
+                    'authGate.login'.tr(),
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -1468,8 +1469,8 @@ class _CartTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isGuest) {
       return _GuestLoginTabState(
-        title: 'السلة',
-        message: 'لعرض محتويات السلة الخاصة بك، يرجى تسجيل الدخول أولا',
+        title: 'nav.cart'.tr(),
+        message: 'home.cart.guestMessage'.tr(),
         onSignupPressed: onSignupPressed,
         onLoginPressed: onLoginPressed,
       );
@@ -1515,7 +1516,7 @@ class _CartItemsView extends StatelessWidget {
         return ListView(
           padding: const EdgeInsets.fromLTRB(16, 18, 16, 118),
           children: [
-            const _PlainTabTitle(title: 'السلة'),
+            _PlainTabTitle(title: 'nav.cart'.tr()),
             if (state.status == CartStatus.loading)
               const Padding(
                 padding: EdgeInsets.only(top: 160),
@@ -1570,8 +1571,8 @@ class _EmptyCartState extends StatelessWidget {
             painter: _EmptyCartBagPainter(),
           ),
           const SizedBox(height: 28),
-          const Text(
-            'عذراً، السلة فارغة',
+          Text(
+            'home.cart.emptyTitle'.tr(),
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
@@ -1580,7 +1581,7 @@ class _EmptyCartState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'لا يوجد منتجات في السلة، استكمل التسوق\nواضف أي شيء تريده',
+            'home.cart.emptyBody'.tr(),
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 13,
@@ -1601,8 +1602,8 @@ class _EmptyCartState extends StatelessWidget {
                   borderRadius: BorderRadius.circular(5),
                 ),
               ),
-              child: const Text(
-                'استكشف التسوق',
+              child: Text(
+                'home.cart.exploreShopping'.tr(),
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
               ),
             ),
@@ -1710,7 +1711,7 @@ class _CartItemTile extends StatelessWidget {
         ],
       ),
       child: Row(
-        textDirection: TextDirection.rtl,
+        textDirection: Directionality.of(context),
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
@@ -1746,7 +1747,7 @@ class _CartItemTile extends StatelessWidget {
                     item.variantLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    textDirection: TextDirection.rtl,
+                    textDirection: Directionality.of(context),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -1756,8 +1757,8 @@ class _CartItemTile extends StatelessWidget {
                 ],
                 const SizedBox(height: 6),
                 Text(
-                  'الكمية: ${item.quantity}',
-                  textDirection: TextDirection.rtl,
+                  'home.cart.quantity'.tr(args: ['${item.quantity}']),
+                  textDirection: Directionality.of(context),
                   style: TextStyle(
                     fontSize: 12,
                     color: MerzoxColors.kColor767676,
@@ -1770,7 +1771,7 @@ class _CartItemTile extends StatelessWidget {
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       'catalog.outOfStock'.tr(),
-                      textDirection: TextDirection.rtl,
+                      textDirection: Directionality.of(context),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -1780,7 +1781,7 @@ class _CartItemTile extends StatelessWidget {
                   ),
                 const SizedBox(height: 8),
                 Row(
-                  textDirection: TextDirection.rtl,
+                  textDirection: Directionality.of(context),
                   children: [
                     Text(
                       '\u20AA ${item.total.toStringAsFixed(0)}',
@@ -1793,7 +1794,7 @@ class _CartItemTile extends StatelessWidget {
                     ),
                     const Spacer(),
                     IconButton(
-                      tooltip: 'إزالة',
+                      tooltip: 'common.remove'.tr(),
                       onPressed: onRemove,
                       icon: Icon(
                         Icons.delete_outline_rounded,
@@ -1918,10 +1919,10 @@ class _BusinessesTabState extends State<_BusinessesTab> {
             ),
           )
         else if (businesses.isEmpty)
-          const _EmptyFeatureState(
+          _EmptyFeatureState(
             icon: Icons.search_off_rounded,
-            title: 'لا توجد نتائج',
-            message: 'جرّب البحث باسم متجر أو منتج آخر.',
+            title: 'search.noResults'.tr(),
+            message: 'home.businesses.noResultsMessage'.tr(),
           )
         else ...[
           ...rows,
@@ -1952,7 +1953,7 @@ class _BusinessesTabState extends State<_BusinessesTab> {
               padding: const EdgeInsets.symmetric(vertical: 10),
               child: Center(
                 child: Text(
-                  'مرر لعرض المزيد من المتاجر',
+                  'home.businesses.swipeForMore'.tr(),
                   style: TextStyle(
                     fontSize: 12,
                     color: MerzoxColors.kColor8D99AE,
@@ -1976,9 +1977,9 @@ class _AllBusinessesTopBar extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          const Center(
+          Center(
             child: Text(
-              'المتاجر',
+              'nav.stores'.tr(),
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
@@ -2136,8 +2137,8 @@ class _ProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     if (isGuest) {
       return _GuestLoginTabState(
-        title: 'الملف الشخصي',
-        message: 'لعرض حسابك وتعديل بياناتك، يرجى تسجيل الدخول أولا',
+        title: 'profile.title'.tr(),
+        message: 'home.profileGuestMessage'.tr(),
         onSignupPressed: onSignupPressed,
         onLoginPressed: onLoginPressed,
       );
@@ -2201,13 +2202,13 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
     return Stack(
       children: [
         Container(height: 126, color: MerzoxColors.kColor95BDD5),
-        const Positioned(
+        Positioned(
           top: 28,
           left: 0,
           right: 0,
           child: Center(
             child: Text(
-              'الملف الشخصي',
+              'profile.title'.tr(),
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 16,
@@ -2232,10 +2233,11 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
                   FutureBuilder<_StoredUserProfile>(
                     future: _profileFuture,
                     builder: (context, snapshot) {
-                      final name = snapshot.data?.name ?? 'مستخدم Merzox';
+                      final name =
+                          snapshot.data?.name ?? 'home.defaultUser'.tr();
 
                       return Text(
-                        '$name ، أهلا',
+                        'home.profileGreeting'.tr(args: [name]),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -2249,22 +2251,22 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
                   _ProfileMerchantButton(onPressed: widget.onProtectedAction),
                   const SizedBox(height: 18),
                   _ProfileXdMenuTile(
-                    title: 'تعديل الملف الشخصي',
+                    title: 'profileEdit.title'.tr(),
                     icon: Icons.edit_outlined,
                     onTap: widget.onEditProfile,
                   ),
                   _ProfileXdMenuTile(
-                    title: 'طلباتي',
+                    title: 'orders.title'.tr(),
                     icon: Icons.article_outlined,
                     onTap: widget.onOrders,
                   ),
                   _ProfileXdMenuTile(
-                    title: 'الخريطة',
+                    title: 'map.title'.tr(),
                     icon: Icons.location_on_outlined,
                     onTap: widget.onMap,
                   ),
                   _ProfileXdMenuTile(
-                    title: 'المفضلة',
+                    title: 'favorites.title'.tr(),
                     icon: Icons.favorite_border_rounded,
                     onTap: widget.onFavorites,
                   ),
@@ -2337,8 +2339,8 @@ class _ProfileMerchantButton extends StatelessWidget {
       child: FilledButton.icon(
         onPressed: onPressed,
         icon: const Icon(Icons.storefront_outlined, size: 16),
-        label: const Text(
-          'التسجيل كتاجر',
+        label: Text(
+          'home.registerAsMerchant'.tr(),
           style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
         ),
         style: FilledButton.styleFrom(
@@ -2439,7 +2441,7 @@ class _ProfileXdLogoutButton extends StatelessWidget {
           color: MerzoxColors.kColor3D5A80,
           size: 18,
         ),
-        label: const Text('تسجيل خروج', style: TextStyle(fontSize: 12)),
+        label: Text('common.logout'.tr(), style: const TextStyle(fontSize: 12)),
         style: TextButton.styleFrom(
           foregroundColor: const Color(0xFF2B2B2B),
           backgroundColor: MerzoxColors.kColorF5F9FC,
@@ -2516,14 +2518,17 @@ class _CartSummaryCard extends StatelessWidget {
       child: Column(
         children: [
           _SummaryRow(
-            label: 'المجموع الفرعي',
+            label: 'home.cart.subtotal'.tr(),
             value: '\u20AA ${subtotal.toStringAsFixed(0)}',
           ),
           const SizedBox(height: 8),
-          _SummaryRow(label: 'التوصيل', value: 'يحسب لاحقا'),
+          _SummaryRow(
+            label: 'orders.delivery'.tr(),
+            value: 'home.cart.deliveryCalculatedLater'.tr(),
+          ),
           const Divider(height: 24),
           _SummaryRow(
-            label: 'الإجمالي',
+            label: 'home.cart.total'.tr(),
             value: '\u20AA ${subtotal.toStringAsFixed(0)}',
             isStrong: true,
           ),
@@ -2538,7 +2543,7 @@ class _CartSummaryCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: const Text('إكمال الطلب'),
+            child: Text('home.cart.checkout'.tr()),
           ),
         ],
       ),
@@ -2624,7 +2629,7 @@ class _BusinessProfileTopBar extends StatelessWidget {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: IconButton(
-              tooltip: 'رجوع',
+              tooltip: 'common.back'.tr(),
               onPressed: onBack,
               icon: Icon(
                 isRtl
@@ -2672,11 +2677,18 @@ class _ComingSoonTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final titles = ['الرئيسية', 'المتاجر', 'الطلبات', 'الرسائل', 'الحساب'];
+    const titleKeys = [
+      'nav.home',
+      'nav.stores',
+      'home.ordersLabel',
+      'nav.messages',
+      'nav.profile',
+    ];
+    final title = titleKeys[index].tr();
 
     return Center(
       child: Text(
-        '${titles[index]} قريباً',
+        'home.comingSoon'.tr(args: [title]),
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
       ),
     );

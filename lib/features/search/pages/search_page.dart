@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
@@ -44,7 +45,7 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) {
     return Directionality(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       child: Scaffold(
         backgroundColor: Colors.white,
         body: SafeArea(
@@ -110,13 +111,15 @@ class _SearchTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+
     return SizedBox(
       height: 48,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          const Text(
-            'البحث',
+          Text(
+            'search.title'.tr(),
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
@@ -126,9 +129,14 @@ class _SearchTopBar extends StatelessWidget {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: IconButton(
-              tooltip: 'رجوع',
+              tooltip: 'common.back'.tr(),
               onPressed: onBack,
-              icon: const Icon(Icons.chevron_right_rounded, size: 34),
+              icon: Icon(
+                isRtl
+                    ? Icons.chevron_right_rounded
+                    : Icons.chevron_left_rounded,
+                size: 34,
+              ),
             ),
           ),
         ],
@@ -163,14 +171,14 @@ class _SearchField extends StatelessWidget {
         focusNode: focusNode,
         onChanged: onChanged,
         onSubmitted: onSubmitted,
-        textAlign: TextAlign.right,
+        textAlign: TextAlign.start,
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
-          hintText: 'أي متجر أو منتج تريد البحث عنه',
+          hintText: 'search.hint'.tr(),
           hintStyle: TextStyle(color: MerzoxColors.kColorC7C7C7, fontSize: 13),
           prefixIcon: hasText
               ? IconButton(
-                  tooltip: 'مسح',
+                  tooltip: 'search.clear'.tr(),
                   onPressed: onClear,
                   icon: Icon(
                     Icons.cancel_rounded,
@@ -213,7 +221,11 @@ class _SearchHistory extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = history.isEmpty
-        ? const ['حذاء حريمي', 'متجر جوميا', 'بوت حريمي']
+        ? [
+            'search.defaultHistory.womensShoes'.tr(),
+            'search.defaultHistory.jumiaStore'.tr(),
+            'search.defaultHistory.womensBoots'.tr(),
+          ]
         : history;
 
     return Column(
@@ -224,7 +236,7 @@ class _SearchHistory extends StatelessWidget {
             TextButton(
               onPressed: history.isEmpty ? null : onClear,
               child: Text(
-                'مسح الجميع',
+                'search.clearAll'.tr(),
                 style: TextStyle(
                   color: MerzoxColors.kColor3D5A80,
                   fontSize: 14,
@@ -232,8 +244,8 @@ class _SearchHistory extends StatelessWidget {
               ),
             ),
             const Spacer(),
-            const Text(
-              'تم البحث عنه سابقاً',
+            Text(
+              'search.previousSearches'.tr(),
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
             ),
           ],
@@ -270,25 +282,26 @@ class _HistoryTile extends StatelessWidget {
     return Container(
       height: 50,
       margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
+      child: Material(
         color: MerzoxColors.kColorF9F9F9,
         borderRadius: BorderRadius.circular(5),
-      ),
-      child: ListTile(
-        onTap: onSelect,
-        dense: true,
-        title: Text(
-          query,
-          textAlign: TextAlign.right,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF464646)),
-        ),
-        leading: IconButton(
-          tooltip: 'إزالة',
-          onPressed: removable ? onRemove : null,
-          icon: Icon(
-            Icons.cancel_rounded,
-            color: MerzoxColors.kColorD8D8D8,
-            size: 18,
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          onTap: onSelect,
+          dense: true,
+          title: Text(
+            query,
+            textAlign: TextAlign.start,
+            style: const TextStyle(fontSize: 14, color: Color(0xFF464646)),
+          ),
+          leading: IconButton(
+            tooltip: 'common.remove'.tr(),
+            onPressed: removable ? onRemove : null,
+            icon: Icon(
+              Icons.cancel_rounded,
+              color: MerzoxColors.kColorD8D8D8,
+              size: 18,
+            ),
           ),
         ),
       ),
@@ -303,7 +316,7 @@ class _SearchTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['المنتجات', 'المتاجر'];
+    final labels = ['favorites.products'.tr(), 'nav.stores'.tr()];
 
     return Container(
       height: 38,
@@ -380,7 +393,7 @@ class _ProductResultTile extends StatelessWidget {
     final imageUrl = item.product.imageUrl;
 
     return Row(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       children: [
         _ResultImage(
           imageUrl: imageUrl,
@@ -390,10 +403,12 @@ class _ProductResultTile extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            item.product.name.isEmpty ? 'منتج' : item.product.name,
+            item.product.name.isEmpty
+                ? 'search.productFallback'.tr()
+                : item.product.name,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.start,
             style: const TextStyle(fontSize: 13, color: Color(0xFF2B2B2B)),
           ),
         ),
@@ -438,7 +453,7 @@ class _BusinessResultTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      textDirection: TextDirection.rtl,
+      textDirection: Directionality.of(context),
       children: [
         _ResultImage(
           imageUrl: '',
@@ -449,10 +464,12 @@ class _BusinessResultTile extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: Text(
-            business.name.isEmpty ? 'متجر' : business.name,
+            business.name.isEmpty
+                ? 'search.businessFallback'.tr()
+                : business.name,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.start,
             style: const TextStyle(fontSize: 13, color: Color(0xFF2B2B2B)),
           ),
         ),
@@ -525,7 +542,7 @@ class _NoResults extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'لا توجد نتائج',
+            'search.noResults'.tr(),
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w800,
