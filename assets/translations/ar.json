@@ -25,7 +25,11 @@
     "customerAccountRequired": "يمكن إرسال التقييمات من حساب عميل فقط.",
     "deliveredPurchaseRequired": "يمكنك تقييم هذا المتجر بعد استلام طلب مكتمل منه.",
     "productDeliveredPurchaseRequired": "يمكنك تقييم هذا المنتج بعد استلام طلب مكتمل يحتوي عليه.",
-    "eligibilityCheckFailed": "تعذر التحقق من أهلية التقييم. حاول مرة أخرى."
+    "eligibilityCheckFailed": "تعذر التحقق من أهلية التقييم. حاول مرة أخرى.",
+    "title": "التقييمات",
+    "publish": "نشر",
+    "allReviews": "كل التقييمات",
+    "count": "({} تقييم)"
   },
   "nav": {
     "home": "الرئيسية",
@@ -536,5 +540,23 @@
     "registerAsMerchant": "التسجيل كتاجر",
     "ordersLabel": "الطلبات",
     "comingSoon": "{} قريباً"
+  },
+  "businessProfile": {
+    "followers": "متابع",
+    "products": "منتج",
+    "tabs": {
+      "about": "عن المتجر"
+    },
+    "filters": {
+      "new": "الجديدة"
+    }
+  },
+  "productDetails": {
+    "tabs": {
+      "description": "الوصف"
+    },
+    "sellerDetails": "تفاصيل البائع",
+    "reviewHint": "قم بكتابة تقييمك للمنتج الذي قمت بشرائه هنا",
+    "buyNow": "شراء الآن"
   }
 }

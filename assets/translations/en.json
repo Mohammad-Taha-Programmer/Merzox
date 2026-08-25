@@ -25,7 +25,11 @@
     "customerAccountRequired": "Reviews can only be submitted from a customer account.",
     "deliveredPurchaseRequired": "You can review this business after receiving a delivered order from it.",
     "productDeliveredPurchaseRequired": "You can review this product after receiving a delivered order that contains it.",
-    "eligibilityCheckFailed": "Could not verify review eligibility. Please try again."
+    "eligibilityCheckFailed": "Could not verify review eligibility. Please try again.",
+    "title": "Reviews",
+    "publish": "Publish",
+    "allReviews": "All reviews",
+    "count": "({} reviews)"
   },
   "nav": {
     "home": "Home",
@@ -536,5 +540,23 @@
     "registerAsMerchant": "Register as a merchant",
     "ordersLabel": "Orders",
     "comingSoon": "{} coming soon"
+  },
+  "businessProfile": {
+    "followers": "followers",
+    "products": "products",
+    "tabs": {
+      "about": "About"
+    },
+    "filters": {
+      "new": "New"
+    }
+  },
+  "productDetails": {
+    "tabs": {
+      "description": "Description"
+    },
+    "sellerDetails": "Seller details",
+    "reviewHint": "Write your review of the product you purchased here",
+    "buyNow": "Buy now"
   }
 }
