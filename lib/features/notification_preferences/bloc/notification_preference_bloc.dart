@@ -73,7 +73,7 @@ class NotificationPreferenceBloc
       emit(
         const NotificationPreferenceState(
           status: NotificationPreferenceStatus.failure,
-          errorMessage: 'تعذر تحميل تفضيل التنبيهات. حاول مرة أخرى.',
+          errorMessage: 'notificationPreferences.loadError',
         ),
       );
     }
@@ -121,7 +121,7 @@ class NotificationPreferenceBloc
         NotificationPreferenceState(
           status: NotificationPreferenceStatus.ready,
           productOffers: confirmedValue,
-          errorMessage: 'تعذر حفظ تفضيل التنبيهات. لم يتم تغيير الإعداد.',
+          errorMessage: 'notificationPreferences.saveError',
         ),
       );
     }

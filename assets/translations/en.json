@@ -162,7 +162,8 @@
     "loadError": "Messages could not be loaded. Please try again.",
     "guestTitle": "Please sign in",
     "guestHint": "Sign in first to see your messages",
-    "readSyncFailed": "The read receipt did not sync; your messages are still up to date"
+    "readSyncFailed": "The read receipt did not sync; your messages are still up to date",
+    "openError": "Could not open the conversation"
   },
   "notifications": {
     "title": "Notifications",
@@ -170,6 +171,11 @@
     "emptyTitle": "No notifications",
     "emptyHint": "Order, message, and review updates will appear here",
     "loadError": "Notifications could not be loaded. Please try again."
+  },
+  "notificationPreferences": {
+    "productOffers": "Product and offer notifications",
+    "loadError": "Could not load notification preferences. Please try again.",
+    "saveError": "Could not save notification preferences. The setting was not changed."
   },
   "tracking": {
     "title": "Order tracking",

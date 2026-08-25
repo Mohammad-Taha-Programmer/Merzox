@@ -78,7 +78,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       emit(
         state.copyWith(
           status: ChatStatus.failure,
-          errorMessage: 'تعذر فتح المحادثة',
+          errorMessage: 'messages.openError',
         ),
       );
       return;

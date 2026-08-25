@@ -9,6 +9,8 @@ import 'package:merzox/features/notification_preferences/bloc/notification_prefe
 import 'package:merzox/features/notification_preferences/widgets/notification_preference_control.dart';
 import 'package:merzox/services/notification_preference_service.dart';
 
+import 'localization_test_harness.dart';
+
 class _WidgetGateway implements NotificationPreferenceGateway {
   NotificationPreferenceSnapshot loadResult =
       const NotificationPreferenceSnapshot(productOffers: false);
@@ -70,6 +72,12 @@ Widget _app(NotificationPreferenceBloc bloc) {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() async {
+    await loadAppTranslations(languageCode: 'ar');
+  });
+
   testWidgets('initial loading never invents an enabled switch', (
     tester,
   ) async {
