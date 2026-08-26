@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../authentication/bloc/auth_bloc.dart';
@@ -29,9 +30,11 @@ class BusinessShellPage extends StatelessWidget {
         listener: (context, state) {
           if (state.status == BusinessStatus.failure &&
               state.errorMessage != null) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(localizeApiErrorOrRaw(state.errorMessage!)),
+              ),
+            );
           }
         },
         builder: (context, state) {

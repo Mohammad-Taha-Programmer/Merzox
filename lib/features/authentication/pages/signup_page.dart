@@ -5,6 +5,7 @@ import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/bloc/auth_event.dart';
 import 'package:merzox/features/authentication/bloc/auth_state.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 class SignupPage extends StatefulWidget {
   final VoidCallback onSignupCreated;
@@ -89,7 +90,11 @@ class _SignupPageState extends State<SignupPage> {
         }
 
         if (state.status == AuthStatus.failure) {
-          final message = state.errorMessageKey?.tr() ?? state.errorMessage;
+          final message =
+              state.errorMessageKey?.tr() ??
+              (state.errorMessage == null
+                  ? null
+                  : localizeApiErrorOrRaw(state.errorMessage!));
 
           if (message != null) {
             ScaffoldMessenger.of(

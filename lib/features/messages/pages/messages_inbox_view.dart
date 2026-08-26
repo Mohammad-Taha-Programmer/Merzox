@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../bloc/messages_bloc.dart';
 import '../bloc/messages_event.dart';
@@ -134,7 +135,7 @@ class _MessagesInboxViewState extends State<MessagesInboxView> {
               Text(
                 state.errorMessage.isEmpty
                     ? 'messages.loadError'.tr()
-                    : state.errorMessage,
+                    : localizeApiErrorOrRaw(state.errorMessage),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: MerzoxColors.kColor5E5E5E,

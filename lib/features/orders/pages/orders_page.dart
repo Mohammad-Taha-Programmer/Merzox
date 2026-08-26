@@ -9,6 +9,7 @@ import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart'
 import 'package:merzox/features/orders/bloc/orders_bloc.dart';
 import 'package:merzox/features/orders/bloc/orders_event.dart';
 import 'package:merzox/features/orders/bloc/orders_state.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -98,7 +99,7 @@ class _OrdersPageState extends State<OrdersPage> {
       listener: (context, state) {
         final message = state.messageCode.isNotEmpty
             ? state.messageCode.tr()
-            : state.errorMessage;
+            : localizeApiErrorOrRaw(state.errorMessage);
         if (message.isNotEmpty) {
           ScaffoldMessenger.of(
             context,

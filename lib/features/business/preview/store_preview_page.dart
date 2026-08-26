@@ -8,6 +8,7 @@ import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 /// "معاينة المتجر" - the merchant's own store, shown exactly as customers see
 /// it.
@@ -153,7 +154,7 @@ class _PreviewFailure extends StatelessWidget {
             Text(
               message == null || message!.isEmpty
                   ? 'merchantPreview.loadError'.tr()
-                  : message!,
+                  : localizeApiErrorOrRaw(message!),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: MerzoxColors.kColor5E5E5E,

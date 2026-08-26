@@ -6,6 +6,7 @@ import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../bloc/order_tracking_bloc.dart';
 import '../bloc/order_tracking_event.dart';
@@ -106,7 +107,7 @@ class _TrackingBody extends StatelessWidget {
               Text(
                 state.errorMessage.isEmpty
                     ? 'tracking.loadError'.tr()
-                    : state.errorMessage,
+                    : _translateOrRaw(state.errorMessage),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: MerzoxColors.kColor5E5E5E,
@@ -757,7 +758,12 @@ DateTime? _headlineDate(OrderApiModel order) {
 }
 
 String _translateOrRaw(String value) {
-  // Bloc failures arrive as either a translation key or a server message.
+  if (value.startsWith('apiErrors.')) {
+    return localizeApiErrorOrRaw(value);
+  }
+
+  // Existing feature message codes remain translated, while arbitrary
+  // backend messages are returned untouched.
   if (!value.contains(' ') && value.contains('.')) return value.tr();
   return value;
 }
