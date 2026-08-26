@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../services/api_service.dart';
 import '../../../core/auth/auth_session_service.dart';
+import '../../../services/api_service.dart';
+import '../../../services/realtime_service.dart';
 import 'messages_event.dart';
 import 'messages_state.dart';
 
@@ -13,9 +16,22 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
   /// endpoint differs, so the side is fixed when the bloc is created.
   final bool merchantMode;
 
+  StreamSubscription<RealtimeMessageInvalidation>?
+  _messageInvalidationSubscription;
+
+  StreamSubscription<RealtimeConnectionStatus>? _connectionStatusSubscription;
+
+  Timer? _realtimeDebounce;
+
+  bool _realtimeWasDisconnected = false;
+  bool _realtimeSyncInFlight = false;
+  bool _realtimeSyncPending = false;
+
   MessagesBloc({
     ApiService? apiService,
     AuthSessionService authSessionService = const AuthSessionService(),
+    Stream<RealtimeMessageInvalidation>? realtimeMessageInvalidations,
+    Stream<RealtimeConnectionStatus>? realtimeConnectionStatuses,
     this.merchantMode = false,
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
@@ -24,6 +40,59 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     on<MessagesFilterChanged>(_onFilterChanged);
     on<MessagesRefreshRequested>(_onRefreshRequested);
     on<MessagesLoadMoreRequested>(_onLoadMoreRequested);
+    on<MessagesRealtimeSyncRequested>(_onRealtimeSyncRequested);
+
+    _bindRealtime(
+      messageInvalidations: realtimeMessageInvalidations,
+      connectionStatuses: realtimeConnectionStatuses,
+    );
+  }
+
+  void _bindRealtime({
+    required Stream<RealtimeMessageInvalidation>? messageInvalidations,
+    required Stream<RealtimeConnectionStatus>? connectionStatuses,
+  }) {
+    _messageInvalidationSubscription = messageInvalidations?.listen((_) {
+      // Both message-created and conversation-read change the authoritative
+      // inbox summary/unread truth, so either one invalidates page one.
+      _scheduleRealtimeSync();
+    });
+
+    if (connectionStatuses != null) {
+      _realtimeWasDisconnected = true;
+
+      _connectionStatusSubscription = connectionStatuses.listen((status) {
+        if (status == RealtimeConnectionStatus.disconnected) {
+          _realtimeWasDisconnected = true;
+          return;
+        }
+
+        if (status == RealtimeConnectionStatus.connected &&
+            _realtimeWasDisconnected) {
+          _realtimeWasDisconnected = false;
+          _scheduleRealtimeSync();
+        }
+      });
+    }
+  }
+
+  void _scheduleRealtimeSync() {
+    _realtimeDebounce?.cancel();
+
+    _realtimeDebounce = Timer(const Duration(milliseconds: 90), () {
+      if (!isClosed) {
+        add(const MessagesRealtimeSyncRequested());
+      }
+    });
+  }
+
+  void _drainPendingRealtimeSync() {
+    if (!_realtimeSyncPending || _realtimeSyncInFlight || isClosed) {
+      return;
+    }
+
+    _realtimeSyncPending = false;
+    _scheduleRealtimeSync();
   }
 
   Future<void> _onStarted(
@@ -41,6 +110,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
         state.status != MessagesStatus.failure) {
       return;
     }
+
     await _loadFirstPage(emit, event.filter);
   }
 
@@ -68,6 +138,7 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
 
     try {
       final response = await _fetch(filter: filter, page: 1);
+
       emit(
         state.copyWith(
           status: MessagesStatus.ready,
@@ -84,6 +155,8 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
           errorMessage: ApiService.messageFromError(error),
         ),
       );
+    } finally {
+      _drainPendingRealtimeSync();
     }
   }
 
@@ -91,11 +164,15 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     MessagesLoadMoreRequested event,
     Emitter<MessagesState> emit,
   ) async {
-    if (!state.hasMore || state.status != MessagesStatus.ready) return;
+    if (!state.hasMore || state.status != MessagesStatus.ready) {
+      return;
+    }
 
     emit(state.copyWith(status: MessagesStatus.loadingMore));
+
     try {
       final response = await _fetch(filter: state.filter, page: state.page + 1);
+
       emit(
         state.copyWith(
           status: MessagesStatus.ready,
@@ -112,6 +189,50 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
           errorMessage: ApiService.messageFromError(error),
         ),
       );
+    } finally {
+      _drainPendingRealtimeSync();
+    }
+  }
+
+  Future<void> _onRealtimeSyncRequested(
+    MessagesRealtimeSyncRequested event,
+    Emitter<MessagesState> emit,
+  ) async {
+    if (_realtimeSyncInFlight) {
+      _realtimeSyncPending = true;
+      return;
+    }
+
+    if (state.status == MessagesStatus.loading ||
+        state.status == MessagesStatus.loadingMore) {
+      _realtimeSyncPending = true;
+      return;
+    }
+
+    _realtimeSyncInFlight = true;
+
+    try {
+      final response = await _fetch(filter: state.filter, page: 1);
+
+      // Inbox is a summary/feed, not a history thread. Realtime invalidation
+      // intentionally resets it to authoritative page one, including the
+      // current all/unread filter and server unread count.
+      emit(
+        state.copyWith(
+          status: MessagesStatus.ready,
+          conversations: response.conversations,
+          unreadConversationCount: response.unreadConversationCount,
+          page: response.page,
+          hasMore: response.hasMore,
+          errorMessage: '',
+        ),
+      );
+    } catch (_) {
+      // Keep the already rendered inbox. A later realtime event, reconnect, or
+      // manual refresh will retry the authoritative REST read.
+    } finally {
+      _realtimeSyncInFlight = false;
+      _drainPendingRealtimeSync();
     }
   }
 
@@ -154,5 +275,15 @@ class MessagesBloc extends Bloc<MessagesEvent, MessagesState> {
     }
 
     return token;
+  }
+
+  @override
+  Future<void> close() async {
+    _realtimeDebounce?.cancel();
+
+    await _messageInvalidationSubscription?.cancel();
+    await _connectionStatusSubscription?.cancel();
+
+    await super.close();
   }
 }

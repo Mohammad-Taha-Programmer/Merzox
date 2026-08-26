@@ -14,9 +14,13 @@ import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_bloc.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_event.dart';
 import 'package:merzox/features/notification_preferences/widgets/notification_preference_control.dart';
+import 'package:merzox/features/notifications/widgets/notification_badge_button.dart';
 import 'package:merzox/features/messages/bloc/messages_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
+import 'package:merzox/injection/injector.dart';
+import 'package:merzox/services/push_service.dart';
+import 'package:merzox/services/realtime_service.dart';
 import 'package:merzox/services/location_permission_service.dart';
 import 'package:merzox/services/notification_preference_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -78,7 +82,15 @@ class HomeScreen extends StatelessWidget {
   });
 
   Future<void> _logout(BuildContext context) async {
+    if (locator.isRegistered<PushService>()) {
+      await locator<PushService>().unregisterCurrentTarget();
+    }
+
     await AuthBloc.clearStoredSession();
+
+    if (locator.isRegistered<RealtimeService>()) {
+      await locator<RealtimeService>().disconnect();
+    }
 
     if (context.mounted) {
       context.go('/login');
@@ -189,7 +201,11 @@ class HomeScreen extends StatelessWidget {
                   context.read<HomeBloc>().add(const HomeTabChanged(0));
                 },
               ),
-              2 => _BusinessesTab(state: state),
+              2 => _BusinessesTab(
+                state: state,
+                isGuest: isGuest,
+                onProtectedAction: () => _showAuthGate(context),
+              ),
               3 => _ChatTab(
                 isGuest: isGuest,
                 onSignupPressed: () => context.go('/signup'),
@@ -656,28 +672,21 @@ class _HomeTopBar extends StatelessWidget {
           ),
           Align(
             alignment: AlignmentDirectional.centerEnd,
-            child: IconButton(
-              tooltip: 'home.notificationsTooltip'.tr(),
-              onPressed: isGuest ? onProtectedAction : () {},
-              icon: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  const Icon(Icons.notifications_none_rounded, size: 28),
-                  PositionedDirectional(
-                    top: 1,
-                    end: 1,
-                    child: Container(
-                      width: 9,
-                      height: 9,
-                      decoration: BoxDecoration(
-                        color: MerzoxColors.kColorEE6C4D,
-                        shape: BoxShape.circle,
-                      ),
+            child: isGuest
+                ? IconButton(
+                    tooltip: 'home.notificationsTooltip'.tr(),
+                    onPressed: onProtectedAction,
+                    icon: const Icon(
+                      Icons.notifications_none_rounded,
+                      size: 28,
                     ),
+                  )
+                : NotificationBadgeButton(
+                    tooltip: 'home.notificationsTooltip'.tr(),
+                    onPressed: () => context.push('/notifications'),
+                    iconSize: 28,
+                    badgeSize: 9,
                   ),
-                ],
-              ),
-            ),
           ),
           if (!isGuest)
             Align(
@@ -1829,8 +1838,14 @@ class _CartImageFallback extends StatelessWidget {
 
 class _BusinessesTab extends StatefulWidget {
   final HomeState state;
+  final bool isGuest;
+  final VoidCallback onProtectedAction;
 
-  const _BusinessesTab({required this.state});
+  const _BusinessesTab({
+    required this.state,
+    required this.isGuest,
+    required this.onProtectedAction,
+  });
 
   @override
   State<_BusinessesTab> createState() => _BusinessesTabState();
@@ -1899,7 +1914,10 @@ class _BusinessesTabState extends State<_BusinessesTab> {
       controller: _scrollController,
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 118),
       children: [
-        const _AllBusinessesTopBar(),
+        _AllBusinessesTopBar(
+          isGuest: widget.isGuest,
+          onProtectedAction: widget.onProtectedAction,
+        ),
         const SizedBox(height: 18),
         _SearchBox(onTap: () => context.push('/search')),
         const SizedBox(height: 18),
@@ -1968,7 +1986,13 @@ class _BusinessesTabState extends State<_BusinessesTab> {
 }
 
 class _AllBusinessesTopBar extends StatelessWidget {
-  const _AllBusinessesTopBar();
+  final bool isGuest;
+  final VoidCallback onProtectedAction;
+
+  const _AllBusinessesTopBar({
+    required this.isGuest,
+    required this.onProtectedAction,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1989,28 +2013,28 @@ class _AllBusinessesTopBar extends StatelessWidget {
           ),
           Align(
             alignment: AlignmentDirectional.centerEnd,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  Icons.notifications_none_rounded,
-                  color: MerzoxColors.kColor3D5A80,
-                  size: 20,
-                ),
-                PositionedDirectional(
-                  top: 1,
-                  end: -1,
-                  child: Container(
-                    width: 7,
-                    height: 7,
-                    decoration: BoxDecoration(
-                      color: MerzoxColors.kColorEE6C4D,
-                      shape: BoxShape.circle,
+            child: isGuest
+                ? IconButton(
+                    tooltip: 'home.notificationsTooltip'.tr(),
+                    onPressed: onProtectedAction,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 36,
+                      minHeight: 34,
                     ),
+                    icon: Icon(
+                      Icons.notifications_none_rounded,
+                      color: MerzoxColors.kColor3D5A80,
+                      size: 20,
+                    ),
+                  )
+                : NotificationBadgeButton(
+                    tooltip: 'home.notificationsTooltip'.tr(),
+                    onPressed: () => context.push('/notifications'),
+                    iconSize: 20,
+                    badgeSize: 7,
+                    iconColor: MerzoxColors.kColor3D5A80,
                   ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -2094,8 +2118,15 @@ class _ChatTab extends StatelessWidget {
       );
     }
 
+    final realtimeService = locator.isRegistered<RealtimeService>()
+        ? locator<RealtimeService>()
+        : null;
+
     return BlocProvider(
-      create: (_) => MessagesBloc()..add(const MessagesStarted()),
+      create: (_) => MessagesBloc(
+        realtimeMessageInvalidations: realtimeService?.messageInvalidations,
+        realtimeConnectionStatuses: realtimeService?.connectionStatuses,
+      )..add(const MessagesStarted()),
       child: MessagesInboxView(title: 'messages.title'.tr()),
     );
   }

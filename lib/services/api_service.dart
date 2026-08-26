@@ -826,6 +826,29 @@ class ApiService {
     return OwnerOrder.fromJson(data['order'] as Map<String, dynamic>? ?? {});
   }
 
+  Future<void> registerPushTarget({
+    required String token,
+    required String target,
+    required String platform,
+  }) async {
+    await _dio.put<Map<String, dynamic>>(
+      '/push/registrations',
+      data: {'targetKind': 'token', 'target': target, 'platform': platform},
+      options: _authOptions(token),
+    );
+  }
+
+  Future<void> unregisterPushTarget({
+    required String token,
+    required String target,
+  }) async {
+    await _dio.delete<Map<String, dynamic>>(
+      '/push/registrations',
+      data: {'targetKind': 'token', 'target': target},
+      options: _authOptions(token),
+    );
+  }
+
   /// Extracts an entity the endpoint is contractually required to return.
   ///
   /// Throws [ApiContractException] rather than substituting an empty map, so a

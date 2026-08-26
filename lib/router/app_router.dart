@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../core/auth/auth_route_guard.dart';
 import '../core/auth/auth_session_service.dart';
 import '../core/startup/startup_destination.dart';
+import '../injection/injector.dart';
+import '../services/push_service.dart';
+import '../services/realtime_service.dart';
 import '../features/about_us/bloc/about_us_bloc.dart';
 import '../features/about_us/pages/about_us_page.dart';
 import '../features/authentication/bloc/auth_bloc.dart';
@@ -60,6 +63,30 @@ class AppRouter {
   AppRouter(this.destination, {AuthSessionService? authSessionService})
     : _authSessionService = authSessionService ?? const AuthSessionService();
 
+  RealtimeSessionController? get _realtimeSessionController {
+    if (!locator.isRegistered<RealtimeService>()) {
+      return null;
+    }
+
+    return locator<RealtimeService>();
+  }
+
+  PushSessionController? get _pushSessionController {
+    if (!locator.isRegistered<PushService>()) {
+      return null;
+    }
+
+    return locator<PushService>();
+  }
+
+  RealtimeService? get _realtimeService {
+    if (!locator.isRegistered<RealtimeService>()) {
+      return null;
+    }
+
+    return locator<RealtimeService>();
+  }
+
   GoRouter get router => GoRouter(
     initialLocation: switch (destination) {
       StartupDestination.onboarding => '/onboarding',
@@ -85,7 +112,10 @@ class AppRouter {
       GoRoute(
         path: '/login',
         builder: (context, __) => BlocProvider(
-          create: (_) => AuthBloc(),
+          create: (_) => AuthBloc(
+            realtimeSessionController: _realtimeSessionController,
+            pushSessionController: _pushSessionController,
+          ),
           child: LoginPage(
             onAuthenticated: () => _goAfterLogin(context),
             onBrowseAsGuest: () => context.go('/home?guest=true'),
@@ -139,7 +169,10 @@ class AppRouter {
       GoRoute(
         path: '/business/login',
         builder: (context, __) => BlocProvider(
-          create: (_) => AuthBloc(),
+          create: (_) => AuthBloc(
+            realtimeSessionController: _realtimeSessionController,
+            pushSessionController: _pushSessionController,
+          ),
           child: LoginPage(
             businessMode: true,
             onAuthenticated: () => context.go('/business'),
@@ -153,8 +186,12 @@ class AppRouter {
       GoRoute(
         path: '/business/messages',
         builder: (_, __) => BlocProvider(
-          create: (_) =>
-              MessagesBloc(merchantMode: true)..add(const MessagesStarted()),
+          create: (_) => MessagesBloc(
+            merchantMode: true,
+            realtimeMessageInvalidations:
+                _realtimeService?.messageInvalidations,
+            realtimeConnectionStatuses: _realtimeService?.connectionStatuses,
+          )..add(const MessagesStarted()),
           child: const MerchantMessagesPage(),
         ),
       ),
@@ -178,7 +215,10 @@ class AppRouter {
       GoRoute(
         path: '/signup',
         builder: (context, __) => BlocProvider(
-          create: (_) => AuthBloc(),
+          create: (_) => AuthBloc(
+            realtimeSessionController: _realtimeSessionController,
+            pushSessionController: _pushSessionController,
+          ),
           child: SignupPage(
             onSignupCreated: () => context.go('/login'),
             onLoginRequested: () => context.go('/login'),
@@ -229,7 +269,12 @@ class AppRouter {
 
           return BlocProvider(
             create: (_) {
+              final realtimeService = _realtimeService;
+
               final bloc = ChatBloc(
+                realtimeMessageInvalidations:
+                    realtimeService?.messageInvalidations,
+                realtimeConnectionStatuses: realtimeService?.connectionStatuses,
                 conversationId: conversationId,
                 title: parameters['title'] ?? '',
                 avatarUrl: parameters['avatarUrl'] ?? '',
@@ -251,6 +296,9 @@ class AppRouter {
           create: (_) => NotificationsBloc(
             businessAudience:
                 state.uri.queryParameters['audience'] == 'business',
+            realtimeNotificationInvalidations:
+                _realtimeService?.notificationInvalidations,
+            realtimeConnectionStatuses: _realtimeService?.connectionStatuses,
           )..add(const NotificationsStarted()),
           child: const NotificationsPage(),
         ),

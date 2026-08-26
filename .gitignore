@@ -47,3 +47,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase Admin private server credentials (never commit)
+backend/*service-account*.json
+backend/*firebase-admin*.json
+backend/*google-credential*.json
+backend/**/*service-account*.json
+backend/**/*firebase-admin*.json
+backend/**/*google-credential*.json

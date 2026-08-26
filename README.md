@@ -226,12 +226,37 @@ review, production secret management, monitoring, backups, or dependency audits.
 
 ## Roadmap
 
-- Push delivery and live sockets for chat and notifications, which are currently
-  fetched on demand rather than streamed.
+- Finalize the permanent mobile application identity, Firebase platform
+  registrations/APNs setup, and production activation of the already implemented
+  realtime and background push transport.
 - Payment processing for cards, cash, bank transfers, and purchases for others.
 - Courier location on a live map during delivery.
 - Consent-based recommendation and preference analysis.
 - Production deployment, observability, and store publication.
+
+## Production Firebase activation guard
+
+Realtime chat, live notification invalidation, push registration lifecycle,
+background delivery plumbing, and notification-tap routing are implemented.
+Production Firebase activation is intentionally deferred until Merzox has a
+permanent application namespace.
+
+The repository fails closed by default:
+
+- `MERZOX_FIREBASE_PUSH_ENABLED` defaults to `false`.
+- The current application identity remains development-only.
+- Firebase initialization additionally requires a matching
+  `MERZOX_FIREBASE_PRODUCTION_ID`.
+- The repository-level Firebase platform-readiness flag remains `false` until
+  the final Android/iOS Firebase applications and configuration files are
+  reviewed together.
+- Android/iOS Firebase applications must not be registered against a guessed
+  temporary namespace merely to enable production push during development.
+
+After a permanent identity is selected, migrate the platform identifiers first.
+Only then register the Android/iOS Firebase applications, add the reviewed
+platform configuration, enable the readiness flag in the same change, and
+explicitly supply the production Firebase dart-defines.
 
 ## Project Status
 

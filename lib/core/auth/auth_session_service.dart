@@ -46,6 +46,22 @@ class AuthSessionService {
     return _readFromPreferences(prefs);
   }
 
+  /// Reports whether startup is about to purge a still-authenticated
+  /// session because Remember Me was explicitly disabled.
+  ///
+  /// Callers may use this small window to perform authenticated best-effort
+  /// cleanup before [readForStartup] removes the stored bearer token.
+  Future<bool> hasUnrememberedAuthenticatedSession() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberSession = prefs.getBool(AuthBloc.rememberSessionKey);
+
+    if (rememberSession != false) {
+      return false;
+    }
+
+    return _readFromPreferences(prefs).isAuthenticated;
+  }
+
   AuthSessionSnapshot _readFromPreferences(SharedPreferences prefs) {
     final sessionActive = prefs.getBool(AuthBloc.sessionKey) ?? false;
     final token = prefs.getString(AuthBloc.tokenKey)?.trim();

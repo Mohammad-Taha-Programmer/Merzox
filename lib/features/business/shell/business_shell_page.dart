@@ -6,6 +6,10 @@ import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../authentication/bloc/auth_bloc.dart';
+import '../../notifications/widgets/notification_badge_button.dart';
+import '../../../injection/injector.dart';
+import '../../../services/push_service.dart';
+import '../../../services/realtime_service.dart';
 import '../models/business_models.dart';
 import '../../orders/order_status_policy.dart';
 import '../orders/merchant_order_detail_page.dart';
@@ -18,7 +22,16 @@ class BusinessShellPage extends StatelessWidget {
   const BusinessShellPage({super.key, required this.onLoggedOut});
 
   Future<void> _logout() async {
+    if (locator.isRegistered<PushService>()) {
+      await locator<PushService>().unregisterCurrentTarget();
+    }
+
     await AuthBloc.clearStoredSession();
+
+    if (locator.isRegistered<RealtimeService>()) {
+      await locator<RealtimeService>().disconnect();
+    }
+
     onLoggedOut();
   }
 
@@ -126,10 +139,12 @@ class _PageHeader extends StatelessWidget {
           onPressed: () => context.push('/business/messages'),
           icon: const Icon(Icons.chat_bubble_outline_rounded),
         ),
-        IconButton(
+        NotificationBadgeButton(
           tooltip: 'notifications.title'.tr(),
+          businessAudience: true,
           onPressed: () => context.push('/notifications?audience=business'),
-          icon: const Icon(Icons.notifications_none_rounded),
+          iconSize: 24,
+          badgeSize: 8,
         ),
       ],
     ),

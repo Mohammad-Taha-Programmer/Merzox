@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/features/messages/bloc/chat_bloc.dart';
 import 'package:merzox/features/messages/bloc/chat_event.dart';
@@ -6,6 +8,7 @@ import 'package:merzox/features/messages/bloc/messages_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/bloc/messages_state.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/realtime_service.dart';
 import 'auth_session_fixtures.dart';
 
 ConversationApiModel _conversation({
@@ -58,6 +61,7 @@ class _FakeMessagingApi extends ApiService {
   final List<String> sentBodies = [];
   final List<String> markedRead = [];
   final List<String> openedBusinessIds = [];
+  final List<int> messagePages = [];
 
   ConversationListApiResponse Function(bool unreadOnly, int page)?
   onConversations;
@@ -114,6 +118,8 @@ class _FakeMessagingApi extends ApiService {
     int page = 1,
     int limit = 30,
   }) async {
+    messagePages.add(page);
+
     return onMessages?.call(page) ??
         ConversationMessagesApiResponse(
           conversation: _conversation(),
@@ -452,6 +458,312 @@ void main() {
       expect(bloc.state.messages, hasLength(1));
 
       await bloc.close();
+    },
+  );
+
+  test(
+    'realtime inbox invalidation refreshes authoritative page one',
+    () async {
+      final invalidations =
+          StreamController<RealtimeMessageInvalidation>.broadcast();
+
+      final connections =
+          StreamController<RealtimeConnectionStatus>.broadcast();
+
+      addTearDown(invalidations.close);
+      addTearDown(connections.close);
+
+      var calls = 0;
+
+      final api = _FakeMessagingApi()
+        ..onConversations = (_, page) {
+          calls += 1;
+
+          return ConversationListApiResponse(
+            conversations: [
+              _conversation(
+                lastBody: calls == 1 ? 'old summary' : 'live summary',
+                unreadCount: calls == 1 ? 0 : 1,
+              ),
+            ],
+            unreadConversationCount: calls == 1 ? 0 : 1,
+            page: page,
+            hasMore: false,
+          );
+        };
+
+      final bloc = MessagesBloc(
+        apiService: api,
+        realtimeMessageInvalidations: invalidations.stream,
+        realtimeConnectionStatuses: connections.stream,
+      );
+
+      addTearDown(bloc.close);
+
+      bloc.add(const MessagesStarted());
+
+      await bloc.stream.firstWhere(
+        (state) => state.status == MessagesStatus.ready,
+      );
+
+      invalidations.add(
+        const RealtimeMessageInvalidation(
+          conversationId: 'c1',
+          businessId: 'b1',
+          messageId: 'm-live',
+          reason: 'message-created',
+        ),
+      );
+
+      await bloc.stream.firstWhere(
+        (state) =>
+            state.status == MessagesStatus.ready &&
+            state.conversations.isNotEmpty &&
+            state.conversations.single.lastMessage.body == 'live summary',
+      );
+
+      expect(calls, 2);
+      expect(bloc.state.unreadConversationCount, 1);
+      expect(bloc.state.page, 1);
+    },
+  );
+
+  test('reconnect re-syncs inbox from REST after a disconnect', () async {
+    final connections = StreamController<RealtimeConnectionStatus>.broadcast();
+
+    addTearDown(connections.close);
+
+    var calls = 0;
+
+    final api = _FakeMessagingApi()
+      ..onConversations = (_, page) {
+        calls += 1;
+
+        return ConversationListApiResponse(
+          conversations: [_conversation(lastBody: 'call-$calls')],
+          unreadConversationCount: 0,
+          page: page,
+          hasMore: false,
+        );
+      };
+
+    final bloc = MessagesBloc(
+      apiService: api,
+      realtimeConnectionStatuses: connections.stream,
+    );
+
+    addTearDown(bloc.close);
+
+    bloc.add(const MessagesStarted());
+
+    await bloc.stream.firstWhere(
+      (state) => state.status == MessagesStatus.ready,
+    );
+
+    connections.add(RealtimeConnectionStatus.disconnected);
+
+    connections.add(RealtimeConnectionStatus.connected);
+
+    await bloc.stream.firstWhere(
+      (state) =>
+          state.status == MessagesStatus.ready &&
+          state.conversations.single.lastMessage.body == 'call-2',
+    );
+
+    expect(calls, 2);
+  });
+
+  test(
+    'chat realtime merge preserves loaded history and deduplicates overlap',
+    () async {
+      final invalidations =
+          StreamController<RealtimeMessageInvalidation>.broadcast();
+
+      addTearDown(invalidations.close);
+
+      var firstPageCalls = 0;
+
+      final api = _FakeMessagingApi()
+        ..onMessages = (page) {
+          if (page == 1) {
+            firstPageCalls += 1;
+
+            return ConversationMessagesApiResponse(
+              conversation: _conversation(),
+              messages: firstPageCalls == 1
+                  ? [
+                      _message(id: 'm2', body: 'middle'),
+                      _message(
+                        id: 'm3',
+                        body: 'previous newest',
+                        isMine: false,
+                      ),
+                    ]
+                  : [
+                      _message(
+                        id: 'm3',
+                        body: 'previous newest',
+                        isMine: false,
+                      ),
+                      _message(id: 'm4', body: 'live newest', isMine: false),
+                    ],
+              page: 1,
+              hasMore: true,
+            );
+          }
+
+          return ConversationMessagesApiResponse(
+            conversation: _conversation(),
+            messages: [
+              _message(id: 'm1', body: 'oldest'),
+              _message(id: 'm2', body: 'middle'),
+            ],
+            page: 2,
+            hasMore: false,
+          );
+        };
+
+      final bloc = ChatBloc(
+        apiService: api,
+        conversationId: 'c1',
+        realtimeMessageInvalidations: invalidations.stream,
+      );
+
+      addTearDown(bloc.close);
+
+      bloc.add(const ChatStarted());
+
+      await bloc.stream.firstWhere((state) => state.status == ChatStatus.ready);
+
+      bloc.add(const ChatOlderMessagesRequested());
+
+      await bloc.stream.firstWhere(
+        (state) => state.status == ChatStatus.ready && state.page == 2,
+      );
+
+      expect(bloc.state.messages.map((message) => message.id).toList(), [
+        'm1',
+        'm2',
+        'm3',
+      ]);
+
+      invalidations.add(
+        const RealtimeMessageInvalidation(
+          conversationId: 'c1',
+          businessId: 'b1',
+          messageId: 'm4',
+          reason: 'message-created',
+        ),
+      );
+
+      await bloc.stream.firstWhere(
+        (state) => state.messages.any((message) => message.id == 'm4'),
+      );
+
+      final ids = bloc.state.messages.map((message) => message.id).toList();
+
+      expect(ids, ['m1', 'm2', 'm3', 'm4']);
+
+      expect(ids.toSet(), hasLength(ids.length));
+
+      // Realtime page-one refresh must not forget that page two was already
+      // loaded or resurrect a stale "has more" flag from page one.
+      expect(bloc.state.page, 2);
+      expect(bloc.state.hasMore, isFalse);
+
+      expect(api.messagePages, [1, 2, 1]);
+    },
+  );
+
+  test('chat ignores realtime invalidation for another conversation', () async {
+    final invalidations =
+        StreamController<RealtimeMessageInvalidation>.broadcast();
+
+    addTearDown(invalidations.close);
+
+    final api = _FakeMessagingApi();
+
+    final bloc = ChatBloc(
+      apiService: api,
+      conversationId: 'c1',
+      realtimeMessageInvalidations: invalidations.stream,
+    );
+
+    addTearDown(bloc.close);
+
+    bloc.add(const ChatStarted());
+
+    await bloc.stream.firstWhere((state) => state.status == ChatStatus.ready);
+
+    expect(api.messagePages, [1]);
+
+    invalidations.add(
+      const RealtimeMessageInvalidation(
+        conversationId: 'other',
+        businessId: 'b1',
+        messageId: 'm-other',
+        reason: 'message-created',
+      ),
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+
+    expect(api.messagePages, [1]);
+  });
+
+  test(
+    'conversation-read invalidation refreshes unread-filter inbox truth',
+    () async {
+      final invalidations =
+          StreamController<RealtimeMessageInvalidation>.broadcast();
+
+      addTearDown(invalidations.close);
+
+      var stillUnread = true;
+
+      final api = _FakeMessagingApi()
+        ..onConversations = (unreadOnly, page) => ConversationListApiResponse(
+          conversations: unreadOnly && stillUnread
+              ? [_conversation(unreadCount: 2)]
+              : const [],
+          unreadConversationCount: stillUnread ? 1 : 0,
+          page: page,
+          hasMore: false,
+        );
+
+      final bloc = MessagesBloc(
+        apiService: api,
+        realtimeMessageInvalidations: invalidations.stream,
+      );
+
+      addTearDown(bloc.close);
+
+      bloc.add(const MessagesFilterChanged(MessagesFilter.unread));
+
+      await bloc.stream.firstWhere(
+        (state) =>
+            state.status == MessagesStatus.ready &&
+            state.filter == MessagesFilter.unread,
+      );
+
+      expect(bloc.state.conversations, hasLength(1));
+
+      stillUnread = false;
+
+      invalidations.add(
+        const RealtimeMessageInvalidation(
+          conversationId: 'c1',
+          businessId: 'b1',
+          reason: 'conversation-read',
+        ),
+      );
+
+      await bloc.stream.firstWhere(
+        (state) =>
+            state.status == MessagesStatus.ready && state.conversations.isEmpty,
+      );
+
+      expect(bloc.state.unreadConversationCount, 0);
     },
   );
 }

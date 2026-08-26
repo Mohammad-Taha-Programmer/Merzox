@@ -23,3 +23,11 @@ final class NotificationMarkedRead extends NotificationsEvent {
 final class NotificationsAllMarkedRead extends NotificationsEvent {
   const NotificationsAllMarkedRead();
 }
+
+/// Internal invalidation raised by Socket.IO/reconnect.
+///
+/// Socket payloads never become notification rows directly. The BLoC re-reads
+/// the authoritative REST/MongoDB feed for its customer/business audience.
+final class NotificationsRealtimeSyncRequested extends NotificationsEvent {
+  const NotificationsRealtimeSyncRequested();
+}

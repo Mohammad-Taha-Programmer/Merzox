@@ -13,6 +13,7 @@ import {
   acknowledgementUpdate,
   isNoOpAcknowledgement
 } from '../policies/unread-counter.policy.js';
+import { publishMessagesChanged } from '../realtime/realtime.publisher.js';
 import { notifyNewMessage } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -292,8 +293,15 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
     throw resolveSendFailure({ compensated });
   }
 
+  let counterpartUserId = conversation.user;
+
   if (viewerType === 'customer') {
-    const owner = business?.owner ?? (await Business.findById(conversation.business))?.owner;
+    const owner =
+      business?.owner ??
+      (await Business.findById(conversation.business))?.owner;
+
+    counterpartUserId = owner ?? null;
+
     if (owner) {
       await notifyNewMessage({
         recipientId: owner,
@@ -314,6 +322,17 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
       body: message.body
     });
   }
+
+  publishMessagesChanged({
+    recipientIds: [
+      req.user._id,
+      counterpartUserId
+    ],
+    conversationId: conversation._id,
+    businessId: conversation.business,
+    messageId: message._id,
+    reason: 'message-created'
+  });
 
   res.status(201).json({
     success: true,
@@ -376,6 +395,13 @@ export const markConversationRead = asyncHandler(async (req, res) => {
       'CONVERSATION_NOT_FOUND'
     );
   }
+
+  publishMessagesChanged({
+    recipientIds: [req.user._id],
+    conversationId: conversation._id,
+    businessId: conversation.business,
+    reason: 'conversation-read'
+  });
 
   res.json({
     success: true,

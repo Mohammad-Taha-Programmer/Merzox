@@ -25,3 +25,8 @@ final class MessagesRefreshRequested extends MessagesEvent {
 final class MessagesLoadMoreRequested extends MessagesEvent {
   const MessagesLoadMoreRequested();
 }
+
+/// Internal synchronization request from realtime/reconnect invalidation.
+final class MessagesRealtimeSyncRequested extends MessagesEvent {
+  const MessagesRealtimeSyncRequested();
+}

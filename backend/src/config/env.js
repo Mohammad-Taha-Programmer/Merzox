@@ -30,5 +30,6 @@ export const env = {
     .map((origin) => origin.trim())
     .filter(Boolean),
   rateLimitWindowMs: Number(process.env.RATE_LIMIT_WINDOW_MS ?? 900000),
-  rateLimitMax: Number(process.env.RATE_LIMIT_MAX ?? 300)
+  rateLimitMax: Number(process.env.RATE_LIMIT_MAX ?? 300),
+  firebasePushEnabled: process.env.FIREBASE_PUSH_ENABLED === 'true'
 };
