@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 import { Notification } from '../models/Notification.js';
+import { publishNotificationsChanged } from '../realtime/realtime.publisher.js';
 import {
   enumParam,
   NOTIFICATION_AUDIENCES,
@@ -105,6 +106,14 @@ export const markNotificationRead = asyncHandler(async (req, res) => {
     return;
   }
 
+  publishNotificationsChanged({
+    recipientIds: [req.user._id],
+    audience: notification.audience,
+    notificationId: notification._id,
+    businessId: notification.business,
+    reason: 'notification-read'
+  });
+
   res.json({ success: true, data: { notification: notification.toClientJSON() } });
 });
 
@@ -115,8 +124,18 @@ export const markAllNotificationsRead = asyncHandler(async (req, res) => {
     { $set: { readAt: new Date() } }
   );
 
+  const updatedCount = result.modifiedCount ?? 0;
+
+  if (updatedCount > 0) {
+    publishNotificationsChanged({
+      recipientIds: [req.user._id],
+      audience,
+      reason: 'notifications-read-all'
+    });
+  }
+
   res.json({
     success: true,
-    data: { updatedCount: result.modifiedCount ?? 0, unreadCount: 0 }
+    data: { updatedCount, unreadCount: 0 }
   });
 });

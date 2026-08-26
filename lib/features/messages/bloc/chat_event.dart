@@ -26,3 +26,11 @@ final class ChatOlderMessagesRequested extends ChatEvent {
 final class ChatRefreshRequested extends ChatEvent {
   const ChatRefreshRequested();
 }
+
+/// Internal synchronization request raised by the realtime transport.
+///
+/// The event stays inside the BLoC boundary: Socket.IO never writes chat state
+/// directly. The BLoC always re-reads authoritative REST/MongoDB truth.
+final class ChatRealtimeSyncRequested extends ChatEvent {
+  const ChatRealtimeSyncRequested();
+}

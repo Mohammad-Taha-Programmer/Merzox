@@ -1,5 +1,7 @@
 import { env } from '../config/env.js';
 import { Notification, notificationTypes } from '../models/Notification.js';
+import { deliverNotificationPush } from '../push/push.delivery.js';
+import { publishNotificationsChanged } from '../realtime/realtime.publisher.js';
 import { formatErrorCode, safeErrorCode, safeErrorName } from '../utils/safe-log.js';
 
 const orderStatusCopy = {
@@ -40,6 +42,19 @@ export function notificationFailureLog(payload, error) {
 async function create(payload) {
   try {
     const notification = await Notification.create(payload);
+
+    publishNotificationsChanged({
+      recipientIds: [notification.user],
+      audience: notification.audience,
+      notificationId: notification._id,
+      businessId: notification.business,
+      reason: 'notification-created'
+    });
+
+    // Push is an attention channel only. It runs after MongoDB has
+    // accepted the notification and never controls REST truth.
+    void deliverNotificationPush(notification);
+
     return notification;
   } catch (error) {
     // Best-effort delivery still has to leave a trace, but the trace is built

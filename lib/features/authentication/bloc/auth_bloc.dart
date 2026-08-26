@@ -1,5 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/push_service.dart';
+import 'package:merzox/services/realtime_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth_event.dart';
@@ -23,10 +25,17 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static const String locationPromptAskedPrefix = 'auth_location_prompt_asked_';
 
   final ApiService _apiService;
+  final RealtimeSessionController? _realtimeSessionController;
+  final PushSessionController? _pushSessionController;
 
-  AuthBloc({ApiService? apiService})
-    : _apiService = apiService ?? ApiService(),
-      super(const AuthState()) {
+  AuthBloc({
+    ApiService? apiService,
+    RealtimeSessionController? realtimeSessionController,
+    PushSessionController? pushSessionController,
+  }) : _apiService = apiService ?? ApiService(),
+       _realtimeSessionController = realtimeSessionController,
+       _pushSessionController = pushSessionController,
+       super(const AuthState()) {
     on<LoginSubmitted>(_onLoginSubmitted);
     on<SignupSubmitted>(_onSignupSubmitted);
     on<LogoutRequested>(_onLogoutRequested);
@@ -74,6 +83,8 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         return;
       }
       await _persistAuthenticatedSession(auth, rememberMe: event.rememberMe);
+      await _syncRealtimeSession();
+      await _syncPushSession();
       emit(
         state.copyWith(
           status: AuthStatus.authenticated,
@@ -165,12 +176,58 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     LogoutRequested event,
     Emitter<AuthState> emit,
   ) async {
+    await _unregisterPushSession();
     await clearStoredSession();
+    await _disconnectRealtimeSession();
     emit(state.copyWith(status: AuthStatus.unauthenticated));
   }
 
   Future<void> _clearAuthenticatedSession() async {
+    await _unregisterPushSession();
     await clearStoredSession();
+    await _disconnectRealtimeSession();
+  }
+
+  Future<void> _syncPushSession() async {
+    final controller = _pushSessionController;
+
+    if (controller == null) {
+      return;
+    }
+
+    try {
+      await controller.syncWithSession();
+    } catch (_) {
+      // Push is best-effort and must never convert a valid login into failure.
+    }
+  }
+
+  Future<void> _unregisterPushSession() async {
+    final controller = _pushSessionController;
+
+    if (controller == null) {
+      return;
+    }
+
+    try {
+      await controller.unregisterCurrentTarget();
+    } catch (_) {
+      // Logout must continue even if push cleanup cannot reach the backend.
+    }
+  }
+
+  Future<void> _syncRealtimeSession() async {
+    final controller = _realtimeSessionController;
+    if (controller != null) {
+      await controller.syncWithSession();
+    }
+  }
+
+  Future<void> _disconnectRealtimeSession() async {
+    final controller = _realtimeSessionController;
+    if (controller != null) {
+      await controller.disconnect();
+    }
   }
 
   static Future<void> clearStoredSession() async {
