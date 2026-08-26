@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/services/api_service.dart';
 
@@ -262,15 +263,52 @@ void main() {
   });
 
   group('error message mapping', () {
-    test('a contract failure maps to a safe user-facing message', () {
+    test('contract failures map to a stable localization key', () {
       final message = ApiService.messageFromError(
         const ApiContractException('order', 'response has no "order" object'),
       );
 
-      // No endpoint internals, no Dart type names, no payload.
+      expect(message, 'apiErrors.contract');
       expect(message.contains('ApiContractException'), isFalse);
       expect(message.contains('order'), isFalse);
-      expect(message.trim(), isNotEmpty);
+    });
+
+    test('connection failures map to a stable localization key', () {
+      final message = ApiService.messageFromError(
+        DioException(
+          requestOptions: RequestOptions(path: '/health'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      expect(message, 'apiErrors.connection');
+    });
+
+    test('unexpected failures map to a stable localization key', () {
+      expect(
+        ApiService.messageFromError(StateError('boom')),
+        'apiErrors.unexpected',
+      );
+    });
+
+    test('backend-provided error messages remain raw', () {
+      final request = RequestOptions(path: '/orders');
+
+      final message = ApiService.messageFromError(
+        DioException(
+          requestOptions: request,
+          response: Response<Map<String, dynamic>>(
+            requestOptions: request,
+            statusCode: 400,
+            data: const {
+              'error': {'message': 'Server says no. Please retry.'},
+            },
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      expect(message, 'Server says no. Please retry.');
     });
   });
 }

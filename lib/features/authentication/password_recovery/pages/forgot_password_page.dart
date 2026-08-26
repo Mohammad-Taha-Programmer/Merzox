@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../bloc/password_recovery_bloc.dart';
 import '../bloc/password_recovery_event.dart';
@@ -53,9 +54,11 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
 
           if (state.status == PasswordRecoveryStatus.failure &&
               state.errorMessage != null) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(localizeApiErrorOrRaw(state.errorMessage!)),
+              ),
+            );
           }
         },
         builder: (context, state) {

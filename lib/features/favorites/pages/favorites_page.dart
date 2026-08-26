@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../services/api_service.dart';
@@ -81,7 +82,7 @@ class _FavoritesPageState extends State<FavoritesPage> {
       listener: (context, state) {
         final message = state.messageCode.isNotEmpty
             ? state.messageCode.tr()
-            : state.errorMessage;
+            : localizeApiErrorOrRaw(state.errorMessage);
         if (message.isEmpty) return;
         ScaffoldMessenger.of(
           context,

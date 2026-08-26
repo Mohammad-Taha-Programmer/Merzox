@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../bloc/chat_bloc.dart';
 import '../bloc/chat_event.dart';
@@ -454,7 +455,8 @@ class _ChatAvatar extends StatelessWidget {
 }
 
 String _localizedError(String message) {
-  return message.startsWith('messages.') ? message.tr() : message;
+  if (message.startsWith('messages.')) return message.tr();
+  return localizeApiErrorOrRaw(message);
 }
 
 String _formatTime(DateTime? value) {

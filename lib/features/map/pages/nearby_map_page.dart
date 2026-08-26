@@ -7,6 +7,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../services/api_service.dart';
@@ -169,7 +170,7 @@ class _NearbyMapPageState extends State<NearbyMapPage> {
         return _LocationGate(
           icon: Icons.map_outlined,
           title: 'map.loadError'.tr(),
-          body: state.errorMessage,
+          body: localizeApiErrorOrRaw(state.errorMessage),
           primaryLabel: 'common.retry'.tr(),
           onPrimary: () =>
               context.read<NearbyMapBloc>().add(const NearbyMapRefreshed()),

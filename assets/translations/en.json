@@ -565,4 +565,10 @@
     "reviewHint": "Write your review of the product you purchased here",
     "buyNow": "Buy now"
   }
+,
+  "apiErrors": {
+    "contract": "Could not read the server response. Please try again.",
+    "connection": "Could not connect to the server. Make sure the Merzox backend is running.",
+    "unexpected": "An unexpected error occurred. Please try again."
+  }
 }

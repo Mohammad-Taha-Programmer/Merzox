@@ -9,10 +9,10 @@ customers with nearby businesses, their products, and their services. The mobile
 client is built with Flutter for Android and iOS, while the API uses Node.js,
 Express, MongoDB, and Mongoose.
 
-The project is under active development. Arabic is the default language, and
-the project includes English localization infrastructure with RTL/LTR support.
-Some screens still contain hard-coded Arabic while localization coverage is
-being completed.
+The project is under active development. Arabic is the default language, with
+English coverage across application UI copy and RTL/LTR support. Controlled
+client-side API fallback errors are localized in both languages, while
+language-aware sharing payloads are generated in Arabic or English at runtime.
 
 ## Current Features
 
@@ -56,8 +56,8 @@ being completed.
 ### Application foundations
 
 - BLoC-based state management for application workflows.
-- Arabic and English localization infrastructure with RTL/LTR support; full
-  string coverage is still in progress.
+- Arabic and English application UI localization with RTL/LTR support, including
+  controlled client-side API fallback errors and locale-aware error rendering.
 - Runtime location permission handling.
 - Responsive Android and iOS UI based on the supplied Adobe XD designs.
 - Local session persistence and configurable API endpoints.

@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../../../core/constants/colors.dart';
 import 'business_enrollment_bloc.dart';
@@ -104,7 +105,9 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  state.errorMessage ?? 'businessEnrollment.createFailed'.tr(),
+                  state.errorMessage == null
+                      ? 'businessEnrollment.createFailed'.tr()
+                      : localizeApiErrorOrRaw(state.errorMessage!),
                 ),
               ),
             );

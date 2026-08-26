@@ -7,6 +7,7 @@ import 'package:merzox/features/profile/bloc/profile_edit_bloc.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_event.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_state.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 import 'dart:ui' as ui;
 
 class ProfileEditPage extends StatefulWidget {
@@ -163,9 +164,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
         if (state.status == ProfileEditStatus.failure &&
             state.errorMessage != null) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(state.errorMessage!)));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(localizeApiErrorOrRaw(state.errorMessage!))),
+          );
         }
       },
       builder: (context, state) {

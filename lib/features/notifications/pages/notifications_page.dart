@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../bloc/notifications_bloc.dart';
 import '../bloc/notifications_event.dart';
@@ -89,7 +90,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
             ScaffoldMessenger.of(context)
               ..hideCurrentSnackBar()
-              ..showSnackBar(SnackBar(content: Text(state.errorMessage)));
+              ..showSnackBar(
+                SnackBar(
+                  content: Text(localizeApiErrorOrRaw(state.errorMessage)),
+                ),
+              );
           },
           builder: (context, state) {
             return Column(
@@ -130,7 +135,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           Text(
             state.errorMessage.isEmpty
                 ? 'notifications.loadError'.tr()
-                : state.errorMessage,
+                : localizeApiErrorOrRaw(state.errorMessage),
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: MerzoxColors.kColor5E5E5E,

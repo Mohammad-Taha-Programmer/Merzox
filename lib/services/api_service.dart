@@ -856,7 +856,7 @@ class ApiService {
 
   static String messageFromError(Object error) {
     if (error is ApiContractException) {
-      return 'تعذر قراءة رد الخادم. حاول مرة أخرى.';
+      return 'apiErrors.contract';
     }
 
     if (error is DioException) {
@@ -871,11 +871,11 @@ class ApiService {
 
       if (error.type == DioExceptionType.connectionError ||
           error.type == DioExceptionType.connectionTimeout) {
-        return 'تعذر الاتصال بالخادم. تأكد من تشغيل Backend Merzox.';
+        return 'apiErrors.connection';
       }
     }
 
-    return 'حدث خطأ غير متوقع، حاول مرة أخرى';
+    return 'apiErrors.unexpected';
   }
 
   Options _authOptions(String token) {
