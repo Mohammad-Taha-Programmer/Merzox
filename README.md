@@ -23,6 +23,8 @@ language-aware sharing payloads are generated in Arabic or English at runtime.
 - Email verification before an email-based account is persisted.
 - Guest browsing with purchasing and account changes restricted to authenticated users.
 - Home feed for new, highly rated, discounted, and nearby businesses.
+- Explicitly opt-in business recommendations derived on demand from existing
+  server-side favorites and delivered-order categories.
 - Paginated all-businesses catalog.
 - Search for products, services, and businesses, with local search history.
 - Business profiles with information, products, services, ratings, and reviews.
@@ -236,6 +238,11 @@ flutter build apk --debug
   sanitization are enabled by the backend.
 - Local `.env` files, dependencies, and build output are excluded from Git.
 - Location and other sensitive permissions are requested only for relevant flows.
+- Personalized recommendations require both the server-side
+  `aiPersonalization` permission and a `granted` consent lifecycle. They are
+  computed on demand from bounded favorites and delivered orders; local search
+  history, clicks, page views, contacts, and location are not recommendation
+  signals, and no derived preference profile is persisted.
 - Courier location sharing is foreground-only; Merzox does not request Android
   or iOS background-location permission for the courier flow.
 - Courier location capabilities are order-scoped and expire after 12 hours. Only
@@ -255,7 +262,6 @@ review, production secret management, monitoring, backups, or dependency audits.
   registrations/APNs setup, and production activation of the already implemented
   realtime and background push transport.
 - Activate real processing for card, bank-transfer, and assisted payment flows beyond the current cash-only operational baseline.
-- Consent-based recommendation and preference analysis.
 - Production deployment, observability, and store publication.
 
 ## Payment capability guard

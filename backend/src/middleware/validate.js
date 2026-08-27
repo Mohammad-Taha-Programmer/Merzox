@@ -139,6 +139,52 @@ export function validateProfilePatch(req, _res, next) {
     throw new AppError(`Unsupported profile fields: ${invalid.join(', ')}`, 400, 'INVALID_PROFILE_FIELDS');
   }
 
+  if (req.body.permissions !== undefined) {
+    const permissions = req.body.permissions;
+
+    if (
+      !permissions ||
+      typeof permissions !== 'object' ||
+      Array.isArray(permissions)
+    ) {
+      throw new AppError(
+        'Profile permissions must be an object',
+        400,
+        'INVALID_PROFILE_PERMISSIONS'
+      );
+    }
+
+    const allowedPermissionKeys = [
+      'aiPersonalization',
+      'location',
+      'contacts'
+    ];
+
+    const invalidPermissionKeys = Object.keys(permissions).filter(
+      (key) => !allowedPermissionKeys.includes(key)
+    );
+
+    if (invalidPermissionKeys.length > 0) {
+      throw new AppError(
+        `Unsupported profile permissions: ${invalidPermissionKeys.join(', ')}`,
+        400,
+        'INVALID_PROFILE_PERMISSION_FIELDS'
+      );
+    }
+
+    const invalidPermissionValue = Object.entries(permissions).find(
+      ([, value]) => typeof value !== 'boolean'
+    );
+
+    if (invalidPermissionValue) {
+      throw new AppError(
+        `Profile permission ${invalidPermissionValue[0]} must be boolean`,
+        400,
+        'INVALID_PROFILE_PERMISSION_VALUE'
+      );
+    }
+  }
+
   next();
 }
 

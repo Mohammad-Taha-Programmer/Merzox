@@ -43,6 +43,7 @@ flutter run --dart-define=MERZOX_API_BASE_URL=http://localhost:3000/api/v1
 - `GET|POST /api/v1/businesses/me/products`
 - `PATCH|DELETE /api/v1/businesses/me/products/:productId`
 - `PATCH /api/v1/users/me`
+- `GET /api/v1/users/me/recommendations`
 - `GET|POST /api/v1/orders`
 - `GET /api/v1/orders/:id`
 - `PATCH /api/v1/orders/:id/address`
@@ -59,6 +60,24 @@ flutter run --dart-define=MERZOX_API_BASE_URL=http://localhost:3000/api/v1
 - `GET /ready`
 
 The businesses endpoint uses pagination and caps `limit` at 100.
+
+## Consent-based recommendations
+
+`GET /api/v1/users/me/recommendations` is authenticated and fails closed unless
+both `permissions.aiPersonalization` is `true` and
+`permissionConsents.aiPersonalization.status` is `granted`.
+
+The service computes an ephemeral deterministic category profile from existing
+server-side favorites and delivered orders. It does not consume local search
+history, page views, clicks, contacts, or location, and it does not persist the
+derived profile.
+
+Candidates are active businesses and exclude a business owned by the requesting
+user. Raw favorites, orders, interaction counts, and internal affinity scores are
+not returned.
+
+See [`RECOMMENDATIONS.md`](RECOMMENDATIONS.md) for the complete engineering
+contract.
 
 ## Payment capability
 

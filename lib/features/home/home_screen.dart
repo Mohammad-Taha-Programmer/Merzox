@@ -14,6 +14,10 @@ import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_bloc.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_event.dart';
 import 'package:merzox/features/notification_preferences/widgets/notification_preference_control.dart';
+import 'package:merzox/features/recommendation_preferences/bloc/recommendation_preference_bloc.dart';
+import 'package:merzox/features/recommendation_preferences/bloc/recommendation_preference_event.dart';
+import 'package:merzox/features/recommendation_preferences/bloc/recommendation_preference_state.dart';
+import 'package:merzox/features/recommendation_preferences/widgets/recommendation_preference_control.dart';
 import 'package:merzox/features/notifications/widgets/notification_badge_button.dart';
 import 'package:merzox/features/messages/bloc/messages_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
@@ -23,6 +27,7 @@ import 'package:merzox/services/push_service.dart';
 import 'package:merzox/services/realtime_service.dart';
 import 'package:merzox/services/location_permission_service.dart';
 import 'package:merzox/services/notification_preference_service.dart';
+import 'package:merzox/services/recommendation_preference_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../authentication/bloc/auth_bloc.dart';
@@ -73,12 +78,17 @@ class HomeScreen extends StatelessWidget {
   final NotificationPreferenceGateway? notificationPreferenceGateway;
   final NotificationPreferenceSessionReader?
   notificationPreferenceSessionReader;
+  final RecommendationPreferenceGateway? recommendationPreferenceGateway;
+  final RecommendationPreferenceSessionReader?
+  recommendationPreferenceSessionReader;
 
   const HomeScreen({
     super.key,
     required this.isGuest,
     this.notificationPreferenceGateway,
     this.notificationPreferenceSessionReader,
+    this.recommendationPreferenceGateway,
+    this.recommendationPreferenceSessionReader,
   });
 
   Future<void> _logout(BuildContext context) async {
@@ -226,6 +236,10 @@ class HomeScreen extends StatelessWidget {
                 notificationPreferenceGateway: notificationPreferenceGateway,
                 notificationPreferenceSessionReader:
                     notificationPreferenceSessionReader,
+                recommendationPreferenceGateway:
+                    recommendationPreferenceGateway,
+                recommendationPreferenceSessionReader:
+                    recommendationPreferenceSessionReader,
               ),
               _ => _ComingSoonTab(index: state.selectedTab),
             },
@@ -510,6 +524,10 @@ class _HomeTab extends StatelessWidget {
       state.nearbyBusinesses,
       state.searchQuery,
     );
+    final recommendedBusinesses = _filtered(
+      state.recommendedBusinesses,
+      state.searchQuery,
+    );
 
     return CustomScrollView(
       slivers: [
@@ -533,6 +551,21 @@ class _HomeTab extends StatelessWidget {
             ),
           ),
         ),
+        if (state.recommendationConsentEnabled)
+          _BusinessSection(
+            title:
+                (state.recommendationsPersonalized
+                        ? 'recommendationHome.personalizedTitle'
+                        : 'recommendationHome.suggestionsTitle')
+                    .tr(),
+            businesses: recommendedBusinesses,
+            status: HomeSectionStatus.ready,
+            errorMessage: '',
+            onRetry: () => context.read<HomeBloc>().add(
+              const HomeRecommendationsRefreshRequested(),
+            ),
+            followedBusinessIds: state.followedBusinessIds,
+          ),
         _BusinessSection(
           title: 'home.sections.newBusinesses'.tr(),
           businesses: newBusinesses,
@@ -2147,6 +2180,9 @@ class _ProfileTab extends StatelessWidget {
   final NotificationPreferenceGateway? notificationPreferenceGateway;
   final NotificationPreferenceSessionReader?
   notificationPreferenceSessionReader;
+  final RecommendationPreferenceGateway? recommendationPreferenceGateway;
+  final RecommendationPreferenceSessionReader?
+  recommendationPreferenceSessionReader;
 
   const _ProfileTab({
     required this.isGuest,
@@ -2162,6 +2198,8 @@ class _ProfileTab extends StatelessWidget {
     required this.onProtectedAction,
     this.notificationPreferenceGateway,
     this.notificationPreferenceSessionReader,
+    this.recommendationPreferenceGateway,
+    this.recommendationPreferenceSessionReader,
   });
 
   @override
@@ -2175,11 +2213,21 @@ class _ProfileTab extends StatelessWidget {
       );
     }
 
-    return BlocProvider(
-      create: (_) => NotificationPreferenceBloc(
-        gateway: notificationPreferenceGateway,
-        sessionReader: notificationPreferenceSessionReader,
-      )..add(const NotificationPreferenceStarted()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          create: (_) => NotificationPreferenceBloc(
+            gateway: notificationPreferenceGateway,
+            sessionReader: notificationPreferenceSessionReader,
+          )..add(const NotificationPreferenceStarted()),
+        ),
+        BlocProvider(
+          create: (_) => RecommendationPreferenceBloc(
+            gateway: recommendationPreferenceGateway,
+            sessionReader: recommendationPreferenceSessionReader,
+          )..add(const RecommendationPreferenceStarted()),
+        ),
+      ],
       child: _ProfileXdContent(
         onProtectedAction: onProtectedAction,
         onEditProfile: onEditProfile,
@@ -2307,6 +2355,23 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
                     onTap: widget.onAboutUs,
                   ),
                   const NotificationPreferenceControl(),
+                  BlocListener<
+                    RecommendationPreferenceBloc,
+                    RecommendationPreferenceState
+                  >(
+                    listenWhen: (previous, current) =>
+                        previous.status ==
+                            RecommendationPreferenceStatus.saving &&
+                        current.status ==
+                            RecommendationPreferenceStatus.ready &&
+                        previous.enabled != current.enabled,
+                    listener: (context, state) {
+                      context.read<HomeBloc>().add(
+                        const HomeRecommendationsRefreshRequested(),
+                      );
+                    },
+                    child: const RecommendationPreferenceControl(),
+                  ),
                   _ProfileXdMenuTile(
                     title: 'shareApp.profileTitle'.tr(),
                     icon: Icons.ios_share_rounded,

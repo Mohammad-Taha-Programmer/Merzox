@@ -15,6 +15,10 @@ final class HomeState {
   final List<HomeBusiness> discountedBusinesses;
   final List<HomeBusiness> nearbyBusinesses;
   final List<HomeBusiness> allBusinesses;
+  final List<HomeBusiness> recommendedBusinesses;
+  final bool recommendationConsentEnabled;
+  final bool recommendationsPersonalized;
+  final List<String> recommendationPreferenceCategories;
   final HomeSectionStatus newBusinessesStatus;
   final HomeSectionStatus bestBusinessesStatus;
   final HomeSectionStatus discountedBusinessesStatus;
@@ -43,6 +47,10 @@ final class HomeState {
     this.discountedBusinesses = const [],
     this.nearbyBusinesses = const [],
     this.allBusinesses = const [],
+    this.recommendedBusinesses = const [],
+    this.recommendationConsentEnabled = false,
+    this.recommendationsPersonalized = false,
+    this.recommendationPreferenceCategories = const [],
     this.newBusinessesStatus = HomeSectionStatus.initial,
     this.bestBusinessesStatus = HomeSectionStatus.initial,
     this.discountedBusinessesStatus = HomeSectionStatus.initial,
@@ -72,6 +80,10 @@ final class HomeState {
     List<HomeBusiness>? discountedBusinesses,
     List<HomeBusiness>? nearbyBusinesses,
     List<HomeBusiness>? allBusinesses,
+    List<HomeBusiness>? recommendedBusinesses,
+    bool? recommendationConsentEnabled,
+    bool? recommendationsPersonalized,
+    List<String>? recommendationPreferenceCategories,
     HomeSectionStatus? newBusinessesStatus,
     HomeSectionStatus? bestBusinessesStatus,
     HomeSectionStatus? discountedBusinessesStatus,
@@ -106,6 +118,15 @@ final class HomeState {
       discountedBusinesses: discountedBusinesses ?? this.discountedBusinesses,
       nearbyBusinesses: nearbyBusinesses ?? this.nearbyBusinesses,
       allBusinesses: allBusinesses ?? this.allBusinesses,
+      recommendedBusinesses:
+          recommendedBusinesses ?? this.recommendedBusinesses,
+      recommendationConsentEnabled:
+          recommendationConsentEnabled ?? this.recommendationConsentEnabled,
+      recommendationsPersonalized:
+          recommendationsPersonalized ?? this.recommendationsPersonalized,
+      recommendationPreferenceCategories:
+          recommendationPreferenceCategories ??
+          this.recommendationPreferenceCategories,
       newBusinessesStatus: newBusinessesStatus ?? this.newBusinessesStatus,
       bestBusinessesStatus: bestBusinessesStatus ?? this.bestBusinessesStatus,
       discountedBusinessesStatus:

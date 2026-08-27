@@ -177,6 +177,16 @@
     "loadError": "Could not load notification preferences. Please try again.",
     "saveError": "Could not save notification preferences. The setting was not changed."
   },
+  "recommendationPreferences": {
+    "personalization": "Personalized recommendations",
+    "description": "Use your favorites and delivered orders to personalize business suggestions.",
+    "loadError": "Could not load recommendation preferences. Please try again.",
+    "saveError": "Could not save recommendation preferences. The setting was not changed."
+  },
+  "recommendationHome": {
+    "personalizedTitle": "Recommended for you",
+    "suggestionsTitle": "Suggestions you may like"
+  },
   "tracking": {
     "title": "Order tracking",
     "courier": "Driver",

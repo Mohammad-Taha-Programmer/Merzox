@@ -11,6 +11,10 @@ final class HomeStarted extends HomeEvent {
   const HomeStarted({required this.isGuest, this.initialTab = 0});
 }
 
+final class HomeRecommendationsRefreshRequested extends HomeEvent {
+  const HomeRecommendationsRefreshRequested();
+}
+
 final class HomeSearchChanged extends HomeEvent {
   final String query;
 

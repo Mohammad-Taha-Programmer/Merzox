@@ -5,6 +5,7 @@ import {
   updateMe,
   updateMyNotificationPreferences
 } from '../controllers/user.controller.js';
+import { getMyRecommendations } from '../controllers/recommendation.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validateProfilePatch } from '../middleware/validate.js';
 
@@ -19,6 +20,11 @@ router.patch(
   '/me/notification-preferences',
   requireAuth,
   updateMyNotificationPreferences
+);
+router.get(
+  '/me/recommendations',
+  requireAuth,
+  getMyRecommendations
 );
 router.patch('/me', requireAuth, validateProfilePatch, updateMe);
 

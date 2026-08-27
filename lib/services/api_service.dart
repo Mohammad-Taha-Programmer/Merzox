@@ -184,6 +184,26 @@ class ApiService {
     return AuthApiUser.fromJson(user);
   }
 
+  Future<RecommendationApiResponse> recommendations({
+    required String token,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/users/me/recommendations',
+      options: _authOptions(token),
+    );
+
+    final rawData = response.data?['data'];
+
+    if (rawData is! Map<String, dynamic>) {
+      throw const ApiContractException(
+        'recommendations',
+        'response carried no recommendation data object',
+      );
+    }
+
+    return RecommendationApiResponse.fromJson(rawData);
+  }
+
   Future<BusinessListApiResponse> businesses({
     int page = 1,
     int limit = 100,
@@ -1769,6 +1789,127 @@ class FavoriteStatusApiResponse {
   }
 }
 
+class RecommendationApiResponse {
+  final bool consentEnabled;
+  final String consentStatus;
+  final bool personalized;
+  final List<String> preferenceCategories;
+  final List<SearchBusinessApiModel> recommendations;
+
+  const RecommendationApiResponse({
+    required this.consentEnabled,
+    required this.consentStatus,
+    required this.personalized,
+    required this.preferenceCategories,
+    required this.recommendations,
+  });
+
+  bool get consentGranted => consentEnabled && consentStatus == 'granted';
+
+  factory RecommendationApiResponse.fromJson(Map<String, dynamic> json) {
+    final rawConsent = json['consent'];
+
+    if (rawConsent is! Map) {
+      throw const ApiContractException(
+        'recommendations',
+        'consent must be an object',
+      );
+    }
+
+    final consent = Map<String, dynamic>.from(rawConsent);
+
+    final enabled = consent['enabled'];
+    final status = consent['status'];
+
+    if (enabled is! bool) {
+      throw const ApiContractException(
+        'recommendations',
+        'consent.enabled must be boolean',
+      );
+    }
+
+    if (status is! String ||
+        !const {'notAsked', 'granted', 'denied'}.contains(status)) {
+      throw const ApiContractException(
+        'recommendations',
+        'consent.status is invalid',
+      );
+    }
+
+    final personalized = json['personalized'];
+
+    if (personalized is! bool) {
+      throw const ApiContractException(
+        'recommendations',
+        'personalized must be boolean',
+      );
+    }
+
+    final rawCategories = json['preferenceCategories'];
+
+    if (rawCategories is! List) {
+      throw const ApiContractException(
+        'recommendations',
+        'preferenceCategories must be a list',
+      );
+    }
+
+    final categories = <String>[];
+
+    for (final rawCategory in rawCategories) {
+      if (rawCategory is! String || rawCategory.trim().isEmpty) {
+        throw const ApiContractException(
+          'recommendations',
+          'preferenceCategories contains an invalid category',
+        );
+      }
+
+      categories.add(rawCategory.trim());
+    }
+
+    final rawRecommendations = json['recommendations'];
+
+    if (rawRecommendations is! List) {
+      throw const ApiContractException(
+        'recommendations',
+        'recommendations must be a list',
+      );
+    }
+
+    final businesses = <SearchBusinessApiModel>[];
+
+    for (final rawBusiness in rawRecommendations) {
+      if (rawBusiness is! Map) {
+        throw const ApiContractException(
+          'recommendations',
+          'recommendation entry must be an object',
+        );
+      }
+
+      final business = SearchBusinessApiModel.fromJson(
+        Map<String, dynamic>.from(rawBusiness),
+      );
+
+      if (business.id.trim().isEmpty) {
+        throw const ApiContractException(
+          'recommendations',
+          'recommendation entry has no business id',
+        );
+      }
+
+      businesses.add(business);
+    }
+
+    return RecommendationApiResponse(
+      consentEnabled: enabled,
+      consentStatus: status,
+      personalized: personalized,
+      preferenceCategories: List.unmodifiable(categories),
+      recommendations: List.unmodifiable(businesses),
+    );
+  }
+}
+
 class OrderItemRequest {
   final String productId;
   final String? variantId;
@@ -2415,6 +2556,7 @@ class AuthApiUser {
   final bool canChangeName;
   final bool canChangeGender;
   final UserPermissions permissions;
+  final UserPermissionConsents permissionConsents;
 
   const AuthApiUser({
     required this.id,
@@ -2429,6 +2571,7 @@ class AuthApiUser {
     required this.canChangeName,
     required this.canChangeGender,
     required this.permissions,
+    this.permissionConsents = const UserPermissionConsents(),
   });
 
   factory AuthApiUser.fromJson(Map<String, dynamic> json) {
@@ -2458,6 +2601,9 @@ class AuthApiUser {
       permissions: UserPermissions.fromJson(
         json['permissions'] as Map<String, dynamic>? ?? {},
       ),
+      permissionConsents: UserPermissionConsents.fromJson(
+        json['permissionConsents'],
+      ),
     );
   }
 }
@@ -2478,6 +2624,70 @@ class UserPermissions {
       aiPersonalization: json['aiPersonalization'] as bool? ?? false,
       location: json['location'] as bool? ?? false,
       contacts: json['contacts'] as bool? ?? false,
+    );
+  }
+}
+
+class UserPermissionConsent {
+  final String status;
+  final DateTime? askedAt;
+  final DateTime? respondedAt;
+
+  const UserPermissionConsent({
+    this.status = 'notAsked',
+    this.askedAt,
+    this.respondedAt,
+  });
+
+  bool get isGranted => status == 'granted';
+
+  factory UserPermissionConsent.fromJson(Object? raw) {
+    if (raw is! Map) {
+      return const UserPermissionConsent();
+    }
+
+    final json = Map<String, dynamic>.from(raw);
+    final rawStatus = json['status'];
+
+    final status = switch (rawStatus) {
+      'granted' => 'granted',
+      'denied' => 'denied',
+      'notAsked' => 'notAsked',
+      _ => 'notAsked',
+    };
+
+    return UserPermissionConsent(
+      status: status,
+      askedAt: DateTime.tryParse(json['askedAt'] as String? ?? ''),
+      respondedAt: DateTime.tryParse(json['respondedAt'] as String? ?? ''),
+    );
+  }
+}
+
+class UserPermissionConsents {
+  final UserPermissionConsent aiPersonalization;
+  final UserPermissionConsent location;
+  final UserPermissionConsent contacts;
+
+  const UserPermissionConsents({
+    this.aiPersonalization = const UserPermissionConsent(),
+    this.location = const UserPermissionConsent(),
+    this.contacts = const UserPermissionConsent(),
+  });
+
+  factory UserPermissionConsents.fromJson(Object? raw) {
+    if (raw is! Map) {
+      return const UserPermissionConsents();
+    }
+
+    final json = Map<String, dynamic>.from(raw);
+
+    return UserPermissionConsents(
+      aiPersonalization: UserPermissionConsent.fromJson(
+        json['aiPersonalization'],
+      ),
+      location: UserPermissionConsent.fromJson(json['location']),
+      contacts: UserPermissionConsent.fromJson(json['contacts']),
     );
   }
 }
