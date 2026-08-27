@@ -1,4 +1,11 @@
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
+import { env } from '../config/env.js';
+import {
+  CLI_ACTIONS,
+  cliExecutionRefusal,
+  cliRefusalMessage,
+  safeCliErrorSummary
+} from './cli-safety.js';
 import {
   AboutUsContent,
   createDefaultAboutUsContent
@@ -130,15 +137,61 @@ async function seed() {
 
   await Business.insertMany(businesses);
 
-  console.log('Seed complete');
-  console.log('Login user@merzox.local / Password123');
-  console.log('Login +972590000001 / Password123');
+  console.log(
+    'Seed complete. Development fixtures were recreated.'
+  );
 
   await disconnectDatabase();
 }
 
-seed().catch(async (error) => {
-  console.error(error);
-  await disconnectDatabase();
-  process.exit(1);
-});
+const seedAction =
+  CLI_ACTIONS.destructiveSeed;
+
+const seedRefusal =
+  cliExecutionRefusal({
+    nodeEnv:
+      env.nodeEnv,
+    allowValue:
+      process.env[
+        seedAction.allowFlag
+      ]
+  });
+
+if (seedRefusal) {
+  console.error(
+    cliRefusalMessage({
+      action:
+        seedAction,
+      refusal:
+        seedRefusal
+    })
+  );
+
+  process.exitCode = 1;
+} else {
+  seed().catch(
+    async (error) => {
+      console.error(
+        'Seed failed.',
+        safeCliErrorSummary(
+          error
+        )
+      );
+
+      try {
+        await disconnectDatabase();
+      } catch (
+        disconnectError
+      ) {
+        console.error(
+          'Seed database disconnect failed.',
+          safeCliErrorSummary(
+            disconnectError
+          )
+        );
+      }
+
+      process.exitCode = 1;
+    }
+  );
+}

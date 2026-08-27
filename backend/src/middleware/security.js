@@ -63,7 +63,10 @@ export function applySecurityMiddleware(app) {
       origin(origin, callback) {
         callback(null, isOriginAllowed(origin));
       },
-      credentials: true
+      credentials: true,
+      exposedHeaders: [
+        'X-Request-ID'
+      ]
     })
   );
   app.use(

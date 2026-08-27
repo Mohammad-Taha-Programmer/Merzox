@@ -151,8 +151,22 @@ npm run seed
 > `npm run seed` clears the collections managed by the seed script. Do not run
 > it against a production database.
 
-The health endpoint is available at `http://localhost:3000/health`. More backend
-details and endpoint documentation are in [backend/README.md](backend/README.md).
+The backend exposes separate operational probes:
+
+- `GET /health` is process liveness and does not depend on MongoDB.
+- `GET /ready` is deployment readiness. It returns HTTP `200` only after the
+  runtime is accepting traffic and MongoDB is connected; otherwise it returns
+  HTTP `503`.
+- `SIGTERM` and `SIGINT` trigger an idempotent graceful shutdown: readiness is
+  withdrawn first, background reconciliation stops, realtime/push transports
+  close, HTTP drains, and MongoDB disconnects before Node exits naturally.
+- Every HTTP request receives a server-generated `X-Request-ID`. Operational
+  access/error/runtime logs are one-line structured JSON with a bounded field
+  allowlist; request bodies, query strings, authentication headers and raw
+  errors are not logged.
+
+More backend details and endpoint documentation are in
+[backend/README.md](backend/README.md).
 
 ## Flutter Setup
 
@@ -263,3 +277,95 @@ explicitly supply the production Firebase dart-defines.
 Merzox is currently a development-stage product. Store identifiers, payment
 credentials, production SMTP credentials, deployment URLs, privacy documents,
 and final legal content must be supplied before public release.
+
+### Development CLI safety
+
+The database seed and SMTP diagnostic are development-only maintenance tools.
+
+- The seed command refuses to run when `NODE_ENV=production`.
+- Outside production, the seed command requires
+  `MERZOX_ALLOW_DESTRUCTIVE_SEED=true`.
+- The SMTP diagnostic refuses to run when `NODE_ENV=production`.
+- Outside production, the SMTP diagnostic requires
+  `MERZOX_ALLOW_EMAIL_DIAGNOSTIC=true`.
+- The production refusal cannot be overridden by either opt-in flag.
+- CLI failures expose only bounded error class/code information rather than raw
+  provider responses, error messages, stack traces, recipients, tokens, or
+  verification URLs.
+- Development seed credentials are fixtures only and must never be reused as
+  production credentials.
+
+### Backend production configuration
+
+The backend validates its runtime environment before accepting traffic.
+
+When `NODE_ENV=production`:
+
+- `JWT_SECRET` must contain at least 32 characters.
+- `PUBLIC_BASE_URL` is mandatory and must be an HTTPS origin.
+- Configured CORS entries must be exact HTTPS origins; development wildcard
+  patterns are refused.
+- SMTP delivery must be fully configured because production email signup does
+  not expose verification URLs to the API client.
+
+In every environment, invalid ports, rate-limit numbers, boolean flags, or an
+unknown `NODE_ENV` are refused during configuration loading rather than being
+silently coerced into unusable runtime values.
+
+### Reverse-proxy client IPs
+
+The backend does not trust forwarded client-IP headers by default.
+
+When deployment places Merzox behind a reverse proxy or load balancer, configure
+`TRUST_PROXY_RANGES` with only the IP addresses or CIDR ranges from which the
+API server actually receives trusted proxy connections.
+
+Merzox deliberately does not support `trust proxy=true` or numeric hop counts.
+This keeps IP-based rate limiting tied to a verifiable proxy topology rather
+than trusting an attacker-controlled `X-Forwarded-For` chain.
+
+The ingress proxy must also overwrite or sanitize forwarded headers rather than
+blindly preserving attacker-supplied forwarding information.
+
+### Backend HTTP connection hardening
+
+The Node.js API uses an explicit, validated HTTP server policy instead of
+depending on runtime defaults. The default whole-request/header/keep-alive
+bounds are 30 seconds, 15 seconds, and 5 seconds respectively, timeout checks
+run every 5 seconds, incoming headers are capped at 100, and a keep-alive socket
+is recycled after 1000 requests.
+
+The generic Node socket inactivity timeout remains disabled because Socket.IO
+shares the HTTP server and owns heartbeat/liveness for its long-lived transports.
+Production reverse proxies and load balancers should use compatible outer
+timeouts rather than silently overriding these application assumptions.
+
+### Production deployment contract
+
+The provider-neutral backend production process contract is documented in
+[`backend/DEPLOYMENT.md`](backend/DEPLOYMENT.md). It defines the supported Node
+runtime, start command, readiness/liveness probes, graceful shutdown, trusted
+proxy boundary, HTTP connection policy, and the current single-replica realtime
+baseline. It intentionally does not select a hosting platform.
+
+### Database recovery contract
+
+The provider-neutral MongoDB backup, isolated restore-verification, and
+disaster-recovery safety contract is documented in
+[backend/RECOVERY.md](backend/RECOVERY.md).
+
+Production RPO/RTO, retention, backup consistency, encrypted off-host storage,
+and provider-specific recovery activation remain deployment acceptance inputs.
+
+### Production telemetry contract
+
+The provider-neutral production telemetry and alerting contract is documented in
+[backend/TELEMETRY.md](backend/TELEMETRY.md). Merzox already emits structured JSON
+runtime events with server-generated request IDs, HTTP status codes, request
+durations, and authoritative `/health` and `/ready` probes.
+
+Real production telemetry activation still requires the selected deployment's log
+collector, retention/access controls, dashboards or equivalent queries, alert
+rules and responder ownership, plus a non-destructive alert-delivery drill.
+Dedicated metrics, distributed tracing, and an external error-reporting SDK remain
+separate architecture decisions rather than repository defaults.

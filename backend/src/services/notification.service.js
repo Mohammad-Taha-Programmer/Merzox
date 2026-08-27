@@ -1,4 +1,5 @@
 import { env } from '../config/env.js';
+import { logger } from '../observability/logger.js';
 import { Notification, notificationTypes } from '../models/Notification.js';
 import { deliverNotificationPush } from '../push/push.delivery.js';
 import { publishNotificationsChanged } from '../realtime/realtime.publisher.js';
@@ -61,7 +62,17 @@ async function create(payload) {
     // from a fixed allowlist of bounded primitives. The payload carries
     // customer names and order identifiers and is never touched.
     if (env.nodeEnv !== 'test') {
-      console.error(...notificationFailureLog(payload, error));
+      logger.error(
+        'notification_persist_failed',
+        {
+          appCode:
+            'NOTIFICATION_PERSIST_FAILED',
+          errorName:
+            safeErrorName(error),
+          errorCode:
+            safeErrorCode(error)
+        }
+      );
     }
     return null;
   }
