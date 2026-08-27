@@ -158,6 +158,8 @@ export function createRealtimeAuthMiddleware(
   };
 }
 
+const realtimeCloseHandlers = new WeakMap();
+
 export function createRealtimeServer(
   httpServer,
   {
@@ -176,9 +178,15 @@ export function createRealtimeServer(
     }
   });
 
-  registerRealtimeEmitter((userId, event, payload) => {
-    io.to(realtimeUserRoom(userId)).emit(event, payload);
-  });
+  const unregisterRealtimeEmitter =
+    registerRealtimeEmitter((userId, event, payload) => {
+      io.to(realtimeUserRoom(userId)).emit(event, payload);
+    });
+
+  realtimeCloseHandlers.set(
+    io,
+    unregisterRealtimeEmitter
+  );
 
   io.use(
     createRealtimeAuthMiddleware(authenticate)
@@ -193,4 +201,21 @@ export function createRealtimeServer(
   });
 
   return io;
+}
+
+export function closeRealtimeServer(io) {
+  const unregister =
+    realtimeCloseHandlers.get(io);
+
+  realtimeCloseHandlers.delete(io);
+
+  if (unregister) {
+    unregister();
+  }
+
+  return new Promise((resolve) => {
+    io.close(() => {
+      resolve();
+    });
+  });
 }

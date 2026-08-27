@@ -1,11 +1,16 @@
 import mongoose from 'mongoose';
 
+import { logger } from '../observability/logger.js';
+import {
+  safeErrorCode,
+  safeErrorName
+} from '../utils/safe-log.js';
+
 import { Business } from '../models/Business.js';
 import { paginationParams, readFilterParam } from '../policies/query.policy.js';
 import { Conversation } from '../models/Conversation.js';
 import { Message } from '../models/Message.js';
 import {
-  messageCompensationLog,
   resolveSendFailure
 } from '../policies/message-consistency.policy.js';
 import {
@@ -64,7 +69,17 @@ async function compensateMessage(messageId) {
     await Message.deleteOne({ _id: messageId });
     return true;
   } catch (error) {
-    console.error(...messageCompensationLog(error));
+    logger.error(
+      'message_compensation_failed',
+      {
+        appCode:
+          'MESSAGE_COMPENSATION_FAILED',
+        errorName:
+          safeErrorName(error),
+        errorCode:
+          safeErrorCode(error)
+      }
+    );
     return false;
   }
 }

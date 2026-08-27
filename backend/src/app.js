@@ -1,8 +1,10 @@
 import express from 'express';
-import morgan from 'morgan';
 
 import { env } from './config/env.js';
+import { currentReadiness } from './runtime/readiness.js';
+import { applyProxyTrust } from './runtime/proxy-trust.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { requestContextMiddleware } from './middleware/request-context.js';
 import { applySecurityMiddleware } from './middleware/security.js';
 import authRoutes from './routes/auth.routes.js';
 import businessRoutes from './routes/business.routes.js';
@@ -17,16 +19,35 @@ import userRoutes from './routes/user.routes.js';
 
 const app = express();
 
-applySecurityMiddleware(app);
+applyProxyTrust(
+  app,
+  env.trustedProxyRanges
+);
 
-if (env.nodeEnv !== 'test') {
-  app.use(morgan(env.nodeEnv === 'production' ? 'combined' : 'dev'));
-}
+app.use(
+  requestContextMiddleware
+);
+
+applySecurityMiddleware(app);
 
 app.use(express.json({ limit: '32kb' }));
 
 app.get('/health', (_req, res) => {
   res.json({ success: true, data: { status: 'ok', service: 'merzox-api' } });
+});
+
+app.get('/ready', (_req, res) => {
+  const readiness = currentReadiness();
+
+  res
+    .status(readiness.ready ? 200 : 503)
+    .json({
+      success: readiness.ready,
+      data: {
+        status: readiness.status,
+        service: readiness.service
+      }
+    });
 });
 
 app.use('/api/v1/auth', authRoutes);

@@ -1,3 +1,4 @@
+import { logger } from '../observability/logger.js';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -115,7 +116,13 @@ export async function requestPasswordReset({
       }
     }
 
-    console.warn('Password reset request could not be completed');
+    logger.warn(
+      'password_reset_request_failed',
+      {
+        appCode:
+          'PASSWORD_RESET_REQUEST_FAILED'
+      }
+    );
   }
 }
 

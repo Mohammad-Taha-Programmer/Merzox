@@ -11,6 +11,10 @@ export async function connectDatabase() {
   });
 }
 
+export function isDatabaseReady() {
+  return mongoose.connection.readyState === 1;
+}
+
 export async function disconnectDatabase() {
   await mongoose.disconnect();
 }

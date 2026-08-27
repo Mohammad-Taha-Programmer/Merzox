@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer';
 
 import { env } from '../config/env.js';
+import { logger } from '../observability/logger.js';
 
 function smtpConfigured() {
   return Boolean(env.smtp.host && env.smtp.user && env.smtp.pass && env.smtp.from);
@@ -40,15 +41,18 @@ export async function sendVerificationEmail({ to, name, link }) {
   const mailer = getTransporter();
 
   if (!mailer) {
-    const status = smtpStatus();
-    console.warn('SMTP is not configured. Missing settings:', {
-      SMTP_HOST: !status.hostConfigured,
-      SMTP_USER: !status.userConfigured,
-      SMTP_PASS: !status.passConfigured,
-      SMTP_FROM: !status.fromConfigured
-    });
-    console.warn(`Merzox email verification link for ${to}: ${link}`);
-    return { sent: false, reason: 'SMTP_NOT_CONFIGURED' };
+    logger.warn(
+      'verification_email_not_sent',
+      {
+        appCode:
+          'SMTP_NOT_CONFIGURED'
+      }
+    );
+
+    return {
+      sent: false,
+      reason: 'SMTP_NOT_CONFIGURED'
+    };
   }
 
   await mailer.sendMail({
@@ -93,20 +97,19 @@ export async function sendPasswordResetEmail({
   const mailer = getTransporter();
 
   if (!mailer) {
-    const status = smtpStatus();
-
-    console.warn(
-      'SMTP is not configured for password reset email. Missing settings:',
+    logger.warn(
+      'password_reset_email_not_sent',
       {
-        SMTP_HOST: !status.hostConfigured,
-        SMTP_USER: !status.userConfigured,
-        SMTP_PASS: !status.passConfigured,
-        SMTP_FROM: !status.fromConfigured
+        appCode:
+          'SMTP_NOT_CONFIGURED'
       }
     );
 
     // Deliberately do not log `to`, `token`, or a reset URL.
-    return { sent: false, reason: 'SMTP_NOT_CONFIGURED' };
+    return {
+      sent: false,
+      reason: 'SMTP_NOT_CONFIGURED'
+    };
   }
 
   await mailer.sendMail({

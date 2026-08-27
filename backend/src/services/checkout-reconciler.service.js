@@ -1,3 +1,4 @@
+import { logger } from '../observability/logger.js';
 import { Business } from '../models/Business.js';
 import { CheckoutIntent } from '../models/CheckoutIntent.js';
 import { Order } from '../models/Order.js';
@@ -361,7 +362,15 @@ export function startCheckoutReconciler({
     try {
       await reconcileStaleCheckouts({ staleAfterMs });
     } catch (error) {
-      console.error('checkout reconciliation failed', safeErrorCode(error));
+      logger.error(
+        'checkout_reconciliation_failed',
+        {
+          appCode:
+            'CHECKOUT_RECONCILIATION_FAILED',
+          errorCode:
+            safeErrorCode(error)
+        }
+      );
     }
   };
 

@@ -612,10 +612,10 @@ test(
         'utf8'
       );
 
-    const env =
+    const environment =
       fs.readFileSync(
         new URL(
-          '../src/config/env.js',
+          '../src/config/environment.js',
           import.meta.url
         ),
         'utf8'
@@ -636,7 +636,7 @@ test(
     );
 
     assert.match(
-      env,
+      environment,
       /FIREBASE_PUSH_ENABLED/
     );
 

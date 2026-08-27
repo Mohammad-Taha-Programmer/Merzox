@@ -56,8 +56,56 @@ flutter run --dart-define=MERZOX_API_BASE_URL=http://localhost:3000/api/v1
 - `POST /api/v1/notifications/:id/read`
 - `POST /api/v1/notifications/read-all`
 - `GET /health`
+- `GET /ready`
 
 The businesses endpoint uses pagination and caps `limit` at 100.
+
+## Operational probes
+
+`GET /health` is a liveness probe. It confirms that the Node.js process can
+serve HTTP and intentionally does not depend on MongoDB.
+
+`GET /ready` is a readiness probe. It fails closed with HTTP `503` until the
+server bootstrap has connected to MongoDB and started accepting traffic. Once
+both conditions are true it returns HTTP `200`. If MongoDB is no longer
+connected, readiness returns to `503` while liveness can remain healthy.
+
+## Graceful shutdown
+
+The production runtime handles both `SIGTERM` and `SIGINT`. Shutdown is
+idempotent: the first signal withdraws readiness immediately, stops the checkout
+reconciler timer, closes the Firebase push sender, closes Socket.IO and the HTTP
+server, and finally disconnects MongoDB. A repeated signal reuses the same
+shutdown operation instead of closing resources twice.
+
+Cleanup continues through every resource even when one close operation fails.
+Normal signal handling does not call `process.exit()`; after runtime handles are
+closed Node exits naturally. Cleanup failure sets a non-zero process exit code.
+
+## Request correlation and operational logs
+
+Every HTTP request receives a Merzox-generated `X-Request-ID` response header.
+Inbound request IDs are not trusted or reused. For browser clients,
+`X-Request-ID` is exposed through CORS.
+
+HTTP completion/error events and server lifecycle events are written as one-line
+JSON records. The logger accepts only bounded operational fields such as request
+ID, HTTP method, route template, status code, duration, application error code
+and sanitized error class/code.
+
+The operational logger intentionally does **not** accept request bodies, raw
+URLs/query strings, Authorization/Cookie headers, customer identity fields,
+message content, tokens, or raw Error message/stack data.
+
+Server-runtime diagnostics also use this structured logger; runtime source does
+not emit directly through `console.*`. Human-facing maintenance scripts under
+`backend/src/scripts/` remain a separate CLI surface and are not treated as
+server observability.
+
+When SMTP is unavailable, verification and password-reset delivery failures are
+logged only as fixed operational events. Recipient addresses, verification
+links, reset tokens and provider error messages are never written by the server
+runtime logger.
 
 ## Integration authorization tests
 
@@ -147,3 +195,118 @@ then clear the old session and show the business login screen.
 Products are soft-deleted so historical orders remain intact. Owner order status
 changes must follow `pending -> confirmed -> preparing -> outForDelivery -> delivered`;
 the owner may cancel before delivery where the API permits it.
+
+## Development CLI safety
+
+The seed and SMTP diagnostic scripts remain human-facing CLI utilities rather
+than server observability processes.
+
+Both commands fail closed when `NODE_ENV=production`.
+
+Outside production, destructive seeding requires the exact opt-in
+`MERZOX_ALLOW_DESTRUCTIVE_SEED=true`. The guard is evaluated before the seed
+connects to MongoDB.
+
+Outside production, SMTP diagnostics require the exact opt-in
+`MERZOX_ALLOW_EMAIL_DIAGNOSTIC=true`.
+
+Neither opt-in overrides the production refusal. CLI failure output is bounded
+to safe error class/code information and does not print raw provider responses,
+raw error messages, stack traces, recipients, tokens, or verification URLs.
+
+## Production environment contract
+
+Runtime configuration is parsed through a pure, testable environment resolver
+before the server connects to MongoDB or begins listening.
+
+Supported `NODE_ENV` values are exactly `development`, `test`, and
+`production`.
+
+Production additionally requires:
+
+- a `JWT_SECRET` of at least 32 characters;
+- an explicit HTTPS `PUBLIC_BASE_URL`;
+- complete SMTP host/user/password/from configuration;
+- only exact HTTPS CORS origins when browser origins are configured.
+
+An empty production CORS list remains valid and denies browser-origin requests;
+it is not widened automatically. Wildcard CORS entries remain available for
+local development only.
+
+`PORT` and `SMTP_PORT` are bounded to valid TCP port numbers. Rate-limit
+window/max values must be positive safe integers. Boolean environment flags
+accept only literal `true` or `false`.
+
+Environment validation errors use bounded error codes and never include secret
+values.
+
+## Reverse-proxy trust
+
+Express `trust proxy` is explicitly `false` when `TRUST_PROXY_RANGES` is empty.
+
+For deployments behind a reverse proxy/load balancer, set
+`TRUST_PROXY_RANGES` to a comma-separated allowlist of the exact proxy source
+IP addresses or CIDR ranges that can connect to the Node.js process.
+
+Examples of accepted shapes are an exact IPv4/IPv6 address or a CIDR such as
+`10.20.30.0/24`. Hostnames, booleans and numeric hop counts are not accepted.
+
+This matters because the global and password-recovery rate limiters use
+Express's `req.ip`. Trusting arbitrary forwarded headers would allow spoofed
+client identities, while leaving proxy trust disabled behind a shared proxy
+would collapse many users onto the proxy's source address.
+
+The reverse proxy must overwrite/sanitize forwarded headers at the ingress
+boundary. Only networks that are actually controlled as Merzox proxy ingress
+should appear in the allowlist.
+
+### HTTP parser and connection policy
+
+Merzox does not rely on changing Node.js HTTP defaults for production behavior.
+The HTTP server is created through a dedicated policy and the values can be
+overridden only with validated positive integers:
+
+- `HTTP_REQUEST_TIMEOUT_MS` defaults to `30000`.
+- `HTTP_HEADERS_TIMEOUT_MS` defaults to `15000` and cannot exceed the whole
+  request timeout.
+- `HTTP_KEEP_ALIVE_TIMEOUT_MS` defaults to `5000`.
+- `HTTP_CONNECTIONS_CHECKING_INTERVAL_MS` defaults to `5000` and cannot exceed
+  the headers timeout.
+- `HTTP_MAX_HEADERS_COUNT` defaults to `100`.
+- `HTTP_MAX_REQUESTS_PER_SOCKET` defaults to `1000`.
+
+`server.timeout` intentionally remains `0`. Socket.IO shares the same Node HTTP
+server and manages liveness for its polling/WebSocket transports through its own
+heartbeat. Ordinary incomplete HTTP requests remain bounded by the request and
+header timers above.
+
+The application request body remains independently capped at `32kb`; these HTTP
+connection limits do not replace route-level validation or ingress/load-balancer
+timeouts.
+
+## Production deployment contract
+
+See [`DEPLOYMENT.md`](DEPLOYMENT.md) for the provider-neutral production
+process contract. Production backup/restore and disaster-recovery procedures
+remain a separate required operations gate.
+
+## Database recovery contract
+
+See [RECOVERY.md](RECOVERY.md) for the provider-neutral MongoDB backup,
+isolated restore-verification, and disaster-recovery safety contract.
+
+The repository defines the safety boundaries, while production RPO/RTO,
+retention, backup consistency, storage/encryption ownership, and the real
+provider recovery mechanism remain deployment acceptance inputs.
+
+## Production telemetry contract
+
+See [TELEMETRY.md](TELEMETRY.md) for the provider-neutral production telemetry and
+alerting contract. The existing structured logger, request correlation,
+`http_request_completed` / `http_request_aborted` / `http_request_error` events,
+and `/health` / `/ready` probes form the application-owned telemetry baseline.
+
+Production activation must provide real collection, retention/access control,
+dashboard or query visibility, alert rules, responder ownership, and an exercised
+non-destructive alert-delivery path. A metrics endpoint, distributed tracing, or
+external error-reporting SDK is not required by the current repository baseline.
