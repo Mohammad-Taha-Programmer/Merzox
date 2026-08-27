@@ -229,6 +229,28 @@ Build an Android debug APK:
 flutter build apk --debug
 ```
 
+## Production Release Readiness
+
+Merzox includes a fail-closed production release preflight.
+
+Normal CI runs the non-blocking audit:
+
+```powershell
+dart run tool/release_readiness.dart --audit
+```
+
+An explicit production release gate must use:
+
+```powershell
+dart run tool/release_readiness.dart --require-ready
+```
+
+`--require-ready` fails while any production blocker remains and is intentionally
+not part of ordinary CI while production activation is incomplete.
+
+See [RELEASE_READINESS.md](RELEASE_READINESS.md) for the blocker model,
+attestations, exit codes, and secret boundary.
+
 ## Security Notes
 
 - Passwords are hashed with bcrypt and are never returned by the API.
