@@ -243,10 +243,32 @@ review, production secret management, monitoring, backups, or dependency audits.
 - Finalize the permanent mobile application identity, Firebase platform
   registrations/APNs setup, and production activation of the already implemented
   realtime and background push transport.
-- Payment processing for cards, cash, bank transfers, and purchases for others.
+- Activate real processing for card, bank-transfer, and assisted payment flows beyond the current cash-only operational baseline.
 - Courier location on a live map during delivery.
 - Consent-based recommendation and preference analysis.
 - Production deployment, observability, and store publication.
+
+## Payment capability guard
+
+Merzox keeps the historical order-payment vocabulary `cash`, `card`,
+`bankTransfer`, and `assisted`, but recognized does not mean operational.
+
+The backend currently fails closed:
+
+- `cash` is the only operational checkout payment method.
+- `card`, `bankTransfer`, and `assisted` remain recognized for API/history
+  compatibility but are rejected with `PAYMENT_METHOD_UNAVAILABLE`.
+- Unknown or malformed methods are rejected separately with
+  `INVALID_PAYMENT_METHOD`.
+- The rejection occurs in request validation before `createOrder`, so an
+  unavailable payment method cannot create a `CheckoutIntent`, reserve stock,
+  mutate inventory, or create an `Order`.
+- No payment gateway, card SDK, merchant credential, provider webhook, capture,
+  or monetary refund flow is configured by this repository yet.
+
+A future provider integration must explicitly activate a payment method only
+after its processing lifecycle, idempotency, webhook verification, failure
+recovery, and refund/cancellation semantics have been implemented and reviewed.
 
 ## Production Firebase activation guard
 

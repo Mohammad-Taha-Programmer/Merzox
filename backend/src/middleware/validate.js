@@ -2,6 +2,11 @@ import validator from 'validator';
 
 import { merchantSelectableStatuses } from '../policies/order-status.policy.js';
 import {
+  isKnownPaymentMethod,
+  isOperationalPaymentMethod,
+  PAYMENT_ERRORS
+} from '../policies/payment.policy.js';
+import {
   merchantWritableProductFields,
   normalizeKeywords,
   productClassifications,
@@ -223,9 +228,26 @@ export function validateOrderCreate(req, _res, next) {
 
   }
 
-  const paymentMethods = new Set(['cash', 'card', 'bankTransfer', 'assisted']);
-  if (req.body.paymentMethod && !paymentMethods.has(req.body.paymentMethod)) {
-    throw new AppError('Payment method is invalid', 400, 'INVALID_PAYMENT_METHOD');
+  // A missing/null method preserves the historical cash default. Any value
+  // explicitly supplied by the client must first be recognized, then proven
+  // operational. This gate executes before createOrder and therefore before a
+  // CheckoutIntent, reservation, inventory mutation, or Order can exist.
+  const paymentMethod = req.body.paymentMethod ?? 'cash';
+
+  if (!isKnownPaymentMethod(paymentMethod)) {
+    throw new AppError(
+      'Payment method is invalid',
+      400,
+      'INVALID_PAYMENT_METHOD'
+    );
+  }
+
+  if (!isOperationalPaymentMethod(paymentMethod)) {
+    throw new AppError(
+      'Payment method is not currently available',
+      409,
+      PAYMENT_ERRORS.unavailable
+    );
   }
 
   if (req.body.deliveryAddress && String(req.body.deliveryAddress).trim().length > 250) {

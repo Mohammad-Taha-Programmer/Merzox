@@ -60,6 +60,32 @@ flutter run --dart-define=MERZOX_API_BASE_URL=http://localhost:3000/api/v1
 
 The businesses endpoint uses pagination and caps `limit` at 100.
 
+## Payment capability
+
+`POST /api/v1/orders` recognizes the historical payment-method vocabulary
+`cash`, `card`, `bankTransfer`, and `assisted`.
+
+Recognition and operational capability are intentionally separate:
+
+- `cash` is currently the only operational method.
+- `card`, `bankTransfer`, and `assisted` fail closed with HTTP `409` and
+  application code `PAYMENT_METHOD_UNAVAILABLE`.
+- Unknown or malformed payment values fail with HTTP `400` and
+  `INVALID_PAYMENT_METHOD`.
+- Payment capability is checked by `validateOrderCreate` before `createOrder`
+  runs. Therefore a known-but-unavailable method cannot create a checkout
+  intent, consume a reservation, mutate inventory, or create an order.
+- The persisted `Order.paymentMethod` vocabulary remains backward-compatible;
+  historical values are not rewritten merely because they are not operational
+  today.
+
+There is currently no configured payment gateway, provider SDK, merchant
+credential, provider webhook, capture operation, monetary refund operation, or
+provider payment state machine. Future payment-provider work must plug into an
+explicit payment lifecycle rather than bypassing checkout/inventory consistency
+controls.
+
+
 ## Operational probes
 
 `GET /health` is a liveness probe. It confirms that the Node.js process can
