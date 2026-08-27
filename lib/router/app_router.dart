@@ -22,6 +22,8 @@ import '../features/business/enrollment/business_enrollment_page.dart';
 import '../features/business/preview/store_preview_page.dart';
 import '../features/business/shell/business_bloc.dart';
 import '../features/business/shell/business_shell_page.dart';
+import '../features/courier_location/courier_location_bloc.dart';
+import '../features/courier_location/courier_location_page.dart';
 import '../features/favorites/bloc/favorites_bloc.dart';
 import '../features/favorites/bloc/favorites_event.dart';
 import '../features/favorites/pages/favorites_page.dart';
@@ -121,6 +123,7 @@ class AppRouter {
             onBrowseAsGuest: () => context.go('/home?guest=true'),
             onSignupRequested: () => context.go('/signup'),
             onForgotPasswordRequested: () => context.go('/forgot-password'),
+            onCourierLocationRequested: () => context.push('/courier/location'),
           ),
         ),
       ),
@@ -180,7 +183,15 @@ class AppRouter {
             onSignupRequested: () => context.go('/login'),
             onForgotPasswordRequested: () =>
                 context.go('/forgot-password?business=true'),
+            onCourierLocationRequested: () => context.push('/courier/location'),
           ),
+        ),
+      ),
+      GoRoute(
+        path: '/courier/location',
+        builder: (_, __) => BlocProvider(
+          create: (_) => CourierLocationBloc(),
+          child: const CourierLocationPage(),
         ),
       ),
       GoRoute(
@@ -254,9 +265,11 @@ class AppRouter {
       GoRoute(
         path: '/orders/:orderId/tracking',
         builder: (_, state) => BlocProvider(
-          create: (_) =>
-              OrderTrackingBloc(orderId: state.pathParameters['orderId'] ?? '')
-                ..add(const OrderTrackingStarted()),
+          create: (_) => OrderTrackingBloc(
+            orderId: state.pathParameters['orderId'] ?? '',
+            realtimeOrderTrackingInvalidations:
+                _realtimeService?.orderTrackingInvalidations,
+          )..add(const OrderTrackingStarted()),
           child: const OrderTrackingPage(),
         ),
       ),

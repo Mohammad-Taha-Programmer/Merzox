@@ -26,6 +26,7 @@ import {
   getMyBusinessDashboard,
   listMyBusinessOrders,
   listMyBusinessProducts,
+  revokeMyBusinessOrderCourierLocation,
   updateMyBusiness,
   updateMyBusinessOrderCourier,
   updateMyBusinessOrderStatus,
@@ -76,6 +77,12 @@ router.patch(
   requireBusinessUser,
   validateOrderCourierPatch,
   updateMyBusinessOrderCourier
+);
+router.delete(
+  '/me/orders/:orderId/courier-location-capability',
+  requireAuth,
+  requireBusinessUser,
+  revokeMyBusinessOrderCourierLocation
 );
 router.get(
   '/me/conversations/unread-count',

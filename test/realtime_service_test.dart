@@ -565,4 +565,105 @@ void main() {
 
     expect(event.audience, 'customer');
   });
+
+  test(
+    'order tracking invalidation accepts only the stable minimal payload',
+    () {
+      final event = RealtimeOrderTrackingInvalidation.tryParse({
+        'orderId': 'order-1',
+        'reason': 'courier-location-updated',
+      });
+
+      expect(event, isNotNull);
+      expect(event!.orderId, 'order-1');
+      expect(event.reason, 'courier-location-updated');
+
+      expect(
+        RealtimeOrderTrackingInvalidation.tryParse({
+          'orderId': '',
+          'reason': 'courier-location-updated',
+        }),
+        isNull,
+      );
+
+      expect(
+        RealtimeOrderTrackingInvalidation.tryParse({
+          'orderId': 'order-1',
+          'reason': 'unknown',
+        }),
+        isNull,
+      );
+    },
+  );
+
+  test('active client publishes typed order tracking invalidations', () async {
+    final sessionService = FakeAuthSessionService(
+      const AuthSessionSnapshot(type: AuthSessionType.customer, token: 'token'),
+    );
+
+    late FakeRealtimeSocketClient client;
+
+    final service = RealtimeService(
+      authSessionService: sessionService,
+      serverUrl: 'http://127.0.0.1:4000',
+      clientFactory: ({required serverUrl, required token}) {
+        client = FakeRealtimeSocketClient();
+
+        return client;
+      },
+    );
+
+    addTearDown(service.close);
+
+    await service.syncWithSession();
+
+    final next = service.orderTrackingInvalidations.first;
+
+    client.emitEvent(RealtimeService.orderTrackingChangedEvent, {
+      'orderId': 'order-1',
+      'reason': 'courier-location-updated',
+    });
+
+    final event = await next;
+
+    expect(event.orderId, 'order-1');
+    expect(event.reason, 'courier-location-updated');
+  });
+
+  test(
+    'order tracking invalidation accepts lifecycle reasons but rejects extra payload fields',
+    () {
+      for (final reason in [
+        'courier-location-updated',
+        'courier-location-cleared',
+        'order-status-changed',
+      ]) {
+        final event = RealtimeOrderTrackingInvalidation.tryParse({
+          'orderId': 'order-1',
+          'reason': reason,
+        });
+
+        expect(event, isNotNull);
+        expect(event!.reason, reason);
+      }
+
+      expect(
+        RealtimeOrderTrackingInvalidation.tryParse({
+          'orderId': 'order-1',
+          'reason': 'courier-location-updated',
+          'latitude': 31.9,
+        }),
+        isNull,
+      );
+
+      expect(
+        RealtimeOrderTrackingInvalidation.tryParse({
+          'orderId': 'order-1',
+          'reason': 'courier-location-cleared',
+          'courierLocation': {'latitude': 31.9},
+        }),
+        isNull,
+      );
+    },
+  );
 }

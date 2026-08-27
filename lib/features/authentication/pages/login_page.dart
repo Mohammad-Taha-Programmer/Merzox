@@ -12,6 +12,7 @@ class LoginPage extends StatefulWidget {
   final VoidCallback onBrowseAsGuest;
   final VoidCallback onSignupRequested;
   final VoidCallback onForgotPasswordRequested;
+  final VoidCallback? onCourierLocationRequested;
   final bool businessMode;
 
   const LoginPage({
@@ -20,6 +21,7 @@ class LoginPage extends StatefulWidget {
     required this.onBrowseAsGuest,
     required this.onSignupRequested,
     required this.onForgotPasswordRequested,
+    this.onCourierLocationRequested,
     this.businessMode = false,
   });
 
@@ -224,6 +226,18 @@ class _LoginPageState extends State<LoginPage> {
                               onPressed: () => _submit(bloc),
                             ),
                             const SizedBox(height: 14),
+                            if (widget.onCourierLocationRequested != null) ...[
+                              OutlinedButton.icon(
+                                onPressed: isLoading
+                                    ? null
+                                    : widget.onCourierLocationRequested,
+                                icon: const Icon(
+                                  Icons.delivery_dining_outlined,
+                                ),
+                                label: Text('courierLocation.loginEntry'.tr()),
+                              ),
+                              const SizedBox(height: 14),
+                            ],
                             if (!widget.businessMode)
                               TextButton(
                                 onPressed: isLoading

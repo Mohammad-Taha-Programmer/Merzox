@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../services/api_service.dart';
+import '../../../services/realtime_service.dart';
 import '../../../core/auth/auth_session_service.dart';
 import 'order_tracking_event.dart';
 import 'order_tracking_state.dart';
@@ -10,10 +13,14 @@ class OrderTrackingBloc extends Bloc<OrderTrackingEvent, OrderTrackingState> {
   final AuthSessionService _authSessionService;
   final String orderId;
 
+  StreamSubscription<RealtimeOrderTrackingInvalidation>? _realtimeSubscription;
+
   OrderTrackingBloc({
     required this.orderId,
     ApiService? apiService,
     AuthSessionService authSessionService = const AuthSessionService(),
+    Stream<RealtimeOrderTrackingInvalidation>?
+    realtimeOrderTrackingInvalidations,
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
        super(const OrderTrackingState()) {
@@ -22,6 +29,14 @@ class OrderTrackingBloc extends Bloc<OrderTrackingEvent, OrderTrackingState> {
     on<OrderTrackingCancelRequested>(_onCancelRequested);
     on<OrderTrackingAddressChanged>(_onAddressChanged);
     on<OrderTrackingReviewSubmitted>(_onReviewSubmitted);
+
+    _realtimeSubscription = realtimeOrderTrackingInvalidations
+        ?.where((invalidation) => invalidation.orderId == orderId)
+        .listen((_) {
+          if (!isClosed) {
+            add(const OrderTrackingRefreshRequested());
+          }
+        });
   }
 
   Future<void> _onStarted(
@@ -180,6 +195,12 @@ class OrderTrackingBloc extends Bloc<OrderTrackingEvent, OrderTrackingState> {
         ),
       );
     }
+  }
+
+  @override
+  Future<void> close() async {
+    await _realtimeSubscription?.cancel();
+    return super.close();
   }
 
   /// Session truth lives in [AuthSessionService]: a stale token without an

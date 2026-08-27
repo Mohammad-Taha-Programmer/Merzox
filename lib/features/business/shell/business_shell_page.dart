@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../authentication/bloc/auth_bloc.dart';
@@ -20,6 +23,94 @@ class BusinessShellPage extends StatelessWidget {
   final VoidCallback onLoggedOut;
 
   const BusinessShellPage({super.key, required this.onLoggedOut});
+
+  Future<void> _showCourierLocationHandoff(
+    BuildContext context,
+    CourierLocationHandoff handoff,
+  ) async {
+    var handedOff = false;
+
+    final expiresAt = handoff.expiresAt.toLocal().toIso8601String();
+
+    final message = 'courierLocation.handoffMessage'.tr(
+      args: [handoff.orderId, handoff.capabilityToken, expiresAt],
+    );
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => PopScope(
+          canPop: handedOff,
+          child: AlertDialog(
+            title: Text('courierLocation.handoffTitle'.tr()),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('courierLocation.handoffWarning'.tr()),
+                const SizedBox(height: 12),
+                Text(
+                  'courierLocation.handoffOrder'.tr(args: [handoff.orderId]),
+                ),
+                const SizedBox(height: 6),
+                Text('courierLocation.handoffExpires'.tr(args: [expiresAt])),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  setDialogState(() {
+                    handedOff = true;
+                  });
+                  Navigator.of(dialogContext).pop();
+                },
+                child: Text('courierLocation.discardAccess'.tr()),
+              ),
+              FilledButton.icon(
+                onPressed: () async {
+                  try {
+                    final result = await SharePlus.instance.share(
+                      ShareParams(
+                        text: message,
+                        subject: 'courierLocation.handoffSubject'.tr(),
+                        title: 'Merzox',
+                      ),
+                    );
+
+                    if (!dialogContext.mounted ||
+                        result.status == ShareResultStatus.dismissed) {
+                      return;
+                    }
+
+                    setDialogState(() {
+                      handedOff = true;
+                    });
+
+                    Navigator.of(dialogContext).pop();
+                  } catch (_) {
+                    if (!dialogContext.mounted) {
+                      return;
+                    }
+
+                    ScaffoldMessenger.of(dialogContext)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text('courierLocation.shareFailed'.tr()),
+                        ),
+                      );
+                  }
+                },
+                icon: const Icon(Icons.share_outlined),
+                label: Text('courierLocation.shareAccess'.tr()),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   Future<void> _logout() async {
     if (locator.isRegistered<PushService>()) {
@@ -41,6 +132,16 @@ class BusinessShellPage extends StatelessWidget {
       textDirection: Directionality.of(context),
       child: BlocConsumer<BusinessBloc, BusinessState>(
         listener: (context, state) {
+          final handoff = state.courierLocationHandoff;
+
+          if (handoff != null) {
+            context.read<BusinessBloc>().add(
+              const BusinessCourierLocationHandoffConsumed(),
+            );
+
+            unawaited(_showCourierLocationHandoff(context, handoff));
+          }
+
           if (state.status == BusinessStatus.failure &&
               state.errorMessage != null) {
             ScaffoldMessenger.of(context).showSnackBar(

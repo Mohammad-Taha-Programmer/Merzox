@@ -46,6 +46,10 @@ final class BusinessOrderCourierAssigned extends BusinessEvent {
   });
 }
 
+final class BusinessCourierLocationHandoffConsumed extends BusinessEvent {
+  const BusinessCourierLocationHandoffConsumed();
+}
+
 final class BusinessProductSaved extends BusinessEvent {
   final String? productId;
   final Map<String, dynamic> values;
@@ -64,6 +68,18 @@ final class BusinessProfileSaved extends BusinessEvent {
 
 enum BusinessStatus { initial, loading, ready, saving, failure }
 
+final class CourierLocationHandoff {
+  final String orderId;
+  final String capabilityToken;
+  final DateTime expiresAt;
+
+  const CourierLocationHandoff({
+    required this.orderId,
+    required this.capabilityToken,
+    required this.expiresAt,
+  });
+}
+
 final class BusinessState {
   final BusinessStatus status;
   final int selectedTab;
@@ -76,6 +92,11 @@ final class BusinessState {
   final String? errorMessage;
   final int revision;
 
+  /// One-shot memory-only bridge between the successful merchant assignment
+  /// response and the system share sheet. It is consumed before presentation
+  /// and is never written to AuthSessionService, SharedPreferences or a URL.
+  final CourierLocationHandoff? courierLocationHandoff;
+
   const BusinessState({
     this.status = BusinessStatus.initial,
     this.selectedTab = 0,
@@ -87,6 +108,7 @@ final class BusinessState {
     this.products = const [],
     this.errorMessage,
     this.revision = 0,
+    this.courierLocationHandoff,
   });
 
   BusinessState copyWith({
@@ -100,6 +122,8 @@ final class BusinessState {
     List<OwnerProduct>? products,
     String? errorMessage,
     int? revision,
+    CourierLocationHandoff? courierLocationHandoff,
+    bool clearCourierLocationHandoff = false,
   }) => BusinessState(
     status: status ?? this.status,
     selectedTab: selectedTab ?? this.selectedTab,
@@ -111,6 +135,9 @@ final class BusinessState {
     products: products ?? this.products,
     errorMessage: errorMessage,
     revision: revision ?? this.revision,
+    courierLocationHandoff: clearCourierLocationHandoff
+        ? null
+        : courierLocationHandoff ?? this.courierLocationHandoff,
   );
 }
 
@@ -132,6 +159,9 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     on<BusinessOrderGroupChanged>(_onOrderGroupChanged);
     on<BusinessOrderStatusChanged>(_onOrderStatusChanged);
     on<BusinessOrderCourierAssigned>(_onOrderCourierAssigned);
+    on<BusinessCourierLocationHandoffConsumed>((event, emit) {
+      emit(state.copyWith(clearCourierLocationHandoff: true));
+    });
     on<BusinessProductSaved>(_onProductSaved);
     on<BusinessProductDeleted>(_onProductDeleted);
     on<BusinessProfileSaved>(_onProfileSaved);
@@ -264,23 +294,32 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     Emitter<BusinessState> emit,
   ) async {
     emit(state.copyWith(status: BusinessStatus.saving));
+
     try {
-      await _apiService.assignOrderCourier(
+      final assignment = await _apiService.assignOrderCourier(
         token: await _token(),
         orderId: event.orderId,
         name: event.name,
         phone: event.phone,
       );
-      final list = await _apiService.ownerOrders(
-        token: await _token(),
-        statusGroup: state.orderGroup,
-      );
+
+      final updatedOrders = state.orders
+          .map(
+            (order) =>
+                order.id == assignment.order.id ? assignment.order : order,
+          )
+          .toList(growable: false);
+
       emit(
         state.copyWith(
           status: BusinessStatus.ready,
-          orders: list.orders,
-          orderCounts: list.counts,
+          orders: updatedOrders,
           revision: state.revision + 1,
+          courierLocationHandoff: CourierLocationHandoff(
+            orderId: assignment.order.id,
+            capabilityToken: assignment.capability.token,
+            expiresAt: assignment.capability.expiresAt,
+          ),
         ),
       );
     } catch (error) {

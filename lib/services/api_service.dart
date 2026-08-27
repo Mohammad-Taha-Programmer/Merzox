@@ -20,6 +20,68 @@ class ApiContractException implements Exception {
   String toString() => 'ApiContractException($endpoint): $detail';
 }
 
+final class CourierLocationCapabilityRejected implements Exception {
+  const CourierLocationCapabilityRejected();
+
+  @override
+  String toString() => 'CourierLocationCapabilityRejected';
+}
+
+final class CourierLocationCapabilityApiModel {
+  final String token;
+  final DateTime expiresAt;
+
+  const CourierLocationCapabilityApiModel({
+    required this.token,
+    required this.expiresAt,
+  });
+
+  factory CourierLocationCapabilityApiModel.fromJson(
+    Map<String, dynamic> json,
+  ) {
+    final token = json['token'];
+    final expiresAtValue = json['expiresAt'];
+
+    if (token is! String || !RegExp(r'^[A-Za-z0-9_-]{43}$').hasMatch(token)) {
+      throw const ApiContractException(
+        'courierLocationCapability',
+        'response did not contain a valid capability token',
+      );
+    }
+
+    if (expiresAtValue is! String) {
+      throw const ApiContractException(
+        'courierLocationCapability',
+        'response did not contain capability expiry',
+      );
+    }
+
+    final expiresAt = DateTime.tryParse(expiresAtValue);
+
+    if (expiresAt == null) {
+      throw const ApiContractException(
+        'courierLocationCapability',
+        'capability expiry was not a valid timestamp',
+      );
+    }
+
+    return CourierLocationCapabilityApiModel(
+      token: token,
+      expiresAt: expiresAt,
+    );
+  }
+}
+
+final class CourierAssignmentApiResult {
+  final OwnerOrder order;
+  final CourierLocationCapabilityApiModel capability;
+
+  const CourierAssignmentApiResult({
+    required this.order,
+    required this.capability,
+  });
+}
+
 class ApiService {
   static const String configuredBaseUrl = String.fromEnvironment(
     'MERZOX_API_BASE_URL',
@@ -810,7 +872,7 @@ class ApiService {
     return OrderApiModel.fromJson(data['order'] as Map<String, dynamic>? ?? {});
   }
 
-  Future<OwnerOrder> assignOrderCourier({
+  Future<CourierAssignmentApiResult> assignOrderCourier({
     required String token,
     required String orderId,
     required String name,
@@ -821,9 +883,82 @@ class ApiService {
       data: {'name': name, 'phone': phone},
       options: _authOptions(token),
     );
-    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
 
-    return OwnerOrder.fromJson(data['order'] as Map<String, dynamic>? ?? {});
+    final order = requiredEntity(
+      response.data,
+      'order',
+      endpoint: 'ownerOrderCourier',
+    );
+
+    final capability = requiredEntity(
+      response.data,
+      'courierLocationCapability',
+      endpoint: 'ownerOrderCourier',
+    );
+
+    return CourierAssignmentApiResult(
+      order: OwnerOrder.fromJson(order),
+      capability: CourierLocationCapabilityApiModel.fromJson(capability),
+    );
+  }
+
+  Future<DateTime> updateCourierLocationByCapability({
+    required String orderId,
+    required String capabilityToken,
+    required double latitude,
+    required double longitude,
+    required double accuracy,
+    required DateTime capturedAt,
+  }) async {
+    try {
+      final response = await _dio.patch<Map<String, dynamic>>(
+        '/orders/$orderId/courier-location',
+        data: {
+          'latitude': latitude,
+          'longitude': longitude,
+          'accuracy': accuracy,
+          'capturedAt': capturedAt.toUtc().toIso8601String(),
+        },
+        options: Options(
+          headers: {'Authorization': 'Courier $capabilityToken'},
+        ),
+      );
+
+      final data = response.data?['data'] as Map<String, dynamic>?;
+
+      if (data == null || data['accepted'] != true) {
+        throw const ApiContractException(
+          'courierLocation',
+          'response did not acknowledge the location update',
+        );
+      }
+
+      final receivedAtValue = data['receivedAt'];
+
+      if (receivedAtValue is! String) {
+        throw const ApiContractException(
+          'courierLocation',
+          'response did not contain receivedAt',
+        );
+      }
+
+      final receivedAt = DateTime.tryParse(receivedAtValue);
+
+      if (receivedAt == null) {
+        throw const ApiContractException(
+          'courierLocation',
+          'receivedAt was not a valid timestamp',
+        );
+      }
+
+      return receivedAt;
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 401) {
+        throw const CourierLocationCapabilityRejected();
+      }
+
+      rethrow;
+    }
   }
 
   Future<void> registerPushTarget({
@@ -1817,6 +1952,146 @@ class OrderTrackingStepApiModel {
   }
 }
 
+class OrderCourierLocationApiModel {
+  final double latitude;
+  final double longitude;
+  final double? accuracy;
+  final DateTime capturedAt;
+  final DateTime receivedAt;
+  final DateTime capabilityExpiresAt;
+
+  const OrderCourierLocationApiModel({
+    required this.latitude,
+    required this.longitude,
+    required this.capturedAt,
+    required this.receivedAt,
+    required this.capabilityExpiresAt,
+    this.accuracy,
+  });
+
+  static const visibilityWindow = Duration(minutes: 15);
+
+  static const maximumFutureSkew = Duration(minutes: 2);
+
+  DateTime get visibleUntil {
+    final freshnessDeadline = capturedAt.add(visibilityWindow);
+
+    return capabilityExpiresAt.isBefore(freshnessDeadline)
+        ? capabilityExpiresAt
+        : freshnessDeadline;
+  }
+
+  bool isFreshAt(DateTime now) {
+    final ageMicroseconds = now.difference(capturedAt).inMicroseconds;
+
+    return ageMicroseconds <= visibilityWindow.inMicroseconds &&
+        ageMicroseconds >= -maximumFutureSkew.inMicroseconds &&
+        now.isBefore(capabilityExpiresAt);
+  }
+
+  static OrderCourierLocationApiModel? fromJsonValue(Object? raw) {
+    if (raw == null) {
+      return null;
+    }
+
+    if (raw is! Map<String, dynamic>) {
+      throw const ApiContractException(
+        'order',
+        'tracking.courierLocation has the wrong type',
+      );
+    }
+
+    final latitudeValue = raw['latitude'];
+    final longitudeValue = raw['longitude'];
+    final accuracyValue = raw['accuracy'];
+    final capturedAtValue = raw['capturedAt'];
+    final receivedAtValue = raw['receivedAt'];
+    final capabilityExpiresAtValue = raw['capabilityExpiresAt'];
+
+    if (latitudeValue is! num || longitudeValue is! num) {
+      throw const ApiContractException(
+        'order',
+        'tracking.courierLocation coordinates are invalid',
+      );
+    }
+
+    final latitude = latitudeValue.toDouble();
+    final longitude = longitudeValue.toDouble();
+
+    if (!latitude.isFinite ||
+        latitude < -90 ||
+        latitude > 90 ||
+        !longitude.isFinite ||
+        longitude < -180 ||
+        longitude > 180) {
+      throw const ApiContractException(
+        'order',
+        'tracking.courierLocation coordinates are out of range',
+      );
+    }
+
+    double? accuracy;
+
+    if (accuracyValue != null) {
+      if (accuracyValue is! num) {
+        throw const ApiContractException(
+          'order',
+          'tracking.courierLocation accuracy is invalid',
+        );
+      }
+
+      accuracy = accuracyValue.toDouble();
+
+      if (!accuracy.isFinite || accuracy < 0 || accuracy > 10000) {
+        throw const ApiContractException(
+          'order',
+          'tracking.courierLocation accuracy is out of range',
+        );
+      }
+    }
+
+    if (capturedAtValue is! String ||
+        receivedAtValue is! String ||
+        capabilityExpiresAtValue is! String) {
+      throw const ApiContractException(
+        'order',
+        'tracking.courierLocation timestamps are invalid',
+      );
+    }
+
+    final capturedAt = DateTime.tryParse(capturedAtValue);
+
+    final receivedAt = DateTime.tryParse(receivedAtValue);
+
+    final capabilityExpiresAt = DateTime.tryParse(capabilityExpiresAtValue);
+
+    if (capturedAt == null ||
+        receivedAt == null ||
+        capabilityExpiresAt == null) {
+      throw const ApiContractException(
+        'order',
+        'tracking.courierLocation timestamps are invalid',
+      );
+    }
+
+    if (!capabilityExpiresAt.isAfter(receivedAt)) {
+      throw const ApiContractException(
+        'order',
+        'tracking.courierLocation capability expiry is invalid',
+      );
+    }
+
+    return OrderCourierLocationApiModel(
+      latitude: latitude,
+      longitude: longitude,
+      accuracy: accuracy,
+      capturedAt: capturedAt,
+      receivedAt: receivedAt,
+      capabilityExpiresAt: capabilityExpiresAt,
+    );
+  }
+}
+
 class OrderTrackingApiModel {
   static const List<String> stepOrder = [
     'placed',
@@ -1830,6 +2105,7 @@ class OrderTrackingApiModel {
   final int currentIndex;
   final List<OrderTrackingStepApiModel> steps;
   final OrderCourierApiModel courier;
+  final OrderCourierLocationApiModel? courierLocation;
   final bool canCancel;
   final bool canChangeAddress;
   final bool canReview;
@@ -1840,6 +2116,7 @@ class OrderTrackingApiModel {
     required this.currentIndex,
     required this.steps,
     required this.courier,
+    this.courierLocation,
     required this.canCancel,
     required this.canChangeAddress,
     required this.canReview,
@@ -1893,6 +2170,11 @@ class OrderTrackingApiModel {
           .toList(),
       courier: OrderCourierApiModel.fromJson(
         _field<Map<String, dynamic>>(json, 'courier'),
+      ),
+      // Absence is fail-closed for the optional live map. A present malformed
+      // location is still a contract failure.
+      courierLocation: OrderCourierLocationApiModel.fromJsonValue(
+        json['courierLocation'],
       ),
       // Permission flags are never defaulted: an absent flag is a malformed
       // response, not a closed permission.

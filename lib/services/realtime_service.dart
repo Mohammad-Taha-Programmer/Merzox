@@ -102,6 +102,40 @@ final class RealtimeNotificationInvalidation {
   }
 }
 
+final class RealtimeOrderTrackingInvalidation {
+  final String orderId;
+  final String reason;
+
+  const RealtimeOrderTrackingInvalidation({
+    required this.orderId,
+    required this.reason,
+  });
+
+  static RealtimeOrderTrackingInvalidation? tryParse(dynamic data) {
+    if (data is! Map) {
+      return null;
+    }
+
+    final orderId = data['orderId']?.toString().trim() ?? '';
+
+    final reason = data['reason']?.toString().trim() ?? '';
+
+    if (data.length != 2 ||
+        !data.containsKey('orderId') ||
+        !data.containsKey('reason') ||
+        data.keys.any((key) => key != 'orderId' && key != 'reason') ||
+        orderId.isEmpty ||
+        orderId.length > 256 ||
+        (reason != 'courier-location-updated' &&
+            reason != 'courier-location-cleared' &&
+            reason != 'order-status-changed')) {
+      return null;
+    }
+
+    return RealtimeOrderTrackingInvalidation(orderId: orderId, reason: reason);
+  }
+}
+
 abstract interface class RealtimeSessionController {
   Future<void> syncWithSession();
 
@@ -198,6 +232,7 @@ class SocketIoRealtimeClient implements RealtimeSocketClient {
 class RealtimeService implements RealtimeSessionController {
   static const messagesChangedEvent = 'merzox:messages-changed';
   static const notificationsChangedEvent = 'merzox:notifications-changed';
+  static const orderTrackingChangedEvent = 'merzox:order-tracking-changed';
 
   final AuthSessionService _authSessionService;
   final RealtimeSocketFactory _clientFactory;
@@ -213,6 +248,10 @@ class RealtimeService implements RealtimeSessionController {
   final StreamController<RealtimeNotificationInvalidation>
   _notificationInvalidationController =
       StreamController<RealtimeNotificationInvalidation>.broadcast();
+
+  final StreamController<RealtimeOrderTrackingInvalidation>
+  _orderTrackingInvalidationController =
+      StreamController<RealtimeOrderTrackingInvalidation>.broadcast();
 
   RealtimeSocketClient? _client;
   String? _activeToken;
@@ -239,6 +278,9 @@ class RealtimeService implements RealtimeSessionController {
 
   Stream<RealtimeNotificationInvalidation> get notificationInvalidations =>
       _notificationInvalidationController.stream;
+
+  Stream<RealtimeOrderTrackingInvalidation> get orderTrackingInvalidations =>
+      _orderTrackingInvalidationController.stream;
 
   bool get isConnected =>
       _connectionStatus == RealtimeConnectionStatus.connected;
@@ -344,6 +386,21 @@ class RealtimeService implements RealtimeSessionController {
       _notificationInvalidationController.add(invalidation);
     });
 
+    client.onEvent(orderTrackingChangedEvent, (data) {
+      if (!identical(_client, client)) {
+        return;
+      }
+
+      final invalidation = RealtimeOrderTrackingInvalidation.tryParse(data);
+
+      if (invalidation == null ||
+          _orderTrackingInvalidationController.isClosed) {
+        return;
+      }
+
+      _orderTrackingInvalidationController.add(invalidation);
+    });
+
     client.onConnect((_) {
       if (!identical(_client, client)) {
         return;
@@ -406,5 +463,6 @@ class RealtimeService implements RealtimeSessionController {
     await _connectionStatusController.close();
     await _messageInvalidationController.close();
     await _notificationInvalidationController.close();
+    await _orderTrackingInvalidationController.close();
   }
 }
