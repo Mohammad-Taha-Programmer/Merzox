@@ -169,16 +169,18 @@ export const updateMe = asyncHandler(async (req, res) => {
       'location',
       'contacts'
     ]);
+    const booleanPermissions = Object.fromEntries(
+      Object.entries(allowedPermissions).filter(
+        ([, value]) => typeof value === 'boolean'
+      )
+    );
+
     req.user.permissions = {
       ...req.user.permissions,
-      ...allowedPermissions
+      ...booleanPermissions
     };
 
-    for (const [key, value] of Object.entries(allowedPermissions)) {
-      if (typeof value !== 'boolean') {
-        continue;
-      }
-
+    for (const [key, value] of Object.entries(booleanPermissions)) {
       req.user.permissionConsents ??= {};
       req.user.permissionConsents[key] = {
         status: value ? 'granted' : 'denied',

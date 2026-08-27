@@ -4,30 +4,43 @@ import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/services/device_location_service.dart';
 import 'package:merzox/services/location_permission_service.dart';
+import 'package:merzox/services/recommendation_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'home_event.dart';
 import 'home_state_.dart';
+
+typedef HomeRecommendationSessionReader =
+    Future<AuthSessionSnapshot> Function();
 
 class HomeBloc extends Bloc<HomeEvent, HomeState> {
   final ApiService _apiService;
   final DeviceLocationService _deviceLocationService;
   final LocationPermissionService _locationPermissionService;
   final AuthSessionService _authSessionService;
+  final HomeRecommendationGateway _recommendationGateway;
+  final HomeRecommendationSessionReader _recommendationSessionReader;
 
   HomeBloc({
     ApiService? apiService,
     DeviceLocationService? deviceLocationService,
     LocationPermissionService? locationPermissionService,
     AuthSessionService authSessionService = const AuthSessionService(),
+    HomeRecommendationGateway? recommendationGateway,
+    HomeRecommendationSessionReader? recommendationSessionReader,
   }) : _apiService = apiService ?? ApiService(),
        _deviceLocationService =
            deviceLocationService ?? DeviceLocationService(),
        _locationPermissionService =
            locationPermissionService ?? LocationPermissionService(),
        _authSessionService = authSessionService,
+       _recommendationGateway =
+           recommendationGateway ?? RecommendationService(),
+       _recommendationSessionReader =
+           recommendationSessionReader ?? authSessionService.read,
        super(const HomeState()) {
     on<HomeStarted>(_onStarted);
+    on<HomeRecommendationsRefreshRequested>(_onRecommendationsRefreshRequested);
     on<HomeSearchChanged>(_onSearchChanged);
     on<HomeTabChanged>(_onTabChanged);
     on<HomeLocationPromptShown>(_onLocationPromptShown);
@@ -59,6 +72,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         discountedBusinesses: const [],
         nearbyBusinesses: const [],
         allBusinesses: const [],
+        recommendedBusinesses: const [],
+        recommendationConsentEnabled: false,
+        recommendationsPersonalized: false,
+        recommendationPreferenceCategories: const [],
         newBusinessesStatus: HomeSectionStatus.loading,
         bestBusinessesStatus: HomeSectionStatus.loading,
         discountedBusinessesStatus: HomeSectionStatus.loading,
@@ -138,6 +155,14 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     }
 
     await _loadFavoriteBusinesses(emit, session);
+    await _loadRecommendations(emit, knownSession: session);
+  }
+
+  Future<void> _onRecommendationsRefreshRequested(
+    HomeRecommendationsRefreshRequested event,
+    Emitter<HomeState> emit,
+  ) async {
+    await _loadRecommendations(emit);
   }
 
   void _onSearchChanged(HomeSearchChanged event, Emitter<HomeState> emit) {
@@ -250,6 +275,10 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         businessId: event.businessId,
         favorited: !wasFollowed,
       );
+
+      if (state.recommendationConsentEnabled) {
+        await _loadRecommendations(emit, knownSession: session);
+      }
     } catch (_) {
       final reverted = Set<String>.from(state.followedBusinessIds);
       if (wasFollowed) {
@@ -508,6 +537,53 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       emit(state.copyWith(followedBusinessIds: followedIds));
     } catch (_) {
       // Catalog browsing remains available if favorite status is unavailable.
+    }
+  }
+
+  Future<void> _loadRecommendations(
+    Emitter<HomeState> emit, {
+    AuthSessionSnapshot? knownSession,
+  }) async {
+    emit(
+      state.copyWith(
+        recommendedBusinesses: const [],
+        recommendationConsentEnabled: false,
+        recommendationsPersonalized: false,
+        recommendationPreferenceCategories: const [],
+      ),
+    );
+
+    final session = knownSession ?? await _recommendationSessionReader();
+
+    final token = session.token?.trim();
+
+    if (!session.isAuthenticated || token == null || token.isEmpty) {
+      return;
+    }
+
+    try {
+      final snapshot = await _recommendationGateway.load(token: token);
+
+      if (!snapshot.consentEnabled) {
+        return;
+      }
+
+      emit(
+        state.copyWith(
+          recommendedBusinesses: snapshot.businesses
+              .where((business) => business.id.trim().isNotEmpty)
+              .map(HomeBusiness.fromApi)
+              .toList(),
+          recommendationConsentEnabled: true,
+          recommendationsPersonalized: snapshot.personalized,
+          recommendationPreferenceCategories: List.unmodifiable(
+            snapshot.preferenceCategories,
+          ),
+        ),
+      );
+    } catch (_) {
+      // Generic catalog remains available.
+      // Personalized output stays cleared.
     }
   }
 
