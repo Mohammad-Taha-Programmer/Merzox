@@ -36,8 +36,11 @@ jobs:
       - name: Install Flutter dependencies from lockfile
         run: flutter pub get --enforce-lockfile
 
+      - name: Audit production release readiness
+        run: dart run tool/release_readiness.dart --audit
+
       - name: Verify Dart formatting
-        run: dart format --output=none --set-exit-if-changed lib test
+        run: dart format --output=none --set-exit-if-changed lib test tool
 
       - name: Analyze Flutter
         run: flutter analyze --no-pub
