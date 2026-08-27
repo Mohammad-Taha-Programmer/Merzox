@@ -82,3 +82,9 @@ required repository changes and approved production evidence exist.
 
 The preflight does not build, sign, upload, publish, deploy, or mutate
 production infrastructure.
+
+## iOS privacy audit
+
+The repository-level Required Reason API audit and dependency remediation are documented in [`IOS_PRIVACY_AUDIT.md`](IOS_PRIVACY_AUDIT.md).
+
+Repository-level remediation does not satisfy the production archive gate by itself. `MERZOX_RELEASE_IOS_PRIVACY_AUDIT_COMPLETE=true` must remain unset until the final signed iOS archive is validated on macOS/Xcode.
