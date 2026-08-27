@@ -8,6 +8,9 @@ import {
   canReviewOrder
 } from '../policies/order-status.policy.js';
 import { PRODUCT_LIMITS } from '../policies/product.policy.js';
+import {
+  isCourierLocationSnapshotVisible
+} from '../policies/courier-location.policy.js';
 
 const orderItemSchema = new mongoose.Schema(
   {
@@ -57,6 +60,47 @@ const courierSchema = new mongoose.Schema(
     name: { type: String, trim: true, maxlength: 80, default: '' },
     phone: { type: String, trim: true, maxlength: 20, default: '' },
     assignedAt: { type: Date, default: null }
+  },
+  { _id: false }
+);
+
+const courierLocationCapabilitySchema = new mongoose.Schema(
+  {
+    tokenHash: {
+      type: String,
+      maxlength: 64,
+      default: '',
+      select: false
+    },
+    issuedAt: { type: Date, default: null },
+    expiresAt: { type: Date, default: null },
+    revokedAt: { type: Date, default: null }
+  },
+  { _id: false }
+);
+
+const courierLocationSchema = new mongoose.Schema(
+  {
+    latitude: {
+      type: Number,
+      min: -90,
+      max: 90,
+      default: null
+    },
+    longitude: {
+      type: Number,
+      min: -180,
+      max: 180,
+      default: null
+    },
+    accuracy: {
+      type: Number,
+      min: 0,
+      max: 10000,
+      default: null
+    },
+    capturedAt: { type: Date, default: null },
+    receivedAt: { type: Date, default: null }
   },
   { _id: false }
 );
@@ -144,7 +188,15 @@ const orderSchema = new mongoose.Schema(
     cancellationReason: { type: String, trim: true, maxlength: 250, default: '' },
     cancelledAt: { type: Date, default: null },
     deliveredAt: { type: Date, default: null },
-    courier: { type: courierSchema, default: () => ({}) }
+    courier: { type: courierSchema, default: () => ({}) },
+    courierLocationCapability: {
+      type: courierLocationCapabilitySchema,
+      default: () => ({})
+    },
+    courierLocation: {
+      type: courierLocationSchema,
+      default: null
+    }
   },
   { timestamps: true }
 );
@@ -182,6 +234,42 @@ orderSchema.methods.courierJSON = function courierJSON() {
   };
 };
 
+orderSchema.methods.courierLocationJSON =
+  function courierLocationJSON(
+    { now = new Date() } = {}
+  ) {
+    const capability =
+      this.courierLocationCapability ?? {};
+
+    const location =
+      this.courierLocation;
+
+    if (
+      !isCourierLocationSnapshotVisible(
+        {
+          status: this.status,
+          capability,
+          location
+        },
+        { now }
+      )
+    ) {
+      return null;
+    }
+
+    return {
+      latitude: location.latitude,
+      longitude: location.longitude,
+      accuracy:
+        Number.isFinite(location.accuracy)
+          ? location.accuracy
+          : null,
+      capturedAt: location.capturedAt,
+      receivedAt: location.receivedAt,
+      capabilityExpiresAt: capability.expiresAt
+    };
+  };
+
 orderSchema.methods.trackingJSON = function trackingJSON() {
   const reachedAt = new Map();
 
@@ -205,6 +293,7 @@ orderSchema.methods.trackingJSON = function trackingJSON() {
       isReached: this.status !== 'cancelled' && index <= currentIndex
     })),
     courier: this.courierJSON(),
+    courierLocation: this.courierLocationJSON(),
     canCancel: canCustomerCancel(this.status),
     canChangeAddress: canChangeDeliveryAddress(this.status),
     canReview: canReviewOrder(this.status)

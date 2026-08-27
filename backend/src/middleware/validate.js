@@ -1,5 +1,9 @@
 import validator from 'validator';
 
+import {
+  COURIER_LOCATION_ERRORS,
+  normalizeCourierLocationPayload
+} from '../policies/courier-location.policy.js';
 import { merchantSelectableStatuses } from '../policies/order-status.policy.js';
 import {
   isKnownPaymentMethod,
@@ -828,6 +832,40 @@ export function validateOrderCourierPatch(req, _res, next) {
   if (phone.length > 0 && !/^\+?[0-9]{7,15}$/.test(phone)) {
     throw new AppError('Courier phone is invalid', 400, 'INVALID_ORDER_COURIER_PHONE');
   }
+
+  next();
+}
+
+export function validateCourierLocationUpdate(req, _res, next) {
+  const result =
+    normalizeCourierLocationPayload(
+      req.body
+    );
+
+  if (!result.ok) {
+    const messages = {
+      [COURIER_LOCATION_ERRORS.invalidFields]:
+        'Courier location fields are invalid',
+      [COURIER_LOCATION_ERRORS.invalidLatitude]:
+        'Courier latitude is invalid',
+      [COURIER_LOCATION_ERRORS.invalidLongitude]:
+        'Courier longitude is invalid',
+      [COURIER_LOCATION_ERRORS.invalidAccuracy]:
+        'Courier location accuracy is invalid',
+      [COURIER_LOCATION_ERRORS.invalidCapturedAt]:
+        'Courier location timestamp is invalid'
+    };
+
+    throw new AppError(
+      messages[result.code] ??
+        'Courier location is invalid',
+      400,
+      result.code
+    );
+  }
+
+  req.courierLocationPayload =
+    result.value;
 
   next();
 }

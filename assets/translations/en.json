@@ -180,6 +180,7 @@
   "tracking": {
     "title": "Order tracking",
     "courier": "Driver",
+    "liveCourierLocation": "Live driver location",
     "changeAddress": "Change address",
     "addressHint": "Enter the full delivery address",
     "addressTooShort": "The address is too short",
@@ -570,5 +571,35 @@
     "contract": "Could not read the server response. Please try again.",
     "connection": "Could not connect to the server. Make sure the Merzox backend is running.",
     "unexpected": "An unexpected error occurred. Please try again."
+  },
+  "courierLocation": {
+    "loginEntry": "Share courier location",
+    "title": "Courier location sharing",
+    "subtitle": "Enter the order ID and access code sent by the merchant. Merzox shares location only while this screen remains in the foreground.",
+    "orderId": "Order ID",
+    "orderIdHint": "24-character order ID",
+    "accessCode": "Access code",
+    "accessCodeHint": "Courier location access code",
+    "start": "Start sharing",
+    "stop": "Stop sharing",
+    "checking": "Checking location access…",
+    "sharing": "Your location is being shared while this screen stays in the foreground.",
+    "stopped": "Location sharing stopped.",
+    "serviceDisabled": "Turn on device location services, then try again.",
+    "permissionDenied": "Location permission was denied. Allow location access and try again.",
+    "permissionDeniedForever": "Location permission is permanently denied. Enable it in system settings, then return and try again.",
+    "invalidCredentials": "Enter a valid order ID and courier access code.",
+    "capabilityRejected": "Location sharing is not available. Check that delivery has started and that the access code is still valid.",
+    "lastSent": "Last location sent: {}",
+    "privacy": "Merzox does not persist the access code on this device. Sharing stops and the in-memory code is cleared when this screen leaves the foreground.",
+    "handoffTitle": "Courier location access",
+    "handoffWarning": "This access code is shown to Merzox only for this handoff. Share it with the assigned courier through a trusted channel. Treat it like a password.",
+    "handoffOrder": "Order ID: {}",
+    "handoffExpires": "Access expires: {}",
+    "handoffSubject": "Merzox courier location access",
+    "handoffMessage": "Merzox courier location access\nOrder ID: {}\nAccess code: {}\nExpires: {}\n\nOpen Merzox, choose “Share courier location” on the sign-in screen, and enter these values. Treat the access code like a password and do not forward it.",
+    "shareAccess": "Share access details",
+    "shareFailed": "The system share sheet could not be opened.",
+    "discardAccess": "Discard code"
   }
 }

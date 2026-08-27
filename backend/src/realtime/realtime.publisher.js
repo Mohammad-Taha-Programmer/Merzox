@@ -1,6 +1,7 @@
 export const realtimeEvents = Object.freeze({
   messagesChanged: 'merzox:messages-changed',
-  notificationsChanged: 'merzox:notifications-changed'
+  notificationsChanged: 'merzox:notifications-changed',
+  orderTrackingChanged: 'merzox:order-tracking-changed'
 });
 
 let realtimeEmitter = null;
@@ -187,6 +188,76 @@ export function publishNotificationsChanged({
     } catch (_) {
       // Notifications are persisted REST/MongoDB truth. Socket delivery is
       // only an invalidation hint and must never roll back a successful write.
+    }
+  }
+
+  return published;
+}
+
+
+const orderTrackingReasons = new Set([
+  'courier-location-updated',
+  'courier-location-cleared',
+  'order-status-changed'
+]);
+
+export function publishOrderTrackingChanged({
+  recipientIds,
+  orderId,
+  reason
+}) {
+  const emitter = realtimeEmitter;
+
+  if (!emitter) {
+    return false;
+  }
+
+  const normalizedOrderId =
+    normalizedId(orderId);
+
+  const normalizedReason =
+    normalizedId(reason);
+
+  if (
+    !normalizedOrderId ||
+    !orderTrackingReasons.has(normalizedReason)
+  ) {
+    return false;
+  }
+
+  const recipients = [
+    ...new Set(
+      (recipientIds ?? [])
+        .map(normalizedId)
+        .filter(Boolean)
+    )
+  ];
+
+  if (recipients.length === 0) {
+    return false;
+  }
+
+  // Deliberately contains no coordinates. The socket is only a hint that the
+  // authoritative REST order representation should be fetched again.
+  const payload = {
+    orderId: normalizedOrderId,
+    reason: normalizedReason
+  };
+
+  let published = false;
+
+  for (const recipientId of recipients) {
+    try {
+      emitter(
+        recipientId,
+        realtimeEvents.orderTrackingChanged,
+        payload
+      );
+
+      published = true;
+    } catch (_) {
+      // Courier coordinates are persisted before this call. Realtime delivery
+      // must never turn an authoritative MongoDB write into a failed request.
     }
   }
 

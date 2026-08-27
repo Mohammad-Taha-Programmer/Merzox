@@ -47,6 +47,9 @@ import {
   notifyOrderCancelledByCustomer,
   notifyOrderPlaced
 } from '../services/notification.service.js';
+import {
+  publishOrderTrackingChanged
+} from '../realtime/realtime.publisher.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
@@ -998,7 +1001,11 @@ export const cancelMyOrder = asyncHandler(async (req, res) => {
         status: 'cancelled',
         statusGroup: 'cancelled',
         cancellationReason: reason,
-        cancelledAt
+        cancelledAt,
+        'courierLocationCapability.tokenHash': '',
+        'courierLocationCapability.revokedAt':
+          cancelledAt,
+        courierLocation: null
       },
       $push: {
         statusHistory: { status: 'cancelled', changedAt: cancelledAt, note: reason }
@@ -1018,6 +1025,12 @@ export const cancelMyOrder = asyncHandler(async (req, res) => {
       'ORDER_NOT_CANCELLABLE'
     );
   }
+
+  publishOrderTrackingChanged({
+    recipientIds: [order.user],
+    orderId: order._id,
+    reason: 'order-status-changed'
+  });
 
   const business = await Business.findById(order.business).select('owner');
   if (business?.owner) {

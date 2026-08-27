@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/features/notifications/bloc/notifications_bloc.dart';
 import 'package:merzox/features/notifications/bloc/notifications_event.dart';
@@ -6,6 +9,7 @@ import 'package:merzox/features/orders/bloc/order_tracking_bloc.dart';
 import 'package:merzox/features/orders/bloc/order_tracking_event.dart';
 import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/realtime_service.dart';
 import 'auth_session_fixtures.dart';
 
 OrderApiModel _order({
@@ -119,6 +123,7 @@ AppNotificationApiModel _notification({
 
 class _FakeTrackingApi extends ApiService {
   OrderApiModel current;
+  int orderCalls = 0;
   final List<String> addressUpdates = [];
   final List<String> cancellations = [];
   final List<int> submittedRatings = [];
@@ -130,7 +135,10 @@ class _FakeTrackingApi extends ApiService {
   Future<OrderApiModel> order({
     required String token,
     required String orderId,
-  }) async => current;
+  }) async {
+    orderCalls += 1;
+    return current;
+  }
 
   @override
   Future<OrderApiModel> updateOrderAddress({
@@ -698,4 +706,240 @@ void main() {
 
     await bloc.close();
   });
+
+  test(
+    'courier location REST payload is parsed strictly and remains optional',
+    () {
+      final payload = serverTracking('outForDelivery');
+
+      payload['courierLocation'] = {
+        'latitude': 31.9038,
+        'longitude': 35.2034,
+        'accuracy': 7,
+        'capturedAt': '2026-08-27T06:20:00.000Z',
+        'receivedAt': '2026-08-27T06:20:01.000Z',
+        'capabilityExpiresAt': '2026-08-27T07:20:00.000Z',
+      };
+
+      final tracking = OrderTrackingApiModel.fromJson(payload);
+
+      expect(tracking.courierLocation, isNotNull);
+
+      expect(tracking.courierLocation!.latitude, 31.9038);
+
+      expect(tracking.courierLocation!.longitude, 35.2034);
+
+      expect(tracking.courierLocation!.accuracy, 7);
+
+      expect(
+        tracking.courierLocation!.capabilityExpiresAt,
+        DateTime.parse('2026-08-27T07:20:00.000Z'),
+      );
+
+      final missingExpiry = serverTracking('outForDelivery')
+        ..['courierLocation'] = {
+          'latitude': 31.9038,
+          'longitude': 35.2034,
+          'capturedAt': '2026-08-27T06:20:00.000Z',
+          'receivedAt': '2026-08-27T06:20:01.000Z',
+        };
+
+      expect(
+        () => OrderTrackingApiModel.fromJson(missingExpiry),
+        throwsA(isA<ApiContractException>()),
+      );
+
+      final absent = OrderTrackingApiModel.fromJson(
+        serverTracking('outForDelivery'),
+      );
+
+      expect(absent.courierLocation, isNull);
+
+      final malformed = serverTracking('outForDelivery')
+        ..['courierLocation'] = {
+          'latitude': 95,
+          'longitude': 35,
+          'capturedAt': '2026-08-27T06:20:00.000Z',
+          'receivedAt': '2026-08-27T06:20:01.000Z',
+          'capabilityExpiresAt': '2026-08-27T07:20:00.000Z',
+        };
+
+      expect(
+        () => OrderTrackingApiModel.fromJson(malformed),
+        throwsA(isA<ApiContractException>()),
+      );
+    },
+  );
+
+  test(
+    'matching realtime invalidation triggers REST refetch and other orders are ignored',
+    () async {
+      final api = _FakeTrackingApi(_order(status: 'outForDelivery'));
+
+      final realtime =
+          StreamController<RealtimeOrderTrackingInvalidation>.broadcast();
+
+      final bloc = OrderTrackingBloc(
+        orderId: 'o1',
+        apiService: api,
+        realtimeOrderTrackingInvalidations: realtime.stream,
+      );
+
+      addTearDown(bloc.close);
+      addTearDown(realtime.close);
+
+      bloc.add(const OrderTrackingStarted());
+
+      await bloc.stream.firstWhere(
+        (state) => state.status == OrderTrackingStatus.ready,
+      );
+
+      expect(api.orderCalls, 1);
+
+      realtime.add(
+        const RealtimeOrderTrackingInvalidation(
+          orderId: 'another-order',
+          reason: 'courier-location-updated',
+        ),
+      );
+
+      await Future<void>.delayed(Duration.zero);
+
+      expect(api.orderCalls, 1);
+
+      final refreshed = bloc.stream.firstWhere(
+        (state) =>
+            api.orderCalls >= 2 && state.status == OrderTrackingStatus.ready,
+      );
+
+      realtime.add(
+        const RealtimeOrderTrackingInvalidation(
+          orderId: 'o1',
+          reason: 'courier-location-updated',
+        ),
+      );
+
+      await refreshed;
+
+      expect(api.orderCalls, 2);
+    },
+  );
+
+  test(
+    'customer tracking map consumes REST courierLocation and no location permission',
+    () {
+      final page = File(
+        'lib/features/orders/pages/order_tracking_page.dart',
+      ).readAsStringSync();
+
+      final router = File('lib/router/app_router.dart').readAsStringSync();
+
+      final bloc = File(
+        'lib/features/orders/bloc/order_tracking_bloc.dart',
+      ).readAsStringSync();
+
+      expect(page.contains('tracking.courierLocation'), isTrue);
+
+      expect(page.contains('FlutterMap('), isTrue);
+
+      expect(page.contains('TileLayer('), isTrue);
+
+      expect(page.contains('MarkerLayer('), isTrue);
+
+      expect(page.contains('Geolocator'), isFalse);
+
+      expect(page.contains('permission_handler'), isFalse);
+
+      expect(router.contains('orderTrackingInvalidations'), isTrue);
+
+      expect(bloc.contains('OrderTrackingRefreshRequested'), isTrue);
+    },
+  );
+
+  test('courier location freshness window is exactly fifteen minutes', () {
+    final capturedAt = DateTime.utc(2026, 8, 27, 6);
+
+    final location = OrderCourierLocationApiModel(
+      latitude: 31.9038,
+      longitude: 35.2034,
+      accuracy: 7,
+      capturedAt: capturedAt,
+      receivedAt: capturedAt.add(const Duration(seconds: 1)),
+      capabilityExpiresAt: capturedAt.add(const Duration(hours: 1)),
+    );
+
+    expect(
+      location.isFreshAt(
+        capturedAt.add(const Duration(minutes: 14, seconds: 59)),
+      ),
+      isTrue,
+    );
+
+    expect(
+      location.isFreshAt(capturedAt.add(const Duration(minutes: 15))),
+      isTrue,
+    );
+
+    expect(
+      location.isFreshAt(
+        capturedAt.add(const Duration(minutes: 15, milliseconds: 1)),
+      ),
+      isFalse,
+    );
+
+    expect(
+      location.isFreshAt(
+        capturedAt.subtract(const Duration(minutes: 2, milliseconds: 1)),
+      ),
+      isFalse,
+    );
+  });
+
+  test(
+    'customer live map has a local expiry timer independent of realtime delivery',
+    () {
+      final page = File(
+        'lib/features/orders/pages/order_tracking_page.dart',
+      ).readAsStringSync();
+
+      expect(page.contains('Timer? _expiryTimer'), isTrue);
+
+      expect(page.contains('widget.location.visibleUntil'), isTrue);
+
+      expect(page.contains('widget.location.isFreshAt'), isTrue);
+
+      expect(page.contains('_expiryTimer?.cancel()'), isTrue);
+
+      expect(page.contains('return const SizedBox.shrink()'), isTrue);
+    },
+  );
+
+  test(
+    'capability expiry can hide the local courier map before the fifteen-minute snapshot deadline',
+    () {
+      final capturedAt = DateTime.utc(2026, 8, 27, 6);
+
+      final capabilityExpiresAt = capturedAt.add(const Duration(minutes: 10));
+
+      final location = OrderCourierLocationApiModel(
+        latitude: 31.9038,
+        longitude: 35.2034,
+        accuracy: 7,
+        capturedAt: capturedAt,
+        receivedAt: capturedAt.add(const Duration(seconds: 1)),
+        capabilityExpiresAt: capabilityExpiresAt,
+      );
+
+      expect(location.visibleUntil, capabilityExpiresAt);
+
+      expect(
+        location.isFreshAt(
+          capabilityExpiresAt.subtract(const Duration(milliseconds: 1)),
+        ),
+        isTrue,
+      );
+
+      expect(location.isFreshAt(capabilityExpiresAt), isFalse);
+    },
+  );
 }

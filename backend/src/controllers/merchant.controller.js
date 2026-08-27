@@ -6,6 +6,9 @@ import { Business } from '../models/Business.js';
 import { Order } from '../models/Order.js';
 import { User } from '../models/User.js';
 import {
+  issueCourierLocationCapability
+} from '../policies/courier-location.policy.js';
+import {
   canTransitionOwnerOrder,
   courierAssignableStatuses,
   orderStatusGroups as policyStatusGroups,
@@ -23,6 +26,9 @@ import {
 } from '../policies/product.policy.js';
 import { paginationParams } from '../policies/query.policy.js';
 import { notifyOrderStatus } from '../services/notification.service.js';
+import {
+  publishOrderTrackingChanged
+} from '../realtime/realtime.publisher.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { normalizeIdentifier, normalizePhone } from '../utils/normalize.js';
@@ -485,6 +491,16 @@ export const updateMyBusinessOrderStatus = asyncHandler(async (req, res) => {
     set.cancellationReason = note;
   }
 
+  if (
+    nextStatus === 'delivered' ||
+    nextStatus === 'cancelled'
+  ) {
+    set['courierLocationCapability.tokenHash'] = '';
+    set['courierLocationCapability.revokedAt'] =
+      changedAt;
+    set.courierLocation = null;
+  }
+
   const updated = await Order.findOneAndUpdate(
     { _id: order._id, business: business._id, status: order.status },
     {
@@ -501,6 +517,12 @@ export const updateMyBusinessOrderStatus = asyncHandler(async (req, res) => {
     );
   }
 
+  publishOrderTrackingChanged({
+    recipientIds: [updated.user],
+    orderId: updated._id,
+    reason: 'order-status-changed'
+  });
+
   await notifyOrderStatus({
     userId: updated.user,
     order: updated,
@@ -511,14 +533,19 @@ export const updateMyBusinessOrderStatus = asyncHandler(async (req, res) => {
 });
 
 /**
- * Assigning a courier is what fills the driver card on the customer's tracking
- * screen, so it is allowed from the moment the order is being prepared.
+ * Courier assignment rotates a narrow, order-scoped location capability.
+ *
+ * Only the SHA-256 token hash is persisted. The raw credential is returned
+ * exactly in this response so the merchant can hand it to the courier flow.
  */
 export const updateMyBusinessOrderCourier = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);
   if (!mongoose.isValidObjectId(req.params.orderId)) {
     throw new AppError('Order id is invalid', 400, 'INVALID_ORDER_ID');
   }
+
+  const capability =
+    issueCourierLocationCapability();
 
   const order = await Order.findOneAndUpdate(
     {
@@ -531,8 +558,15 @@ export const updateMyBusinessOrderCourier = asyncHandler(async (req, res) => {
         courier: {
           name: String(req.body.name).trim(),
           phone: String(req.body.phone ?? '').trim(),
-          assignedAt: new Date()
-        }
+          assignedAt: capability.issuedAt
+        },
+        courierLocationCapability: {
+          tokenHash: capability.tokenHash,
+          issuedAt: capability.issuedAt,
+          expiresAt: capability.expiresAt,
+          revokedAt: null
+        },
+        courierLocation: null
       }
     },
     { new: true, runValidators: true }
@@ -553,5 +587,82 @@ export const updateMyBusinessOrderCourier = asyncHandler(async (req, res) => {
     );
   }
 
-  res.json({ success: true, data: { order: order.toMerchantJSON() } });
+  publishOrderTrackingChanged({
+    recipientIds: [order.user],
+    orderId: order._id,
+    reason: 'courier-location-cleared'
+  });
+
+  res.json({
+    success: true,
+    data: {
+      order: order.toMerchantJSON(),
+      courierLocationCapability: {
+        token: capability.token,
+        expiresAt: capability.expiresAt
+      }
+    }
+  });
 });
+
+/**
+ * Merchant-side kill switch for a leaked, lost or no-longer-needed courier
+ * credential. It is deliberately idempotent and also removes the visible
+ * latest-location snapshot.
+ */
+export const revokeMyBusinessOrderCourierLocation =
+  asyncHandler(async (req, res) => {
+    const business = await findOwnedBusiness(req);
+
+    if (!mongoose.isValidObjectId(req.params.orderId)) {
+      throw new AppError(
+        'Order id is invalid',
+        400,
+        'INVALID_ORDER_ID'
+      );
+    }
+
+    const revokedAt = new Date();
+
+    const order =
+      await Order.findOneAndUpdate(
+        {
+          _id: req.params.orderId,
+          business: business._id
+        },
+        {
+          $set: {
+            'courierLocationCapability.tokenHash':
+              '',
+            'courierLocationCapability.revokedAt':
+              revokedAt,
+            courierLocation: null
+          }
+        },
+        {
+          new: true,
+          runValidators: true
+        }
+      );
+
+    if (!order) {
+      throw new AppError(
+        'Order was not found',
+        404,
+        'ORDER_NOT_FOUND'
+      );
+    }
+
+    publishOrderTrackingChanged({
+      recipientIds: [order.user],
+      orderId: order._id,
+      reason: 'courier-location-cleared'
+    });
+
+    res.json({
+      success: true,
+      data: {
+        order: order.toMerchantJSON()
+      }
+    });
+  });

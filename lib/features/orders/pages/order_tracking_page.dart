@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
@@ -165,6 +170,10 @@ class _TrackingBody extends StatelessWidget {
           if (tracking.courier.isAssigned) ...[
             const SizedBox(height: 22),
             _CourierCard(courier: tracking.courier),
+          ],
+          if (tracking.courierLocation != null) ...[
+            const SizedBox(height: 22),
+            _CourierLiveMap(location: tracking.courierLocation!),
           ],
           const SizedBox(height: 26),
           _TrackingActions(state: state, order: order),
@@ -457,6 +466,147 @@ class _CourierCard extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+class _CourierLiveMap extends StatefulWidget {
+  final OrderCourierLocationApiModel location;
+
+  const _CourierLiveMap({required this.location});
+
+  @override
+  State<_CourierLiveMap> createState() => _CourierLiveMapState();
+}
+
+class _CourierLiveMapState extends State<_CourierLiveMap> {
+  Timer? _expiryTimer;
+
+  bool _expired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleExpiry();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CourierLiveMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (oldWidget.location.capturedAt != widget.location.capturedAt) {
+      _scheduleExpiry();
+    }
+  }
+
+  void _scheduleExpiry() {
+    _expiryTimer?.cancel();
+
+    final now = DateTime.now();
+
+    _expired = !widget.location.isFreshAt(now);
+
+    if (_expired) {
+      return;
+    }
+
+    final remaining = widget.location.visibleUntil.difference(now);
+
+    _expiryTimer = Timer(remaining + const Duration(milliseconds: 1), () {
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _expired = true;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _expiryTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_expired || !widget.location.isFreshAt(DateTime.now())) {
+      return const SizedBox.shrink();
+    }
+
+    final location = widget.location;
+
+    final point = LatLng(location.latitude, location.longitude);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'tracking.liveCourierLocation'.tr(),
+          style: const TextStyle(
+            color: MerzoxColors.kColor2B2B2B,
+            fontSize: 14,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            height: 240,
+            child: FlutterMap(
+              key: ValueKey(location.capturedAt.microsecondsSinceEpoch),
+              options: MapOptions(
+                initialCenter: point,
+                initialZoom: 16,
+                interactionOptions: const InteractionOptions(
+                  flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+                ),
+              ),
+              children: [
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.merzox',
+                  maxNativeZoom: 19,
+                ),
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: point,
+                      width: 58,
+                      height: 58,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: MerzoxColors.kColorEE6C4D,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.delivery_dining_rounded,
+                          color: Colors.white,
+                          size: 32,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                RichAttributionWidget(
+                  showFlutterMapAttribution: false,
+                  attributions: [
+                    TextSourceAttribution(
+                      'OpenStreetMap contributors',
+                      onTap: () => launchUrl(
+                        Uri.parse('https://www.openstreetmap.org/copyright'),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

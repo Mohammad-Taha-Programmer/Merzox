@@ -33,8 +33,9 @@ language-aware sharing payloads are generated in Arabic or English at runtime.
 - Order history grouped into current, completed, and cancelled orders.
 - Favorites for businesses, products, and services.
 - Direct messaging with a business, with all/unread inbox tabs and unread badges.
-- Order tracking with a four-step delivery timeline, courier details, delivery
-  address changes before preparation starts, and a post-delivery store rating.
+- Order tracking with a four-step delivery timeline, courier details, foreground
+  courier live-location mapping during delivery, delivery address changes before
+  preparation starts, and a post-delivery store rating.
 - Notification feed for order status changes, replies, and new orders.
 - Nearby-business map with filtering, business details, and external directions.
 - Profile editing with multiple labeled phone numbers and email addresses.
@@ -49,7 +50,8 @@ language-aware sharing payloads are generated in Arabic or English at runtime.
 - Product and service management.
 - Business order management with validated status transitions.
 - Order detail and invoice view with customer, delivery, and payment details.
-- Courier assignment that populates the customer's tracking screen.
+- Courier assignment with an order-scoped capability whose raw credential is
+  returned once for merchant-to-courier handoff.
 - Merchant inbox for customer conversations.
 - Store settings for the logo, description, and social media links.
 
@@ -234,6 +236,15 @@ flutter build apk --debug
   sanitization are enabled by the backend.
 - Local `.env` files, dependencies, and build output are excluded from Git.
 - Location and other sensitive permissions are requested only for relevant flows.
+- Courier location sharing is foreground-only; Merzox does not request Android
+  or iOS background-location permission for the courier flow.
+- Courier location capabilities are order-scoped and expire after 12 hours. Only
+  the SHA-256 capability hash is stored; reassignment rotates the credential and
+  explicit revocation or a terminal order state removes its authority.
+- Courier tracking stores only the latest location snapshot, not route history.
+  Samples older than 15 minutes are hidden from the customer, and Socket.IO sends
+  only order invalidation metadata; coordinates are obtained from authenticated
+  REST order tracking.
 
 These controls reduce common risks but do not replace a professional security
 review, production secret management, monitoring, backups, or dependency audits.
@@ -244,7 +255,6 @@ review, production secret management, monitoring, backups, or dependency audits.
   registrations/APNs setup, and production activation of the already implemented
   realtime and background push transport.
 - Activate real processing for card, bank-transfer, and assisted payment flows beyond the current cash-only operational baseline.
-- Courier location on a live map during delivery.
 - Consent-based recommendation and preference analysis.
 - Production deployment, observability, and store publication.
 

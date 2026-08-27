@@ -5,6 +5,7 @@ import test from 'node:test';
 import {
   publishMessagesChanged,
   publishNotificationsChanged,
+  publishOrderTrackingChanged,
   realtimeEvents,
   registerRealtimeEmitter
 } from '../src/realtime/realtime.publisher.js';
@@ -632,6 +633,190 @@ test(
     assert.match(
       bulk,
       /reason:\s*'notifications-read-all'/
+    );
+  }
+);
+
+
+test(
+  'realtime order tracking event name is stable',
+  () => {
+    assert.equal(
+      realtimeEvents.orderTrackingChanged,
+      'merzox:order-tracking-changed'
+    );
+  }
+);
+
+test(
+  'order tracking invalidation is customer-targeted metadata only',
+  () => {
+    const emissions = [];
+
+    const unregister = registerRealtimeEmitter(
+      (userId, event, payload) => {
+        emissions.push({
+          userId,
+          event,
+          payload
+        });
+      }
+    );
+
+    try {
+      const published =
+        publishOrderTrackingChanged({
+          recipientIds: [
+            'customer-1',
+            'customer-1',
+            '',
+            null
+          ],
+          orderId: 'order-1',
+          reason: 'courier-location-updated'
+        });
+
+      assert.equal(published, true);
+
+      assert.deepEqual(
+        emissions,
+        [
+          {
+            userId: 'customer-1',
+            event:
+              'merzox:order-tracking-changed',
+            payload: {
+              orderId: 'order-1',
+              reason:
+                'courier-location-updated'
+            }
+          }
+        ]
+      );
+
+      for (const privateField of [
+        'latitude',
+        'longitude',
+        'accuracy',
+        'capturedAt',
+        'receivedAt',
+        'courierLocation'
+      ]) {
+        assert.equal(
+          Object.hasOwn(
+            emissions[0].payload,
+            privateField
+          ),
+          false
+        );
+      }
+    } finally {
+      unregister();
+    }
+  }
+);
+
+test(
+  'order tracking realtime remains best-effort and rejects unknown reasons',
+  () => {
+    const delivered = [];
+
+    const unregister =
+      registerRealtimeEmitter(
+        (userId) => {
+          if (userId === 'broken-user') {
+            throw new Error(
+              'transport failed'
+            );
+          }
+
+          delivered.push(userId);
+        }
+      );
+
+    try {
+      assert.doesNotThrow(() => {
+        publishOrderTrackingChanged({
+          recipientIds: [
+            'broken-user',
+            'customer-1'
+          ],
+          orderId: 'order-1',
+          reason:
+            'courier-location-updated'
+        });
+      });
+
+      assert.deepEqual(
+        delivered,
+        ['customer-1']
+      );
+
+      assert.equal(
+        publishOrderTrackingChanged({
+          recipientIds: ['customer-1'],
+          orderId: 'order-1',
+          reason: 'coordinates-updated'
+        }),
+        false
+      );
+    } finally {
+      unregister();
+    }
+  }
+);
+
+test(
+  'courier location write publishes only after the authoritative update succeeds',
+  () => {
+    const source = fs.readFileSync(
+      new URL(
+        '../src/controllers/courier-location.controller.js',
+        import.meta.url
+      ),
+      'utf8'
+    );
+
+    const writeIndex =
+      source.indexOf(
+        'await Order.findOneAndUpdate'
+      );
+
+    const publishIndex =
+      source.indexOf(
+        'publishOrderTrackingChanged({',
+        writeIndex
+      );
+
+    const responseIndex =
+      source.indexOf(
+        'res.json({',
+        publishIndex
+      );
+
+    assert.ok(writeIndex >= 0);
+    assert.ok(publishIndex > writeIndex);
+    assert.ok(responseIndex > publishIndex);
+
+    const publishBlock =
+      source.slice(
+        publishIndex,
+        responseIndex
+      );
+
+    assert.match(
+      publishBlock,
+      /recipientIds:\s*\[order\.user\]/
+    );
+
+    assert.match(
+      publishBlock,
+      /reason:\s*'courier-location-updated'/
+    );
+
+    assert.doesNotMatch(
+      publishBlock,
+      /\b(latitude|longitude|accuracy|capturedAt|receivedAt)\b/
     );
   }
 );
