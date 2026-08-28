@@ -6,6 +6,7 @@ ReleaseReadinessInput readyInput({
   String androidApplicationId = 'ps.merzoxapp.merzox',
   String iosBundleIdentifier = 'ps.merzoxapp.merzox',
   bool androidReleaseUsesDebugSigning = false,
+  bool androidProductionSigningReady = true,
   bool iosProductionSigningReady = true,
   bool firebaseProductionReady = true,
   bool playStorePublicationReady = true,
@@ -22,6 +23,7 @@ ReleaseReadinessInput readyInput({
     androidApplicationId: androidApplicationId,
     iosBundleIdentifier: iosBundleIdentifier,
     androidReleaseUsesDebugSigning: androidReleaseUsesDebugSigning,
+    androidProductionSigningReady: androidProductionSigningReady,
     iosProductionSigningReady: iosProductionSigningReady,
     firebaseProductionReady: firebaseProductionReady,
     playStorePublicationReady: playStorePublicationReady,
@@ -87,9 +89,21 @@ void main() {
     );
   });
 
+  test('missing Android production signing activation fails closed', () {
+    final result = evaluateReleaseReadiness(
+      readyInput(androidProductionSigningReady: false),
+    );
+
+    expect(
+      result.blockers,
+      contains(ReleaseReadinessBlocker.androidProductionSigningMissing),
+    );
+  });
+
   test('every external production input fails closed when absent', () {
     final result = evaluateReleaseReadiness(
       readyInput(
+        androidProductionSigningReady: false,
         iosProductionSigningReady: false,
         firebaseProductionReady: false,
         playStorePublicationReady: false,
@@ -104,10 +118,11 @@ void main() {
     );
 
     expect(result.canRelease, isFalse);
-    expect(result.blockers.length, 10);
+    expect(result.blockers.length, 11);
     expect(
       result.blockers,
       containsAll({
+        ReleaseReadinessBlocker.androidProductionSigningMissing,
         ReleaseReadinessBlocker.iosProductionSigningMissing,
         ReleaseReadinessBlocker.firebaseProductionActivationMissing,
         ReleaseReadinessBlocker.playStorePublicationMissing,

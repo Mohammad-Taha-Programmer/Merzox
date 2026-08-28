@@ -5,6 +5,7 @@ enum ReleaseReadinessBlocker {
   androidIdentityMismatch,
   iosIdentityMismatch,
   androidReleaseUsesDebugSigning,
+  androidProductionSigningMissing,
   iosProductionSigningMissing,
   firebaseProductionActivationMissing,
   playStorePublicationMissing,
@@ -22,6 +23,7 @@ final class ReleaseReadinessInput {
   final String androidApplicationId;
   final String iosBundleIdentifier;
   final bool androidReleaseUsesDebugSigning;
+  final bool androidProductionSigningReady;
   final bool iosProductionSigningReady;
   final bool firebaseProductionReady;
   final bool playStorePublicationReady;
@@ -38,6 +40,7 @@ final class ReleaseReadinessInput {
     required this.androidApplicationId,
     required this.iosBundleIdentifier,
     required this.androidReleaseUsesDebugSigning,
+    required this.androidProductionSigningReady,
     required this.iosProductionSigningReady,
     required this.firebaseProductionReady,
     required this.playStorePublicationReady,
@@ -80,6 +83,8 @@ ReleaseReadiness evaluateReleaseReadiness(ReleaseReadinessInput input) {
   }
 
   final readinessFlags = <ReleaseReadinessBlocker, bool>{
+    ReleaseReadinessBlocker.androidProductionSigningMissing:
+        input.androidProductionSigningReady,
     ReleaseReadinessBlocker.iosProductionSigningMissing:
         input.iosProductionSigningReady,
     ReleaseReadinessBlocker.firebaseProductionActivationMissing:

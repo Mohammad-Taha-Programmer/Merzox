@@ -27,6 +27,7 @@ void main() {
     expect(contract, contains('--require-ready'));
     expect(contract, contains('CAN_RELEASE=false'));
     expect(contract, contains('exits `2`'));
+    expect(contract, contains('MERZOX_RELEASE_ANDROID_SIGNING_READY'));
     expect(contract, contains('MERZOX_RELEASE_IOS_SIGNING_READY'));
     expect(contract, contains('MERZOX_RELEASE_IOS_PRIVACY_AUDIT_COMPLETE'));
     expect(contract, contains('Normal CI must not run `--require-ready`'));

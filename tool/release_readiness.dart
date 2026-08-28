@@ -42,6 +42,14 @@ void main(List<String> arguments) {
       '${snapshot.input.androidReleaseUsesDebugSigning}',
     );
     stdout.writeln(
+      'ANDROID_PRODUCTION_SIGNING_CONFIG_READY='
+      '${snapshot.androidProductionSigningConfigReady}',
+    );
+    stdout.writeln(
+      'ANDROID_PRODUCTION_SIGNING_READY='
+      '${snapshot.input.androidProductionSigningReady}',
+    );
+    stdout.writeln(
       'FIREBASE_PLATFORM_CONFIG_READY='
       '${snapshot.firebasePlatformConfigReady}',
     );

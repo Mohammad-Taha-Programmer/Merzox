@@ -10,6 +10,7 @@ void writeFixture(
   String androidId = 'ps.merzoxapp.merzox',
   String iosId = 'ps.merzoxapp.merzox',
   bool androidDebugSigning = false,
+  bool androidSigningStructureReady = true,
   bool firebasePlatformReady = true,
 }) {
   void write(String relativePath, String content) {
@@ -29,15 +30,42 @@ const String merzoxPlatformApplicationId = '$canonicalId';
 const bool merzoxFirebasePlatformConfigReady = $firebasePlatformReady;
 ''');
 
+  final releaseTaskMarker = androidSigningStructureReady
+      ? 'releaseTaskRequested'
+      : 'releaseTaskRemoved';
+
   write('android/app/build.gradle.kts', '''
+val keystorePropertiesFile = rootProject.file("key.properties")
+
+val $releaseTaskMarker = gradle.startParameter.taskNames.any {
+  it.contains("release", ignoreCase = true)
+}
+
+val requiredReleaseSigningProperties = listOf(
+  "storeFile",
+  "storePassword",
+  "keyAlias",
+  "keyPassword",
+)
+
+val signingGuardMessages = listOf(
+  "Merzox release signing requires android/key.properties.",
+  "Merzox release signing is missing required properties:",
+  "Merzox release signing keystore file does not exist.",
+)
+
 android {
   defaultConfig {
     applicationId = "$androidId"
   }
 
+  signingConfigs {
+    create("release") {}
+  }
+
   buildTypes {
     release {
-      ${androidDebugSigning ? 'signingConfig = signingConfigs.getByName("debug")' : 'isMinifyEnabled = true'}
+      ${androidDebugSigning ? 'signingConfig = signingConfigs.getByName("debug")' : 'signingConfig = signingConfigs.getByName("release")'}
     }
   }
 }
@@ -51,6 +79,7 @@ PRODUCT_BUNDLE_IDENTIFIER = $iosId.RunnerTests;
 
 Map<String, String> allAttestations() {
   return const {
+    'MERZOX_RELEASE_ANDROID_SIGNING_READY': 'true',
     'MERZOX_RELEASE_IOS_SIGNING_READY': 'true',
     'MERZOX_RELEASE_FIREBASE_READY': 'true',
     'MERZOX_RELEASE_PLAY_STORE_READY': 'true',
@@ -112,6 +141,7 @@ void main() {
       containsAll({
         ReleaseReadinessBlocker.applicationIdentityNotPermanent,
         ReleaseReadinessBlocker.androidReleaseUsesDebugSigning,
+        ReleaseReadinessBlocker.androidProductionSigningMissing,
         ReleaseReadinessBlocker.iosProductionSigningMissing,
         ReleaseReadinessBlocker.firebaseProductionActivationMissing,
         ReleaseReadinessBlocker.playStorePublicationMissing,
@@ -125,7 +155,7 @@ void main() {
       }),
     );
 
-    expect(snapshot.readiness.blockers.length, 12);
+    expect(snapshot.readiness.blockers.length, 13);
   });
 
   test('native identity divergence is detected independently', () {
@@ -146,6 +176,43 @@ void main() {
         ReleaseReadinessBlocker.androidIdentityMismatch,
         ReleaseReadinessBlocker.iosIdentityMismatch,
       }),
+    );
+  });
+
+  test('Android signing attestation cannot bypass repository structure', () {
+    writeFixture(root, androidSigningStructureReady: false);
+
+    final snapshot = ReleaseReadinessRepositoryScanner(
+      root: root,
+      environment: allAttestations(),
+    ).scan();
+
+    expect(snapshot.androidProductionSigningConfigReady, isFalse);
+    expect(snapshot.input.androidProductionSigningReady, isFalse);
+
+    expect(
+      snapshot.readiness.blockers,
+      contains(ReleaseReadinessBlocker.androidProductionSigningMissing),
+    );
+  });
+
+  test('missing Android signing attestation fails closed', () {
+    writeFixture(root);
+
+    final environment = Map<String, String>.from(allAttestations())
+      ..remove('MERZOX_RELEASE_ANDROID_SIGNING_READY');
+
+    final snapshot = ReleaseReadinessRepositoryScanner(
+      root: root,
+      environment: environment,
+    ).scan();
+
+    expect(snapshot.androidProductionSigningConfigReady, isTrue);
+    expect(snapshot.input.androidProductionSigningReady, isFalse);
+
+    expect(
+      snapshot.readiness.blockers,
+      contains(ReleaseReadinessBlocker.androidProductionSigningMissing),
     );
   });
 
