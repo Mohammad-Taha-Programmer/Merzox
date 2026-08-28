@@ -5,10 +5,12 @@ import 'release_readiness.dart';
 final class ReleaseReadinessRepositorySnapshot {
   final ReleaseReadinessInput input;
   final bool firebasePlatformConfigReady;
+  final bool androidProductionSigningConfigReady;
 
   const ReleaseReadinessRepositorySnapshot({
     required this.input,
     required this.firebasePlatformConfigReady,
+    required this.androidProductionSigningConfigReady,
   });
 
   ReleaseReadiness get readiness => evaluateReleaseReadiness(input);
@@ -65,6 +67,10 @@ final class ReleaseReadinessRepositoryScanner {
       r'signingConfig\s*=\s*signingConfigs\.getByName\("debug"\)',
     ).hasMatch(androidReleaseSection);
 
+    final androidProductionSigningConfigReady =
+        !androidReleaseUsesDebugSigning &&
+        _androidProductionSigningConfigReady(androidSource);
+
     final iosBundleIdentifier = _iosApplicationBundleIdentifier(iosSource);
 
     final input = ReleaseReadinessInput(
@@ -72,6 +78,9 @@ final class ReleaseReadinessRepositoryScanner {
       androidApplicationId: androidApplicationId,
       iosBundleIdentifier: iosBundleIdentifier,
       androidReleaseUsesDebugSigning: androidReleaseUsesDebugSigning,
+      androidProductionSigningReady:
+          androidProductionSigningConfigReady &&
+          _attested('MERZOX_RELEASE_ANDROID_SIGNING_READY'),
       iosProductionSigningReady: _attested('MERZOX_RELEASE_IOS_SIGNING_READY'),
       firebaseProductionReady:
           firebasePlatformConfigReady &&
@@ -93,7 +102,27 @@ final class ReleaseReadinessRepositoryScanner {
     return ReleaseReadinessRepositorySnapshot(
       input: input,
       firebasePlatformConfigReady: firebasePlatformConfigReady,
+      androidProductionSigningConfigReady: androidProductionSigningConfigReady,
     );
+  }
+
+  bool _androidProductionSigningConfigReady(String source) {
+    const requiredMarkers = <String>[
+      'rootProject.file("key.properties")',
+      'releaseTaskRequested',
+      'requiredReleaseSigningProperties',
+      '"storeFile"',
+      '"storePassword"',
+      '"keyAlias"',
+      '"keyPassword"',
+      'create("release")',
+      'signingConfig = signingConfigs.getByName("release")',
+      'Merzox release signing requires android/key.properties.',
+      'Merzox release signing is missing required properties:',
+      'Merzox release signing keystore file does not exist.',
+    ];
+
+    return requiredMarkers.every(source.contains);
   }
 
   bool _attested(String name) {
