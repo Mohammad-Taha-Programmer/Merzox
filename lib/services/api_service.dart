@@ -136,11 +136,14 @@ class ApiService {
     return AuthApiUser.fromJson(user);
   }
 
+  /// [birthDate] is the canonical date-only `YYYY-MM-DD`. Passing null omits
+  /// the field entirely, which leaves the stored date of birth untouched.
   Future<AuthApiUser> updateProfile({
     required String token,
     String? name,
     String? gender,
     String? address,
+    String? birthDate,
     List<ContactEmail>? emails,
     List<ContactPhone>? phones,
   }) async {
@@ -150,6 +153,7 @@ class ApiService {
         if (name != null) 'name': name,
         if (gender != null) 'gender': gender,
         if (address != null) 'address': address,
+        if (birthDate != null) 'birthDate': birthDate,
         if (emails != null)
           'emails': emails.map((email) => email.toJson()).toList(),
         if (phones != null)
@@ -1032,6 +1036,12 @@ class ApiService {
     return entity;
   }
 
+  /// Operational server codes whose English message would otherwise reach an
+  /// Arabic screen verbatim. The code, not the prose, is the stable contract.
+  static const localizedApiErrorCodes = {
+    'INVALID_BIRTH_DATE': 'apiErrors.invalidBirthDate',
+  };
+
   static String messageFromError(Object error) {
     if (error is ApiContractException) {
       return 'apiErrors.contract';
@@ -1041,9 +1051,15 @@ class ApiService {
       final data = error.response?.data;
       if (data is Map<String, dynamic>) {
         final errorBody = data['error'];
-        if (errorBody is Map<String, dynamic> &&
-            errorBody['message'] is String) {
-          return errorBody['message'] as String;
+        if (errorBody is Map<String, dynamic>) {
+          final localized = localizedApiErrorCodes[errorBody['code']];
+          if (localized != null) {
+            return localized;
+          }
+
+          if (errorBody['message'] is String) {
+            return errorBody['message'] as String;
+          }
         }
       }
 
@@ -2553,6 +2569,11 @@ class AuthApiUser {
   final String address;
   final String userType;
   final String gender;
+
+  /// Canonical date-only `YYYY-MM-DD`, or null for an account that has never
+  /// supplied one. A `DateTime` is deliberately not used: a birth date is a
+  /// calendar fact and must not shift under a timezone conversion.
+  final String? birthDate;
   final bool canChangeName;
   final bool canChangeGender;
   final UserPermissions permissions;
@@ -2571,6 +2592,7 @@ class AuthApiUser {
     required this.canChangeName,
     required this.canChangeGender,
     required this.permissions,
+    this.birthDate,
     this.permissionConsents = const UserPermissionConsents(),
   });
 
@@ -2596,6 +2618,7 @@ class AuthApiUser {
       address: json['address'] as String? ?? '',
       userType: json['userType'] as String? ?? 'normal',
       gender: json['gender'] as String? ?? 'unspecified',
+      birthDate: canonicalBirthDate(json['birthDate']),
       canChangeName: json['canChangeName'] as bool? ?? true,
       canChangeGender: json['canChangeGender'] as bool? ?? true,
       permissions: UserPermissions.fromJson(
@@ -2606,6 +2629,41 @@ class AuthApiUser {
       ),
     );
   }
+}
+
+final _birthDatePattern = RegExp(r'^(\d{4})-(\d{2})-(\d{2})');
+
+/// The canonical `YYYY-MM-DD` a backend value denotes, or null.
+///
+/// Anything that is not a real Gregorian calendar date resolves to null rather
+/// than to a silently normalized neighbouring day. A longer ISO string is
+/// truncated to its calendar part so no timezone conversion can move it.
+String? canonicalBirthDate(Object? raw) {
+  if (raw is! String) {
+    return null;
+  }
+
+  final match = _birthDatePattern.firstMatch(raw);
+
+  if (match == null) {
+    return null;
+  }
+
+  final year = int.parse(match.group(1)!);
+  final month = int.parse(match.group(2)!);
+  final day = int.parse(match.group(3)!);
+
+  if (month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+
+  final parsed = DateTime.utc(year, month, day);
+
+  if (parsed.year != year || parsed.month != month || parsed.day != day) {
+    return null;
+  }
+
+  return match.group(0);
 }
 
 class UserPermissions {

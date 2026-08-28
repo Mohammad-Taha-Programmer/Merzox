@@ -482,6 +482,8 @@
     "day": "اليوم",
     "month": "الشهر",
     "year": "السنة",
+    "birthDateIncomplete": "اختر اليوم والشهر والسنة لتاريخ الميلاد",
+    "birthDateInvalid": "اختر تاريخ ميلاد صحيحاً وغير مستقبلي",
     "contactLabels": {
       "personal": "شخصي",
       "work": "عمل",
@@ -580,7 +582,8 @@
   "apiErrors": {
     "contract": "تعذر قراءة رد الخادم. حاول مرة أخرى.",
     "connection": "تعذر الاتصال بالخادم. تأكد من تشغيل Backend Merzox.",
-    "unexpected": "حدث خطأ غير متوقع، حاول مرة أخرى"
+    "unexpected": "حدث خطأ غير متوقع، حاول مرة أخرى",
+    "invalidBirthDate": "تاريخ الميلاد غير صحيح. اختر تاريخاً حقيقياً وغير مستقبلي."
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",

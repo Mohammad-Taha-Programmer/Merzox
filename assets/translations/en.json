@@ -482,6 +482,8 @@
     "day": "Day",
     "month": "Month",
     "year": "Year",
+    "birthDateIncomplete": "Choose the day, month and year of your date of birth",
+    "birthDateInvalid": "Choose a real date of birth that is not in the future",
     "contactLabels": {
       "personal": "Personal",
       "work": "Work",
@@ -580,7 +582,8 @@
   "apiErrors": {
     "contract": "Could not read the server response. Please try again.",
     "connection": "Could not connect to the server. Make sure the Merzox backend is running.",
-    "unexpected": "An unexpected error occurred. Please try again."
+    "unexpected": "An unexpected error occurred. Please try again.",
+    "invalidBirthDate": "The date of birth is invalid. Choose a real date that is not in the future."
   },
   "courierLocation": {
     "loginEntry": "Share courier location",

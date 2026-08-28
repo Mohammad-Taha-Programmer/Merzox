@@ -8,7 +8,8 @@ import {
   validateMessageCreate,
   validateOrderAddressPatch,
   validateOrderCourierPatch,
-  validateOrderCreate
+  validateOrderCreate,
+  validateProfilePatch
 } from '../src/middleware/validate.js';
 
 /**
@@ -267,4 +268,93 @@ test('store settings are allowlisted and validated', () => {
     rejectCode(validateBusinessProfilePatch, { socialLinks: 'x' }),
     'INVALID_BUSINESS_SOCIAL_LINKS'
   );
+});
+
+test('a profile patch accepts an optional canonical birth date', () => {
+  accept(validateProfilePatch, { birthDate: '1994-11-07' });
+  // A real leap day is a legitimate birthday and must not be refused.
+  accept(validateProfilePatch, { birthDate: '2000-02-29' });
+  // Optional means omittable, and explicitly clearable.
+  accept(validateProfilePatch, { name: 'ليان' });
+  accept(validateProfilePatch, { birthDate: null });
+});
+
+test('a profile birth date must be a real, past calendar date', () => {
+  // February 29th only exists in a leap year, and no month has a 30th of
+  // February. `new Date()` would silently normalize both into March.
+  for (const value of ['2025-02-29', '2026-02-30', '2000-13-01', '2000-00-01']) {
+    assert.equal(
+      rejectCode(validateProfilePatch, { birthDate: value }),
+      'INVALID_BIRTH_DATE',
+      `${value} should be refused`
+    );
+  }
+});
+
+test('a profile birth date is refused when it is not canonical', () => {
+  for (const value of [
+    '01-02-2000',
+    'not-a-date',
+    '2000-1-1',
+    '2000/01/01',
+    ' 2000-01-01 ',
+    '2000-01-01T00:00:00.000Z',
+    20000101,
+    true,
+    {},
+    []
+  ]) {
+    assert.equal(
+      rejectCode(validateProfilePatch, { birthDate: value }),
+      'INVALID_BIRTH_DATE',
+      `${JSON.stringify(value)} should be refused`
+    );
+  }
+});
+
+test('the validator accepts every year the selector offers', () => {
+  // The year list runs down to 1, so the validator may not stop at some
+  // invented age limit and may not read 0001 as 1901.
+  for (const value of ['0001-01-01', '0004-02-29', '0099-12-31', '0100-01-01']) {
+    accept(validateProfilePatch, { birthDate: value });
+  }
+
+  // Year 0000 is not a Gregorian birth year, and year 1 was not a leap year.
+  for (const value of ['0000-01-01', '0000-12-31', '0001-02-29']) {
+    assert.equal(
+      rejectCode(validateProfilePatch, { birthDate: value }),
+      'INVALID_BIRTH_DATE',
+      `${value} should be refused`
+    );
+  }
+});
+
+test('a profile birth date may not be in the future', () => {
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const nextCentury = new Date(Date.UTC(tomorrow.getUTCFullYear() + 100, 0, 1));
+
+  for (const value of [tomorrow, nextCentury]) {
+    assert.equal(
+      rejectCode(validateProfilePatch, {
+        birthDate: value.toISOString().slice(0, 10)
+      }),
+      'INVALID_BIRTH_DATE',
+      `${value.toISOString()} should be refused`
+    );
+  }
+
+  // Today itself is a legitimate, if unusual, date of birth.
+  accept(validateProfilePatch, {
+    birthDate: new Date().toISOString().slice(0, 10)
+  });
+});
+
+test('a profile patch still refuses fields it does not own', () => {
+  for (const field of ['birthdate', 'birth_date', 'dob', 'nameChangedAt']) {
+    assert.equal(
+      rejectCode(validateProfilePatch, { [field]: '2000-01-01' }),
+      'INVALID_PROFILE_FIELDS',
+      `${field} should be refused`
+    );
+  }
 });

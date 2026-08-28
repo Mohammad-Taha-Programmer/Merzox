@@ -1,3 +1,7 @@
+import {
+  BIRTH_DATE_ERRORS,
+  parseBirthDate
+} from '../policies/birth-date.policy.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { normalizeGender, normalizeIdentifier, normalizePhone } from '../utils/normalize.js';
@@ -41,6 +45,7 @@ export const updateMe = asyncHandler(async (req, res) => {
     'name',
     'gender',
     'address',
+    'birthDate',
     'emails',
     'phones',
     'permissions'
@@ -74,6 +79,27 @@ export const updateMe = asyncHandler(async (req, res) => {
 
   if (updates.address !== undefined) {
     req.user.address = String(updates.address).trim();
+  }
+
+  // An omitted birthDate leaves the stored value untouched. This carries no
+  // one-time-change restriction, so nameChangedAt/genderChangedAt are not
+  // consulted or written here.
+  if (updates.birthDate !== undefined) {
+    if (updates.birthDate === null) {
+      req.user.birthDate = null;
+    } else {
+      const birthDate = parseBirthDate(updates.birthDate);
+
+      if (!birthDate) {
+        throw new AppError(
+          'Date of birth must be a real past date in YYYY-MM-DD format',
+          400,
+          BIRTH_DATE_ERRORS.invalid
+        );
+      }
+
+      req.user.birthDate = birthDate;
+    }
   }
 
   if (Array.isArray(updates.emails)) {

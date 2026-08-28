@@ -1,6 +1,10 @@
 import validator from 'validator';
 
 import {
+  BIRTH_DATE_ERRORS,
+  isValidBirthDate
+} from '../policies/birth-date.policy.js';
+import {
   COURIER_LOCATION_ERRORS,
   normalizeCourierLocationPayload
 } from '../policies/courier-location.policy.js';
@@ -132,11 +136,34 @@ export function validateResetPassword(req, _res, next) {
 }
 
 export function validateProfilePatch(req, _res, next) {
-  const allowed = ['name', 'gender', 'address', 'emails', 'phones', 'permissions'];
+  const allowed = [
+    'name',
+    'gender',
+    'address',
+    'birthDate',
+    'emails',
+    'phones',
+    'permissions'
+  ];
   const invalid = Object.keys(req.body).filter((key) => !allowed.includes(key));
 
   if (invalid.length > 0) {
     throw new AppError(`Unsupported profile fields: ${invalid.join(', ')}`, 400, 'INVALID_PROFILE_FIELDS');
+  }
+
+  // `null` clears the optional date. Any other value must be a canonical,
+  // real, non-future calendar date; a malformed one is refused rather than
+  // silently coerced into whatever `new Date()` would have made of it.
+  if (
+    req.body.birthDate !== undefined &&
+    req.body.birthDate !== null &&
+    !isValidBirthDate(req.body.birthDate)
+  ) {
+    throw new AppError(
+      'Date of birth must be a real past date in YYYY-MM-DD format',
+      400,
+      BIRTH_DATE_ERRORS.invalid
+    );
   }
 
   if (req.body.permissions !== undefined) {

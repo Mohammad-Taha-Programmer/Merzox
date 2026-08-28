@@ -28,6 +28,21 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   bool _canChangeName = true;
   bool _canChangeGender = true;
 
+  /// The birth date is held as three independent calendar components so the
+  /// XD Day / Month / Year controls stay individually selectable. It is only
+  /// assembled into a canonical `YYYY-MM-DD` at submit time.
+  int? _birthDay;
+  int? _birthMonth;
+  int? _birthYear;
+  String? _initialBirthDate;
+  String? _birthDateError;
+
+  /// The start of the Gregorian calendar, and the only floor the year list
+  /// has. It is a calendar-domain bound, not an age bound: this product has no
+  /// minimum-age, adult-only or maximum-age rule, so the selector must never
+  /// encode one by cutting the list off at some span of years before today.
+  static const _earliestGregorianYear = 1;
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -52,6 +67,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _nameController.text = user.name;
     _addressController.text = user.address;
     _gender = user.gender == 'male' ? 'male' : 'female';
+
+    // A legacy account carries no birth date; the three selectors then stay
+    // unselected and keep showing their placeholder labels.
+    final birthDate = canonicalBirthDate(user.birthDate);
+    _initialBirthDate = birthDate;
+
+    if (birthDate != null) {
+      _birthYear = int.parse(birthDate.substring(0, 4));
+      _birthMonth = int.parse(birthDate.substring(5, 7));
+      _birthDay = int.parse(birthDate.substring(8, 10));
+    }
 
     final emails = user.emails.isNotEmpty
         ? user.emails
@@ -88,8 +114,141 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
       );
   }
 
+  /// Today, as a calendar day, read in UTC.
+  ///
+  /// The backend compares birth dates against the UTC calendar day, so the
+  /// selector uses the same clock. Reading the local day instead would, for
+  /// anyone ahead of UTC, offer a "today" the server still considers tomorrow
+  /// and reject for a few hours around midnight.
+  DateTime get _today {
+    final now = DateTime.now().toUtc();
+    return DateTime.utc(now.year, now.month, now.day);
+  }
+
+  int get _maxBirthMonth => _birthYear == _today.year ? _today.month : 12;
+
+  /// The highest day the current month/year selection can legitimately offer.
+  ///
+  /// April stops at 30, February 2024 at 29 and February 2025 at 28. When the
+  /// year is still unknown February stays open to 29 so a leap year remains
+  /// reachable; the clamp below removes it again if a non-leap year follows.
+  int get _maxBirthDay {
+    final month = _birthMonth;
+
+    if (month == null) {
+      return 31;
+    }
+
+    final year = _birthYear;
+
+    if (year == null) {
+      return _daysInMonth(2024, month);
+    }
+
+    final inMonth = _daysInMonth(year, month);
+
+    if (year == _today.year && month == _today.month) {
+      return inMonth < _today.day ? inMonth : _today.day;
+    }
+
+    return inMonth;
+  }
+
+  /// Drops a selection that the new month/year makes impossible.
+  ///
+  /// Clearing is preferred over silently moving the user's chosen birthday to
+  /// a neighbouring day they never picked.
+  void _clampBirthSelection() {
+    final month = _birthMonth;
+
+    if (month != null && month > _maxBirthMonth) {
+      _birthMonth = null;
+    }
+
+    final day = _birthDay;
+
+    if (day != null && day > _maxBirthDay) {
+      _birthDay = null;
+    }
+  }
+
+  void _onBirthYearChanged(int? value) {
+    setState(() {
+      _birthYear = value;
+      _birthDateError = null;
+      _clampBirthSelection();
+    });
+  }
+
+  void _onBirthMonthChanged(int? value) {
+    setState(() {
+      _birthMonth = value;
+      _birthDateError = null;
+      _clampBirthSelection();
+    });
+  }
+
+  void _onBirthDayChanged(int? value) {
+    setState(() {
+      _birthDay = value;
+      _birthDateError = null;
+    });
+  }
+
+  /// The canonical `YYYY-MM-DD` for a complete selection, or null when the
+  /// selection is incomplete, not a real calendar date, or in the future.
+  String? _selectedBirthDate() {
+    final year = _birthYear;
+    final month = _birthMonth;
+    final day = _birthDay;
+
+    if (year == null || month == null || day == null) {
+      return null;
+    }
+
+    final candidate = DateTime.utc(year, month, day);
+
+    if (candidate.year != year ||
+        candidate.month != month ||
+        candidate.day != day ||
+        candidate.isAfter(_today)) {
+      return null;
+    }
+
+    return '${year.toString().padLeft(4, '0')}'
+        '-${month.toString().padLeft(2, '0')}'
+        '-${day.toString().padLeft(2, '0')}';
+  }
+
   void _submit() {
-    if (!(_formKey.currentState?.validate() ?? false)) {
+    final isFormValid = _formKey.currentState?.validate() ?? false;
+
+    final chosen = [
+      _birthYear,
+      _birthMonth,
+      _birthDay,
+    ].where((part) => part != null).length;
+
+    String? birthDateError;
+    String? birthDate;
+
+    if (chosen > 0 && chosen < 3) {
+      // The birth date stays optional, but a half-filled one is a mistake
+      // rather than an intent to clear it.
+      birthDateError = 'profileEdit.birthDateIncomplete'.tr();
+    } else if (chosen == 3) {
+      birthDate = _selectedBirthDate();
+
+      if (birthDate == null) {
+        birthDateError = 'profileEdit.birthDateInvalid'.tr();
+      }
+    }
+
+    if (_birthDateError != birthDateError) {
+      setState(() => _birthDateError = birthDateError);
+    }
+
+    if (!isFormValid || birthDateError != null) {
       return;
     }
 
@@ -101,6 +260,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             : null,
         gender: _canChangeGender && _gender != user?.gender ? _gender : null,
         address: _addressController.text.trim(),
+        // An unchanged date is not resent: the PATCH carries the field only
+        // when it actually differs from the stored value.
+        birthDate: birthDate == _initialBirthDate ? null : birthDate,
         emails: _emails
             .map(
               (email) => ContactEmail(
@@ -293,7 +455,20 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             ),
                           const SizedBox(height: 20),
                           _ProfileLabel(text: 'profileEdit.birthDate'.tr()),
-                          const _BirthdayPlaceholders(),
+                          _BirthDateSelectors(
+                            day: _birthDay,
+                            month: _birthMonth,
+                            year: _birthYear,
+                            maxDay: _maxBirthDay,
+                            maxMonth: _maxBirthMonth,
+                            latestYear: _today.year,
+                            earliestYear: _earliestGregorianYear,
+                            enabled: !isBusy,
+                            errorText: _birthDateError,
+                            onDayChanged: _onBirthDayChanged,
+                            onMonthChanged: _onBirthMonthChanged,
+                            onYearChanged: _onBirthYearChanged,
+                          ),
                           const SizedBox(height: 124),
                           Center(
                             child: SizedBox(
@@ -679,50 +854,181 @@ class _GenderChoice extends StatelessWidget {
   }
 }
 
-class _BirthdayPlaceholders extends StatelessWidget {
-  const _BirthdayPlaceholders();
+/// Keys for the three XD birth-date controls.
+///
+/// Selection is real state on the page, so a test asserts against the control
+/// rather than against a rendered placeholder string.
+const birthDayFieldKey = Key('profileEdit.birthDay');
+const birthMonthFieldKey = Key('profileEdit.birthMonth');
+const birthYearFieldKey = Key('profileEdit.birthYear');
+
+/// The XD Day | Month | Year row, made interactive.
+///
+/// The visual structure is unchanged: three horizontal bordered dropdown-style
+/// controls sharing the profile form's border, radius and placeholder colours,
+/// laid out directionally so RTL and LTR both read Day first.
+class _BirthDateSelectors extends StatelessWidget {
+  final int? day;
+  final int? month;
+  final int? year;
+  final int maxDay;
+  final int maxMonth;
+  final int latestYear;
+  final int earliestYear;
+  final bool enabled;
+  final String? errorText;
+  final ValueChanged<int?> onDayChanged;
+  final ValueChanged<int?> onMonthChanged;
+  final ValueChanged<int?> onYearChanged;
+
+  const _BirthDateSelectors({
+    required this.day,
+    required this.month,
+    required this.year,
+    required this.maxDay,
+    required this.maxMonth,
+    required this.latestYear,
+    required this.earliestYear,
+    required this.enabled,
+    required this.errorText,
+    required this.onDayChanged,
+    required this.onMonthChanged,
+    required this.onYearChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(child: _PlaceholderDropdown(text: 'profileEdit.day'.tr())),
-        const SizedBox(width: 18),
-        Expanded(child: _PlaceholderDropdown(text: 'profileEdit.month'.tr())),
-        const SizedBox(width: 18),
-        Expanded(child: _PlaceholderDropdown(text: 'profileEdit.year'.tr())),
+        Row(
+          children: [
+            Expanded(
+              child: _BirthDateDropdown(
+                fieldKey: birthDayFieldKey,
+                label: 'profileEdit.day'.tr(),
+                value: day,
+                options: [
+                  for (var option = 1; option <= maxDay; option++) option,
+                ],
+                enabled: enabled,
+                onChanged: onDayChanged,
+              ),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: _BirthDateDropdown(
+                fieldKey: birthMonthFieldKey,
+                label: 'profileEdit.month'.tr(),
+                value: month,
+                options: [
+                  for (var option = 1; option <= maxMonth; option++) option,
+                ],
+                enabled: enabled,
+                onChanged: onMonthChanged,
+              ),
+            ),
+            const SizedBox(width: 18),
+            Expanded(
+              child: _BirthDateDropdown(
+                fieldKey: birthYearFieldKey,
+                label: 'profileEdit.year'.tr(),
+                value: year,
+                // The whole past calendar domain, newest first. The list is
+                // long on purpose: truncating it to a span of years would be a
+                // maximum-age rule, and this product has none.
+                options: [
+                  for (
+                    var option = latestYear;
+                    option >= earliestYear;
+                    option--
+                  )
+                    option,
+                ],
+                enabled: enabled,
+                onChanged: onYearChanged,
+              ),
+            ),
+          ],
+        ),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              errorText!,
+              style: TextStyle(fontSize: 12, color: MerzoxColors.kColorE40909),
+            ),
+          ),
       ],
     );
   }
 }
 
-class _PlaceholderDropdown extends StatelessWidget {
-  final String text;
+class _BirthDateDropdown extends StatelessWidget {
+  final Key fieldKey;
+  final String label;
+  final int? value;
+  final List<int> options;
+  final bool enabled;
+  final ValueChanged<int?> onChanged;
 
-  const _PlaceholderDropdown({required this.text});
+  const _BirthDateDropdown({
+    required this.fieldKey,
+    required this.label,
+    required this.value,
+    required this.options,
+    required this.enabled,
+    required this.onChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    // The unselected label keeps the XD placeholder colour, and is repeated as
+    // the disabled hint so a busy form still reads Day / Month / Year.
+    final placeholder = Text(
+      label,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(fontSize: 14, color: MerzoxColors.kColorC7C7C7),
+    );
+
+    return SizedBox(
       height: 55,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        border: Border.all(color: MerzoxColors.kColorB9DDF3),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(text, style: TextStyle(color: MerzoxColors.kColorC7C7C7)),
-          Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: MerzoxColors.kColor3D5A80,
+      child: InputDecorator(
+        decoration: _profileInputDecoration(''),
+        child: DropdownButtonHideUnderline(
+          // A plain DropdownButton is used rather than the form-field variant
+          // because the page owns the value: when a month change invalidates
+          // the chosen day, the control must follow that state immediately.
+          child: DropdownButton<int>(
+            key: fieldKey,
+            isExpanded: true,
+            isDense: true,
+            menuMaxHeight: 320,
+            value: options.contains(value) ? value : null,
+            hint: placeholder,
+            disabledHint: placeholder,
+            icon: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: MerzoxColors.kColor3D5A80,
+            ),
+            borderRadius: BorderRadius.circular(4),
+            items: [
+              for (final option in options)
+                DropdownMenuItem<int>(
+                  value: option,
+                  child: Text('$option', style: const TextStyle(fontSize: 14)),
+                ),
+            ],
+            onChanged: enabled ? onChanged : null,
           ),
-        ],
+        ),
       ),
     );
   }
 }
+
+/// The length of a Gregorian month: day zero of the next month is its last.
+int _daysInMonth(int year, int month) => DateTime.utc(year, month + 1, 0).day;
 
 class _RestrictionText extends StatelessWidget {
   final String text;

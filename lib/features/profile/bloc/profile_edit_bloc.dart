@@ -55,6 +55,7 @@ class ProfileEditBloc extends Bloc<ProfileEditEvent, ProfileEditState> {
         name: event.name,
         gender: event.gender,
         address: event.address,
+        birthDate: event.birthDate,
         emails: event.emails,
         phones: event.phones,
       );

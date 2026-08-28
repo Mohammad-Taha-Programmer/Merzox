@@ -2,6 +2,8 @@ import bcrypt from 'bcryptjs';
 import mongoose from 'mongoose';
 import validator from 'validator';
 
+import { formatBirthDate } from '../policies/birth-date.policy.js';
+
 const phoneSchema = new mongoose.Schema(
   {
     value: {
@@ -109,6 +111,12 @@ const userSchema = new mongoose.Schema(
       enum: ['male', 'female', 'unspecified'],
       default: 'unspecified'
     },
+    // Optional and date-only. Stored at UTC midnight and exposed as
+    // `YYYY-MM-DD`; a legacy account without one stays valid and reports null.
+    birthDate: {
+      type: Date,
+      default: null
+    },
     passwordHash: {
       type: String,
       required: true,
@@ -178,6 +186,9 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     address: this.address,
     userType: this.userType,
     gender: this.gender,
+    // Date-only on the wire. A full ISO timestamp would invite a client-side
+    // timezone conversion that shifts the calendar day.
+    birthDate: formatBirthDate(this.birthDate),
     permissions: this.permissions,
     permissionConsents: this.permissionConsents,
     canChangeName: this.canChangeName,

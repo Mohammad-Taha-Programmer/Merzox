@@ -12,6 +12,10 @@ final class ProfileEditSubmitted extends ProfileEditEvent {
   final String? name;
   final String? gender;
   final String address;
+
+  /// Canonical date-only `YYYY-MM-DD`, or null when the birth date is
+  /// unchanged or was never supplied. Null never clears a stored date.
+  final String? birthDate;
   final List<ContactEmail> emails;
   final List<ContactPhone> phones;
 
@@ -21,5 +25,6 @@ final class ProfileEditSubmitted extends ProfileEditEvent {
     required this.address,
     required this.emails,
     required this.phones,
+    this.birthDate,
   });
 }
