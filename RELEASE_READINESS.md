@@ -34,9 +34,10 @@ The scanner reads tracked repository facts for:
 - iOS application bundle identifier;
 - Android debug release-signing regression state;
 - Android production-signing repository structure;
+- iOS production-signing repository structure;
 - Firebase platform-configuration readiness.
 
-Missing, malformed, or ambiguous required source fails the scan. A Firebase
+Missing, malformed, or ambiguous required source fails the scan. An external
 attestation cannot override a repository readiness flag of `false`.
 
 ## Boolean production attestations
@@ -64,10 +65,10 @@ JWT secrets, SMTP passwords, or Firebase service credentials.
 A production release is allowed only when the blocker set is empty.
 
 The development repository intentionally remains fail-closed: its mobile
-identity is still `com.example.merzox`, Android has a fail-closed production
-signing structure but its real signing activation attestation is not supplied,
-Firebase platform readiness is false, and other production attestations remain
-unsupplied.
+identity is still `com.example.merzox`, Android and iOS have repository-owned
+production-signing structures but their real signing activation attestations
+are not supplied, Firebase platform readiness is false, and other production
+attestations remain unsupplied.
 
 ## CI boundary
 
@@ -121,6 +122,41 @@ Gradle structure and the boolean activation attestation.
 
 Normal development and CI must leave
 `MERZOX_RELEASE_ANDROID_SIGNING_READY` unset unless approved production
+evidence is actually present.
+
+## iOS production signing
+
+Tracked Xcode configuration must keep the Runner `Release` and `Profile`
+configurations bound to `Release.xcconfig`, explicitly use
+`CODE_SIGN_STYLE = Automatic`, and avoid pinning a code-sign identity or
+provisioning profile in those Runner configurations.
+
+The project-level `Release` and `Profile` configurations must not pin the
+legacy `iPhone Developer` identity. The development identity used by `Debug`
+may remain; production-signing remediation must not turn a development
+identity into production evidence.
+
+Repository structure alone does not prove that Apple signing is actually
+available or approved. `IOS_PRODUCTION_SIGNING_CONFIG_READY=true` reports only
+the tracked Xcode source contract. `IOS_PRODUCTION_SIGNING_READY=true` requires
+that source contract plus `MERZOX_RELEASE_IOS_SIGNING_READY=true`.
+
+`MERZOX_RELEASE_IOS_SIGNING_READY=true` may be supplied only after the approved
+Apple release environment has the permanent Bundle Identifier, an approved
+Apple Team, valid signing assets and provisioning, and successful signed
+archive/export validation on macOS/Xcode.
+
+The release-readiness scanner does not read certificates, private keys,
+`.mobileprovision` files, Apple account credentials, keychain contents, or
+signed archive bytes. It also does not invent a `DEVELOPMENT_TEAM` value or pin
+a provisioning profile.
+
+The permanent Bundle Identifier remains an independent release-readiness
+requirement. GAP-023D does not replace `com.example.merzox` with a guessed
+identity.
+
+Normal development and CI must leave
+`MERZOX_RELEASE_IOS_SIGNING_READY` unset unless approved production signing
 evidence is actually present.
 
 ## iOS privacy audit

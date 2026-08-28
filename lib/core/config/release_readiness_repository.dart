@@ -6,11 +6,13 @@ final class ReleaseReadinessRepositorySnapshot {
   final ReleaseReadinessInput input;
   final bool firebasePlatformConfigReady;
   final bool androidProductionSigningConfigReady;
+  final bool iosProductionSigningConfigReady;
 
   const ReleaseReadinessRepositorySnapshot({
     required this.input,
     required this.firebasePlatformConfigReady,
     required this.androidProductionSigningConfigReady,
+    required this.iosProductionSigningConfigReady,
   });
 
   ReleaseReadiness get readiness => evaluateReleaseReadiness(input);
@@ -73,6 +75,10 @@ final class ReleaseReadinessRepositoryScanner {
 
     final iosBundleIdentifier = _iosApplicationBundleIdentifier(iosSource);
 
+    final iosProductionSigningConfigReady = _iosProductionSigningConfigReady(
+      iosSource,
+    );
+
     final input = ReleaseReadinessInput(
       canonicalApplicationId: canonicalApplicationId,
       androidApplicationId: androidApplicationId,
@@ -81,7 +87,9 @@ final class ReleaseReadinessRepositoryScanner {
       androidProductionSigningReady:
           androidProductionSigningConfigReady &&
           _attested('MERZOX_RELEASE_ANDROID_SIGNING_READY'),
-      iosProductionSigningReady: _attested('MERZOX_RELEASE_IOS_SIGNING_READY'),
+      iosProductionSigningReady:
+          iosProductionSigningConfigReady &&
+          _attested('MERZOX_RELEASE_IOS_SIGNING_READY'),
       firebaseProductionReady:
           firebasePlatformConfigReady &&
           _attested('MERZOX_RELEASE_FIREBASE_READY'),
@@ -103,6 +111,7 @@ final class ReleaseReadinessRepositoryScanner {
       input: input,
       firebasePlatformConfigReady: firebasePlatformConfigReady,
       androidProductionSigningConfigReady: androidProductionSigningConfigReady,
+      iosProductionSigningConfigReady: iosProductionSigningConfigReady,
     );
   }
 
@@ -123,6 +132,110 @@ final class ReleaseReadinessRepositoryScanner {
     ];
 
     return requiredMarkers.every(source.contains);
+  }
+
+  bool _iosProductionSigningConfigReady(String source) {
+    final runnerRelease = _iosBuildConfiguration(
+      source,
+      configurationListDescription:
+          'Build configuration list for PBXNativeTarget "Runner"',
+      configurationName: 'Release',
+    );
+
+    final runnerProfile = _iosBuildConfiguration(
+      source,
+      configurationListDescription:
+          'Build configuration list for PBXNativeTarget "Runner"',
+      configurationName: 'Profile',
+    );
+
+    final projectRelease = _iosBuildConfiguration(
+      source,
+      configurationListDescription:
+          'Build configuration list for PBXProject "Runner"',
+      configurationName: 'Release',
+    );
+
+    final projectProfile = _iosBuildConfiguration(
+      source,
+      configurationListDescription:
+          'Build configuration list for PBXProject "Runner"',
+      configurationName: 'Profile',
+    );
+
+    return _iosAutomaticRunnerConfigurationReady(runnerRelease) &&
+        _iosAutomaticRunnerConfigurationReady(runnerProfile) &&
+        !_iosPinsLegacyDeveloperIdentity(projectRelease) &&
+        !_iosPinsLegacyDeveloperIdentity(projectProfile);
+  }
+
+  bool _iosAutomaticRunnerConfigurationReady(String source) {
+    final automaticSigning = RegExp(
+      r'CODE_SIGN_STYLE\s*=\s*Automatic;',
+    ).hasMatch(source);
+
+    final manualSigning = RegExp(
+      r'CODE_SIGN_STYLE\s*=\s*Manual;',
+    ).hasMatch(source);
+
+    final pinnedIdentity = RegExp(
+      r'CODE_SIGN_IDENTITY(?:\[[^\]]+\])?\s*=',
+    ).hasMatch(source);
+
+    final pinnedProvisioningProfile = RegExp(
+      r'PROVISIONING_PROFILE(?:_SPECIFIER)?\s*=',
+    ).hasMatch(source);
+
+    return automaticSigning &&
+        !manualSigning &&
+        source.contains('Release.xcconfig') &&
+        !pinnedIdentity &&
+        !pinnedProvisioningProfile;
+  }
+
+  bool _iosPinsLegacyDeveloperIdentity(String source) {
+    return RegExp(
+      r'"CODE_SIGN_IDENTITY\[sdk=iphoneos\*\]"\s*=\s*"iPhone Developer";',
+    ).hasMatch(source);
+  }
+
+  String _iosBuildConfiguration(
+    String source, {
+    required String configurationListDescription,
+    required String configurationName,
+  }) {
+    final configurationList = _captureRequired(
+      source,
+      RegExp(
+        '/\\* ${RegExp.escape(configurationListDescription)} \\*/'
+        r'\s*=\s*\{[\s\S]*?buildConfigurations\s*=\s*\(([\s\S]*?)\);',
+      ),
+      '$configurationListDescription entries',
+    );
+
+    final configurationId = _captureRequired(
+      configurationList,
+      RegExp(
+        '([A-F0-9]+) /\\* '
+        '${RegExp.escape(configurationName)}'
+        r' \*/',
+      ),
+      '$configurationListDescription $configurationName id',
+    );
+
+    return _captureRequired(
+      source,
+      RegExp(
+        '${RegExp.escape(configurationId)} /\\* '
+        '${RegExp.escape(configurationName)}'
+        r' \*/\s*=\s*\{([\s\S]*?)'
+        r'\r?\n\s*name\s*=\s*'
+        '${RegExp.escape(configurationName)}'
+        r';\r?\n\s*\};',
+        multiLine: true,
+      ),
+      '$configurationListDescription $configurationName block',
+    );
   }
 
   bool _attested(String name) {
