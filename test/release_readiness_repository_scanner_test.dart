@@ -11,6 +11,7 @@ void writeFixture(
   String iosId = 'ps.merzoxapp.merzox',
   bool androidDebugSigning = false,
   bool androidSigningStructureReady = true,
+  bool iosSigningStructureReady = true,
   bool firebasePlatformReady = true,
 }) {
   void write(String relativePath, String content) {
@@ -71,8 +72,83 @@ android {
 }
 ''');
 
+  final iosSigningStyle = iosSigningStructureReady ? 'Automatic' : 'Manual';
+
+  final iosLegacyProjectIdentity = iosSigningStructureReady
+      ? ''
+      : '"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";';
+
   write('ios/Runner.xcodeproj/project.pbxproj', '''
-PRODUCT_BUNDLE_IDENTIFIER = $iosId;
+AAA000000000000000000001 /* Debug */ = {
+  isa = XCBuildConfiguration;
+  buildSettings = {
+    PRODUCT_BUNDLE_IDENTIFIER = $iosId;
+  };
+  name = Debug;
+};
+
+AAA000000000000000000002 /* Release */ = {
+  isa = XCBuildConfiguration;
+  baseConfigurationReference = DDD000000000000000000001 /* Release.xcconfig */;
+  buildSettings = {
+    CODE_SIGN_STYLE = $iosSigningStyle;
+    PRODUCT_BUNDLE_IDENTIFIER = $iosId;
+  };
+  name = Release;
+};
+
+AAA000000000000000000003 /* Profile */ = {
+  isa = XCBuildConfiguration;
+  baseConfigurationReference = DDD000000000000000000001 /* Release.xcconfig */;
+  buildSettings = {
+    CODE_SIGN_STYLE = $iosSigningStyle;
+    PRODUCT_BUNDLE_IDENTIFIER = $iosId;
+  };
+  name = Profile;
+};
+
+BBB000000000000000000001 /* Debug */ = {
+  isa = XCBuildConfiguration;
+  buildSettings = {
+    "CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
+  };
+  name = Debug;
+};
+
+BBB000000000000000000002 /* Release */ = {
+  isa = XCBuildConfiguration;
+  buildSettings = {
+    $iosLegacyProjectIdentity
+  };
+  name = Release;
+};
+
+BBB000000000000000000003 /* Profile */ = {
+  isa = XCBuildConfiguration;
+  buildSettings = {
+    $iosLegacyProjectIdentity
+  };
+  name = Profile;
+};
+
+CCC000000000000000000001 /* Build configuration list for PBXNativeTarget "Runner" */ = {
+  isa = XCConfigurationList;
+  buildConfigurations = (
+    AAA000000000000000000001 /* Debug */,
+    AAA000000000000000000002 /* Release */,
+    AAA000000000000000000003 /* Profile */,
+  );
+};
+
+CCC000000000000000000002 /* Build configuration list for PBXProject "Runner" */ = {
+  isa = XCConfigurationList;
+  buildConfigurations = (
+    BBB000000000000000000001 /* Debug */,
+    BBB000000000000000000002 /* Release */,
+    BBB000000000000000000003 /* Profile */,
+  );
+};
+
 PRODUCT_BUNDLE_IDENTIFIER = $iosId.RunnerTests;
 ''');
 }
@@ -213,6 +289,43 @@ void main() {
     expect(
       snapshot.readiness.blockers,
       contains(ReleaseReadinessBlocker.androidProductionSigningMissing),
+    );
+  });
+
+  test('iOS signing attestation cannot bypass repository structure', () {
+    writeFixture(root, iosSigningStructureReady: false);
+
+    final snapshot = ReleaseReadinessRepositoryScanner(
+      root: root,
+      environment: allAttestations(),
+    ).scan();
+
+    expect(snapshot.iosProductionSigningConfigReady, isFalse);
+    expect(snapshot.input.iosProductionSigningReady, isFalse);
+
+    expect(
+      snapshot.readiness.blockers,
+      contains(ReleaseReadinessBlocker.iosProductionSigningMissing),
+    );
+  });
+
+  test('missing iOS signing attestation fails closed', () {
+    writeFixture(root);
+
+    final environment = Map<String, String>.from(allAttestations())
+      ..remove('MERZOX_RELEASE_IOS_SIGNING_READY');
+
+    final snapshot = ReleaseReadinessRepositoryScanner(
+      root: root,
+      environment: environment,
+    ).scan();
+
+    expect(snapshot.iosProductionSigningConfigReady, isTrue);
+    expect(snapshot.input.iosProductionSigningReady, isFalse);
+
+    expect(
+      snapshot.readiness.blockers,
+      contains(ReleaseReadinessBlocker.iosProductionSigningMissing),
     );
   });
 

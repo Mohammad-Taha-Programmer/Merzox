@@ -50,6 +50,14 @@ void main(List<String> arguments) {
       '${snapshot.input.androidProductionSigningReady}',
     );
     stdout.writeln(
+      'IOS_PRODUCTION_SIGNING_CONFIG_READY='
+      '${snapshot.iosProductionSigningConfigReady}',
+    );
+    stdout.writeln(
+      'IOS_PRODUCTION_SIGNING_READY='
+      '${snapshot.input.iosProductionSigningReady}',
+    );
+    stdout.writeln(
       'FIREBASE_PLATFORM_CONFIG_READY='
       '${snapshot.firebasePlatformConfigReady}',
     );
