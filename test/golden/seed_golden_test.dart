@@ -264,7 +264,7 @@ void main() {
         // The seed is the first page only: no swipe, no skip, no completion.
         // These are the same Arabic labels the existing onboarding widget test
         // asserts for the initial state.
-        expect(find.text('أفضل العروض القريبة منك'), findsOneWidget);
+        expect(find.text('أفضل الخصومات'), findsOneWidget);
         expect(find.text('تخطي'), findsOneWidget);
 
         await expectMerzoxSeedGolden('onboarding_initial_ar_375x812.png');

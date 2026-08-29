@@ -98,11 +98,11 @@ void main() {
       ),
     );
 
-    expect(find.text('أفضل العروض القريبة منك'), findsOneWidget);
+    expect(find.text('أفضل الخصومات'), findsOneWidget);
     expect(find.text('تخطي'), findsOneWidget);
 
     expect(
-      Directionality.of(tester.element(find.text('أفضل العروض القريبة منك'))),
+      Directionality.of(tester.element(find.text('أفضل الخصومات'))),
       TextDirection.rtl,
     );
   });
