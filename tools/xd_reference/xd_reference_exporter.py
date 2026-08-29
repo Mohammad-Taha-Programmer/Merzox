@@ -19,7 +19,9 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -36,12 +38,69 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 #: The calibration iteration this exporter currently implements. Every report it
 #: stamps must carry this value; update it whenever a calibrated iteration lands.
-EXPORTER_ITERATION = "MERZOX-UI-GOLDEN-I2-R2"
+EXPORTER_ITERATION = "MERZOX-UI-GOLDEN-I3-R2-D7-I1"
 
-#: Serialization/schema version of the JSON report. Deliberately independent of
-#: EXPORTER_ITERATION: the field set only changes when the schema changes, so a
-#: new calibration iteration does NOT bump this.
+#: Serialization/schema version of the single-artboard JSON report. Deliberately
+#: independent of EXPORTER_ITERATION: the field set only changes when the schema
+#: changes, so a new calibration iteration does NOT bump this.
 REPORT_SCHEMA = "merzox.xd_reference_exporter/1"
+
+#: Serialization/schema version of the all-artboard batch summary. Independent of
+#: both the exporter iteration and the single-artboard report schema.
+BATCH_REPORT_SCHEMA = "merzox.xd_reference_batch/1"
+
+#: Filename of the deterministic batch summary written into --output-dir.
+BATCH_REPORT_FILENAME = "batch-report.json"
+
+#: The only two batch-entry status values. "success" means artifact generation
+#: succeeded - it says nothing about rendering fidelity; unsupported renderer
+#: features are reported separately via unsupported_node_counts.
+BATCH_STATUS_SUCCESS = "success"
+BATCH_STATUS_FAILED = "failed"
+
+#: Fallback slug for an artboard whose name contains no slug-able characters.
+ARTBOARD_SLUG_FALLBACK = "artboard"
+
+#: Number of leading manifest-id characters used to disambiguate output stems.
+ARTBOARD_STEM_ID_LENGTH = 8
+
+#: Canonical suffix of an artboard's AGC file, used to reject AGC paths where a
+#: canonical artwork directory path is required.
+AGC_PATH_SUFFIX = "/graphics/graphicContent.agc"
+
+#: SVG geometry tags whose closure is guaranteed, so they may act as their own
+#: interior clip region when emulating XD inside-stroke alignment. A path counts
+#: only when it ends in an explicit closepath; `line` is never eligible.
+INSIDE_STROKE_CLOSED_TAGS = frozenset({"rect", "circle", "ellipse", "polygon"})
+
+#: XD inside-stroke emulation renders a centred stroke at this multiple of the
+#: declared width and clips away the outward half.
+INSIDE_STROKE_WIDTH_MULTIPLIER = 2
+
+#: Physical corner order of a compact AGC rectangle's four-value ``shape.r``
+#: list. Proven against the corpus: index 0 is the top-left corner and the list
+#: runs clockwise from there.
+#:
+#:     r[0] = top-left
+#:     r[1] = top-right
+#:     r[2] = bottom-right
+#:     r[3] = bottom-left
+#:
+#: Every helper below consumes and produces radii in exactly this order.
+AGC_CORNER_ORDER = ("top-left", "top-right", "bottom-right", "bottom-left")
+
+#: Reporting key for a rectangle whose four corner radii are not all equal and
+#: which is therefore emitted as an exact deterministic SVG path.
+RECT_NON_UNIFORM_RADIUS_KEY = "rect:non-uniform-corner-radius"
+
+#: Reporting key for a non-uniform rectangle whose declared radii overflowed a
+#: side and were reduced by the proportional-overlap policy below.
+RECT_RADIUS_OVERLAP_SCALED_KEY = "rect:corner-radius-overlap-scaled"
+
+#: Reporting key for an image fill laid out against local bounds derived from a
+#: path's own ``d`` by :func:`strict_absolute_mlc_z_bounds`, because the stored
+#: geometry carried no reliable bounds. Counted in ``handled_node_counts``.
+PATTERN_DERIVED_PATH_BOUNDS_KEY = "fill:pattern:path-bounds-derived"
 
 # ---------------------------------------------------------------------------
 # Deterministic, documented approximation constants.
@@ -166,6 +225,302 @@ def attrs_to_string(attrs: "OrderedDict[str, Any]") -> str:
 
 def clamp01(value: float) -> float:
     return max(0.0, min(1.0, value))
+
+
+# ---------------------------------------------------------------------------
+# Non-uniform rounded-rectangle geometry.
+#
+# Radii are always handled as the proven AGC tuple (tl, tr, br, bl); see
+# AGC_CORNER_ORDER.
+# ---------------------------------------------------------------------------
+
+
+def scale_corner_radii(
+    width: Any, height: Any, radii: Sequence[Any]
+) -> Tuple[Tuple[float, float, float, float], float]:
+    """Apply the renderer's deterministic proportional-overlap policy.
+
+    Two radii sharing a side may together demand more than that side's length.
+    The policy - the same one CSS ``border-radius`` and Canvas ``roundRect``
+    specify - computes one common factor from the most-violated side and scales
+    ALL FOUR radii by it, so the shape's corner proportions are preserved::
+
+        factor = min(1, w/(tl+tr), h/(tr+br), w/(bl+br), h/(tl+bl))
+
+    Corners are never clamped independently. This is the exporter's documented
+    overlap policy; it is NOT a claim of parity with Adobe's undocumented
+    internal Scenegraph capping algorithm.
+
+    Returns ``((tl, tr, br, bl), factor)``; ``factor`` is exactly ``1.0`` when
+    nothing overlapped and the radii are returned numerically unchanged.
+    """
+    values = list(radii) + [0.0] * 4
+    tl, tr, br, bl = (max(0.0, to_float(v)) for v in values[:4])
+    w = max(0.0, to_float(width))
+    h = max(0.0, to_float(height))
+
+    factor = 1.0
+    for span, total in (
+        (w, tl + tr),  # top
+        (h, tr + br),  # right
+        (w, bl + br),  # bottom
+        (h, tl + bl),  # left
+    ):
+        if total > 0.0:
+            factor = min(factor, span / total)
+
+    if factor >= 1.0:
+        return (tl, tr, br, bl), 1.0
+    return (tl * factor, tr * factor, br * factor, bl * factor), factor
+
+
+def rounded_rect_path_data(
+    x: Any, y: Any, width: Any, height: Any, radii: Sequence[float]
+) -> str:
+    """Build the closed clockwise path of a rectangle with four corner radii.
+
+    ``radii`` must already have passed through :func:`scale_corner_radii`. The
+    path starts at the end of the top-left corner and runs TL -> TR -> BR -> BL,
+    using a quarter-circle arc for every non-zero corner and a plain straight
+    endpoint for every zero corner, so the output is byte-deterministic.
+    """
+    tl, tr, br, bl = (to_float(v) for v in list(radii)[:4])
+    x = to_float(x)
+    y = to_float(y)
+    w = to_float(width)
+    h = to_float(height)
+
+    def arc(radius: float, end_x: float, end_y: float) -> str:
+        # Quarter circle, clockwise (sweep-flag 1), always the short arc.
+        return (
+            f"A {fmt_num(radius)},{fmt_num(radius)} 0 0 1 "
+            f"{fmt_num(end_x)},{fmt_num(end_y)}"
+        )
+
+    commands = [f"M {fmt_num(x + tl)},{fmt_num(y)}"]
+    commands.append(f"L {fmt_num(x + w - tr)},{fmt_num(y)}")
+    if tr > 0.0:
+        commands.append(arc(tr, x + w, y + tr))
+    commands.append(f"L {fmt_num(x + w)},{fmt_num(y + h - br)}")
+    if br > 0.0:
+        commands.append(arc(br, x + w - br, y + h))
+    commands.append(f"L {fmt_num(x + bl)},{fmt_num(y + h)}")
+    if bl > 0.0:
+        commands.append(arc(bl, x, y + h - bl))
+    commands.append(f"L {fmt_num(x)},{fmt_num(y + tl)}")
+    if tl > 0.0:
+        commands.append(arc(tl, x + tl, y))
+    commands.append("Z")
+    return " ".join(commands)
+
+
+# ---------------------------------------------------------------------------
+# Strict local path bounds (D7-I1).
+#
+# A deliberately tiny, fail-closed reader for ONE explicitly supported path
+# subset. It exists only so an image fill on a closed absolute M/L/C/Z path can
+# be laid out against real geometry instead of the natural-bitmap fallback. It
+# is NOT a general SVG path library and must never grow into one: anything it
+# does not recognise returns None and the caller keeps its documented fallback.
+# ---------------------------------------------------------------------------
+
+#: The complete set of commands this reader accepts, mapped to their exact
+#: argument count. Absolute/uppercase only - no relative forms, no H/V/S/Q/T/A.
+STRICT_PATH_COMMAND_ARITY = OrderedDict([("M", 2), ("L", 2), ("C", 6), ("Z", 0)])
+
+#: The only characters permitted *between* tokens. Anything else is a parse
+#: failure rather than something to skip, so a stray character cannot be
+#: silently ignored the way a loose ``re.findall()`` would ignore it.
+STRICT_PATH_SEPARATORS = frozenset(" \t\r\n\f\v,")
+
+#: A single SVG number. Deliberately explicit: no bare ``.``, no ``nan``/``inf``
+#: spellings (those are letters and are rejected as stray characters), and an
+#: exponent must carry at least one digit.
+_STRICT_PATH_NUMBER = re.compile(
+    r"[-+]?(?:[0-9]+\.[0-9]*|\.[0-9]+|[0-9]+)(?:[eE][-+]?[0-9]+)?"
+)
+
+
+def _cubic_axis_extrema(
+    p0: float, p1: float, p2: float, p3: float
+) -> Tuple[float, float]:
+    """Exact ``(min, max)`` of one coordinate of a cubic Bezier segment.
+
+    The segment's derivative is the quadratic ``a t^2 + b t + c`` (up to the
+    constant factor 3) with::
+
+        a = -p0 + 3 p1 - 3 p2 + p3
+        b = 2 (p0 - 2 p1 + p2)
+        c = p1 - p0
+
+    Both endpoints plus every derivative root strictly inside ``0 < t < 1`` are
+    evaluated. The control points themselves are never used as bounds and the
+    curve is never sampled.
+    """
+    low = min(p0, p3)
+    high = max(p0, p3)
+
+    a = -p0 + 3.0 * p1 - 3.0 * p2 + p3
+    b = 2.0 * (p0 - 2.0 * p1 + p2)
+    c = p1 - p0
+
+    roots: List[float] = []
+    if a == 0.0:
+        if b != 0.0:
+            roots.append(-c / b)
+    else:
+        discriminant = b * b - 4.0 * a * c
+        if discriminant >= 0.0:
+            root = math.sqrt(discriminant)
+            roots.append((-b + root) / (2.0 * a))
+            roots.append((-b - root) / (2.0 * a))
+
+    for t in roots:
+        if not math.isfinite(t) or not (0.0 < t < 1.0):
+            continue
+        s = 1.0 - t
+        value = (
+            s * s * s * p0
+            + 3.0 * s * s * t * p1
+            + 3.0 * s * t * t * p2
+            + t * t * t * p3
+        )
+        if not math.isfinite(value):
+            continue
+        low = min(low, value)
+        high = max(high, value)
+    return low, high
+
+
+def _strict_path_commands(text: str) -> Optional[List[Tuple[str, List[float]]]]:
+    """Tokenise the WHOLE string, or fail.
+
+    Every command letter must appear explicitly and be followed by exactly its
+    own argument count. Implicit repetition (``M 0 0 10 10``), missing or excess
+    arguments, unknown letters and stray characters are all rejected.
+    """
+    length = len(text)
+    index = 0
+
+    def skip_separators(position: int) -> int:
+        while position < length and text[position] in STRICT_PATH_SEPARATORS:
+            position += 1
+        return position
+
+    commands: List[Tuple[str, List[float]]] = []
+    index = skip_separators(index)
+    while index < length:
+        letter = text[index]
+        arity = STRICT_PATH_COMMAND_ARITY.get(letter)
+        if arity is None:
+            # Lowercase/relative forms, H/V/S/Q/T/A, and any stray character all
+            # land here. Nothing is skipped and nothing is guessed.
+            return None
+        index += 1
+
+        arguments: List[float] = []
+        for _ in range(arity):
+            index = skip_separators(index)
+            match = _STRICT_PATH_NUMBER.match(text, index)
+            if match is None:
+                return None
+            try:
+                value = float(match.group(0))
+            except ValueError:  # pragma: no cover - the regex already guarantees it
+                return None
+            if not math.isfinite(value):
+                return None
+            arguments.append(value)
+            index = match.end()
+
+        commands.append((letter, arguments))
+        index = skip_separators(index)
+
+    return commands
+
+
+def strict_absolute_mlc_z_bounds(
+    path_data: Any,
+) -> Optional[Tuple[float, float, float, float]]:
+    """Exact local bounds of a closed absolute ``M``/``L``/``C``/``Z`` path.
+
+    Returns ``(x, y, width, height)`` for the explicitly supported subset, or
+    ``None`` for **everything** else - lowercase/relative commands, ``H``,
+    ``V``, ``S``, ``Q``, ``T``, ``A``, implicit command repetition, wrong
+    argument counts, stray characters, non-finite numbers, an unclosed subpath,
+    an empty path, or bounds with a non-positive width or height.
+
+    Cubic extrema are solved analytically (see :func:`_cubic_axis_extrema`); the
+    curve is never sampled and control points are never used as a bounding box.
+    """
+    if not isinstance(path_data, str):
+        return None
+    commands = _strict_path_commands(path_data)
+    if not commands:
+        return None
+
+    min_x = min_y = float("inf")
+    max_x = max_y = float("-inf")
+
+    def include(x: float, y: float) -> None:
+        nonlocal min_x, min_y, max_x, max_y
+        min_x = min(min_x, x)
+        max_x = max(max_x, x)
+        min_y = min(min_y, y)
+        max_y = max(max_y, y)
+
+    current: Optional[Tuple[float, float]] = None
+    subpath_start: Optional[Tuple[float, float]] = None
+    closed_subpaths = 0
+
+    for letter, arguments in commands:
+        if letter == "M":
+            # A previous subpath must already be closed: this fallback exists
+            # only for closed fill geometry, so an open one fails closed.
+            if subpath_start is not None:
+                return None
+            current = (arguments[0], arguments[1])
+            subpath_start = current
+            include(*current)
+        elif letter == "L":
+            if current is None or subpath_start is None:
+                return None
+            current = (arguments[0], arguments[1])
+            include(*current)
+        elif letter == "C":
+            if current is None or subpath_start is None:
+                return None
+            x0, y0 = current
+            x1, y1, x2, y2, x3, y3 = arguments
+            low_x, high_x = _cubic_axis_extrema(x0, x1, x2, x3)
+            low_y, high_y = _cubic_axis_extrema(y0, y1, y2, y3)
+            include(low_x, low_y)
+            include(high_x, high_y)
+            current = (x3, y3)
+        else:  # "Z"
+            if current is None or subpath_start is None:
+                return None
+            # The closing line adds no new extremum: both of its endpoints are
+            # already included. Only the subpath state changes.
+            current = subpath_start
+            subpath_start = None
+            closed_subpaths += 1
+
+    if subpath_start is not None or closed_subpaths == 0:
+        return None
+    if not (
+        math.isfinite(min_x)
+        and math.isfinite(min_y)
+        and math.isfinite(max_x)
+        and math.isfinite(max_y)
+    ):
+        return None
+
+    width = max_x - min_x
+    height = max_y - min_y
+    if width <= 0.0 or height <= 0.0:
+        return None
+    return min_x, min_y, width, height
 
 
 def color_to_css(color: Any) -> Tuple[Optional[str], float]:
@@ -625,10 +980,13 @@ class XdPackage:
         if len(matches) == 1:
             return matches[0]
         if len(matches) > 1:
-            paths = ", ".join(ab.path for ab in matches)
+            # Manifest ids are ASCII and survive any terminal encoding, so they
+            # keep the diagnostic actionable even if the name renders poorly.
+            detail = ", ".join(f"{ab.manifest_id} ({ab.path})" for ab in matches)
             raise XdExportError(
                 f"Artboard name {name!r} is ambiguous; matched {len(matches)} "
-                f"entries: {paths}"
+                f"entries: {detail}. Select one with --artboard-id or "
+                "--artboard-path instead."
             )
         available = [ab.name for ab in self.artboards()]
         near = [candidate for candidate in available if name.strip() in candidate]
@@ -636,6 +994,51 @@ class XdPackage:
         raise XdExportError(
             f"Artboard {name!r} not found. The package declares "
             f"{len(available)} artboards.{hint}"
+        )
+
+    def find_artboard_by_manifest_id(self, manifest_id: str) -> ManifestArtboard:
+        """Canonical machine selector: the manifest id is unique per artboard."""
+        if not isinstance(manifest_id, str) or not manifest_id.strip():
+            raise XdExportError("An artboard manifest id must be a non-empty string.")
+        wanted = manifest_id.strip()
+        matches = [ab for ab in self.artboards() if ab.manifest_id == wanted]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            paths = ", ".join(ab.path for ab in matches)
+            raise XdExportError(
+                f"Manifest id {wanted!r} is ambiguous; it matched {len(matches)} "
+                f"artboards: {paths}. Refusing to guess."
+            )
+        raise XdExportError(
+            f"No artboard with manifest id {wanted!r}. The package declares "
+            f"{len(self.artboards())} artboards; run --list-artboards to see them."
+        )
+
+    def find_artboard_by_path(self, path: str) -> ManifestArtboard:
+        """Secondary stable selector: the canonical ``artwork/artboard-<uuid>``."""
+        if not isinstance(path, str) or not path.strip():
+            raise XdExportError("An artboard path must be a non-empty string.")
+        # A single trailing slash is normalised; nothing else is guessed.
+        wanted = path.strip().rstrip("/")
+        if wanted.endswith(AGC_PATH_SUFFIX):
+            raise XdExportError(
+                f"{path!r} is an AGC file path. --artboard-path expects the canonical "
+                f"artwork directory instead, e.g. "
+                f"{wanted[: -len(AGC_PATH_SUFFIX)]!r}."
+            )
+        matches = [ab for ab in self.artboards() if ab.path == wanted]
+        if len(matches) == 1:
+            return matches[0]
+        if len(matches) > 1:
+            ids = ", ".join(str(ab.manifest_id) for ab in matches)
+            raise XdExportError(
+                f"Artboard path {wanted!r} is ambiguous; it matched {len(matches)} "
+                f"artboards: {ids}. Refusing to guess."
+            )
+        raise XdExportError(
+            f"No artboard at path {wanted!r}. Expected a canonical manifest artwork "
+            "path such as 'artwork/artboard-<uuid>'; run --list-artboards to see them."
         )
 
     # -- graphics ---------------------------------------------------------
@@ -1383,39 +1786,86 @@ class AgcRenderer:
         return "matrix(" + " ".join(fmt_num(v) for v in (a, b, c, d, tx, ty)) + ")"
 
     # -- syncRef ----------------------------------------------------------
-    def _render_sync_ref(self, node: Dict[str, Any], depth: int) -> List[str]:
-        payload = node.get("syncRef") if isinstance(node.get("syncRef"), dict) else {}
-        ux = (node.get("meta") or {}).get("ux") or {}
-        ref: Optional[str] = None
-        for source in (payload, node, ux if isinstance(ux, dict) else {}):
+    @staticmethod
+    def _first_string(sources: Sequence[Any], keys: Sequence[str]) -> Optional[str]:
+        for source in sources:
             if not isinstance(source, dict):
                 continue
-            for key in ("ref", "guid", "symbolId", "componentId"):
+            for key in keys:
                 value = source.get(key)
                 if isinstance(value, str) and value:
-                    ref = value
-                    break
-            if ref:
-                break
+                    return value
+        return None
 
-        symbol = self.resources.symbol(ref) if ref else None
-        if symbol is None or (ref is not None and ref in self._sync_ref_stack):
+    def _sync_ref_identity(
+        self, node: Dict[str, Any], payload: Dict[str, Any]
+    ) -> Tuple[Optional[str], Optional[str], str]:
+        """Return ``(instance_guid, lookup_key, selector)`` for a syncRef node.
+
+        XD carries two distinct identities on a syncRef, and conflating them was
+        the defect this repairs:
+
+        ``guid``
+            identifies *this instance* of the reference.
+        ``syncSourceGuid``
+            identifies the *shared source definition* in the AGC symbol index.
+
+        Only ``syncSourceGuid`` can index the shared definition, so it wins
+        whenever present. The older ``ref``/``guid``/``symbolId``/``componentId``
+        scan is kept purely as a fallback for nodes that declare no
+        ``syncSourceGuid``.
+        """
+        ux = (node.get("meta") or {}).get("ux") or {}
+        sources = (payload, node, ux if isinstance(ux, dict) else {})
+
+        instance_guid = self._first_string(sources, ("guid",))
+        source_guid = self._first_string(sources, ("syncSourceGuid",))
+        if source_guid is not None:
+            return instance_guid, source_guid, "syncSourceGuid"
+
+        fallback = self._first_string(
+            sources, ("ref", "guid", "symbolId", "componentId")
+        )
+        return instance_guid, fallback, "legacy-fallback"
+
+    def _render_sync_ref(self, node: Dict[str, Any], depth: int) -> List[str]:
+        payload = node.get("syncRef") if isinstance(node.get("syncRef"), dict) else {}
+        instance_guid, lookup_key, selector = self._sync_ref_identity(node, payload)
+
+        # Recursion is keyed on the identity actually used for resolution, so a
+        # source that references itself is caught even though every instance guid
+        # along the way is distinct.
+        recursive = lookup_key is not None and lookup_key in self._sync_ref_stack
+        symbol = (
+            None
+            if (recursive or lookup_key is None)
+            else self.resources.symbol(lookup_key)
+        )
+
+        if symbol is None:
             self.report.unresolved_sync_refs += 1
             self.report.count_unsupported("syncRef:unresolved")
+            reason = (
+                "recursive reference"
+                if recursive
+                else "no matching definition in the artboard or shared AGC resources"
+            )
             self.report.warn(
-                f"syncRef {ref!r} could not be resolved from the artboard or shared "
-                "AGC resources; the referenced content was skipped."
+                f"syncRef instance {instance_guid!r} could not be resolved: attempted "
+                f"source guid {lookup_key!r} via {selector} ({reason}). Only the "
+                "referenced content was skipped."
             )
             return []
 
         self.report.resolved_sync_refs += 1
         self.report.count_handled("syncRef")
-        assert ref is not None
-        self._sync_ref_stack.append(ref)
+        self._sync_ref_stack.append(lookup_key)
         try:
-            # Render the resolved source under this syncRef's own placement. The
-            # blend mode is stripped from the proxy because the syncRef node has
-            # already reported it; leaving it would double-count.
+            # The instance keeps its own placement; the resolved source node is
+            # rendered underneath it exactly as indexed, carrying whatever
+            # transform and style it already has. The blend mode is stripped from
+            # the proxy because the syncRef node has already reported it; leaving
+            # it would double-count.
             source_style = (
                 node.get("style") if isinstance(node.get("style"), dict) else {}
             )
@@ -1428,7 +1878,7 @@ class AgcRenderer:
                     for key, value in source_style.items()
                     if key != "blendMode"
                 },
-                "group": {"children": child_nodes_of(symbol) or [symbol]},
+                "group": {"children": [symbol]},
             }
             return self.render_node(proxy, depth)
         finally:
@@ -1674,10 +2124,7 @@ class AgcRenderer:
             return []
 
         self.report.count_handled(f"shape:{shape_type}")
-        attrs = OrderedDict(geometry.attrs)
-        attrs.update(self._paint_attributes(style, geometry))
-        pad = "  " * depth
-        return [f"{pad}<{geometry.tag} {attrs_to_string(attrs)}/>"]
+        return self._render_painted_geometry(geometry, style, depth)
 
     def _render_compound(
         self,
@@ -1693,10 +2140,9 @@ class AgcRenderer:
             # XD pre-flattens the boolean result into a single path: exact.
             self.report.count_handled(f"shape:compound:{operation}")
             geometry = ShapeGeometry(tag="path", attrs=OrderedDict([("d", path_data)]))
-            attrs = OrderedDict(geometry.attrs)
-            attrs["fill-rule"] = "evenodd"
-            attrs.update(self._paint_attributes(style, geometry))
-            return [f"{pad}<path {attrs_to_string(attrs)}/>"]
+            return self._render_painted_geometry(
+                geometry, style, depth, OrderedDict([("fill-rule", "evenodd")])
+            )
 
         # No pre-flattened path: we cannot evaluate the boolean op ourselves.
         self.report.count_unsupported(
@@ -1735,6 +2181,12 @@ class AgcRenderer:
                 values = [to_float(v) for v in radius]
                 if any(values):
                     if len(set(values)) > 1:
+                        if len(values) == 4:
+                            # Exactly four radii in the proven AGC corner order:
+                            # rendered exactly, as a path, not approximated.
+                            return self._non_uniform_rect_geometry(
+                                x, y, width, height, values
+                            )
                         self.report.count_unsupported(
                             "rect:non-uniform-corner-radius",
                             "Non-uniform rectangle corner radii were approximated with "
@@ -1834,7 +2286,144 @@ class AgcRenderer:
                 )
         return None
 
+    def _non_uniform_rect_geometry(
+        self,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        values: Sequence[float],
+    ) -> ShapeGeometry:
+        """Exact geometry for a rectangle with four distinct corner radii.
+
+        ``values`` is the raw AGC list in the proven ``(tl, tr, br, bl)`` order.
+        The radii pass through the deterministic proportional-overlap policy and
+        are then emitted as one closed path. The result is an ordinary
+        ``ShapeGeometry``, so fill, stroke, inside-stroke clipping, opacity,
+        filters, transforms, blend and outer clips all compose through the
+        existing painted-geometry pipeline with no special-casing. Declared
+        bounds stay reliable, so image fills keep laying out against the box.
+        """
+        radii, factor = scale_corner_radii(width, height, values)
+        if factor < 1.0:
+            self.report.count_handled(RECT_RADIUS_OVERLAP_SCALED_KEY)
+            self.report.note_limitation(
+                "Rectangle corner radii that overflow a side are reduced by one "
+                "common proportional factor (min of w/(tl+tr), h/(tr+br), "
+                "w/(bl+br), h/(tl+bl)) applied to all four corners. This is the "
+                "renderer's deterministic overlap policy, validated against the "
+                "current corpus; it is not a claim of parity with Adobe's "
+                "undocumented internal Scenegraph capping algorithm."
+            )
+        self.report.count_handled(RECT_NON_UNIFORM_RADIUS_KEY)
+        path_data = rounded_rect_path_data(x, y, width, height, radii)
+        return ShapeGeometry(
+            "path",
+            OrderedDict([("d", path_data)]),
+            (x, y),
+            (width, height),
+            True,
+        )
+
     # -- paint ------------------------------------------------------------
+    # -- inside-stroke emulation -------------------------------------------
+    @staticmethod
+    def _is_inside_solid_stroke(stroke: Any) -> bool:
+        if not isinstance(stroke, dict):
+            return False
+        if str(stroke.get("type") or "") != "solid":
+            return False
+        align = stroke.get("align")
+        return isinstance(align, str) and align.strip().lower() == "inside"
+
+    @staticmethod
+    def _is_closed_geometry(geometry: ShapeGeometry) -> bool:
+        """Can this geometry safely act as its own interior clip region?
+
+        Only shapes whose closure is provable from the emitted geometry qualify.
+        A path must end in an explicit closepath; anything else (an open path, a
+        line, an unrecognised tag) stays ineligible so the honest centred-stroke
+        fallback applies instead.
+        """
+        if geometry.tag in INSIDE_STROKE_CLOSED_TAGS:
+            return True
+        if geometry.tag == "path":
+            path_data = geometry.attrs.get("d")
+            if isinstance(path_data, str):
+                stripped = path_data.strip()
+                return bool(stripped) and stripped[-1] in ("Z", "z")
+        return False
+
+    def _emit_inside_stroke_clip(
+        self, geometry: ShapeGeometry, base_attrs: "OrderedDict[str, Any]"
+    ) -> str:
+        """Define the shape's own interior as a deterministic clip region."""
+        clip_attrs = OrderedDict(base_attrs)
+        fill_rule = clip_attrs.pop("fill-rule", None)
+        if fill_rule is not None:
+            # Mirror even-odd semantics so the clip covers the same interior.
+            clip_attrs["clip-rule"] = fill_rule
+        clip_id = self.doc.new_id("inside-stroke")
+        self.doc.add_def(
+            f'<clipPath id="{clip_id}" clipPathUnits="userSpaceOnUse">'
+            f"<{geometry.tag} {attrs_to_string(clip_attrs)}/>"
+            "</clipPath>"
+        )
+        return clip_id
+
+    def _render_painted_geometry(
+        self,
+        geometry: ShapeGeometry,
+        style: Dict[str, Any],
+        depth: int,
+        extra_attrs: "Optional[OrderedDict[str, Any]]" = None,
+    ) -> List[str]:
+        """Emit one XD shape, emulating inside-stroke alignment when eligible.
+
+        SVG has no inside-stroke alignment. For a closed shape the exporter
+        renders the fill once at the original geometry, then a stroke-only copy
+        of the *same* geometry at double the XD stroke width, clipped to that
+        geometry's interior - leaving exactly the inward half, i.e. the width XD
+        asked for. Both elements sit inside the node's single existing wrapper,
+        so the node transform, opacity, filter, blend and outer clip still apply
+        exactly once to the composite.
+        """
+        pad = "  " * depth
+        base: "OrderedDict[str, Any]" = OrderedDict(geometry.attrs)
+        if extra_attrs:
+            base.update(extra_attrs)
+
+        stroke = style.get("stroke")
+        emulate = self._is_inside_solid_stroke(stroke) and self._is_closed_geometry(
+            geometry
+        )
+
+        if not emulate:
+            # Byte-identical to the pre-I3-R2-I3 single-element path.
+            attrs = OrderedDict(base)
+            attrs.update(self._paint_attributes(style, geometry))
+            return [f"{pad}<{geometry.tag} {attrs_to_string(attrs)}/>"]
+
+        # Each paint helper runs exactly once, so pattern/gradient defs and their
+        # report counters are not duplicated across the two elements.
+        fill_attrs = self._fill_attributes(style.get("fill"), geometry)
+        stroke_attrs = self._stroke_attributes(stroke, inside_emulated=True)
+        clip_id = self._emit_inside_stroke_clip(geometry, base)
+
+        fill_element = OrderedDict(base)
+        fill_element.update(fill_attrs)
+
+        stroke_element = OrderedDict(base)
+        stroke_element["fill"] = "none"
+        stroke_element.update(stroke_attrs)
+        stroke_element["clip-path"] = f"url(#{clip_id})"
+        stroke_element["data-xd-stroke-align"] = "inside"
+
+        return [
+            f"{pad}<{geometry.tag} {attrs_to_string(fill_element)}/>",
+            f"{pad}<{geometry.tag} {attrs_to_string(stroke_element)}/>",
+        ]
+
     def _paint_attributes(
         self, style: Dict[str, Any], geometry: ShapeGeometry
     ) -> "OrderedDict[str, Any]":
@@ -2010,19 +2599,54 @@ class AgcRenderer:
         bounds_source)``. XD image fills cover the *shape*, so the tile is the
         shape's bounds - not the natural bitmap box - and it is emitted once
         rather than tiled across a bitmap-sized coordinate space.
+
+        Priority, highest first:
+
+        1. reliable stored bounds (``rect``/``circle``/``ellipse``, and the
+           generated non-uniform rounded rectangle) - unchanged;
+        2. a ``path`` whose ``d`` is inside the strictly supported closed
+           absolute ``M``/``L``/``C``/``Z`` subset, whose exact local bounds are
+           derived by :func:`strict_absolute_mlc_z_bounds`;
+        3. the pre-existing natural-bitmap / no-size fallbacks, verbatim.
         """
         origin_x, origin_y = geometry.origin
         box_width, box_height = geometry.size
         tile_x = origin_x + offset_x
         tile_y = origin_y + offset_y
 
-        if geometry.bounds_reliable and box_width > 0 and box_height > 0:
-            preserve = (
+        def fit_preserve() -> str:
+            return (
                 STRETCH_PRESERVE_ASPECT_RATIO
                 if mode == "stretch"
                 else COVER_PRESERVE_ASPECT_RATIO
             )
-            return tile_x, tile_y, box_width, box_height, preserve, "shape-bounds"
+
+        if geometry.bounds_reliable and box_width > 0 and box_height > 0:
+            return (
+                tile_x,
+                tile_y,
+                box_width,
+                box_height,
+                fit_preserve(),
+                "shape-bounds",
+            )
+
+        if geometry.tag == "path":
+            derived = strict_absolute_mlc_z_bounds(geometry.attrs.get("d"))
+            if derived is not None:
+                derived_x, derived_y, derived_width, derived_height = derived
+                if derived_width > 0 and derived_height > 0:
+                    # Real geometry, exactly solved - so this shape gets proper
+                    # cover/stretch semantics instead of the bitmap fallback.
+                    self.report.count_handled(PATTERN_DERIVED_PATH_BOUNDS_KEY)
+                    return (
+                        derived_x + offset_x,
+                        derived_y + offset_y,
+                        derived_width,
+                        derived_height,
+                        fit_preserve(),
+                        "derived-path-bounds",
+                    )
 
         if natural_width > 0 and natural_height > 0:
             # No trustworthy shape bounds (e.g. a path fill): keep the pre-repair
@@ -2128,7 +2752,9 @@ class AgcRenderer:
         self.report.count_handled(f"fill:gradient:{gradient_type}")
         return gradient_id
 
-    def _stroke_attributes(self, stroke: Any) -> "OrderedDict[str, Any]":
+    def _stroke_attributes(
+        self, stroke: Any, inside_emulated: bool = False
+    ) -> "OrderedDict[str, Any]":
         attrs: "OrderedDict[str, Any]" = OrderedDict()
         if not isinstance(stroke, dict):
             return attrs
@@ -2147,7 +2773,13 @@ class AgcRenderer:
         if alpha != 1.0:
             attrs["stroke-opacity"] = fmt_num(alpha, 1.0)
         width = stroke.get("width")
-        if width is not None:
+        if inside_emulated:
+            # Double ONLY the width: the clip discards the outward half, so the
+            # visible result is the original XD inside width. Dash lengths, dash
+            # offset and opacity are deliberately left untouched.
+            original = to_float(width, 1.0) if width is not None else 1.0
+            attrs["stroke-width"] = fmt_num(original * INSIDE_STROKE_WIDTH_MULTIPLIER)
+        elif width is not None:
             attrs["stroke-width"] = fmt_num(width, 1.0)
         cap = stroke.get("cap")
         if isinstance(cap, str) and cap:
@@ -2167,11 +2799,15 @@ class AgcRenderer:
 
         align = stroke.get("align")
         if isinstance(align, str) and align not in ("", "center"):
-            self.report.count_unsupported(
-                f"stroke-align:{align}",
-                f"Stroke alignment {align!r} has no SVG equivalent; the stroke was "
-                "rendered centred on the path.",
-            )
+            if inside_emulated:
+                self.report.count_handled(f"stroke-align:{align}")
+            else:
+                self.report.count_unsupported(
+                    f"stroke-align:{align}",
+                    f"Stroke alignment {align!r} could not be emulated on this "
+                    "geometry (it is not provably closed), so the stroke was "
+                    "rendered centred on the path.",
+                )
         self.report.count_handled("stroke:solid")
         return attrs
 
@@ -2685,9 +3321,115 @@ def default_font_path() -> Path:
     return Path(__file__).resolve().parents[2] / DEFAULT_FONT_RELATIVE_PATH
 
 
+# -- artboard selection ------------------------------------------------------
+
+
+def resolve_selector(
+    artboard_name: Optional[str] = None,
+    artboard_id: Optional[str] = None,
+    artboard_path: Optional[str] = None,
+) -> str:
+    """Validate that exactly one artboard selector was supplied."""
+    active = [
+        label
+        for label, value in (
+            ("artboard_name", artboard_name),
+            ("artboard_id", artboard_id),
+            ("artboard_path", artboard_path),
+        )
+        if value is not None
+    ]
+    if not active:
+        raise XdExportError(
+            "No artboard selector given. Supply exactly one of artboard_name, "
+            "artboard_id or artboard_path."
+        )
+    if len(active) > 1:
+        raise XdExportError(
+            "Exactly one artboard selector may be used, but "
+            f"{len(active)} were given: {', '.join(active)}."
+        )
+    return active[0]
+
+
+def select_artboard(
+    package: XdPackage,
+    artboard_name: Optional[str] = None,
+    artboard_id: Optional[str] = None,
+    artboard_path: Optional[str] = None,
+) -> ManifestArtboard:
+    """Resolve one artboard from exactly one selector.
+
+    The manifest id is the canonical machine selector: it is unique across all
+    artboards. The artwork path is a stable secondary selector. The human name is
+    convenient but may be shared by several artboards, in which case the lookup
+    deliberately fails closed rather than guessing.
+    """
+    selector = resolve_selector(artboard_name, artboard_id, artboard_path)
+    if selector == "artboard_id":
+        return package.find_artboard_by_manifest_id(str(artboard_id))
+    if selector == "artboard_path":
+        return package.find_artboard_by_path(str(artboard_path))
+    return package.find_artboard_by_exact_name(str(artboard_name))
+
+
+# -- deterministic batch output naming ---------------------------------------
+
+
+def slugify_artboard_name(name: Any) -> str:
+    """Deterministic, Unicode-preserving slug of a canonical artboard name.
+
+    Arabic (and any other) letters and digits survive verbatim; punctuation and
+    whitespace collapse to single hyphens; leading/trailing hyphens are trimmed.
+    A name with nothing slug-able falls back to ``artboard``.
+    """
+    out: List[str] = []
+    for char in str(name if name is not None else ""):
+        if char.isalnum():
+            out.append(char)
+        elif out and out[-1] != "-":
+            out.append("-")
+    slug = "".join(out).strip("-")
+    return slug or ARTBOARD_SLUG_FALLBACK
+
+
+def artboard_output_stem(index: int, artboard: ManifestArtboard) -> str:
+    """``NNN--<slug>--<first8-manifest-id>`` for a 1-based manifest index.
+
+    The index alone already guarantees uniqueness across a manifest; the slug and
+    id fragment make the filename identifiable when names collide (the real
+    package has 112 artboards but only 105 distinct names).
+    """
+    identifier = artboard.manifest_id if isinstance(artboard.manifest_id, str) else ""
+    fragment = identifier.strip().lower()[:ARTBOARD_STEM_ID_LENGTH] or "noid"
+    return f"{index:03d}--{slugify_artboard_name(artboard.name)}--{fragment}"
+
+
+def prepare_batch_output_dir(output_dir: "os.PathLike[str] | str") -> Path:
+    """Fail closed rather than mixing a new corpus into existing output."""
+    path = Path(output_dir)
+    if path.exists():
+        if not path.is_dir():
+            raise XdExportError(
+                f"--output-dir {path} exists but is not a directory."
+            )
+        existing = sorted(entry.name for entry in path.iterdir())
+        if existing:
+            preview = ", ".join(existing[:5])
+            more = f" (+{len(existing) - 5} more)" if len(existing) > 5 else ""
+            raise XdExportError(
+                f"--output-dir {path} is not empty ({len(existing)} entries: "
+                f"{preview}{more}). Refusing to mix a new batch with existing files; "
+                "point at a new directory or clear that one yourself."
+            )
+        return path
+    path.mkdir(parents=True)
+    return path
+
+
 def export_artboard(
     xd_path: "os.PathLike[str] | str",
-    artboard_name: str,
+    artboard_name: Optional[str] = None,
     output_svg: "os.PathLike[str] | str | None" = None,
     output_png: "os.PathLike[str] | str | None" = None,
     report_json: "os.PathLike[str] | str | None" = None,
@@ -2695,8 +3437,19 @@ def export_artboard(
     font_path: "os.PathLike[str] | str | None" = None,
     browser_path: Optional[str] = None,
     render_png: bool = True,
+    *,
+    artboard_id: Optional[str] = None,
+    artboard_path: Optional[str] = None,
 ) -> ExportResult:
-    """Export one artboard to SVG (+ optional PNG) and return the report."""
+    """Export one artboard to SVG (+ optional PNG) and return the report.
+
+    Exactly one selector must be supplied: ``artboard_name`` (positional, kept
+    for backwards compatibility), ``artboard_id`` or ``artboard_path``. The
+    report always carries all three canonical identity fields regardless of
+    which selector was used.
+    """
+    resolve_selector(artboard_name, artboard_id, artboard_path)
+
     report = ExportReport()
     report.source_xd = str(Path(xd_path).resolve())
     report.brand_normalization_enabled = bool(normalize_brand)
@@ -2711,7 +3464,12 @@ def export_artboard(
     options = RenderOptions(normalize_brand=bool(normalize_brand))
 
     with XdPackage(xd_path) as package:
-        artboard = package.find_artboard_by_exact_name(artboard_name)
+        artboard = select_artboard(
+            package,
+            artboard_name=artboard_name,
+            artboard_id=artboard_id,
+            artboard_path=artboard_path,
+        )
         report.selected_artboard_name = artboard.name
         report.selected_artboard_path = artboard.path
         report.selected_artboard_id = artboard.manifest_id
@@ -2749,6 +3507,132 @@ def export_artboard(
     return ExportResult(svg=svg, report=report_dict, artboard=artboard)
 
 
+def export_all_artboards(
+    xd_path: "os.PathLike[str] | str",
+    output_dir: "os.PathLike[str] | str",
+    normalize_brand: bool = False,
+    font_path: "os.PathLike[str] | str | None" = None,
+    browser_path: Optional[str] = None,
+    render_png: bool = True,
+    progress: Optional[Any] = None,
+) -> Dict[str, Any]:
+    """Export EVERY canonical artboard in manifest order into ``output_dir``.
+
+    Iteration is over ``XdPackage.artboards()`` verbatim - entries are never
+    deduplicated by human name, so artboards sharing a name are all exported.
+    Each artboard is selected by its unique artwork path, so a duplicate name can
+    never make one shadow another.
+
+    Returns the batch summary dict (also written as ``batch-report.json``). A
+    single artboard failing does not abort the run: it is recorded as failed and
+    the remaining artboards are still attempted.
+    """
+    destination = prepare_batch_output_dir(output_dir)
+
+    with XdPackage(xd_path) as package:
+        artboards = package.artboards()
+
+    entries: List[Dict[str, Any]] = []
+    success_count = 0
+    failure_count = 0
+
+    for index, artboard in enumerate(artboards, start=1):
+        stem = artboard_output_stem(index, artboard)
+        svg_path = destination / f"{stem}.svg"
+        png_path = destination / f"{stem}.png" if render_png else None
+        report_path = destination / f"{stem}.report.json"
+
+        entry: Dict[str, Any] = OrderedDict(
+            [
+                ("index", index),
+                ("name", artboard.name),
+                ("manifest_id", artboard.manifest_id),
+                ("artboard_path", artboard.path),
+                ("output_stem", stem),
+                ("output_svg", None),
+                ("output_png", None),
+                ("report_json", None),
+                ("status", BATCH_STATUS_FAILED),
+                ("error", None),
+                ("artboard_bounds", None),
+                ("svg_width", None),
+                ("svg_height", None),
+                ("unsupported_node_counts", None),
+                ("warning_count", None),
+                ("pattern_fill_count", None),
+                ("resolved_pattern_fill_count", None),
+                ("brand_replacement_count", None),
+                ("blend_mode_application_counts", None),
+            ]
+        )
+
+        try:
+            result = export_artboard(
+                xd_path,
+                artboard_path=artboard.path,
+                output_svg=svg_path,
+                output_png=png_path,
+                report_json=report_path,
+                normalize_brand=normalize_brand,
+                font_path=font_path,
+                browser_path=browser_path,
+                render_png=render_png,
+            )
+        except Exception as exc:  # noqa: BLE001 - a batch must stay honest
+            failure_count += 1
+            entry["error"] = f"{type(exc).__name__}: {exc}"
+        else:
+            success_count += 1
+            report = result.report
+            # "success" describes artifact generation only. Unsupported renderer
+            # features are honest report data, not an export failure.
+            entry["status"] = BATCH_STATUS_SUCCESS
+            entry["artboard_bounds"] = report["artboard_bounds"]
+            entry["svg_width"] = report["svg_width"]
+            entry["svg_height"] = report["svg_height"]
+            entry["unsupported_node_counts"] = report["unsupported_node_counts"]
+            entry["warning_count"] = len(report["warnings"])
+            entry["pattern_fill_count"] = report["pattern_fill_count"]
+            entry["resolved_pattern_fill_count"] = report["resolved_pattern_fill_count"]
+            entry["brand_replacement_count"] = report["brand_replacement_count"]
+            entry["blend_mode_application_counts"] = report[
+                "blend_mode_application_counts"
+            ]
+
+        # Artifact paths are recorded relative to --output-dir so the summary is
+        # reproducible across machines, and only when the file really exists.
+        for key, path in (
+            ("output_svg", svg_path),
+            ("output_png", png_path),
+            ("report_json", report_path),
+        ):
+            if path is not None and path.is_file():
+                entry[key] = path.name
+
+        entries.append(entry)
+        if progress is not None:
+            progress(entry)
+
+    summary: Dict[str, Any] = OrderedDict(
+        [
+            ("schema", BATCH_REPORT_SCHEMA),
+            ("iteration", EXPORTER_ITERATION),
+            ("source_xd", str(Path(xd_path).resolve())),
+            ("output_dir", str(destination.resolve())),
+            ("normalize_merzox_brand", bool(normalize_brand)),
+            ("skip_png", not render_png),
+            ("artboard_count", len(artboards)),
+            ("success_count", success_count),
+            ("failure_count", failure_count),
+            ("entries", entries),
+        ]
+    )
+    (destination / BATCH_REPORT_FILENAME).write_text(
+        json.dumps(summary, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return summary
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="xd_reference_exporter.py",
@@ -2760,12 +3644,31 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--xd", required=True, help="Path to the .xd package.")
     parser.add_argument(
         "--artboard-name",
-        required=True,
-        help="Exact canonical artboard name as declared by the XD manifest.",
+        help=(
+            "Exact canonical artboard name from the XD manifest. Convenient, but "
+            "names may be shared by several artboards; ambiguous names fail closed."
+        ),
+    )
+    parser.add_argument(
+        "--artboard-id",
+        help="Canonical manifest id (unique per artboard). The stable selector.",
+    )
+    parser.add_argument(
+        "--artboard-path",
+        help="Canonical artwork path, e.g. 'artwork/artboard-<uuid>'.",
     )
     parser.add_argument("--output-svg", help="Path of the SVG to write.")
     parser.add_argument("--output-png", help="Path of the PNG to write.")
     parser.add_argument("--report-json", help="Path of the JSON report to write.")
+    parser.add_argument(
+        "--all-artboards",
+        action="store_true",
+        help="Export every artboard in manifest order into --output-dir.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        help="Destination directory for --all-artboards. Must be empty or absent.",
+    )
     parser.add_argument(
         "--normalize-merzox-brand",
         action="store_true",
@@ -2779,7 +3682,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--list-artboards",
         action="store_true",
-        help="Print every canonical manifest artboard name and exit.",
+        help=(
+            "Print name, manifest id, path and bounds for every artboard in "
+            "manifest order, then exit."
+        ),
     )
     parser.add_argument(
         "--skip-png",
@@ -2789,25 +3695,130 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _validate_cli_modes(args: argparse.Namespace) -> None:
+    """Reject ambiguous flag combinations instead of guessing intent."""
+    selectors = [
+        name
+        for name, value in (
+            ("--artboard-name", args.artboard_name),
+            ("--artboard-id", args.artboard_id),
+            ("--artboard-path", args.artboard_path),
+        )
+        if value is not None
+    ]
+
+    if args.all_artboards:
+        if selectors:
+            raise XdExportError(
+                "--all-artboards exports every artboard and cannot be combined with "
+                f"a single-artboard selector ({', '.join(selectors)})."
+            )
+        if not args.output_dir:
+            raise XdExportError("--all-artboards requires --output-dir.")
+        per_file = [
+            name
+            for name, value in (
+                ("--output-svg", args.output_svg),
+                ("--output-png", args.output_png),
+                ("--report-json", args.report_json),
+            )
+            if value is not None
+        ]
+        if per_file:
+            raise XdExportError(
+                "--all-artboards writes deterministic filenames into --output-dir and "
+                f"cannot be combined with {', '.join(per_file)}."
+            )
+        return
+
+    if args.output_dir:
+        raise XdExportError("--output-dir is only valid with --all-artboards.")
+
+    if args.list_artboards:
+        return
+
+    if len(selectors) > 1:
+        raise XdExportError(
+            f"Exactly one artboard selector may be used; got {', '.join(selectors)}."
+        )
+    if not selectors:
+        raise XdExportError(
+            "No artboard selector given. Supply exactly one of --artboard-name, "
+            "--artboard-id or --artboard-path (or use --list-artboards / "
+            "--all-artboards)."
+        )
+    if not args.output_svg:
+        raise XdExportError("--output-svg is required unless --list-artboards.")
+
+
+def force_utf8_streams() -> None:
+    """Emit CLI output as UTF-8 regardless of the host ANSI code page.
+
+    Artboard names are Arabic. On Windows, ``sys.stdout``/``sys.stderr`` default
+    to the console/ANSI code page (cp1256 here), so a diagnostic naming an
+    artboard was written as cp1256 bytes. Anything decoding that stream as UTF-8
+    saw invalid bytes and dropped them, turning ``'الرسائل'`` into ``''`` - the
+    name was never actually lost, only mis-encoded on the way out.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue  # e.g. a StringIO capture in tests: nothing to reconfigure
+        try:
+            reconfigure(encoding="utf-8", errors="backslashreplace")
+        except (ValueError, OSError):  # pragma: no cover - exotic stream
+            pass
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    force_utf8_streams()
     args = build_arg_parser().parse_args(argv)
 
     try:
+        _validate_cli_modes(args)
+
         if args.list_artboards:
             with XdPackage(args.xd) as package:
                 for artboard in package.artboards():
                     print(
-                        f"{artboard.name}\t{artboard.path}\t"
+                        f"{artboard.name}\t{artboard.manifest_id}\t{artboard.path}\t"
                         f"{fmt_num(artboard.width)}x{fmt_num(artboard.height)}"
                     )
             return 0
 
-        if not args.output_svg:
-            raise XdExportError("--output-svg is required unless --list-artboards.")
+        if args.all_artboards:
+            summary = export_all_artboards(
+                xd_path=args.xd,
+                output_dir=args.output_dir,
+                normalize_brand=args.normalize_merzox_brand,
+                font_path=args.font,
+                browser_path=args.browser,
+                render_png=not args.skip_png,
+                progress=lambda entry: print(
+                    f"[{entry['index']:03d}] {entry['status']:>7}  "
+                    f"{entry['output_stem']}"
+                ),
+            )
+            print(f"artboards     : {summary['artboard_count']}")
+            print(f"succeeded     : {summary['success_count']}")
+            print(f"failed        : {summary['failure_count']}")
+            print(f"output dir    : {summary['output_dir']}")
+            print(f"batch report  : {BATCH_REPORT_FILENAME}")
+            if summary["failure_count"]:
+                for entry in summary["entries"]:
+                    if entry["status"] != BATCH_STATUS_SUCCESS:
+                        print(
+                            f"  FAILED {entry['output_stem']}: {entry['error']}",
+                            file=sys.stderr,
+                        )
+                return 1
+            return 0
 
         result = export_artboard(
             xd_path=args.xd,
             artboard_name=args.artboard_name,
+            artboard_id=args.artboard_id,
+            artboard_path=args.artboard_path,
             output_svg=args.output_svg,
             output_png=args.output_png,
             report_json=args.report_json,
@@ -2822,6 +3833,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     report = result.report
     print(f"artboard      : {report['selected_artboard_name']}")
+    print(f"manifest id   : {report['selected_artboard_id']}")
+    print(f"artboard path : {report['selected_artboard_path']}")
     print(f"bounds        : {report['artboard_bounds']}")
     print(f"viewBox       : {report['viewbox']} ({report['viewbox_origin_source']})")
     print(f"svg           : {report['output_svg']}")

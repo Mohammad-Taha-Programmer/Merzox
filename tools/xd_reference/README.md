@@ -1,4 +1,70 @@
-# Merzox XD Reference Exporter — iteration I2-R2 (`MERZOX-UI-GOLDEN-I2-R2`)
+# Merzox XD Reference Exporter — iteration I3-R2-D7-I1 (`MERZOX-UI-GOLDEN-I3-R2-D7-I1`)
+
+> **I3-R2-D7-I1 changes at a glance**
+> - Image fills still use **reliable stored geometry bounds** whenever the shape
+>   has them; that path is byte-for-byte unchanged.
+> - When a `path` has **no** reliable stored bounds, the exporter can now derive
+>   its **exact local bounds** — but only for an explicitly supported, closed,
+>   absolute `M`/`L`/`C`/`Z` subset, via `strict_absolute_mlc_z_bounds()`.
+> - Cubic extrema are **solved analytically** (derivative roots in `0 < t < 1`),
+>   never sampled and never approximated by the control-point box.
+> - Anything outside that subset stays **fail-closed** and keeps the existing
+>   documented natural-bitmap fallback plus `fill:pattern:no-shape-bounds`.
+> - In the current `design.xd` this repairs exactly **six** occurrences across
+>   **three** artboards, counted as
+>   `handled_node_counts["fill:pattern:path-bounds-derived"]`.
+> - Background blur remains honestly unsupported.
+
+> **I3-R2-I4 changes at a glance**
+> - **Non-uniform rounded rectangles are now rendered exactly**, as deterministic
+>   closed SVG paths, instead of being approximated by a single uniform `rx`/`ry`.
+>   That covers **315** rectangles across **70** artboards.
+> - The compact AGC four-value `shape.r` corner order is **proven**:
+>   `r[0] = top-left`, `r[1] = top-right`, `r[2] = bottom-right`,
+>   `r[3] = bottom-left`.
+> - Radii that overflow a side are reduced by a **deterministic proportional
+>   overlap policy**: one common factor, applied to all four corners. Corners are
+>   never clamped independently.
+> - Inside-stroke composition is unchanged and simply consumes the new geometry:
+>   fill, stroke copy and interior clip all use the *same* path.
+> - `rect:non-uniform-corner-radius` moves from `unsupported_node_counts` to
+>   `handled_node_counts`.
+
+> **I3-R2-I3 changes at a glance**
+> - **Inside-stroke alignment is now emulated** for provably closed shapes: the
+>   fill renders once, then a stroke-only copy of the same geometry at double
+>   width, clipped to that geometry's interior. That covers **482 / 482**
+>   occurrences in the current corpus, across 111 artboards.
+> - Only `stroke-width` is doubled — dash array, dash offset, caps, joins,
+>   miter limit and stroke opacity are passed through untouched.
+> - Geometry that cannot be proven closed keeps the honest centred-stroke
+>   fallback and stays reported as unsupported.
+
+> **I3-R2-I1 changes at a glance**
+> - `syncRef` resolution now uses **`syncSourceGuid`** — the shared source
+>   definition — instead of the instance `guid`. That single conflation caused
+>   **all 432** unresolved-syncRef occurrences across **108** of the 112
+>   artboards.
+> - The instance's own transform is still the placement wrapper; the resolved
+>   source renders underneath it with its own transform and style.
+> - Recursion protection is keyed on the source guid actually used for lookup.
+> - Nodes without `syncSourceGuid` keep the legacy fallback unchanged.
+
+> **I3-I1 changes at a glance**
+> - **Stable identity selectors**: `--artboard-id` (canonical manifest id) and
+>   `--artboard-path` join `--artboard-name`. Exactly one may be used.
+> - **All-artboard batch export** via `--all-artboards --output-dir <dir>`,
+>   iterating every manifest entry in order — so the 7 artboards whose human
+>   names collide are no longer unreachable.
+> - Deterministic per-artboard output stems
+>   (`017--سبلاش-1--1ff58a48`) and a `batch-report.json` summary.
+> - Batch output directories **fail closed** when non-empty.
+> - No rendering, compositing, opacity, image-fill or blend behaviour changed.
+>
+> **I3-I1-R1 acceptance repairs**
+> - Batch entry status vocabulary is now exactly `success` / `failed`.
+> - CLI output is forced to UTF-8, so Arabic artboard names survive in
+>   diagnostics instead of being dropped by the host ANSI code page.
 
 > **I2-R2 changes at a glance**
 > - A **calibrated `soft-light` hoist**: when it can be proven safe, the blend is
@@ -62,6 +128,55 @@ This iteration deliberately targets a **single artboard**, not the full
 
 Nothing is ever downloaded. No font is fetched, no browser is installed.
 
+## Artboard identity
+
+The real `design.xd` declares **112 artboards** but only **105 distinct human
+names**. Three names are shared:
+
+| Name | Artboards |
+| --- | --- |
+| `اعدادات المتجر` | 2 |
+| `الرسائل` | 4 |
+| `معاينة` | 4 |
+
+That is 7 artboards in excess of the distinct-name count — and they are exactly
+the ones a name-only workflow silently loses. Every artboard does, however, have
+a **unique, non-null, UUID-like manifest id** and a **unique artwork path** of
+the form `artwork/artboard-<uuid>`.
+
+Note that an artboard's manifest id and the uuid in its artwork path are
+*different values*. For the calibrated Splash artboard:
+
+```
+name        : سبلاش – 1
+manifest id : 1ff58a48-0e8d-49eb-be2f-4b7a24adcf9c
+path        : artwork/artboard-29c52d7e-0f4c-439b-87cc-5d4a5cd8f229
+```
+
+Three selectors are available, and **exactly one** may be used:
+
+| Selector | Stability | Notes |
+| --- | --- | --- |
+| `--artboard-id` | **Canonical.** Unique per artboard. | Prefer this for scripts and automation. |
+| `--artboard-path` | Stable secondary. | The canonical `artwork/artboard-<uuid>` directory. A single trailing `/` is normalised; nothing else is guessed, and passing a `graphicContent.agc` file path is rejected with a pointer to the directory. |
+| `--artboard-name` | Convenient, **may be ambiguous**. | Fails closed: a name matching several artboards raises rather than picking one, and the error lists each match's manifest id so you can retry with `--artboard-id`. Unchanged from earlier iterations. |
+
+CLI output is written as UTF-8 regardless of the host ANSI code page, so Arabic
+artboard names survive intact in diagnostics and in `--list-artboards` even when
+the console's default encoding could not represent them.
+
+Supplying zero selectors, or more than one, is an error in both the CLI and the
+Python API. Whichever selector is used, the report always carries all three
+identity fields: `selected_artboard_name`, `selected_artboard_id` and
+`selected_artboard_path`.
+
+List everything with identity exposed (deterministic manifest order,
+tab-separated `name`, `manifest_id`, `path`, `WxH`):
+
+```bash
+python tools/xd_reference/xd_reference_exporter.py --xd "C:/design/design.xd" --list-artboards
+```
+
 ## CLI
 
 Exact documented invocation:
@@ -73,6 +188,25 @@ python tools/xd_reference/xd_reference_exporter.py \
   --output-svg <path> \
   --output-png <path> \
   --report-json <path>
+```
+
+By manifest id — the recommended form, and the only one that works for a
+duplicated name:
+
+```bash
+python tools/xd_reference/xd_reference_exporter.py \
+  --xd "C:/design/design.xd" \
+  --artboard-id 1ff58a48-0e8d-49eb-be2f-4b7a24adcf9c \
+  --output-svg "C:/temp/merzox-xd/splash-1.svg"
+```
+
+By canonical artwork path:
+
+```bash
+python tools/xd_reference/xd_reference_exporter.py \
+  --xd "C:/design/design.xd" \
+  --artboard-path artwork/artboard-29c52d7e-0f4c-439b-87cc-5d4a5cd8f229 \
+  --output-svg "C:/temp/merzox-xd/splash-1.svg"
 ```
 
 Real example (raw calibration mode — write outputs **outside** the repository):
@@ -103,13 +237,124 @@ Additional flags:
 | Flag | Purpose |
 | --- | --- |
 | `--normalize-merzox-brand` | Replace the literal rendered text `Bictov` with `Merzox`. |
-| `--list-artboards` | Print every canonical manifest artboard name, path and size. |
+| `--list-artboards` | Print name, manifest id, path and bounds for every artboard, in manifest order. |
+| `--all-artboards` | Export every artboard into `--output-dir`. |
+| `--output-dir <dir>` | Batch destination. Required by (and only valid with) `--all-artboards`. |
 | `--skip-png` | Produce SVG + report without launching a browser. |
 | `--font <path>` | Override the embedded Tajawal TTF. |
 | `--browser <path>` | Force a specific Edge/Chrome executable. |
 
 The `MERZOX_XD_BROWSER` environment variable is also honoured as a browser
 override.
+
+## All-artboard batch export
+
+```bash
+python tools/xd_reference/xd_reference_exporter.py \
+  --xd "C:/design/design.xd" \
+  --all-artboards \
+  --output-dir "C:/temp/merzox-xd/corpus-raw"
+```
+
+Batch mode walks **every** `XdPackage.artboards()` entry in manifest order and
+never deduplicates by name, so the real package produces exactly **112** exports,
+including all four `الرسائل` and all four `معاينة`. Each artboard is selected by
+its unique artwork path, so a duplicated name can never shadow another entry.
+
+### Deterministic output naming
+
+Each artboard gets the stem:
+
+```
+{manifest-order-index:03d}--{unicode-slug}--{first-8-of-manifest-id}
+```
+
+for example `017--سبلاش-1--1ff58a48`. The slug preserves Arabic (and any other
+Unicode) letters and digits verbatim, collapses punctuation and whitespace to
+single hyphens, trims leading/trailing hyphens, and falls back to `artboard` if
+nothing slug-able remains. The id fragment is lowercased. The 1-based manifest
+index alone already guarantees uniqueness; the slug and id fragment make a
+filename identifiable when names collide.
+
+Per artboard, inside `--output-dir` only:
+
+```
+<stem>.svg
+<stem>.report.json
+<stem>.png          # unless --skip-png
+```
+
+### Output-directory safety
+
+Batch generation fails closed rather than mixing a new corpus with old files:
+
+- the directory does not exist → it is created (including parents);
+- it exists and is empty → it is used;
+- it exists and contains anything → **error**, before a single file is written.
+
+Nothing is ever deleted or overwritten. Point at a fresh directory, or clear the
+old one yourself.
+
+### `batch-report.json`
+
+One deterministic summary is written into the output directory under the
+independent schema `merzox.xd_reference_batch/1` (deliberately *not* the
+single-artboard `merzox.xd_reference_exporter/1`, and not tied to the exporter
+iteration). It contains `schema`, `iteration`, `source_xd`, `output_dir`,
+`normalize_merzox_brand`, `skip_png`, `artboard_count`, `success_count`,
+`failure_count` and an ordered `entries` list.
+
+Each entry carries `index`, `name`, `manifest_id`, `artboard_path`,
+`output_stem`, `output_svg`, `output_png`, `report_json`, `status`, `error`,
+plus rollups from the per-artboard report: `artboard_bounds`, `svg_width`,
+`svg_height`, `unsupported_node_counts`, `warning_count`, `pattern_fill_count`,
+`resolved_pattern_fill_count`, `brand_replacement_count` and
+`blend_mode_application_counts`.
+
+Artifact paths in the summary are **relative filenames** inside the output
+directory, never machine-specific absolute paths, so the summary is reproducible
+across machines.
+
+### Entry `status` vocabulary
+
+`status` has exactly two values — there is no alias and no third state:
+
+| Value | Meaning |
+| --- | --- |
+| `success` | Artifact generation succeeded: the SVG, the per-artboard report, and (unless `--skip-png`) the PNG were written. |
+| `failed` | Artifact generation failed. `error` carries a concise description. |
+
+`status` describes **artifact generation only — never rendering fidelity.** A
+`success` entry may still contain unsupported renderer features; those are
+described separately and honestly by that entry's `unsupported_node_counts` (and
+by `warning_count`, with the detail in the per-artboard report). Unsupported
+features are a documented limitation of this exporter, not an export failure, so
+they never flip an entry to `failed` or increment `failure_count`.
+
+A `success` entry therefore does **not** mean the artboard is pixel-perfect, and
+a fully green batch does not mean the design renders correctly — see the
+calibration caveat in the limitations below.
+
+### Failure semantics
+
+One artboard failing does not abort the run: the entry is recorded with
+`status: "failed"` and a concise `error` string, and the remaining artboards are
+still attempted. `failure_count` reflects reality and the CLI process exits
+**non-zero** — a batch never claims complete corpus success when any artboard
+failed.
+
+`unsupported_node_counts` is *not* a failure. Those are renderer limitations
+reported honestly per artboard; an export with unsupported features still counts
+as a successful export.
+
+### Batch flags
+
+`--normalize-merzox-brand` and `--skip-png` apply uniformly to every entry.
+Under `--skip-png` no PNG is produced and each entry's `output_png` is `null`.
+
+Batch mode writes deterministic filenames and therefore rejects
+`--output-svg`, `--output-png` and `--report-json`, as well as any single
+artboard selector — those combinations are errors rather than guesses.
 
 ### Raw vs normalized Merzox mode
 
@@ -149,6 +394,8 @@ Normalization rules:
 | Matrix transforms (`a b c d tx ty`) | `transform="matrix(...)"`; identity transforms omitted |
 | Groups | `<g>` |
 | `rect`, `circle`, `ellipse`, `line`, `path` | Direct SVG equivalents |
+| Uniform rectangle corner radius | `rx` / `ry` on the `<rect>` |
+| Non-uniform rectangle corner radii | Exact closed `<path>` — see below |
 | Solid fills | `fill` + `fill-opacity` |
 | Solid strokes | width, cap, join, miter limit, dash, dash offset |
 | Opacity | Applied to the node's group wrapper |
@@ -158,7 +405,7 @@ Normalization rules:
 | `uxdesign#blur` | `feGaussianBlur` (visible foreground blur only) |
 | `clipPath` | Emitted into `<defs>`; clip geometry never painted |
 | Text | Per-segment placement from `rawText` + paragraph/line coordinates |
-| `syncRef` | Resolved against the artboard AGC and `resources/graphics/graphicContent.agc` |
+| `syncRef` | Resolved by `syncSourceGuid` against the artboard AGC and `resources/graphics/graphicContent.agc` — see below |
 
 ### Pattern / image fills
 
@@ -257,11 +504,99 @@ XD spelling) and described in full under `pattern_fills`.
 - Natural bitmap dimensions remain available for diagnostics as
   `pattern_fills[].natural_width` / `natural_height` — but they never become the
   cover tile size.
-- Geometry with no reliable local bounds (a `path`, for example) keeps the
-  pre-repair natural-bitmap fallback rather than inventing a path
-  bounding-box parser. That case is recorded as
-  `fill:pattern:no-shape-bounds` with a warning saying cover semantics were
-  **not** applied to that shape.
+- Geometry with no reliable local bounds keeps the pre-repair natural-bitmap
+  fallback, recorded as `fill:pattern:no-shape-bounds` with a warning saying
+  cover semantics were **not** applied to that shape — **except** for the
+  strictly supported closed absolute path subset described next.
+
+#### Derived path bounds (I3-R2-D7-I1)
+
+A `path` carries no stored width/height, so before this iteration *every* image
+fill on a path fell back to the natural bitmap box. The exporter now derives the
+path's exact local bounds — but only when it can do so with certainty.
+
+`strict_absolute_mlc_z_bounds(path_data)` returns
+`Optional[Tuple[float, float, float, float]]` — `(x, y, width, height)` — and is
+deliberately **fail-closed**: anything it does not explicitly support returns
+`None` and the caller keeps the documented fallback. It is **not** a general SVG
+path-bounds implementation and no such support is claimed. The exporter runtime
+stays standard-library-only.
+
+Supported — and nothing else:
+
+| Command | Arguments | Notes |
+| --- | --- | --- |
+| `M` | exactly 2 | Absolute moveto; must open every subpath |
+| `L` | exactly 2 | Absolute lineto |
+| `C` | exactly 6 | Absolute cubic Bézier |
+| `Z` | exactly 0 | Closepath |
+
+Rejected, every time:
+
+- lowercase/relative commands (`m`, `l`, `c`, `z`);
+- `H`, `V`, `S`, `Q`, `T`, `A`;
+- **implicit command repetition** — `M 0 0 10 10` is refused, because the second
+  pair is an unstated continuation rather than an explicit command;
+- missing or excess arguments, malformed numbers, non-finite values
+  (`1e400`, `NaN`, `Infinity`);
+- geometry before a valid `M`, or any subpath left open;
+- an empty path, or bounds with non-positive width or height;
+- **stray characters.** The whole input string is validated by an index-driven
+  tokenizer, not by a loose `re.findall()` that would silently skip what it does
+  not recognise. Only whitespace and commas are accepted between tokens.
+
+Cubic bounds are **exact**. For each segment `P0 → P1 → P2 → P3` and each
+coordinate independently, the derivative
+`a t² + b t + c` (with `a = -P0 + 3P1 - 3P2 + P3`, `b = 2(P0 - 2P1 + P2)`,
+`c = P1 - P0`) is solved analytically; the curve is evaluated at `t = 0`, at
+`t = 1`, and at every root strictly inside `0 < t < 1`. Segment extrema are then
+unioned. The control-point box is never used as a bound and the curve is never
+sampled. Line segments use their endpoints; `Z` adds the closing line back to the
+subpath start, whose endpoints are already included.
+
+Priority inside `AgcRenderer._image_fill_layout(...)`, highest first:
+
+1. **reliable stored bounds** (`rect`, `circle`, `ellipse`, and the generated
+   non-uniform rounded rectangle) — unchanged, and still preferred;
+2. a `path` whose `d` parses under the strict subset with positive width and
+   height → tile origin `(derived_x + offsetX, derived_y + offsetY)`, tile size
+   `(derived_width, derived_height)`, `preserveAspectRatio` from the existing
+   stretch/cover constants, and `bounds_source: "derived-path-bounds"`;
+3. otherwise the pre-existing fallbacks, verbatim — natural-bitmap when natural
+   dimensions exist, then the no-size fallback.
+
+Offsets move the **tile origin only**; they never change the derived width or
+height.
+
+Each successful derivation increments
+`handled_node_counts["fill:pattern:path-bounds-derived"]` exactly once. The
+`fill:pattern:no-shape-bounds` key and its logic are unchanged and still
+required — they remain the honest report for every path outside the subset.
+
+##### Coverage measured on the real package
+
+The current `design.xd` contains **six** such image fills, in **three**
+artboards (`تفاصيل المتجر – 7`, `تفاصيل المتجر – 13` and `معاينة`, two each).
+All six are independent AGC nodes that happen to share one identical local path:
+a **closed 33 × 33 circle** built from four cubic segments, whose exact solved
+bounds are `x = 0`, `y = 0`, `width = 33`, `height = 33`. All six are `cover`
+fills of a 200 × 200 bitmap with zero offsets.
+
+The repair was **pre-validated across all 112 artboards** as a read-only
+simulation before being persisted: it derived the 33 × 33 bounds exactly six
+times, took `fill:pattern:no-shape-bounds` from 6 to 0, exported 112/112
+successfully with 112 valid correctly-sized PNGs and 112 distinct PNG hashes, and
+left `syncRef` (216 resolved / 0 unresolved), `stroke-align:inside` (482),
+`rect:non-uniform-corner-radius` (315), `rect:corner-radius-overlap-scaled` (6)
+and `fill:pattern` (289) all identical.
+
+After it, the only unsupported renderer feature remaining in the corpus is
+`filter:uxdesign#blur:background = 2` — background blur, which stays honestly
+unsupported and is never faked.
+
+`REPORT_SCHEMA` is unchanged (`merzox.xd_reference_exporter/1`): the field set
+did not change, only the value of an existing `handled_node_counts` key and of
+`pattern_fills[].bounds_source`.
 
 ### Filter mapping (deterministic approximations)
 
@@ -283,6 +618,283 @@ Blur rules:
   SVG equivalent. It is **reported as unsupported**
   (`unsupported_background_blur_count`) rather than approximated with a
   foreground blur that would look wrong.
+
+#### Background (backdrop) blur — final feasibility decision (I3-R2-D8-D3)
+
+Background blur was investigated in full and the outcome is a **deliberate
+decision not to implement it**. This subsection records that decision and the
+evidence behind it; it does not change any code, report field or constant.
+
+**Proven — the corpus evidence.** The current `design.xd` contains exactly
+**two** visible `uxdesign#blur` effects with `backgroundEffect = true`, in the
+artboards `الرئيسية` and `الرئيسية – 1`. The two cases are structurally
+identical:
+
+| Aspect | Value |
+| --- | --- |
+| Node | `type = shape`, `shape.type = rect`, `98 × 35` |
+| Corner radii | `[5, 5, 5, 5]` |
+| Transform | identity plus `tx = 81`, `ty = 178` |
+| Filter | `uxdesign#blur`, `global = true`, `backgroundEffect = true` |
+| Filter params | `blurAmount = 14`, `brightnessAmount = 15`, `fillOpacity = 0` |
+
+The stacking context is the same in both: an underlying `293 × 110` image
+rectangle, then an additional `293 × 110` overlay at approximately 10% opacity,
+then the `98 × 35` background-blur rectangle, then foreground text
+(`اشتري الآن`). `fillOpacity = 0` and that ordering together establish these as
+genuine **backdrop** blur nodes, not ordinary foreground object blur.
+
+**Proven — browser mechanism feasibility.** A controlled local Microsoft Edge
+test was run against the same headless rendering path this exporter uses. It
+used a candidate mapping (`blurAmount 14 → backdrop-filter: blur(14px)`,
+`brightnessAmount 15 → brightness(115%)`) **purely to exercise browser
+mechanics**; those numbers are explicitly *not* calibrated to Adobe XD.
+
+| Mechanism | Result |
+| --- | --- |
+| CSS feature detection | reports `backdrop-filter` support |
+| `backdrop-filter` directly on an SVG `<rect>` | computed style contained `blur(14px) brightness(1.15)`, but pixel comparison showed **zero changed pixels** inside the target region — **not a proven usable mechanism** in this Edge SVG/HTML rendering path |
+| `backdrop-filter` on an HTML element inside an SVG `<foreignObject>` | produced a **real** backdrop effect: pixels changed only inside the backdrop region, an unrelated outside region was unchanged, and foreground content painted afterwards was unaltered |
+
+So the technical mechanism **SVG `foreignObject` + HTML `backdrop-filter`** is
+feasible in the current Edge runtime, while applying `backdrop-filter` directly
+to an SVG graphics element is not.
+
+**Not proven — numeric parity with Adobe XD.** There is no established
+calibration showing that XD `blurAmount = 14` is CSS `blur(14px)`, nor that XD
+`brightnessAmount = 15` is CSS `brightness(115%)`. The local Adobe XD/UXP oracle
+is unavailable, and there is no authentic target-artboard screenshot or
+reference for these two exact occurrences. Exact XD visual parity for the two
+nodes is therefore **unproven**.
+
+**Decision.** Background blur is **not implemented in this renderer iteration**.
+The two occurrences stay honestly unsupported as
+`filter:uxdesign#blur:background = 2`, and **no approximation is emitted**.
+Shipping a `foreignObject` path driven by a guessed numeric conversion would be
+a visual approximation dressed as parity; the existing fail-closed behaviour —
+report `backgroundEffect = true` as unsupported rather than silently apply a
+guessed effect — is the accepted final outcome for this iteration.
+
+Nothing here claims pixel-perfect XD parity for those two nodes, that Adobe
+`blurAmount` equals CSS pixels, that Adobe `brightnessAmount` maps directly to a
+CSS percentage, or that `backdrop-filter` works directly on SVG graphics
+elements in the current Edge rendering path.
+
+### Non-uniform rectangle corner radii
+
+A compact AGC rectangle carries its corner radii as a four-value `shape.r` list.
+The physical order was determined independently against the corpus and is
+**proven**: the list runs clockwise from the top-left corner.
+
+| Index | Corner |
+| --- | --- |
+| `r[0]` | top-left |
+| `r[1]` | top-right |
+| `r[2]` | bottom-right |
+| `r[3]` | bottom-left |
+
+SVG's `<rect>` has only a single `rx`/`ry` pair, so before I3-R2-I4 a rectangle
+whose four radii were not all equal was approximated with `r[0]` and reported as
+`rect:non-uniform-corner-radius` in `unsupported_node_counts`. It is now emitted
+as an exact, deterministic, **closed** path instead:
+
+```xml
+<path d="M 5,6 L 35,6 A 10,10 0 0 1 45,16 L 45,26 A 10,10 0 0 1 35,36
+         L 5,36 L 5,6 Z" fill="#123456"/>
+```
+
+The path runs TL → TR → BR → BL in that proven order: a quarter-circle arc
+(`A r,r 0 0 1 …`, clockwise, short arc) for every non-zero corner, and a plain
+straight endpoint for every zero corner. Coordinates, transforms, artboard
+coordinate semantics and fractional values are untouched — only the element
+changes. The result is an ordinary geometry, so fill, stroke, opacity, filters,
+blend, transforms and outer clips compose through the existing pipeline with no
+special-casing.
+
+Rectangles whose radii are **all equal** — including a uniform four-value list —
+still render as a plain `<rect>` with `rx`/`ry`, and a rectangle with no radius
+is completely unchanged.
+
+#### Deterministic overlap policy
+
+Two radii sharing a side may together demand more than that side's length. The
+exporter resolves this with one **common** scale factor, taken from the most
+violated side:
+
+```
+factor = min(1, w/(tl+tr), h/(tr+br), w/(bl+br), h/(tl+bl))
+```
+
+If `factor < 1`, **all four** radii are multiplied by it. Corners are never
+clamped independently, so the shape's corner proportions are preserved. This is
+the same rule CSS `border-radius` and Canvas `roundRect` specify.
+
+In the current corpus there are exactly **six** scaling occurrences — six
+independent nodes in the artboard `السلة – 1`, reducing to **two mirrored
+19 × 19 geometry classes**:
+
+| Class | Occurrences | Size | Raw `r` | Violating side | Effective `r` |
+| --- | --- | --- | --- | --- | --- |
+| A | 3 | 19 × 19 | `[0, 10, 10, 0]` | right | `[0, 9.5, 9.5, 0]` |
+| B | 3 | 19 × 19 | `[10, 0, 0, 10]` | left | `[9.5, 0, 0, 9.5]` |
+
+Both scale by `factor = 0.95` (`19 / 20`), i.e. `10 → 9.5`. Browser Canvas
+`roundRect` validation returned exact pixel equality against manually
+constructed 9.5-radius paths for both mirrored cases.
+
+> **Not an Adobe parity claim.** Adobe documents that effective corner radii
+> *may* be reduced, but its generic internal Scenegraph capping algorithm is
+> undocumented and no local Adobe XD oracle is available. The rule above is
+> **this renderer's deterministic overlap policy**, standards-backed and
+> validated for the current target corpus. Nothing here claims that it matches
+> Adobe's internal capping for inputs outside that corpus.
+
+#### Reporting
+
+| Key | Bucket | Meaning |
+| --- | --- | --- |
+| `rect:non-uniform-corner-radius` | `handled_node_counts` | Rendered exactly as a path |
+| `rect:corner-radius-overlap-scaled` | `handled_node_counts` | Also needed `factor < 1` |
+
+`rect:non-uniform-corner-radius` no longer appears in `unsupported_node_counts`
+for valid four-value geometry; a scaled shape additionally records the overlap
+policy in the report's `limitations` list. A malformed `r` list that is
+non-uniform but does **not** have exactly four values keeps the previous
+documented `rx`/`ry` approximation and stays reported as unsupported.
+
+### Inside-stroke alignment
+
+Adobe XD can align a stroke to the **inside** of a shape's path. SVG has no
+native equivalent — its strokes are always centred on the path, so a naive
+render puts half the stroke outside the shape and makes every bordered element
+slightly too large.
+
+For a **solid** stroke with `align: "inside"` on **provably closed** geometry,
+the exporter emulates XD's behaviour:
+
+1. the shape's fill renders once, at the original geometry;
+2. a stroke-only copy of the *same* geometry renders at
+   `2 x` the XD stroke width;
+3. that doubled centred stroke is clipped to the same geometry's interior via a
+   dedicated `<clipPath clipPathUnits="userSpaceOnUse">`.
+
+Only the inward half survives the clip, which is exactly the width XD asked for.
+
+```xml
+<clipPath id="mxg-inside-stroke-1" clipPathUnits="userSpaceOnUse">
+  <rect x="0" y="0" width="100" height="100"/>
+</clipPath>
+...
+<rect x="0" y="0" width="100" height="100" fill="#123456"/>
+<rect x="0" y="0" width="100" height="100" fill="none" stroke="#000000"
+      stroke-width="1" clip-path="url(#mxg-inside-stroke-1)"
+      data-xd-stroke-align="inside"/>
+```
+
+Both copies sit inside the node's **single existing wrapper**, so the node
+transform, opacity, filter, blend mode and any outer clip still apply exactly
+once to the composite. Nothing is numerically flattened.
+
+#### Eligibility
+
+Closure must be provable from the emitted geometry:
+
+| Geometry | Eligible |
+| --- | --- |
+| `rect`, `circle`, `ellipse`, `polygon` | Yes — closed by definition |
+| `path` ending in an explicit closepath (`Z`/`z`) | Yes — including the non-uniform rounded-rectangle path |
+| `path` not ending in a closepath | **No** |
+| `line`, anything else | **No** |
+
+Ineligible geometry keeps the previous behaviour: a centred stroke, plus
+`stroke-align:inside` counted in `unsupported_node_counts` with a warning saying
+the geometry is not provably closed. That fallback exists even though the
+current corpus has no ineligible case.
+
+#### Coverage measured on the real package (I3-R2-D4)
+
+All **482** inside-stroke occurrences across **111** artboards are eligible and
+emulated:
+
+| Geometry | Count |
+| --- | --- |
+| `rect` | 340 |
+| `circle` | 101 |
+| closed `path` | 41 |
+
+Stroke widths present: `0.3` (11), `0.5` (262), `1` (143), `1.5` (66). Origin:
+374 artboard-direct, 108 via shared `syncRef` sources — both routes use the same
+mechanism. Four cases are dashed and three use round caps; those properties pass
+through unchanged.
+
+#### Paint semantics
+
+The fill copy carries no stroke; the stroke copy carries `fill="none"`. A shape
+with no visible fill still uses its geometry as the clip region. For a
+non-uniform rounded rectangle this is the *same* generated path in all three
+places — interior clip, filled copy and stroked copy — so the emulation needed
+no change beyond consuming the new geometry, and the width doubling is
+unaffected. Stroke colour,
+stroke opacity, line cap, line join, miter limit, dash array and dash offset are
+all preserved verbatim — **only `stroke-width` is doubled**. Dash lengths and
+offsets are explicitly *not* scaled.
+
+A successfully emulated inside stroke is counted in
+`handled_node_counts["stroke-align:inside"]` and is no longer reported as
+unsupported. `stroke-align:outside` remains unsupported and unchanged.
+
+Clip IDs come from the existing deterministic `SvgDocument` counter
+(`mxg-inside-stroke-1`, `-2`, …) — one dedicated clipPath per handled shape, for
+auditability. No UUIDs, timestamps, random values or path-derived hashes are
+used, so re-exporting the same artboard produces byte-identical SVG.
+
+### `syncRef` resolution — `guid` vs `syncSourceGuid`
+
+An XD `syncRef` node carries **two different identities**, and conflating them
+was the defect repaired in I3-R2-I1:
+
+| Field | Meaning |
+| --- | --- |
+| `guid` | Identity of **this instance** of the reference. Unique per occurrence. |
+| `syncSourceGuid` | Identity of the **shared source definition** in the AGC symbol index. Shared by every instance of that definition. |
+
+Only `syncSourceGuid` can index the shared definition. The pre-repair resolver
+scanned `ref` / `guid` / `symbolId` / `componentId` and so passed the *instance*
+guid to the symbol index, which by construction never contains it — every lookup
+missed.
+
+Measured on the real package (I3-R2-D2), across the accepted 112-artboard
+corpus:
+
+- **432** unresolved `syncRef` occurrences, spanning **108** of the 112 artboards;
+- all 432 are real `type="syncRef"` nodes with **432 unique instance guids**;
+- every one carries a `syncSourceGuid`;
+- those 432 instances reference just **52 unique source GUIDs**;
+- **52/52** of those definitions exist in `resources/graphics/graphicContent.agc`,
+  as identity-bearing leaf shape/text nodes (`Border`, `Cap`, `Capacity`,
+  `↳ Time`, …).
+
+Resolution order:
+
+1. If `syncSourceGuid` is present (checked on the nested `syncRef` payload, the
+   node itself, then `meta.ux`), it is the source selector. The instance `guid`
+   is never used for lookup in this case.
+2. Otherwise the legacy `ref` / `guid` / `symbolId` / `componentId` scan applies
+   unchanged, so older and synthetic fixtures keep working.
+
+The resolved node is rendered **exactly as indexed** — the exporter does not
+inline a whole parent symbol when the source guid identifies a single child —
+underneath the instance's own placement wrapper, which keeps the syncRef's
+`transform` (or its payload transform). The source keeps whatever transform and
+style it already carries. Nothing is flattened or pre-composed.
+
+Recursion protection is keyed on **the identity actually used for lookup**, so a
+definition that references itself is caught even though each instance guid along
+the chain is distinct. A recursive or missing source stays fail-closed: only the
+referenced content is skipped, `unresolved_sync_refs` increments,
+`syncRef:unresolved` is counted, and the warning names the instance guid, the
+attempted source guid, the selector used, and whether the cause was recursion or
+a missing definition.
 
 ### Blend modes
 
@@ -485,8 +1097,9 @@ The report is the contract: if a feature was approximated or skipped, it appears
 there. An empty `unsupported_node_counts` is the only claim of completeness this
 tool will make.
 
-Every report is stamped with `iteration` (currently `MERZOX-UI-GOLDEN-I2-R2`,
-from the `EXPORTER_ITERATION` constant) and `schema`. The two are independent:
+Every report is stamped with `iteration` (currently
+`MERZOX-UI-GOLDEN-I3-R2-D7-I1`, from the `EXPORTER_ITERATION` constant) and
+`schema`. The two are independent:
 `schema` is the serialization version and only moves when the field set changes,
 so a new calibration iteration does not bump it.
 
@@ -579,6 +1192,28 @@ counted there.
 
 All existing report fields are unchanged and remain backwards compatible.
 
+## Current corpus coverage (accepted state)
+
+Measured over the full 112-artboard corpus after the accepted repairs:
+
+| Metric | Count |
+| --- | --- |
+| Artboards | 112 |
+| `syncRef` handled | 216 |
+| `syncRef` unresolved | 0 |
+| Inside-aligned strokes handled | 482 |
+| Non-uniform rounded rectangles handled | 315 |
+| Proportional corner-overlap scaling handled | 6 |
+| Image pattern fills handled | 289 |
+| Derived path bounds for pattern fills | 6 |
+| `fill:pattern:no-shape-bounds` unsupported | 0 |
+| `filter:uxdesign#blur:background` unsupported | **2** |
+
+Background blur is the **only** remaining known unsupported renderer feature in
+this corpus — see the D8 feasibility decision above. Coverage counts are not
+fidelity claims: an artboard with no unsupported features is still uncalibrated
+unless it has been measured against the authentic XD preview.
+
 ## Current limitations (summary)
 
 1. **No pixel-perfect claim.** This is a reference renderer, not Adobe XD. The
@@ -592,23 +1227,56 @@ All existing report fields are unchanged and remain backwards compatible.
    locally.
 4. **Blur and shadow radii use linear approximation constants** (`* 0.5`), not
    XD's actual kernel.
-5. **Background (backdrop) blur is unsupported** and reported, never faked.
+5. **Background (backdrop) blur is unsupported** and reported, never faked —
+   the two occurrences in the corpus stay
+   `filter:uxdesign#blur:background = 2`. This is a *decision*, not an
+   oversight: an `foreignObject` + `backdrop-filter` mechanism was proven to
+   work in the Edge runtime, but the XD `blurAmount`/`brightnessAmount` → CSS
+   conversion is uncalibrated and no XD oracle or authentic reference exists for
+   those nodes, so emitting it would be a guessed approximation rather than
+   parity. See the D8 feasibility decision above.
 6. **Compound booleans without a pre-flattened path are not evaluated** — child
    geometry is preserved and the limitation is reported.
-7. **Non-uniform corner radii collapse to a single uniform radius**, reported.
-8. **Stroke alignment `inside`/`outside` has no SVG equivalent** — strokes are
-   centred, reported.
+7. **Non-uniform corner radii are rendered exactly** as deterministic closed
+   paths in the proven `TL, TR, BR, BL` order. Overlapping radii are reduced by
+   this renderer's own proportional-overlap policy (one common factor for all
+   four corners), validated for the six occurrences in the current corpus
+   (`10 → 9.5`, factor `0.95`). **Parity with Adobe's undocumented internal
+   Scenegraph capping algorithm is not claimed** outside that validated corpus.
+   A non-uniform `r` list that does not have exactly four values still collapses
+   to a single uniform radius and is still reported.
+8. **Stroke alignment has no native SVG equivalent.** `inside` is *emulated*
+   on provably closed geometry (doubled stroke clipped to the interior) — an
+   approximation of XD's rasteriser, not a proof of equality, and not a claim of
+   pixel parity for the 111 affected artboards. `outside`, and `inside` on
+   geometry that is not provably closed, are still rendered centred and reported
+   as unsupported.
 9. **Blend modes remain the leading fidelity blocker.** Only `soft-light` is
    calibrated, and only when the safe-hoist proof succeeds. Every other mode —
    and every unprovable soft-light — is detected and reported
    (`style:blendMode:<value>`) but not rendered. Masks beyond `clipPath` and
    text-on-path are also not implemented.
-10. **Image fills on geometry without reliable bounds** (paths) fall back to the
-    natural-bitmap tile and do not get cover semantics; this is reported as
-    `fill:pattern:no-shape-bounds`.
+10. **Image fills on geometry without reliable bounds.** A `path` whose `d` is
+    inside the explicitly supported **closed absolute `M`/`L`/`C`/`Z`** subset
+    now gets exact local bounds solved analytically
+    (`fill:pattern:path-bounds-derived`, six occurrences in the current corpus).
+    **This is not general SVG-path bounds support**: relative commands, `H`,
+    `V`, `S`, `Q`, `T`, `A`, implicit command repetition, open paths, stray
+    characters and degenerate bounds are all refused, and every refused case
+    still falls back to the natural-bitmap tile without cover semantics,
+    reported as `fill:pattern:no-shape-bounds`.
 11. **No global colour correction and no translation offsets** are applied, by
     design — measurement showed neither is warranted.
-12. **Single artboard only.** The 112-artboard batch renderer is a later
-    iteration.
+12. **Batch export is not calibration.** `--all-artboards` can now render all
+    112 artboards, but a successful batch says only that the exporter produced
+    output for each one. **Only the Splash artboard has been measured against
+    the authentic Adobe XD preview.** The other 111 are uncalibrated: read each
+    `unsupported_node_counts` and `warnings` before trusting any of them, and do
+    not treat a green batch as evidence that the design renders correctly.
+13. **Resolving `syncSourceGuid` is not a fidelity claim.** Content that was
+    previously dropped now renders, which is strictly more faithful than an
+    empty region — but no artboard other than Splash has been measured against
+    the authentic XD preview, so none of the 108 affected artboards is claimed
+    pixel-perfect. Re-export and re-read the reports rather than assuming.
 13. **PNG output depends on a locally installed Edge/Chrome**, and on the fonts
     that browser can see.
