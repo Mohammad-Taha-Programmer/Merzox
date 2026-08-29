@@ -119,6 +119,25 @@ final class _SeedMerchantApi extends ApiService {
       const <OwnerProduct>[];
 }
 
+/// The single service the Store Preview artboard shows under "About".
+///
+/// Deterministic and entirely local: no image URL, so the About tab renders its
+/// icon placeholder instead of reaching `Image.network`. Rendering it triggers
+/// no customer mutation - the About tab draws services as plain, tapless tiles.
+const BusinessProductApiModel _seedService = BusinessProductApiModel(
+  id: '64c000000000000000000001',
+  name: 'مكياج',
+  description: '',
+  price: 0,
+  imageUrl: '',
+  imageUrls: <String>[],
+  classification: 'new',
+  rating: 0,
+  ratingCount: 0,
+  likeCount: 0,
+  isService: true,
+);
+
 /// Serves the PUBLIC storefront contracts the preview reads.
 ///
 /// Every payload is chosen so the loaded storefront renders from local
@@ -131,17 +150,23 @@ final class _SeedStorefrontApi extends ApiService {
   Future<BusinessDetailApiModel> business({required String businessId}) async {
     return BusinessDetailApiModel(
       id: businessId,
-      publicId: 'MXB-0042',
-      name: 'متجر ميرزوكس التجريبي',
+      publicId: '0020101',
+      name: 'متجر الياسمين',
       englishName: 'Merzox demo store',
-      category: 'مطاعم ومقاهي',
-      description: 'متجر تجريبي ثابت يستخدم لالتقاط لقطة مرجعية للواجهة.',
-      address: 'شارع الملك فيصل، الناصرة',
-      products: const <BusinessProductApiModel>[],
-      productCount: 7,
+      category: 'أفضل المتاجر',
+      description:
+          'هذا النص افتراضي ، هذا النص افتراضي ، هذا النص افتراضي ، هذا النص '
+          'افتراضي ، هذا النص افتراضي هذا النص افتراضي ، هذا النص افتراضي ، '
+          'هذا النص افتراضي ، هذا النص افتراضي ، هذا النص افتراضي',
+      address: '',
+      // The About tab draws its services from the DETAIL payload, so the one
+      // service the artboard shows lives here rather than in
+      // `businessProducts`, which drives the Products tab.
+      products: const <BusinessProductApiModel>[_seedService],
+      productCount: 200,
       rating: 4.5,
       ratingCount: 12,
-      followerCount: 42,
+      followerCount: 300,
       viewCount: 99,
       discount: null,
       colorValue: 0xffdeeef8,
@@ -318,7 +343,7 @@ void main() {
         );
 
         expect(find.byType(CircularProgressIndicator), findsNothing);
-        expect(find.text('متجر ميرزوكس التجريبي'), findsOneWidget);
+        expect(find.text('متجر الياسمين'), findsOneWidget);
 
         await expectMerzoxSeedGolden('store_preview_loaded_ar_375x812.png');
       });

@@ -654,8 +654,19 @@ void main() {
       // Name and public id come from the public detail fetch, not the seed.
       expect(find.text('Test business'), findsOneWidget);
       expect(find.text('ID: MXB-0001'), findsOneWidget);
-      expect(find.text('وضع المعاينة - هذا ما يراه الزبون'), findsOneWidget);
-      expect(find.text('إنهاء المعاينة'), findsOneWidget);
+
+      // The preview owns no bottom chrome of its own: no banner and no close
+      // button. Both were preview-only surfaces with no counterpart in the
+      // customer storefront the preview is supposed to reproduce.
+      expect(find.text('وضع المعاينة - هذا ما يراه الزبون'), findsNothing);
+      expect(find.text('إنهاء المعاينة'), findsNothing);
+
+      // The exit is the shared top Back control. Rendered RTL here, so the
+      // chevron points right, exactly as it does in the customer storefront.
+      expect(
+        find.widgetWithIcon(IconButton, Icons.chevron_right_rounded),
+        findsOneWidget,
+      );
     });
 
     testWidgets('E - preview shows a loading state while the store resolves', (

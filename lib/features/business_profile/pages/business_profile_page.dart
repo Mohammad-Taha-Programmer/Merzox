@@ -23,8 +23,8 @@ class BusinessProfilePage extends StatelessWidget {
   /// removed - it is not a second implementation.
   final BusinessProfileViewMode viewMode;
 
-  /// Supplied in preview so the merchant can return to their own interface;
-  /// the customer bottom navigation is used otherwise.
+  /// Retained for compatibility with existing call sites. The preview exit is
+  /// the shared top Back control, so nothing inside the page consumes this.
   final VoidCallback? onClosePreview;
 
   /// Test seam: an already-started bloc to render against. Nothing in the app
@@ -54,7 +54,6 @@ class BusinessProfilePage extends StatelessWidget {
         business: business,
         onNavChanged: onNavChanged,
         viewMode: viewMode,
-        onClosePreview: onClosePreview,
       ),
     );
   }
@@ -64,13 +63,11 @@ class _BusinessProfileView extends StatelessWidget {
   final HomeBusiness business;
   final ValueChanged<int> onNavChanged;
   final BusinessProfileViewMode viewMode;
-  final VoidCallback? onClosePreview;
 
   const _BusinessProfileView({
     required this.business,
     required this.onNavChanged,
     required this.viewMode,
-    this.onClosePreview,
   });
 
   @override
@@ -100,7 +97,15 @@ class _BusinessProfileView extends StatelessWidget {
             return Stack(
               children: [
                 ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 124),
+                  // Customer mode clears the floating bottom navigation; the
+                  // preview has no bottom chrome, so it only needs a normal
+                  // content inset.
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    10,
+                    16,
+                    viewMode.isPreview ? 16 : 124,
+                  ),
                   children: [
                     _TopBar(onBack: () => Navigator.of(context).pop()),
                     if (state.detailsStatus ==
@@ -185,8 +190,11 @@ class _BusinessProfileView extends StatelessWidget {
           },
         ),
       ),
+      // The preview carries no bottom chrome at all: the shared top Back
+      // control is its exit, and the customer bottom navigation belongs to the
+      // customer storefront only.
       bottomNavigationBar: viewMode.isPreview
-          ? _PreviewCloseBar(onClose: onClosePreview)
+          ? null
           : _ProfileBottomNavigationBar(
               selectedIndex: 0,
               onChanged: onNavChanged,
@@ -230,51 +238,6 @@ class _PreviewAwaitingPublicTruth extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// Replaces the customer bottom navigation while previewing. It is the only
-/// action a merchant gets from inside the preview, which keeps the surface
-/// read-only without altering the storefront body.
-class _PreviewCloseBar extends StatelessWidget {
-  final VoidCallback? onClose;
-
-  const _PreviewCloseBar({this.onClose});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'merchantPreview.banner'.tr(),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 11,
-                color: MerzoxColors.kColor767676,
-              ),
-            ),
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: onClose ?? () => Navigator.of(context).maybePop(),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(46),
-                  backgroundColor: MerzoxColors.kColor3D5A80,
-                ),
-                icon: const Icon(Icons.close_rounded, size: 18),
-                label: Text('merchantPreview.close'.tr()),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
@@ -345,7 +308,7 @@ class _Hero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 164,
+      height: 165,
       child: Stack(
         alignment: Alignment.topCenter,
         children: [
@@ -391,12 +354,14 @@ class _Hero extends StatelessWidget {
           Positioned(
             top: 50,
             child: Container(
-              width: 112,
-              height: 112,
+              // 115x115 outer shell with an 8px inset, so the inner surface is
+              // the 99x99 the shared placeholder geometry specifies.
+              width: 115,
+              height: 115,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(5),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.08),
@@ -407,8 +372,8 @@ class _Hero extends StatelessWidget {
               ),
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: MerzoxColors.kColorF9F9F9,
-                  borderRadius: BorderRadius.circular(4),
+                  color: MerzoxColors.kColor98C1D9,
+                  borderRadius: BorderRadius.circular(5),
                 ),
                 child: Center(
                   child: Text(
