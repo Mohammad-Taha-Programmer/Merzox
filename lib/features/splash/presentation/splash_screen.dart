@@ -10,6 +10,8 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  Timer? _navigationTimer;
+
   @override
   void initState() {
     super.initState();
@@ -17,7 +19,10 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   void _navigateToOnboarding() {
-    Timer(const Duration(seconds: 3), () {
+    _navigationTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) {
+        return;
+      }
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -29,10 +34,23 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   @override
+  void dispose() {
+    _navigationTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const Scaffold(
-      body: Center(
-        child: FlutterLogo(size: 120), // Replace with your splash UI
+    return Scaffold(
+      backgroundColor: const Color(0xFF3D5A80),
+      body: SizedBox.expand(
+        child: Image.asset(
+          'assets/images/splash_xd_reference.png',
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+          filterQuality: FilterQuality.none,
+          gaplessPlayback: true,
+        ),
       ),
     );
   }
