@@ -1,0 +1,61 @@
+{
+  "schema": "merzox.xd_flutter_mapping/1",
+  "target_surface": {
+    "width": 375,
+    "height": 812
+  },
+  "entries": [
+    {
+      "seed": "splash",
+      "flutter_golden": "test/goldens/seed/splash_page_ar_375x812.png",
+      "xd": {
+        "name": "سبلاش – 1",
+        "manifest_id": "1ff58a48-0e8d-49eb-be2f-4b7a24adcf9c",
+        "artboard_path": "artwork/artboard-29c52d7e-0f4c-439b-87cc-5d4a5cd8f229",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "Only splash candidate in the XD corpus, and the historically calibrated XD reference artboard. The XD source text reads \"Bictov\"; branding normalization to \"Merzox\" is the existing exporter's --normalize-merzox-brand behaviour and is never reimplemented in the comparator."
+    },
+    {
+      "seed": "onboarding",
+      "flutter_golden": "test/goldens/seed/onboarding_initial_ar_375x812.png",
+      "xd": {
+        "name": "شاشة ترحيبية",
+        "manifest_id": "670c3191-2903-4423-85bc-4dcfcdaf3a6f",
+        "artboard_path": "artwork/artboard-39b3dc74-2728-41f4-a7ff-52ab7d2bbc1f",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The Flutter onboarding initial state is the offers concept, and this XD state is \"أفضل الخصومات\" (offers and discounts). The other onboarding candidates are the map and payment states. Flutter wording and XD wording are NOT text-identical; this is a semantic state match, not text parity."
+    },
+    {
+      "seed": "login",
+      "flutter_golden": "test/goldens/seed/login_idle_ar_375x812.png",
+      "xd": {
+        "name": "تسجيل الدخول",
+        "manifest_id": "7253b94f-6b60-4685-83c2-e3086ed0ac20",
+        "artboard_path": "artwork/artboard-b371399a-3aed-45f5-8a33-b1f7c4972ef7",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The Flutter seed renders businessMode=false, i.e. the customer flow, and this XD artboard is the customer login (\"لمواصلة استخدام التطبيق\"). The alternative artboard e1a55414-b8c0-4225-be71-3e7df543e421 is the merchant login and explicitly says \"كتاجر\"."
+    },
+    {
+      "seed": "store_preview",
+      "flutter_golden": "test/goldens/seed/store_preview_loaded_ar_375x812.png",
+      "xd": {
+        "name": "معاينة المتجر",
+        "manifest_id": "693ab1c9-14b2-4448-a867-cb5553a8f813",
+        "artboard_path": "artwork/artboard-98945093-5916-454b-a1ea-946956675bf0",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "This is the explicit \"معاينة المتجر\" merchant-preview artboard, containing the store sections خدماتنا, عن المتجر, المنتجات and التقييمات. The long \"معاينة\" alternatives encode shopper/product/review states with customer actions such as add-to-cart and review composition."
+    }
+  ]
+}

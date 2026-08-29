@@ -1158,10 +1158,192 @@ Write every generated artefact to a scratch directory **outside** the
 repository (for example `C:/temp/merzox-xd/`). Only this exporter's source,
 tests and documentation belong in git while calibration is still in progress.
 
+## Flutter golden comparison
+
+`MERZOX-UI-GOLDEN-I5-I1` adds a second, independent tool beside the exporter:
+
+```
+tools/xd_reference/golden_mapping.json        the locked XD <-> Flutter mapping
+tools/xd_reference/xd_flutter_comparator.py   the deterministic comparator
+```
+
+The comparator produces **reproducible measurements** between an already
+accepted Flutter seed golden and the locked XD reference artboard for the same
+seed. It never writes to a Flutter golden, the `.xd` package, the exporter
+source, or any production source, and it never renders the XD itself — it
+imports `xd_reference_exporter` as a sibling module and drives `XdPackage` /
+`export_artboard`, so there is exactly one AGC renderer in this repository.
+
+### The four locked mappings
+
+| Seed | Flutter golden | XD artboard | Manifest id | XD size | Normalization |
+| --- | --- | --- | --- | --- | --- |
+| `splash` | `test/goldens/seed/splash_page_ar_375x812.png` | `سبلاش – 1` | `1ff58a48-0e8d-49eb-be2f-4b7a24adcf9c` | 375 x 812 | `exact` |
+| `onboarding` | `test/goldens/seed/onboarding_initial_ar_375x812.png` | `شاشة ترحيبية` | `670c3191-2903-4423-85bc-4dcfcdaf3a6f` | 375 x 812 | `exact` |
+| `login` | `test/goldens/seed/login_idle_ar_375x812.png` | `تسجيل الدخول` | `7253b94f-6b60-4685-83c2-e3086ed0ac20` | 375 x 812 | `exact` |
+| `store_preview` | `test/goldens/seed/store_preview_loaded_ar_375x812.png` | `معاينة المتجر` | `693ab1c9-14b2-4448-a867-cb5553a8f813` | 375 x 810 | `extend_final_row_to_812` |
+
+Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
+a *different* uuid from the manifest id):
+
+| Seed | Artboard path |
+| --- | --- |
+| `splash` | `artwork/artboard-29c52d7e-0f4c-439b-87cc-5d4a5cd8f229` |
+| `onboarding` | `artwork/artboard-39b3dc74-2728-41f4-a7ff-52ab7d2bbc1f` |
+| `login` | `artwork/artboard-b371399a-3aed-45f5-8a33-b1f7c4972ef7` |
+| `store_preview` | `artwork/artboard-98945093-5916-454b-a1ea-946956675bf0` |
+
+Why each one, in one line:
+
+- **splash** — the only splash candidate, and the historically calibrated XD
+  reference. The XD text reads `Bictov`; normalising it to `Merzox` is the
+  **existing exporter's** `--normalize-merzox-brand` behaviour, which the
+  comparator switches on. No second branding implementation exists.
+- **onboarding** — the Flutter initial state is the offers concept, and this XD
+  state is `أفضل الخصومات` (offers and discounts). The other onboarding
+  candidates are the map and payment states. **Flutter wording and XD wording
+  are not text-identical; this is a semantic state match, not text parity.**
+- **login** — the Flutter seed renders `businessMode=false`, i.e. the customer
+  flow, matching this artboard's `لمواصلة استخدام التطبيق`. The alternative
+  `e1a55414-b8c0-4225-be71-3e7df543e421` is the **merchant** login and
+  explicitly says `كتاجر`.
+- **store_preview** — the explicit `معاينة المتجر` merchant-preview artboard,
+  containing `خدماتنا`, `عن المتجر`, `المنتجات` and `التقييمات`. The long
+  `معاينة` alternatives encode shopper/product/review states with customer
+  actions such as add-to-cart and review composition.
+
+### Identity rule: manifest id, then verified path/name/size
+
+The artboard is selected **only** by its manifest id. There is deliberately no
+display-name fallback — the corpus contains colliding names (see *Artboard
+identity* above). After selection the comparator proves that the id resolves to
+the locked `artboard_path`, the locked `name` and the locked native dimensions,
+and afterwards that the exporter's own report echoes the same three identity
+fields. Any disagreement is a hard failure.
+
+The mapping is **never** re-derived at runtime. The comparator will not pick a
+different artboard because its MAE happens to be lower.
+
+### Canonical viewport and the 810 → 812 policy
+
+Every comparison happens on the canonical **375 x 812** Merzox surface, and the
+mapping's `target_surface` must be exactly that.
+
+Two normalization policies exist, and nothing else:
+
+| Policy | Requires | Does |
+| --- | --- | --- |
+| `exact` | mapping *and* decoded XD reference already 375 x 812 | nothing |
+| `extend_final_row_to_812` | mapping *and* decoded XD reference exactly 375 x 810 | preserves all 375 x 810 real pixels, then appends the **final decoded row exactly twice** |
+
+The extension performs **no scaling, no interpolation, no cropping, no
+translation, no colour adjustment and no visual correction**. Any other shape
+mismatch is a structural failure, never a silent resize.
+
+### CLI
+
+```bash
+python tools/xd_reference/xd_flutter_comparator.py \
+  --xd /path/to/design.xd \
+  --seed all \
+  --output-json /tmp/report.json \
+  --artifact-dir /tmp/artifacts
+```
+
+`--seed` accepts `all` or one of `splash`, `onboarding`, `login`,
+`store_preview`. With one seed, the report contains only that seed's result;
+with `all`, results follow the mapping order exactly:
+`splash`, `onboarding`, `login`, `store_preview`.
+
+| Flag | Required | Purpose |
+| --- | --- | --- |
+| `--xd` | yes | The `.xd` package. |
+| `--seed` | yes | `all` or one accepted seed name. |
+| `--output-json` | yes | Deterministic comparison report. |
+| `--artifact-dir` | yes | Working `<seed>.xd.svg` / `.png` / `.report.json`. |
+| `--mapping` | no | Defaults to the sibling `golden_mapping.json`. |
+
+The repository root is derived deterministically from `__file__`
+(`<repo>/tools/xd_reference/…`), so Flutter goldens resolve identically no
+matter which directory the command is run from. A `flutter_golden` value that is
+absolute, uses backslashes, or escapes the repository root is rejected.
+
+### Metrics produced
+
+For the normalized XD RGBA and the Flutter RGBA at identical size:
+
+| Metric | Meaning |
+| --- | --- |
+| `rgb_mae` | mean absolute error over all R, G, B channels |
+| `rgb_rms` | root-mean-square error over all R, G, B channels |
+| `exact_pixel_diff_ratio` | fraction of pixels differing in **complete RGBA** equality |
+| `rgb_channels_within_5_ratio` | fraction of RGB channels whose absolute difference is `<= 5` |
+| `rgb_channels_within_10_ratio` | same, `<= 10` |
+| `coarse_luma_mae` | MAE of integer-quantised BT.601 luma, `(299R + 587G + 114B) // 1000` |
+
+plus `width`, `height`, `pixel_count`, `rgb_channel_count` and
+`differing_pixel_count`. Colour-distance metrics use the RGB channels; the exact
+diff ratio uses RGBA. Every accumulator is an exact Python integer divided once
+at the end, so results do not depend on iteration order and are bit-reproducible
+across hosts. Nothing is rounded internally.
+
+The comparator's PNG decoding is standard library only (`zlib` + `struct`):
+8-bit depth, non-interlaced, colour types 0/2/4/6, scanline filters 0..4
+including Paeth reconstruction, with CRC verification. Anything else — 16-bit,
+palette, interlaced — is refused with a clear message. There is no OCR and no
+image library.
+
+### Deterministic report
+
+The report uses schema `merzox.xd_flutter_comparison/1` and is serialized with
+`json.dumps(..., ensure_ascii=False, sort_keys=True, indent=2)` plus one final
+newline. It records SHA-256 of the Flutter golden file bytes, of the raw
+exported XD PNG file bytes, and of the normalized XD RGBA byte stream, together
+with the locked identity, native and target dimensions, the normalization
+policy, and the exporter's `iteration`, `schema`, positive `handled_node_counts`
+and `unsupported_node_counts`.
+
+It deliberately contains **no** timestamp, UUID, machine username, temporary
+absolute path or artifact-directory path. The same repository, `.xd` and
+goldens therefore produce **byte-identical** report JSON when run twice into
+different artifact directories and output paths.
+
+A **positive** `unsupported_node_counts` for a mapped artboard is treated
+**fail-closed**: a visually incomplete XD reference is never measured as if it
+were complete. This says nothing about artboards outside these four — no claim
+is made that the exporter supports every future artboard.
+
+### Measurements only — there is no parity threshold
+
+Structural validation passes or fails. The visual numbers do not.
+
+- `measurement_status` has exactly one value: `"measured"`. It is never
+  `"passed"`, `"parity"` or `"pixel-perfect"`.
+- The report's `measurement_policy` block states this in machine-readable form:
+  `metrics_are_measurements_only: true`, `metrics_are_pass_fail: false`,
+  `parity_threshold_exists: false`, `parity_threshold: null`,
+  `pixel_perfect_claimed: false`,
+  `semantic_mapping_selected_by_visual_score: false`,
+  `semantic_mapping_selector: "xd_manifest_id"`.
+- **No parity threshold currently exists** anywhere in this tool, and no metric
+  is compared against one.
+- The semantic state for a seed is **never** selected from the lowest MAE. It is
+  fixed in `golden_mapping.json` and enforced by manifest id.
+
+**Visual remediation is a later phase.** This iteration only establishes the
+locked mapping and a reproducible way to measure it. Nothing here claims that
+any Flutter screen now matches its XD artboard, and in particular the four
+mappings above are semantic-state matches — the onboarding pair is explicitly
+not text-identical.
+
 ## Tests
 
 Hermetic `unittest` suite. It generates minimal `.xd` ZIP fixtures in temporary
-directories and never requires the real `design.xd`, a browser, or Pillow.
+directories and never requires the real `design.xd`, a browser, or Pillow. The
+comparator suite
+(`tools/xd_reference/tests/test_xd_flutter_comparator.py`) is hermetic in the
+same way: synthetic PNGs built with `struct`/`zlib` and synthetic mapping
+documents, so it needs neither `design.xd` nor a Flutter toolchain.
 
 ```bash
 python -m unittest discover -s tools/xd_reference/tests -p 'test_*.py' -v
