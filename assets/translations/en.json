@@ -501,7 +501,12 @@
     "showProduct": "Show on the storefront",
     "hideProduct": "Hide from the storefront",
     "duplicateProduct": "Duplicate product",
-    "deleteProduct": "Delete permanently"
+    "deleteProduct": "Delete permanently",
+    "profileTitle": "Profile",
+    "personalProfile": "Personal profile",
+    "contactUs": "Contact us",
+    "previewStore": "Preview my store",
+    "orderNotifications": "Order notifications"
   },
   "profile": {
     "title": "Profile"

@@ -172,7 +172,10 @@ const userSchema = new mongoose.Schema(
       contacts: { type: permissionConsentSchema, default: () => ({}) }
     },
     notificationPreferences: {
-      productOffers: { type: Boolean, default: true }
+      productOffers: { type: Boolean, default: true },
+      // The merchant's, kept apart from the customer's so silencing
+      // marketing cannot silence the notice that an order arrived.
+      orderUpdates: { type: Boolean, default: true }
     },
     isActive: { type: Boolean, default: true }
   },

@@ -102,7 +102,8 @@ class _PreferenceLocalizationGateway implements NotificationPreferenceGateway {
   @override
   Future<NotificationPreferenceSnapshot> update({
     required String token,
-    required bool productOffers,
+    required bool value,
+    String key = NotificationPreferenceKeys.productOffers,
   }) async {
     updateCalls += 1;
 
@@ -110,9 +111,9 @@ class _PreferenceLocalizationGateway implements NotificationPreferenceGateway {
       throw updateError!;
     }
 
-    this.productOffers = productOffers;
+    productOffers = value;
 
-    return NotificationPreferenceSnapshot(productOffers: productOffers);
+    return NotificationPreferenceSnapshot(productOffers: value);
   }
 }
 

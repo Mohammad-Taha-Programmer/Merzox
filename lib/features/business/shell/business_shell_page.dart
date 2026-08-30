@@ -18,6 +18,10 @@ import '../models/business_models.dart';
 import '../../orders/order_status_policy.dart';
 import '../orders/merchant_order_detail_page.dart';
 import '../settings/store_settings_page.dart';
+import 'package:merzox/features/notification_preferences/bloc/notification_preference_bloc.dart';
+import 'package:merzox/features/notification_preferences/bloc/notification_preference_event.dart';
+import 'package:merzox/features/notification_preferences/widgets/notification_preference_control.dart';
+import 'package:merzox/services/notification_preference_service.dart';
 import 'business_bloc.dart';
 import 'merchant_alert_bloc.dart';
 import 'merchant_browse_widgets.dart';
@@ -27,7 +31,18 @@ import 'merchant_product_images_page.dart';
 class BusinessShellPage extends StatelessWidget {
   final VoidCallback onLoggedOut;
 
-  const BusinessShellPage({super.key, required this.onLoggedOut});
+  /// Injectable so the profile tab's notification switch can be rendered
+  /// without a network, which is the only way a golden can capture it.
+  final NotificationPreferenceGateway? notificationPreferenceGateway;
+  final NotificationPreferenceSessionReader?
+  notificationPreferenceSessionReader;
+
+  const BusinessShellPage({
+    super.key,
+    required this.onLoggedOut,
+    this.notificationPreferenceGateway,
+    this.notificationPreferenceSessionReader,
+  });
 
   Future<void> _showCourierLocationHandoff(
     BuildContext context,
@@ -180,7 +195,14 @@ class BusinessShellPage extends StatelessWidget {
                     0 => _Dashboard(state: state),
                     1 => _Orders(state: state),
                     3 => _Products(state: state),
-                    4 => _Profile(state: state, onLogout: _logout),
+                    4 => _Profile(
+                      state: state,
+                      onLogout: _logout,
+                      notificationPreferenceGateway:
+                          notificationPreferenceGateway,
+                      notificationPreferenceSessionReader:
+                          notificationPreferenceSessionReader,
+                    ),
                     _ => _Dashboard(state: state),
                   },
                   const Positioned(
@@ -1149,106 +1171,116 @@ class _ProductImage extends StatelessWidget {
 class _Profile extends StatelessWidget {
   final BusinessState state;
   final VoidCallback onLogout;
-  const _Profile({required this.state, required this.onLogout});
+  final NotificationPreferenceGateway? notificationPreferenceGateway;
+  final NotificationPreferenceSessionReader?
+  notificationPreferenceSessionReader;
+
+  const _Profile({
+    required this.state,
+    required this.onLogout,
+    this.notificationPreferenceGateway,
+    this.notificationPreferenceSessionReader,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final business = state.business!;
+    final OwnerBusiness business = state.business!;
+
     return ListView(
-      children: [
+      padding: EdgeInsets.zero,
+      children: <Widget>[
+        _ProfileHeader(business: business),
+        const SizedBox(height: 18),
+        _ProfileMenuRow(
+          icon: Icons.person_outline_rounded,
+          label: 'businessShell.personalProfile'.tr(),
+          onTap: () => context.push('/profile/edit'),
+        ),
+        _ProfileMenuRow(
+          icon: Icons.settings_outlined,
+          label: 'storeSettings.title'.tr(),
+          onTap: () => _showProfileEditor(context, business),
+        ),
+        _ProfileMenuRow(
+          icon: Icons.chat_bubble_outline_rounded,
+          label: 'messages.title'.tr(),
+          onTap: () => context.push('/business/messages'),
+        ),
+        _ProfileMenuRow(
+          icon: Icons.phone_outlined,
+          label: 'businessShell.contactUs'.tr(),
+          // The About Us screen carries the company's contact details, which
+          // is where a merchant asking for help ends up regardless.
+          onTap: () => context.push('/about'),
+        ),
+        _ProfileMenuRow(
+          icon: Icons.visibility_outlined,
+          label: 'businessShell.previewStore'.tr(),
+          onTap: () => context.push('/business/preview'),
+        ),
+        _OrderNotificationsRow(
+          gateway: notificationPreferenceGateway,
+          sessionReader: notificationPreferenceSessionReader,
+        ),
+        const SizedBox(height: 10),
+        _ProfileMenuRow(
+          icon: Icons.logout_rounded,
+          label: 'businessShell.logout'.tr(),
+          onTap: onLogout,
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+}
+
+/// The band, the logo and the store's name.
+class _ProfileHeader extends StatelessWidget {
+  final OwnerBusiness business;
+
+  const _ProfileHeader({required this.business});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: <Widget>[
         Container(
-          height: 132,
-          color: MerzoxColors.kColor3D5A80,
+          height: 62,
+          width: double.infinity,
+          color: MerzoxColors.kColor98C1D9,
           alignment: Alignment.center,
-          child: CircleAvatar(
-            radius: 42,
-            backgroundColor: Colors.white,
-            backgroundImage: business.logoUrl.isEmpty
-                ? null
-                : NetworkImage(business.logoUrl),
-            child: business.logoUrl.isNotEmpty
-                ? null
-                : Text(
-                    business.name.isEmpty
-                        ? 'M'
-                        : business.name.characters.first,
-                    style: TextStyle(
-                      fontSize: 28,
-                      color: MerzoxColors.kColor3D5A80,
-                    ),
-                  ),
+          child: Text(
+            'businessShell.profileTitle'.tr(),
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+            ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              Text(
-                business.name,
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              if (business.englishName.isNotEmpty) Text(business.englishName),
-              const SizedBox(height: 6),
-              Text(
-                business.category,
-                style: TextStyle(color: MerzoxColors.kColor767676),
-              ),
-              const SizedBox(height: 18),
-              _ProfileLine(Icons.location_on_outlined, business.address),
-              _ProfileLine(Icons.description_outlined, business.description),
-              if (business.attachmentUrl.isNotEmpty)
-                _ProfileLine(Icons.attach_file_rounded, business.attachmentUrl),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => _showProfileEditor(context, business),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: Text('businessShell.editProfile'.tr()),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: MerzoxColors.kColor3D5A80,
+        const SizedBox(height: 18),
+        CircleAvatar(
+          radius: 26,
+          backgroundColor: Colors.white,
+          backgroundImage: business.logoUrl.isEmpty
+              ? null
+              : NetworkImage(business.logoUrl),
+          child: business.logoUrl.isNotEmpty
+              ? null
+              : Text(
+                  business.name.isEmpty ? 'M' : business.name.characters.first,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    color: MerzoxColors.kColor3D5A80,
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => _openStoreSettings(context, business),
-                  icon: const Icon(Icons.settings_outlined),
-                  label: Text('storeSettings.title'.tr()),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: MerzoxColors.kColor3D5A80),
-                    foregroundColor: MerzoxColors.kColor3D5A80,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  // Routed rather than pushed locally, so the preview passes
-                  // the business-only route guard and loads the storefront
-                  // from the public contract instead of inheriting the
-                  // merchant's own already-loaded owner state.
-                  onPressed: () => context.push('/business/preview'),
-                  icon: const Icon(Icons.visibility_outlined),
-                  label: Text('merchantPreview.open'.tr()),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: MerzoxColors.kColor3D5A80),
-                    foregroundColor: MerzoxColors.kColor3D5A80,
-                  ),
-                ),
-              ),
-              TextButton.icon(
-                onPressed: onLogout,
-                icon: const Icon(Icons.logout_rounded),
-                label: Text('businessShell.logout'.tr()),
-              ),
-            ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          business.name,
+          style: const TextStyle(
+            fontSize: 13,
+            color: MerzoxColors.kColor3B3B3B,
           ),
         ),
       ],
@@ -1256,17 +1288,86 @@ class _Profile extends StatelessWidget {
   }
 }
 
-void _openStoreSettings(BuildContext context, OwnerBusiness business) {
-  final bloc = context.read<BusinessBloc>();
+/// One menu row: an icon at the trailing edge, a chevron at the leading one.
+class _ProfileMenuRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
 
-  Navigator.of(context).push(
-    MaterialPageRoute<void>(
-      builder: (_) => BlocProvider.value(
-        value: bloc,
-        child: StoreSettingsPage(business: business),
+  const _ProfileMenuRow({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: Material(
+        color: MerzoxColors.kColorF7F8FA,
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: SizedBox(
+            height: 48,
+            child: Row(
+              children: <Widget>[
+                const SizedBox(width: 14),
+                const Icon(
+                  Icons.chevron_left_rounded,
+                  size: 20,
+                  color: MerzoxColors.kColorBEBEBE,
+                ),
+                Expanded(
+                  child: Text(
+                    label,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: MerzoxColors.kColor3B3B3B,
+                    ),
+                  ),
+                ),
+                Icon(icon, size: 20, color: MerzoxColors.kColor3D5A80),
+                const SizedBox(width: 14),
+              ],
+            ),
+          ),
+        ),
       ),
-    ),
-  );
+    );
+  }
+}
+
+/// The order-notification switch the artboard puts at the foot of the menu.
+///
+/// Its own bloc, keyed to the merchant's `orderUpdates`: the customer's
+/// marketing switch is a different preference, and a shop owner silencing
+/// offers must not silence the notice that an order arrived.
+class _OrderNotificationsRow extends StatelessWidget {
+  final NotificationPreferenceGateway? gateway;
+  final NotificationPreferenceSessionReader? sessionReader;
+
+  const _OrderNotificationsRow({this.gateway, this.sessionReader});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: BlocProvider<NotificationPreferenceBloc>(
+        create: (_) => NotificationPreferenceBloc(
+          gateway: gateway,
+          sessionReader: sessionReader,
+          preferenceKey: NotificationPreferenceKeys.orderUpdates,
+        )..add(const NotificationPreferenceStarted()),
+        child: const NotificationPreferenceControl(
+          labelKey: 'businessShell.orderNotifications',
+        ),
+      ),
+    );
+  }
 }
 
 class _ProfileLine extends StatelessWidget {

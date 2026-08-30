@@ -501,7 +501,12 @@
     "showProduct": "إظهار المنتج على المتجر",
     "hideProduct": "إخفاء المنتج عن المتجر",
     "duplicateProduct": "تكرار المنتج",
-    "deleteProduct": "حذف المنتج نهائيًا"
+    "deleteProduct": "حذف المنتج نهائيًا",
+    "profileTitle": "البروفايل",
+    "personalProfile": "الملف الشخصي",
+    "contactUs": "تواصل معنا",
+    "previewStore": "معاينة متجري",
+    "orderNotifications": "تنبيهات الطلبات"
   },
   "profile": {
     "title": "الملف الشخصي"

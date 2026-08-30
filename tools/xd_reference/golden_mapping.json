@@ -355,6 +355,45 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "The same results on the stores tab. Both artboards draw a store logo the catalogue does not expose, so the tiles here carry the placeholder the rest of the app uses."
+    },
+    {
+      "seed": "profile_guest",
+      "flutter_golden": "test/goldens/seed/profile_guest_ar_375x812.png",
+      "xd": {
+        "name": "البروفايل – 1",
+        "manifest_id": "6158e2a9-6c0a-4339-a56d-48c8ba2ba108",
+        "artboard_path": "artwork/artboard-b5c6bd68-f048-4631-bae6-44610335a099",
+        "width": 375,
+        "height": 1075
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The customer profile menu, signed out: a greeting with no name over edit-profile, my-orders, map, favourites, about-us, a notification toggle and share. Its signed-in sibling `البروفايل – 2` differs only in the avatar and the name. The residual is one deliberate divergence: the artboard draws the whole menu for a signed-out visitor with a register button, and the app draws a sign-in gate instead. Every row below that header — my orders, favourites, edit profile — needs an account, so the gate asks once rather than letting five rows refuse in turn."
+    },
+    {
+      "seed": "profile_merchant",
+      "flutter_golden": "test/goldens/seed/profile_merchant_ar_375x812.png",
+      "xd": {
+        "name": "البروفايل",
+        "manifest_id": "e5d63064-d49b-4cc9-a5a1-2053cb24300c",
+        "artboard_path": "artwork/artboard-6cc95e16-8971-4d50-ae3f-542d59d0201e",
+        "width": 375,
+        "height": 914
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The merchant profile menu: the store logo and name over personal profile, store settings, messages, contact us, preview my store and an order-notification toggle. Rebuilt from a profile card to this menu, 40.08 -> 15.16. Two of its rows had no way in before: the merchant's own messages were reachable only from the dashboard header, and there was no contact route at all."
+    },
+    {
+      "seed": "profile_form",
+      "flutter_golden": "test/goldens/seed/profile_form_ar_375x812.png",
+      "xd": {
+        "name": "تعديل الملف الشخصي",
+        "manifest_id": "d8998c46-d85a-4d14-ac6e-97c05d25666f",
+        "artboard_path": "artwork/artboard-6636840c-df3a-4c10-8a2f-d4f4a74452d3",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The profile form. `الملف الشخصي` draws the same surface with name, phone and email; this board adds gender and a birth date, which is the one the app implements."
     }
   ]
 }
