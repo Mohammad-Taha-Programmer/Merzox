@@ -446,6 +446,26 @@ class MappingContractTests(unittest.TestCase):
                     808,
                     "extend_final_row_to_812",
                 ),
+                (
+                    "merchant_orders",
+                    "test/goldens/seed/merchant_orders_ar_375x812.png",
+                    "الرئيسية – 9",
+                    "462b4c73-f68d-4ba2-8112-8b9880e2157e",
+                    "artwork/artboard-fa535226-cafd-4177-a74d-857c39ffe28c",
+                    375,
+                    808,
+                    "extend_final_row_to_812",
+                ),
+                (
+                    "merchant_products",
+                    "test/goldens/seed/merchant_products_ar_375x812.png",
+                    "الرئيسية – 10",
+                    "a137e484-7ab5-4c44-88f8-0611fbce6d39",
+                    "artwork/artboard-8b57a3af-6385-461a-af36-9ba3b74809cb",
+                    375,
+                    808,
+                    "extend_final_row_to_812",
+                ),
             ],
         )
 

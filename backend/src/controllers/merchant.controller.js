@@ -414,6 +414,30 @@ export const deleteMyBusinessProduct = asyncHandler(async (req, res) => {
   });
 });
 
+// The order search the merchant browse artboard offers.
+//
+// Its placeholder names the order number and the customer name, so those are
+// the only two fields matched. The needle is escaped before it reaches Mongo:
+// a customer called "a.*b" must not become a wildcard.
+export function ownerOrderSearchFilter(query = {}) {
+  const value = query.q;
+
+  if (value === undefined || value === null) return null;
+
+  if (Array.isArray(value)) {
+    throw new AppError('Order search is invalid', 400, 'INVALID_ORDER_SEARCH');
+  }
+
+  const needle = String(value).trim().slice(0, 80);
+  if (!needle) return null;
+
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return [
+    { publicId: { $regex: escaped, $options: 'i' } },
+    { customerName: { $regex: escaped, $options: 'i' } }
+  ];
+}
+
 export const listMyBusinessOrders = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);
   const { page, limit, skip } = paginationParams(req.query);
@@ -429,6 +453,9 @@ export const listMyBusinessOrders = asyncHandler(async (req, res) => {
       throw new AppError('Order status filter is invalid', 400, 'INVALID_ORDER_STATUS');
     }
   }
+
+  const search = ownerOrderSearchFilter(req.query);
+  if (search) filter.$or = search;
 
   const [orders, total, groupedCounts] = await Promise.all([
     Order.find(filter).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),

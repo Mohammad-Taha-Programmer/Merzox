@@ -21,9 +21,16 @@ final class BusinessRefreshed extends BusinessEvent {
   const BusinessRefreshed();
 }
 
-final class BusinessOrderGroupChanged extends BusinessEvent {
-  final String group;
-  const BusinessOrderGroupChanged(this.group);
+/// A change to either half of the order filter the browse artboard draws.
+///
+/// A null [status] means "no status filter" — the state the chip starts in —
+/// so the chip and the search field can each move without disturbing the
+/// other.
+final class BusinessOrderFilterChanged extends BusinessEvent {
+  final String? status;
+  final String query;
+
+  const BusinessOrderFilterChanged({this.status, this.query = ''});
 }
 
 final class BusinessOrderStatusChanged extends BusinessEvent {
@@ -83,7 +90,13 @@ final class CourierLocationHandoff {
 final class BusinessState {
   final BusinessStatus status;
   final int selectedTab;
-  final String orderGroup;
+
+  /// The status the chip is showing, or null while it reads "order status".
+  final String? orderStatusFilter;
+
+  /// What the merchant typed into the order search field.
+  final String orderQuery;
+
   final OwnerBusiness? business;
   final BusinessDashboardData? dashboard;
   final List<OwnerOrder> orders;
@@ -100,7 +113,8 @@ final class BusinessState {
   const BusinessState({
     this.status = BusinessStatus.initial,
     this.selectedTab = 0,
-    this.orderGroup = 'current',
+    this.orderStatusFilter,
+    this.orderQuery = '',
     this.business,
     this.dashboard,
     this.orders = const [],
@@ -114,7 +128,9 @@ final class BusinessState {
   BusinessState copyWith({
     BusinessStatus? status,
     int? selectedTab,
-    String? orderGroup,
+    String? orderStatusFilter,
+    bool clearOrderStatusFilter = false,
+    String? orderQuery,
     OwnerBusiness? business,
     BusinessDashboardData? dashboard,
     List<OwnerOrder>? orders,
@@ -127,7 +143,10 @@ final class BusinessState {
   }) => BusinessState(
     status: status ?? this.status,
     selectedTab: selectedTab ?? this.selectedTab,
-    orderGroup: orderGroup ?? this.orderGroup,
+    orderStatusFilter: clearOrderStatusFilter
+        ? null
+        : orderStatusFilter ?? this.orderStatusFilter,
+    orderQuery: orderQuery ?? this.orderQuery,
     business: business ?? this.business,
     dashboard: dashboard ?? this.dashboard,
     orders: orders ?? this.orders,
@@ -156,7 +175,7 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
       emit(state.copyWith(selectedTab: event.index));
     });
     on<BusinessRefreshed>(_onRefreshed);
-    on<BusinessOrderGroupChanged>(_onOrderGroupChanged);
+    on<BusinessOrderFilterChanged>(_onOrderFilterChanged);
     on<BusinessOrderStatusChanged>(_onOrderStatusChanged);
     on<BusinessOrderCourierAssigned>(_onOrderCourierAssigned);
     on<BusinessCourierLocationHandoffConsumed>((event, emit) {
@@ -199,7 +218,7 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
       final results = await Future.wait<dynamic>([
         _apiService.ownerBusiness(token: token),
         _apiService.businessDashboard(token: token),
-        _apiService.ownerOrders(token: token, statusGroup: state.orderGroup),
+        _ownerOrders(token),
         _apiService.ownerProducts(token: token),
       ]);
       final orderList = results[2] as OwnerOrderList;
@@ -223,18 +242,28 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     }
   }
 
-  Future<void> _onOrderGroupChanged(
-    BusinessOrderGroupChanged event,
+  /// The one place that builds the order request, so the mutually exclusive
+  /// `status` and `statusGroup` pair can never both be sent.
+  Future<OwnerOrderList> _ownerOrders(String token) => _apiService.ownerOrders(
+    token: token,
+    status: state.orderStatusFilter ?? '',
+    query: state.orderQuery,
+  );
+
+  Future<void> _onOrderFilterChanged(
+    BusinessOrderFilterChanged event,
     Emitter<BusinessState> emit,
   ) async {
     emit(
-      state.copyWith(orderGroup: event.group, status: BusinessStatus.loading),
+      state.copyWith(
+        status: BusinessStatus.loading,
+        orderStatusFilter: event.status,
+        clearOrderStatusFilter: event.status == null,
+        orderQuery: event.query,
+      ),
     );
     try {
-      final list = await _apiService.ownerOrders(
-        token: await _token(),
-        statusGroup: event.group,
-      );
+      final list = await _ownerOrders(await _token());
       emit(
         state.copyWith(
           status: BusinessStatus.ready,
@@ -263,10 +292,7 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
         orderId: event.orderId,
         status: event.status,
       );
-      final list = await _apiService.ownerOrders(
-        token: await _token(),
-        statusGroup: state.orderGroup,
-      );
+      final list = await _ownerOrders(await _token());
       final dashboard = await _apiService.businessDashboard(
         token: await _token(),
       );

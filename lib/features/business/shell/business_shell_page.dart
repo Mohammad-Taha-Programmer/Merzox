@@ -19,6 +19,7 @@ import '../../orders/order_status_policy.dart';
 import '../orders/merchant_order_detail_page.dart';
 import '../settings/store_settings_page.dart';
 import 'business_bloc.dart';
+import 'merchant_browse_widgets.dart';
 
 class BusinessShellPage extends StatelessWidget {
   final VoidCallback onLoggedOut;
@@ -355,10 +356,17 @@ class _Dashboard extends StatelessWidget {
 class _RecentOrdersTable extends StatelessWidget {
   final List<OwnerOrder> orders;
 
-  const _RecentOrdersTable({required this.orders});
+  /// Null on the dashboard, where the table is a summary; the orders tab
+  /// passes a callback so a row opens the order it names.
+  final void Function(OwnerOrder order)? onOpen;
+
+  const _RecentOrdersTable({required this.orders, this.onOpen});
 
   static const double _headerHeight = 48;
   static const double _rowHeight = 37;
+
+  /// The artboard's first row starts 8 below the header, not flush with it.
+  static const double _bodyInset = 8;
 
   /// Column weights, in reading order: number, date, customer, price, status.
   static const List<int> _weights = <int>[4, 4, 4, 2, 4];
@@ -391,40 +399,24 @@ class _RecentOrdersTable extends StatelessWidget {
                       child: Text(
                         headings[column],
                         textAlign: TextAlign.center,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
                 ],
               ),
             ),
+            const ColoredBox(
+              color: MerzoxColors.kColorFDFDFD,
+              child: SizedBox(height: _bodyInset, width: double.infinity),
+            ),
             for (final OwnerOrder order in orders)
-              SizedBox(
-                height: _rowHeight,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    children: <Widget>[
-                      _Cell(flex: _weights[0], text: '#${order.publicId}'),
-                      _Cell(
-                        flex: _weights[1],
-                        text: _shortDate(order.createdAt),
-                      ),
-                      _Cell(flex: _weights[2], text: order.customerName),
-                      _Cell(flex: _weights[3], text: merzoxAmount(order.total)),
-                      Expanded(
-                        flex: _weights[4],
-                        child: Center(child: _StatusBadge(order.status)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+              _OrderRow(order: order, onOpen: onOpen),
           ],
         ),
       ),
@@ -432,11 +424,73 @@ class _RecentOrdersTable extends StatelessWidget {
   }
 }
 
+/// One 37-tall table row.
+class _OrderRow extends StatelessWidget {
+  final OwnerOrder order;
+  final void Function(OwnerOrder order)? onOpen;
+
+  const _OrderRow({required this.order, this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget row = SizedBox(
+      height: _RecentOrdersTable._rowHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Row(
+          children: <Widget>[
+            _Cell(
+              flex: _RecentOrdersTable._weights[0],
+              text: '#${order.publicId}',
+            ),
+            _Cell(
+              flex: _RecentOrdersTable._weights[1],
+              text: _shortDate(order.createdAt),
+            ),
+            _Cell(
+              flex: _RecentOrdersTable._weights[2],
+              text: order.customerName,
+            ),
+            // The only emphasised value in the row, at 14 bold.
+            _Cell(
+              flex: _RecentOrdersTable._weights[3],
+              text: merzoxAmount(order.total),
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+            Expanded(
+              flex: _RecentOrdersTable._weights[4],
+              child: Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: _StatusBadge(order.status),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    return ColoredBox(
+      color: MerzoxColors.kColorFDFDFD,
+      child: onOpen == null
+          ? row
+          : InkWell(onTap: () => onOpen!(order), child: row),
+    );
+  }
+}
+
 class _Cell extends StatelessWidget {
   final int flex;
   final String text;
+  final double fontSize;
+  final FontWeight fontWeight;
 
-  const _Cell({required this.flex, required this.text});
+  const _Cell({
+    required this.flex,
+    required this.text,
+    this.fontSize = 11,
+    this.fontWeight = FontWeight.w400,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -447,7 +501,11 @@ class _Cell extends StatelessWidget {
         textAlign: TextAlign.center,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontSize: 10, color: MerzoxColors.kColor3B3B3B),
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          color: MerzoxColors.kColor3B3B3B,
+        ),
       ),
     );
   }
@@ -488,75 +546,93 @@ class _Metric extends StatelessWidget {
   );
 }
 
+/// The merchant order list, as `الرئيسية – 9` draws it.
+///
+/// One table holding every status at once, filtered by the chip above it and
+/// searched by number or customer name — the segmented current/completed/
+/// cancelled control this replaces is not in the design.
 class _Orders extends StatelessWidget {
   final BusinessState state;
   const _Orders({required this.state});
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      _PageHeader(
-        title: 'businessShell.incomingOrders'.tr(),
-        subtitle: 'businessShell.ordersSubtitle'.tr(),
-      ),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: SegmentedButton<String>(
-          segments: [
-            ButtonSegment(
-              value: 'current',
-              label: Text(
-                'businessShell.orderGroups.current'.tr(
-                  args: [state.orderCounts['current']?.toString() ?? ''],
-                ),
-              ),
-            ),
-            ButtonSegment(
-              value: 'completed',
-              label: Text(
-                'businessShell.orderGroups.completed'.tr(
-                  args: [state.orderCounts['completed']?.toString() ?? ''],
-                ),
-              ),
-            ),
-            ButtonSegment(
-              value: 'cancelled',
-              label: Text(
-                'businessShell.orderGroups.cancelled'.tr(
-                  args: [state.orderCounts['cancelled']?.toString() ?? ''],
-                ),
-              ),
-            ),
-          ],
-          selected: {state.orderGroup},
-          onSelectionChanged: (selection) => context.read<BusinessBloc>().add(
-            BusinessOrderGroupChanged(selection.first),
+  Widget build(BuildContext context) {
+    final BusinessBloc bloc = context.read<BusinessBloc>();
+
+    return Column(
+      children: <Widget>[
+        MerchantTopBar(
+          title: 'businessShell.ordersTitle'.tr(),
+          leading: NotificationBadgeButton(
+            tooltip: 'notifications.title'.tr(),
+            businessAudience: true,
+            onPressed: () => context.push('/notifications?audience=business'),
+            iconSize: 24,
+            badgeSize: 8,
           ),
         ),
-      ),
-      const SizedBox(height: 12),
-      Expanded(
-        child: RefreshIndicator(
-          onRefresh: () async =>
-              context.read<BusinessBloc>().add(const BusinessRefreshed()),
-          child: state.orders.isEmpty
-              ? ListView(
-                  children: [_Empty(message: 'businessShell.noOrders'.tr())],
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  itemCount: state.orders.length,
-                  itemBuilder: (_, index) => _OrderTile(
-                    order: state.orders[index],
-                    onOpen: () =>
-                        _openOrderDetail(context, state, state.orders[index]),
-                  ),
-                ),
+        const SizedBox(height: kMerchantTopBarToSearch),
+        MerchantSearchRow(
+          hint: 'businessShell.orderSearchPlaceholder'.tr(),
+          onChanged: (String value) => bloc.add(
+            BusinessOrderFilterChanged(
+              status: state.orderStatusFilter,
+              query: value,
+            ),
+          ),
         ),
-      ),
-    ],
-  );
+        const SizedBox(height: kMerchantSearchToSection),
+        MerchantSectionRow(
+          heading: 'businessShell.allOrders'.tr(),
+          trailing: MerchantStatusFilterChip(
+            selected: state.orderStatusFilter,
+            options: _kOrderFilterStatuses,
+            labelOf: _statusLabel,
+            onSelected: (String? status) => bloc.add(
+              BusinessOrderFilterChanged(
+                status: status,
+                query: state.orderQuery,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () async => bloc.add(const BusinessRefreshed()),
+            child: state.orders.isEmpty
+                ? ListView(
+                    children: <Widget>[
+                      _Empty(message: 'businessShell.noOrders'.tr()),
+                    ],
+                  )
+                : ListView(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    children: <Widget>[
+                      _RecentOrdersTable(
+                        orders: state.orders,
+                        onOpen: (OwnerOrder order) =>
+                            _openOrderDetail(context, state, order),
+                      ),
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
 }
+
+/// The four statuses `الرئيسية – 11` lists when the chip is open.
+///
+/// `pending` is deliberately absent: the artboard's menu does not offer it,
+/// even though the table below draws new orders with their own chip.
+const List<String> _kOrderFilterStatuses = <String>[
+  'preparing',
+  'outForDelivery',
+  'delivered',
+  'cancelled',
+];
 
 /// Opens the merchant order screen, wiring its actions back to the shell's
 /// bloc so a status change refreshes the list the user returns to.
@@ -734,7 +810,9 @@ class _StatusBadge extends StatelessWidget {
   const _StatusBadge(this.status);
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+    width: 58,
+    height: 19,
+    alignment: Alignment.center,
     decoration: BoxDecoration(
       color: _statusColors[status] ?? MerzoxColors.kColorDEEEF8,
       borderRadius: BorderRadius.circular(4),
@@ -743,82 +821,168 @@ class _StatusBadge extends StatelessWidget {
       _statusLabel(status),
       maxLines: 1,
       overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 10, color: MerzoxColors.kColor3B3B3B),
+      style: const TextStyle(fontSize: 11, color: MerzoxColors.kColor3B3B3B),
     ),
   );
 }
 
-class _Products extends StatelessWidget {
+/// The merchant product list, as `الرئيسية – 10` draws it.
+///
+/// The whole catalogue arrives in one response, so the search field filters it
+/// here rather than asking the server for a page it already holds.
+class _Products extends StatefulWidget {
   final BusinessState state;
   const _Products({required this.state});
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      _PageHeader(
-        title: 'businessShell.productsTitle'.tr(),
-        subtitle: 'businessShell.productsSummary'.tr(
-          args: [state.products.length.toString()],
+  State<_Products> createState() => _ProductsState();
+}
+
+class _ProductsState extends State<_Products> {
+  String _query = '';
+
+  List<OwnerProduct> get _visible {
+    final String needle = _query.trim().toLowerCase();
+    if (needle.isEmpty) return widget.state.products;
+
+    return widget.state.products
+        .where(
+          (OwnerProduct product) =>
+              product.name.toLowerCase().contains(needle) ||
+              product.description.toLowerCase().contains(needle),
+        )
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<OwnerProduct> products = _visible;
+
+    return Column(
+      children: <Widget>[
+        MerchantTopBar(
+          title: 'businessShell.productsHeading'.tr(),
+          leading: IconButton(
+            tooltip: 'businessShell.addNewProduct'.tr(),
+            onPressed: () => _showProductEditor(context),
+            icon: const Icon(
+              Icons.add_circle_outline_rounded,
+              size: 24,
+              color: MerzoxColors.kColor98C1D9,
+            ),
+          ),
+        ),
+        const SizedBox(height: kMerchantTopBarToSearch),
+        MerchantSearchRow(
+          hint: 'businessShell.productSearchPlaceholder'.tr(),
+          onChanged: (String value) => setState(() => _query = value),
+        ),
+        const SizedBox(height: kMerchantSearchToSection),
+        MerchantSectionRow(
+          heading: 'businessShell.allProducts'.tr(),
+          trailing: TextButton(
+            onPressed: () => _showProductEditor(context),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              'businessShell.addNewProduct'.tr(),
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: MerzoxColors.kColor9F9F9F,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Expanded(
+          child: products.isEmpty
+              ? _Empty(
+                  message: 'businessShell.noProducts'.tr(),
+                  action: _query.isNotEmpty
+                      ? null
+                      : FilledButton.icon(
+                          onPressed: () => _showProductEditor(context),
+                          icon: const Icon(Icons.add),
+                          label: Text('businessShell.addProduct'.tr()),
+                        ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(
+                    kMerchantGutter,
+                    0,
+                    kMerchantGutter,
+                    20,
+                  ),
+                  itemCount: products.length,
+                  itemBuilder: (_, int index) => MerchantProductCard(
+                    product: products[index],
+                    onOpen: () =>
+                        _showProductEditor(context, product: products[index]),
+                    onActionsPressed: () =>
+                        _confirmProductDeletion(context, products[index]),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+/// `الرئيسية – 15` gates deletion behind a yes/no dialog, which the list it
+/// replaces did not: a stray tap on the old menu removed a product outright.
+Future<void> _confirmProductDeletion(
+  BuildContext context,
+  OwnerProduct product,
+) async {
+  final BusinessBloc bloc = context.read<BusinessBloc>();
+  final bool? confirmed = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext dialogContext) => AlertDialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      icon: const Icon(
+        Icons.error_outline_rounded,
+        size: 32,
+        color: MerzoxColors.kColorEE6C4D,
+      ),
+      content: Text(
+        'businessShell.deleteProductTitle'.tr(),
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          color: MerzoxColors.kColor2B2B2B,
         ),
       ),
-      Expanded(
-        child: state.products.isEmpty
-            ? _Empty(
-                message: 'businessShell.noProducts'.tr(),
-                action: FilledButton.icon(
-                  onPressed: () => _showProductEditor(context),
-                  icon: const Icon(Icons.add),
-                  label: Text('businessShell.addProduct'.tr()),
-                ),
-              )
-            : ListView.builder(
-                padding: const EdgeInsets.only(bottom: 20),
-                itemCount: state.products.length,
-                itemBuilder: (_, index) {
-                  final product = state.products[index];
-                  return Card(
-                    color: Colors.white,
-                    margin: const EdgeInsets.fromLTRB(16, 5, 16, 7),
-                    child: ListTile(
-                      leading: _ProductImage(product.imageUrl),
-                      title: Text(
-                        product.name,
-                        style: const TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: Text(
-                        '${merzoxAmount(product.price)} ₪ • '
-                        '${product.isService ? 'businessShell.service'.tr() : 'businessShell.product'.tr()}',
-                      ),
-                      trailing: PopupMenuButton<String>(
-                        onSelected: (action) {
-                          if (action == 'edit') {
-                            _showProductEditor(context, product: product);
-                          } else {
-                            context.read<BusinessBloc>().add(
-                              BusinessProductDeleted(product.id),
-                            );
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          PopupMenuItem(
-                            value: 'edit',
-                            child: Text('common.edit'.tr()),
-                          ),
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Text('common.delete'.tr()),
-                          ),
-                        ],
-                      ),
-                      onTap: () =>
-                          _showProductEditor(context, product: product),
-                    ),
-                  );
-                },
-              ),
-      ),
-    ],
+      actionsAlignment: MainAxisAlignment.center,
+      actions: <Widget>[
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          style: FilledButton.styleFrom(
+            backgroundColor: MerzoxColors.kColorEE6C4D,
+            fixedSize: const Size(102, 40),
+          ),
+          child: Text('common.confirm'.tr()),
+        ),
+        OutlinedButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: MerzoxColors.kColor2B2B2B,
+            fixedSize: const Size(84, 40),
+          ),
+          child: Text('common.cancel'.tr()),
+        ),
+      ],
+    ),
   );
+
+  if (confirmed ?? false) {
+    bloc.add(BusinessProductDeleted(product.id));
+  }
 }
 
 class _ProductImage extends StatelessWidget {

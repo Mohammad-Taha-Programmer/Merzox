@@ -462,7 +462,18 @@
     "orderDate": "التاريخ",
     "orderCustomer": "اسم العميل",
     "orderPrice": "السعر",
-    "orderStatus": "حالة الطلب"
+    "orderStatus": "حالة الطلب",
+    "ordersTitle": "الطلبات",
+    "allOrders": "جميع الطلبات",
+    "orderSearchPlaceholder": "ابحث برقم الطلب ، اسم العميل",
+    "productsHeading": "المنتجات",
+    "allProducts": "جميع المنتجات",
+    "addNewProduct": "إضافة منتج جديد",
+    "productSearchPlaceholder": "ابحث باسم المنتج ، أو وصفه",
+    "productQuantity": "الكمية",
+    "productClassification": "تصنيف المنتج",
+    "published": "منشور",
+    "deleteProductTitle": "هل تريد حذف المنتج نهائيًا؟"
   },
   "profile": {
     "title": "الملف الشخصي"

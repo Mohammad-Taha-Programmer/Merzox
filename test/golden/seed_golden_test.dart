@@ -429,7 +429,9 @@ final class _SeedMerchantApi extends ApiService {
   @override
   Future<OwnerOrderList> ownerOrders({
     required String token,
-    String? statusGroup,
+    String statusGroup = '',
+    String status = '',
+    String query = '',
     int page = 1,
     int limit = 20,
   }) async => OwnerOrderList.fromJson(const <String, dynamic>{});
@@ -479,6 +481,62 @@ final class _SeedDashboardApi extends _SeedMerchantApi {
         for (int index = 0; index < 5; index++) _seedOwnerOrder(index),
       ],
     });
+  }
+}
+
+/// The merchant order list, with the ten rows `الرئيسية – 9` tabulates.
+final class _SeedMerchantOrdersApi extends _SeedMerchantApi {
+  @override
+  Future<OwnerOrderList> ownerOrders({
+    required String token,
+    String statusGroup = '',
+    String status = '',
+    String query = '',
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return OwnerOrderList.fromJson(<String, dynamic>{
+      'orders': <Map<String, dynamic>>[
+        for (int index = 0; index < 10; index++) _seedOwnerOrder(index % 5),
+      ],
+      'counts': const <String, dynamic>{
+        'current': 6,
+        'completed': 2,
+        'cancelled': 2,
+        'total': 10,
+      },
+    });
+  }
+}
+
+/// The merchant catalogue, with the four cards `الرئيسية – 10` lists.
+///
+/// No image URL: a golden must not reach the network, so every card draws the
+/// same local placeholder and the measurement stays about the card, not the
+/// photograph inside it.
+final class _SeedMerchantProductsApi extends _SeedMerchantApi {
+  @override
+  Future<List<OwnerProduct>> ownerProducts({required String token}) async {
+    return <OwnerProduct>[
+      for (int index = 0; index < 4; index++)
+        OwnerProduct.fromJson(<String, dynamic>{
+          'id': '64d0000000000000000000$index',
+          'name': 'أساس فت مي',
+          'description': 'وصف المنتج',
+          'price': 35,
+          'stockQuantity': 40,
+          'unlimitedStock': false,
+          'discountPercent': 0,
+          'finalPrice': 35,
+          'inStock': true,
+          'keywords': const <String>[],
+          'imageUrls': const <String>[],
+          'classification': 'جديد',
+          'isService': false,
+          'isActive': true,
+          'variants': const <Map<String, dynamic>>[],
+        }),
+    ];
   }
 }
 
@@ -1302,6 +1360,85 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
 
         await expectMerzoxSeedGolden('merchant_dashboard_ar_375x812.png');
+      });
+
+      // -- 17/18. The two merchant browse tabs ----------------------------
+      //
+      // `الرئيسية – 9` and `الرئيسية – 10` are the orders and products tabs of
+      // the same shell, so both seeds differ only in which tab is selected and
+      // which API answers.
+      Future<BusinessBloc> merchantShell(ApiService api, int tab) async {
+        _useAuthenticatedMerchantSession();
+
+        final BusinessBloc bloc = BusinessBloc(apiService: api);
+        _closeOnTearDown(bloc);
+
+        final Future<BusinessState> ready = bloc.stream.firstWhere(
+          (BusinessState state) => state.status == BusinessStatus.ready,
+        );
+        bloc.add(const BusinessStarted());
+        await ready;
+        bloc.add(BusinessTabChanged(tab));
+        await bloc.stream.firstWhere(
+          (BusinessState state) => state.selectedTab == tab,
+        );
+
+        return bloc;
+      }
+
+      testWidgets('merchant orders tab renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final BusinessBloc bloc = await merchantShell(
+          _SeedMerchantOrdersApi(),
+          1,
+        );
+
+        expect(bloc.state.orders, hasLength(10));
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              BusinessShellPage(onLoggedOut: () {}),
+            ),
+          ),
+        );
+
+        expect(find.text('جميع الطلبات'), findsOneWidget);
+        expect(find.text('حالة الطلب'), findsWidgets);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('merchant_orders_ar_375x812.png');
+      });
+
+      testWidgets('merchant products tab renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final BusinessBloc bloc = await merchantShell(
+          _SeedMerchantProductsApi(),
+          3,
+        );
+
+        expect(bloc.state.products, hasLength(4));
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              BusinessShellPage(onLoggedOut: () {}),
+            ),
+          ),
+        );
+
+        expect(find.text('جميع المنتجات'), findsOneWidget);
+        expect(find.text('إضافة منتج جديد'), findsOneWidget);
+        expect(find.text('منشور'), findsNWidgets(4));
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('merchant_products_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

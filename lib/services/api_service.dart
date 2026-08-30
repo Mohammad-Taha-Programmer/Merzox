@@ -612,16 +612,31 @@ class ApiService {
     );
   }
 
+  /// Lists the merchant's own orders.
+  ///
+  /// [statusGroup] and [status] are mutually exclusive: the server reads
+  /// `statusGroup` first, so a caller that sent both would find [status]
+  /// quietly dropped. Passing neither lists every order, which is the state
+  /// the merchant browse artboard draws.
   Future<OwnerOrderList> ownerOrders({
     required String token,
-    String statusGroup = 'current',
+    String statusGroup = '',
+    String status = '',
+    String query = '',
     int page = 1,
     int limit = 30,
   }) async {
+    assert(
+      statusGroup.isEmpty || status.isEmpty,
+      'ownerOrders takes a status group or a status, never both.',
+    );
+
     final response = await _dio.get<Map<String, dynamic>>(
       '/businesses/me/orders',
-      queryParameters: {
-        'statusGroup': statusGroup,
+      queryParameters: <String, dynamic>{
+        if (statusGroup.isNotEmpty) 'statusGroup': statusGroup,
+        if (status.isNotEmpty) 'status': status,
+        if (query.isNotEmpty) 'q': query,
         'page': page,
         'limit': limit,
       },

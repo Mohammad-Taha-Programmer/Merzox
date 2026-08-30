@@ -462,7 +462,18 @@
     "orderDate": "Date",
     "orderCustomer": "Customer",
     "orderPrice": "Price",
-    "orderStatus": "Status"
+    "orderStatus": "Status",
+    "ordersTitle": "Orders",
+    "allOrders": "All orders",
+    "orderSearchPlaceholder": "Search by order number, customer name",
+    "productsHeading": "Products",
+    "allProducts": "All products",
+    "addNewProduct": "Add a new product",
+    "productSearchPlaceholder": "Search by product name or description",
+    "productQuantity": "Quantity",
+    "productClassification": "Product category",
+    "published": "Published",
+    "deleteProductTitle": "Delete this product permanently?"
   },
   "profile": {
     "title": "Profile"

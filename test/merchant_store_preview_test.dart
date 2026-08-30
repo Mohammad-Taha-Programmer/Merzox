@@ -196,7 +196,9 @@ class _SpyMerchantApi extends ApiService {
   @override
   Future<OwnerOrderList> ownerOrders({
     required String token,
-    String? statusGroup,
+    String statusGroup = '',
+    String status = '',
+    String query = '',
     int page = 1,
     int limit = 20,
   }) async => OwnerOrderList.fromJson(const {});
