@@ -115,6 +115,12 @@ BLUR_AMOUNT_TO_STD_DEVIATION = 0.5
 #: XD drop shadow ``r`` (blur radius) -> SVG ``feDropShadow/@stdDeviation``.
 SHADOW_RADIUS_TO_STD_DEVIATION = 0.5
 
+#: XD backdrop-blur ``brightnessAmount`` (-50..50) -> CSS ``brightness()``.
+#: XD presents the control as a percentage adjustment, so the amount is read
+#: as one: 15 becomes ``brightness(1.15)``. Deterministic and documented, NOT
+#: a reproduction of XD's own tone curve.
+BRIGHTNESS_AMOUNT_TO_CSS_SCALE = 0.01
+
 #: Adobe XD image-fill "cover" semantics: preserve the bitmap aspect ratio,
 #: scale until the shape is fully covered, crop the overflow.
 COVER_PRESERVE_ASPECT_RATIO = "xMidYMid slice"
@@ -715,6 +721,7 @@ class ExportReport:
         self.visible_blur_count: int = 0
         self.hidden_blur_count: int = 0
         self.unsupported_background_blur_count: int = 0
+        self.background_blur_count: int = 0
         self.clip_path_count: int = 0
 
         self.brand_normalization_enabled: bool = False
@@ -825,6 +832,7 @@ class ExportReport:
                 ("visible_drop_shadow_count", self.visible_drop_shadow_count),
                 ("visible_blur_count", self.visible_blur_count),
                 ("hidden_blur_count", self.hidden_blur_count),
+                ("background_blur_count", self.background_blur_count),
                 (
                     "unsupported_background_blur_count",
                     self.unsupported_background_blur_count,
@@ -836,6 +844,9 @@ class ExportReport:
                     "approximation_mapping",
                     {
                         "blur_amount_to_std_deviation": BLUR_AMOUNT_TO_STD_DEVIATION,
+                        "brightness_amount_to_css_scale": (
+                            BRIGHTNESS_AMOUNT_TO_CSS_SCALE
+                        ),
                         "shadow_radius_to_std_deviation": SHADOW_RADIUS_TO_STD_DEVIATION,
                     },
                 ),
@@ -1658,6 +1669,17 @@ class AgcRenderer:
         wrapper_attrs = self._wrapper_attributes(node, style)
         inner_depth = depth + (1 if wrapper_attrs else 0)
 
+        if node_type != "shape" and self.visible_background_blur(style) is not None:
+            # Only a shape has geometry to blur behind, so a backdrop blur
+            # anywhere else stays unsupported rather than being dropped in
+            # silence.
+            self.report.unsupported_background_blur_count += 1
+            self.report.count_unsupported(
+                f"filter:uxdesign#blur:background:{node_type}",
+                f"A backdrop blur was carried by a {node_type!r} node. Only a shape "
+                "has the geometry a backdrop box needs, so it was not applied.",
+            )
+
         if node_type in ("group", "artboard"):
             self.report.count_handled(node_type)
             body = self.render_nodes(child_nodes_of(node), inner_depth)
@@ -2011,6 +2033,116 @@ class AgcRenderer:
             out.extend(self._clip_geometry(child))
         return out
 
+    # -- backdrop blur ----------------------------------------------------
+    @staticmethod
+    def visible_background_blur(style: Any) -> Optional[Dict[str, Any]]:
+        """The node's live backdrop-blur parameters, or None.
+
+        An invisible blur is not one, and a zero-amount blur with no brightness
+        change has nothing to render.
+        """
+        if not isinstance(style, dict):
+            return None
+        filters = style.get("filters")
+        if not isinstance(filters, list):
+            return None
+
+        for entry in filters:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("type") not in ("uxdesign#blur", "blur"):
+                continue
+            if entry.get("visible") is False:
+                continue
+            params = entry.get("params")
+            if not isinstance(params, dict):
+                continue
+            if params.get("backgroundEffect") is not True:
+                continue
+            if (
+                to_float(params.get("blurAmount"), 0.0) <= 0
+                and to_float(params.get("brightnessAmount"), 0.0) == 0
+            ):
+                continue
+            return params
+
+        return None
+
+    def _render_background_blur(
+        self, params: Dict[str, Any], geometry: "ShapeGeometry", depth: int
+    ) -> List[str]:
+        """The backdrop effect as a foreignObject carrying a CSS filter.
+
+        Only an axis-aligned rectangle is accepted. A CSS box can carry a
+        uniform `border-radius`, and nothing else here can be clipped to an
+        arbitrary XD path without inventing geometry, so any other shape stays
+        unsupported and the artboard keeps failing closed.
+        """
+        if geometry.tag != "rect":
+            self.report.unsupported_background_blur_count += 1
+            self.report.count_unsupported(
+                "filter:uxdesign#blur:background:shape",
+                "A backdrop blur was carried by a non-rectangular shape. Only an "
+                "axis-aligned rectangle maps onto a CSS box, so this one was not "
+                "applied.",
+            )
+            return []
+
+        blur_px = to_float(params.get("blurAmount"), 0.0) * BLUR_AMOUNT_TO_STD_DEVIATION
+        brightness = 1.0 + (
+            to_float(params.get("brightnessAmount"), 0.0)
+            * BRIGHTNESS_AMOUNT_TO_CSS_SCALE
+        )
+
+        functions: List[str] = []
+        if blur_px > 0:
+            functions.append(f"blur({fmt_num(blur_px)}px)")
+        if abs(brightness - 1.0) > 1e-9:
+            functions.append(f"brightness({fmt_num(max(brightness, 0.0))})")
+        css_filter = " ".join(functions)
+
+        attrs = OrderedDict(
+            [
+                ("x", geometry.attrs.get("x", "0")),
+                ("y", geometry.attrs.get("y", "0")),
+                ("width", geometry.attrs.get("width", "0")),
+                ("height", geometry.attrs.get("height", "0")),
+            ]
+        )
+
+        radius = geometry.attrs.get("rx")
+        box_style = [
+            f"width:{geometry.attrs.get('width', '0')}px",
+            f"height:{geometry.attrs.get('height', '0')}px",
+        ]
+        if radius:
+            box_style.append(f"border-radius:{radius}px")
+        # Both spellings: the renderer is Chromium today, and the unprefixed
+        # property is the one that will still be there tomorrow.
+        box_style.append(f"backdrop-filter:{css_filter}")
+        box_style.append(f"-webkit-backdrop-filter:{css_filter}")
+
+        self.report.background_blur_count += 1
+        self.report.count_handled("filter:uxdesign#blur:background")
+        self.report.note_limitation(
+            "uxdesign#blur with backgroundEffect=true is rendered as a CSS "
+            "backdrop-filter inside an SVG foreignObject, with blur(px) = "
+            f"blurAmount * {BLUR_AMOUNT_TO_STD_DEVIATION} and brightness() = 1 + "
+            f"brightnessAmount * {BRIGHTNESS_AMOUNT_TO_CSS_SCALE}. The effect is "
+            "real - the browser blurs what is actually behind the box - but the "
+            "parameter mapping is a deterministic approximation of XD's own "
+            "kernel and tone curve, and it requires a renderer that implements "
+            "backdrop-filter."
+        )
+
+        pad = "  " * depth
+        return [
+            f"{pad}<foreignObject {attrs_to_string(attrs)}>",
+            f'{pad}  <div xmlns="http://www.w3.org/1999/xhtml" '
+            f'style="{";".join(box_style)}"></div>',
+            f"{pad}</foreignObject>",
+        ]
+
     # -- filters ----------------------------------------------------------
     def _build_filter(self, style: Dict[str, Any]) -> Optional[str]:
         filters = style.get("filters")
@@ -2090,13 +2222,11 @@ class AgcRenderer:
             return []
         params = entry.get("params") if isinstance(entry.get("params"), dict) else {}
         if params.get("backgroundEffect") is True:
-            self.report.unsupported_background_blur_count += 1
-            self.report.count_unsupported(
-                "filter:uxdesign#blur:background",
-                "uxdesign#blur with backgroundEffect=true (backdrop blur) has no "
-                "reliable standalone SVG equivalent; it is reported as unsupported "
-                "rather than silently approximated.",
-            )
+            # A backdrop blur is not a filter primitive: it reads pixels the
+            # shape does not own. It is emitted by the shape renderer as a
+            # foreignObject, which is also the only place that can tell whether
+            # the shape's geometry can carry one. Counting happens there, so
+            # that exactly one place decides and reports.
             return []
         amount = to_float(params.get("blurAmount"), 0.0)
         std_deviation = amount * BLUR_AMOUNT_TO_STD_DEVIATION
@@ -2136,7 +2266,23 @@ class AgcRenderer:
             return []
 
         self.report.count_handled(f"shape:{shape_type}")
-        return self._render_painted_geometry(geometry, style, depth)
+
+        backdrop = self.visible_background_blur(style)
+        if backdrop is None:
+            return self._render_painted_geometry(geometry, style, depth)
+
+        # The backdrop goes down first, then the shape's own paint over it at
+        # the opacity the filter gives its fill.
+        return self._render_background_blur(backdrop, geometry, depth) + (
+            self._render_painted_geometry(
+                geometry,
+                style,
+                depth,
+                fill_opacity_scale=clamp01(
+                    to_float(backdrop.get("fillOpacity"), 1.0)
+                ),
+            )
+        )
 
     def _render_compound(
         self,
@@ -2383,12 +2529,25 @@ class AgcRenderer:
         )
         return clip_id
 
+    @staticmethod
+    def _scale_fill_opacity(attrs: "OrderedDict[str, Any]", scale: float) -> None:
+        """Multiply an element's fill opacity, leaving its stroke alone.
+
+        A backdrop blur's `fillOpacity` governs the shape's fill, not its
+        stroke, so this cannot be done with a group `opacity`.
+        """
+        if scale >= 1.0:
+            return
+        current = to_float(attrs.get("fill-opacity"), 1.0)
+        attrs["fill-opacity"] = fmt_num(clamp01(current * scale), 1.0)
+
     def _render_painted_geometry(
         self,
         geometry: ShapeGeometry,
         style: Dict[str, Any],
         depth: int,
         extra_attrs: "Optional[OrderedDict[str, Any]]" = None,
+        fill_opacity_scale: float = 1.0,
     ) -> List[str]:
         """Emit one XD shape, emulating inside-stroke alignment when eligible.
 
@@ -2414,11 +2573,13 @@ class AgcRenderer:
             # Byte-identical to the pre-I3-R2-I3 single-element path.
             attrs = OrderedDict(base)
             attrs.update(self._paint_attributes(style, geometry))
+            self._scale_fill_opacity(attrs, fill_opacity_scale)
             return [f"{pad}<{geometry.tag} {attrs_to_string(attrs)}/>"]
 
         # Each paint helper runs exactly once, so pattern/gradient defs and their
         # report counters are not duplicated across the two elements.
         fill_attrs = self._fill_attributes(style.get("fill"), geometry)
+        self._scale_fill_opacity(fill_attrs, fill_opacity_scale)
         stroke_attrs = self._stroke_attributes(stroke, inside_emulated=True)
         clip_id = self._emit_inside_stroke_clip(geometry, base)
 

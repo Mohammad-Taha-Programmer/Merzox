@@ -1436,33 +1436,168 @@ class TestFontEmbedding(ExporterTestCase):
 # ---------------------------------------------------------------------------
 
 
-class TestUnsupportedFeatureReporting(ExporterTestCase):
-    def test_background_blur_is_reported_not_approximated(self) -> None:
-        style = {
-            "fill": solid_fill(0, 0, 0),
+class TestBackgroundBlur(ExporterTestCase):
+    """XD backdrop blur, rendered as a CSS backdrop-filter.
+
+    SVG filters cannot read what is behind an element - `BackgroundImage` was
+    specified and never implemented - so the effect is emitted as a
+    foreignObject carrying `backdrop-filter`, which the exporter's own
+    headless Chromium does implement.
+    """
+
+    @staticmethod
+    def _style(**params):
+        merged = {"blurAmount": 20, "backgroundEffect": True}
+        merged.update(params)
+        return {
+            "fill": solid_fill(255, 255, 255),
             "filters": [
-                {
-                    "type": "uxdesign#blur",
-                    "visible": True,
-                    "params": {"blurAmount": 20, "backgroundEffect": True},
-                }
+                {"type": "uxdesign#blur", "visible": True, "params": merged}
             ],
         }
+
+    def test_backdrop_blur_is_emitted_as_a_css_filter(self) -> None:
+        xd_path = build_xd(self.tmp_path, [rect_node(style=self._style())])
+        result = self.export(xd_path)
+
+        self.assertIn("foreignObject", result.svg)
+        self.assertIn("backdrop-filter:blur(10px)", result.svg)
+        # Both spellings, so the SVG survives a renderer that only has the
+        # prefixed property.
+        self.assertIn("-webkit-backdrop-filter:blur(10px)", result.svg)
+
+    def test_backdrop_blur_is_not_a_gaussian_object_blur(self) -> None:
+        xd_path = build_xd(self.tmp_path, [rect_node(style=self._style())])
+        result = self.export(xd_path)
+
+        # Blurring the shape itself would be the wrong effect entirely.
+        self.assertNotIn("feGaussianBlur", result.svg)
+        self.assertEqual(result.report["visible_blur_count"], 0)
+
+    def test_backdrop_blur_counts_as_handled_not_unsupported(self) -> None:
+        xd_path = build_xd(self.tmp_path, [rect_node(style=self._style())])
+        report = self.export(xd_path).report
+
+        self.assertEqual(report["background_blur_count"], 1)
+        self.assertEqual(report["unsupported_background_blur_count"], 0)
+        self.assertEqual(report["unsupported_node_counts"], {})
+        self.assertIn(
+            "filter:uxdesign#blur:background", report["handled_node_counts"]
+        )
+
+    def test_the_parameter_mapping_is_declared_in_the_report(self) -> None:
+        xd_path = build_xd(self.tmp_path, [rect_node(style=self._style())])
+        report = self.export(xd_path).report
+
+        # A real effect with an approximate mapping must say so.
+        self.assertTrue(
+            any(
+                "backdrop-filter" in note
+                for note in report["limitations"]
+            ),
+            report["limitations"],
+        )
+
+    def test_brightness_is_read_as_a_percentage_adjustment(self) -> None:
+        xd_path = build_xd(
+            self.tmp_path, [rect_node(style=self._style(brightnessAmount=15))]
+        )
+        result = self.export(xd_path)
+
+        self.assertIn("brightness(1.15)", result.svg)
+
+    def test_no_brightness_change_emits_no_brightness_function(self) -> None:
+        xd_path = build_xd(
+            self.tmp_path, [rect_node(style=self._style(brightnessAmount=0))]
+        )
+        result = self.export(xd_path)
+
+        self.assertNotIn("brightness(", result.svg)
+
+    def test_a_transparent_fill_still_paints_the_backdrop(self) -> None:
+        xd_path = build_xd(
+            self.tmp_path, [rect_node(style=self._style(fillOpacity=0))]
+        )
+        result = self.export(xd_path)
+
+        # fillOpacity 0 hides the shape's own white fill; the blurred backdrop
+        # behind it is the whole point and must survive.
+        self.assertIn("foreignObject", result.svg)
+        self.assertIn('fill-opacity="0"', result.svg)
+
+    def test_a_partial_fill_opacity_scales_the_shape_fill(self) -> None:
+        xd_path = build_xd(
+            self.tmp_path, [rect_node(style=self._style(fillOpacity=0.1))]
+        )
+        result = self.export(xd_path)
+
+        self.assertIn('fill-opacity="0.1"', result.svg)
+
+    def test_a_hidden_backdrop_blur_is_not_applied(self) -> None:
+        style = self._style()
+        style["filters"][0]["visible"] = False
         xd_path = build_xd(self.tmp_path, [rect_node(style=style)])
         result = self.export(xd_path)
-        report = result.report
+
+        self.assertNotIn("foreignObject", result.svg)
+        self.assertEqual(result.report["background_blur_count"], 0)
+        self.assertEqual(result.report["hidden_blur_count"], 1)
+
+    def test_an_empty_backdrop_blur_is_not_applied(self) -> None:
+        xd_path = build_xd(
+            self.tmp_path,
+            [rect_node(style=self._style(blurAmount=0, brightnessAmount=0))],
+        )
+        result = self.export(xd_path)
+
+        # Nothing to blur and nothing to brighten is not an effect.
+        self.assertNotIn("foreignObject", result.svg)
+        self.assertEqual(result.report["background_blur_count"], 0)
+
+    def test_a_rounded_rectangle_keeps_its_corners(self) -> None:
+        node = rect_node(style=self._style())
+        node["shape"]["r"] = [5, 5, 5, 5]
+        xd_path = build_xd(self.tmp_path, [node])
+        result = self.export(xd_path)
+
+        self.assertIn("border-radius:5px", result.svg)
+
+    def test_a_non_rectangular_backdrop_blur_still_fails_closed(self) -> None:
+        node = {
+            "type": "shape",
+            "id": "ellipse-1",
+            "shape": {"type": "ellipse", "cx": 10, "cy": 10, "rx": 10, "ry": 5},
+            "style": self._style(),
+        }
+        xd_path = build_xd(self.tmp_path, [node])
+        report = self.export(xd_path).report
+
+        # A CSS box cannot be clipped to an arbitrary XD outline, so this one
+        # is refused rather than drawn as a rectangle that is not there.
+        self.assertEqual(report["unsupported_background_blur_count"], 1)
+        self.assertIn(
+            "filter:uxdesign#blur:background:shape",
+            report["unsupported_node_counts"],
+        )
+
+    def test_a_backdrop_blur_on_a_group_still_fails_closed(self) -> None:
+        group = {
+            "type": "group",
+            "id": "group-1",
+            "style": self._style(),
+            "group": {"children": [rect_node()]},
+        }
+        xd_path = build_xd(self.tmp_path, [group])
+        report = self.export(xd_path).report
 
         self.assertEqual(report["unsupported_background_blur_count"], 1)
-        self.assertEqual(report["visible_blur_count"], 0)
-        self.assertNotIn("feGaussianBlur", result.svg)
         self.assertIn(
-            "filter:uxdesign#blur:background", report["unsupported_node_counts"]
-        )
-        self.assertTrue(
-            any("backgroundEffect" in warning for warning in report["warnings"]),
-            report["warnings"],
+            "filter:uxdesign#blur:background:group",
+            report["unsupported_node_counts"],
         )
 
+
+class TestUnsupportedFeatureReporting(ExporterTestCase):
     def test_compound_without_flattened_path_is_reported(self) -> None:
         compound = {
             "type": "shape",
