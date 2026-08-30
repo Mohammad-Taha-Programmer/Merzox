@@ -9,7 +9,7 @@ import { pick } from '../utils/pick.js';
 import {
   notificationPreferenceView,
   parseNotificationPreferencePatch,
-  updateProductOffersPreference
+  updateNotificationPreference
 } from '../services/notification-preference.service.js';
 
 const emailLabels = new Set(['personal', 'work', 'home', 'other']);
@@ -26,11 +26,12 @@ export const getMyNotificationPreferences = asyncHandler(async (req, res) => {
 
 export const updateMyNotificationPreferences = asyncHandler(
   async (req, res) => {
-    const productOffers = parseNotificationPreferencePatch(req.body);
+    const { key, value } = parseNotificationPreferencePatch(req.body);
 
-    const notificationPreferences = await updateProductOffersPreference({
+    const notificationPreferences = await updateNotificationPreference({
       user: req.user,
-      productOffers
+      key,
+      value
     });
 
     res.json({

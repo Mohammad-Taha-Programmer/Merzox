@@ -68,6 +68,12 @@ import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
 import 'package:merzox/features/orders/pages/order_tracking_page.dart';
 import 'package:merzox/features/splash/presentation/splash_screen.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/notification_preference_service.dart';
+import 'package:merzox/core/auth/auth_session_service.dart';
+import 'package:merzox/features/profile/bloc/profile_edit_bloc.dart';
+import 'package:merzox/features/profile/bloc/profile_edit_event.dart';
+import 'package:merzox/features/profile/bloc/profile_edit_state.dart';
+import 'package:merzox/features/profile/pages/profile_edit_page.dart';
 import 'package:merzox/features/search/bloc/search_bloc.dart';
 import 'package:merzox/features/search/bloc/search_event.dart';
 import 'package:merzox/features/search/bloc/search_state.dart';
@@ -668,6 +674,54 @@ final class _SeedPlacingApi extends _SeedDeliveryApi {
         'canChangeAddress': true,
         'canReview': false,
       },
+    });
+  }
+}
+
+/// The notification preference, answered locally: the merchant profile's
+/// switch would otherwise reach the network and spin forever in a golden.
+final class _SeedPreferenceGateway implements NotificationPreferenceGateway {
+  @override
+  Future<NotificationPreferenceSnapshot> load({required String token}) async =>
+      const NotificationPreferenceSnapshot(
+        productOffers: true,
+        orderUpdates: true,
+      );
+
+  @override
+  Future<NotificationPreferenceSnapshot> update({
+    required String token,
+    required bool value,
+    String key = NotificationPreferenceKeys.productOffers,
+  }) async => NotificationPreferenceSnapshot(
+    productOffers: key == NotificationPreferenceKeys.productOffers
+        ? value
+        : true,
+    orderUpdates: key == NotificationPreferenceKeys.orderUpdates ? value : true,
+  );
+}
+
+/// The signed-in customer the profile form loads.
+final class _SeedProfileApi extends ApiService {
+  @override
+  Future<AuthApiUser> me({required String token}) async {
+    return AuthApiUser.fromJson(const <String, dynamic>{
+      'id': '64a000000000000000000001',
+      'name': 'ياسمين خالد',
+      'email': 'yasmeen@example.test',
+      'emailVerified': true,
+      'emails': <Map<String, dynamic>>[],
+      'phone': '0592029316',
+      'phones': <Map<String, dynamic>>[],
+      'address': 'أريحا',
+      'addresses': <Map<String, dynamic>>[],
+      'userType': 'normal',
+      'gender': 'female',
+      'birthDate': '1995-04-12',
+      'permissions': <String, dynamic>{},
+      'permissionConsents': <String, dynamic>{},
+      'canChangeName': true,
+      'canChangeGender': true,
     });
   }
 }
@@ -1749,6 +1803,123 @@ void main() {
         await pumpSearch(tester, bloc);
 
         await expectMerzoxSeedGolden('search_stores_ar_375x812.png');
+      });
+
+      // -- 28/29/30. The profile family ------------------------------------
+      //
+      // Two customer menus (guest and signed in), the merchant's, and the
+      // form behind all of them.
+      testWidgets('customer profile renders its Arabic guest baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(const <String, Object>{});
+
+        final HomeBloc bloc = HomeBloc(
+          apiService: _SeedHomeApi(),
+          deviceLocationService: _SeedNoDeviceLocation(),
+          locationPermissionService: _SeedDeniedLocation(),
+        );
+        _closeOnTearDown(bloc);
+
+        final Future<HomeState> ready = bloc.stream.firstWhere(
+          (HomeState state) =>
+              state.newBusinessesStatus == HomeSectionStatus.ready,
+        );
+        bloc.add(const HomeStarted(isGuest: true));
+        await ready;
+        bloc.add(const HomeTabChanged(4));
+        await bloc.stream.firstWhere(
+          (HomeState state) => state.selectedTab == 4,
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<HomeBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              const HomeScreen(isGuest: true),
+            ),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('profile_guest_ar_375x812.png');
+      });
+
+      testWidgets('merchant profile renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedMerchantSession();
+
+        final BusinessBloc bloc = BusinessBloc(apiService: _SeedMerchantApi());
+        _closeOnTearDown(bloc);
+
+        final Future<BusinessState> ready = bloc.stream.firstWhere(
+          (BusinessState state) => state.status == BusinessStatus.ready,
+        );
+        bloc.add(const BusinessStarted());
+        await ready;
+        bloc.add(const BusinessTabChanged(4));
+        await bloc.stream.firstWhere(
+          (BusinessState state) => state.selectedTab == 4,
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              BusinessShellPage(
+                onLoggedOut: () {},
+                notificationPreferenceGateway: _SeedPreferenceGateway(),
+                notificationPreferenceSessionReader: () async =>
+                    const AuthSessionSnapshot(
+                      type: AuthSessionType.business,
+                      token: 'seed-golden-token',
+                    ),
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('profile_merchant_ar_375x812.png');
+      });
+
+      testWidgets('profile form renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        final ProfileEditBloc bloc = ProfileEditBloc(
+          apiService: _SeedProfileApi(),
+        );
+        _closeOnTearDown(bloc);
+
+        final Future<ProfileEditState> ready = bloc.stream.firstWhere(
+          (ProfileEditState state) =>
+              state.status != ProfileEditStatus.initial &&
+              state.status != ProfileEditStatus.loading,
+        );
+        bloc.add(const ProfileEditStarted());
+        final ProfileEditState settled = await ready;
+        expect(
+          settled.status,
+          ProfileEditStatus.ready,
+          reason: 'profile fixture rejected: ${settled.errorMessage}',
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<ProfileEditBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(const ProfileEditPage()),
+          ),
+        );
+
+        await expectMerzoxSeedGolden('profile_form_ar_375x812.png');
       });
 
       // -- 16. Merchant dashboard -----------------------------------------

@@ -33,13 +33,14 @@ class _ProfilePreferenceGateway implements NotificationPreferenceGateway {
   @override
   Future<NotificationPreferenceSnapshot> update({
     required String token,
-    required bool productOffers,
+    required bool value,
+    String key = NotificationPreferenceKeys.productOffers,
   }) async {
     updateCalls += 1;
     updateToken = token;
-    requestedValue = productOffers;
+    requestedValue = value;
 
-    return NotificationPreferenceSnapshot(productOffers: productOffers);
+    return NotificationPreferenceSnapshot(productOffers: value);
   }
 }
 

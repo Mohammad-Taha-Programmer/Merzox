@@ -7,7 +7,13 @@ import 'package:merzox/features/notification_preferences/bloc/notification_prefe
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_state.dart';
 
 class NotificationPreferenceControl extends StatelessWidget {
-  const NotificationPreferenceControl({super.key});
+  /// Which row this is. One control drives one preference, so it names it.
+  final String labelKey;
+
+  const NotificationPreferenceControl({
+    super.key,
+    this.labelKey = 'notificationPreferences.productOffers',
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +50,7 @@ class NotificationPreferenceControl extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'notificationPreferences.productOffers'.tr(),
+                    labelKey.tr(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

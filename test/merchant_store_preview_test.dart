@@ -1048,10 +1048,13 @@ void main() {
         await settleFrames(tester);
 
         expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
-        // Nothing existing was displaced to make room for it.
-        expect(find.byIcon(Icons.edit_outlined), findsOneWidget);
+        // Nothing existing was displaced to make room for it: editing the
+        // business is the settings row, and logging out is still there.
         expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
         expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
+        // Two the menu added, which the card had no room for at all.
+        expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsWidgets);
+        expect(find.byIcon(Icons.phone_outlined), findsOneWidget);
       },
     );
   });
@@ -1416,7 +1419,7 @@ void main() {
         bloc.add(const BusinessTabChanged(4));
         await settleFrames(tester);
 
-        final editButton = find.byIcon(Icons.edit_outlined);
+        final editButton = find.byIcon(Icons.settings_outlined);
         expect(editButton, findsOneWidget);
 
         await tester.tap(editButton);

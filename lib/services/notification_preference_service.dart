@@ -1,18 +1,43 @@
 import 'package:dio/dio.dart';
 import 'package:merzox/services/api_service.dart';
 
+/// The names the server knows. Anything else it refuses.
+final class NotificationPreferenceKeys {
+  const NotificationPreferenceKeys._();
+
+  /// The customer's marketing switch.
+  static const String productOffers = 'productOffers';
+
+  /// The merchant's, which `البروفايل` puts at the foot of its menu. Separate
+  /// from the customer's so silencing marketing cannot silence the notice
+  /// that an order arrived.
+  static const String orderUpdates = 'orderUpdates';
+}
+
 final class NotificationPreferenceSnapshot {
   final bool productOffers;
+  final bool orderUpdates;
 
-  const NotificationPreferenceSnapshot({required this.productOffers});
+  const NotificationPreferenceSnapshot({
+    required this.productOffers,
+    this.orderUpdates = true,
+  });
+
+  /// The value of one preference by name.
+  bool valueOf(String key) => key == NotificationPreferenceKeys.orderUpdates
+      ? orderUpdates
+      : productOffers;
 }
 
 abstract interface class NotificationPreferenceGateway {
   Future<NotificationPreferenceSnapshot> load({required String token});
 
+  /// [key] names which preference is being set; the server refuses a body
+  /// carrying more than one.
   Future<NotificationPreferenceSnapshot> update({
     required String token,
-    required bool productOffers,
+    required bool value,
+    String key = NotificationPreferenceKeys.productOffers,
   });
 }
 
@@ -45,11 +70,12 @@ final class NotificationPreferenceService
   @override
   Future<NotificationPreferenceSnapshot> update({
     required String token,
-    required bool productOffers,
+    required bool value,
+    String key = NotificationPreferenceKeys.productOffers,
   }) async {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/users/me/notification-preferences',
-      data: {'productOffers': productOffers},
+      data: <String, dynamic>{key: value},
       options: _authOptions(token),
     );
 
@@ -88,6 +114,20 @@ final class NotificationPreferenceService
       );
     }
 
-    return NotificationPreferenceSnapshot(productOffers: productOffers);
+    // Tolerated when absent: a server that predates this key is still a
+    // server whose customer preference the app must respect.
+    final orderUpdates = rawPreferences['orderUpdates'];
+
+    if (orderUpdates != null && orderUpdates is! bool) {
+      throw const ApiContractException(
+        'notificationPreferences',
+        'notificationPreferences.orderUpdates must be boolean',
+      );
+    }
+
+    return NotificationPreferenceSnapshot(
+      productOffers: productOffers,
+      orderUpdates: orderUpdates as bool? ?? true,
+    );
   }
 }

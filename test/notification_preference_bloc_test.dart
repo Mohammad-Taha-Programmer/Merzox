@@ -39,11 +39,12 @@ class _FakeGateway implements NotificationPreferenceGateway {
   @override
   Future<NotificationPreferenceSnapshot> update({
     required String token,
-    required bool productOffers,
+    required bool value,
+    String key = NotificationPreferenceKeys.productOffers,
   }) async {
     updateCalls += 1;
     this.token = token;
-    requestedValue = productOffers;
+    requestedValue = value;
 
     if (updateError != null) {
       throw updateError!;
@@ -51,7 +52,7 @@ class _FakeGateway implements NotificationPreferenceGateway {
 
     final handler = updateHandler;
     if (handler != null) {
-      return handler(productOffers);
+      return handler(value);
     }
 
     return updateResult;

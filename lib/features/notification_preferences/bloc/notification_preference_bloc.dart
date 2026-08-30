@@ -13,9 +13,13 @@ class NotificationPreferenceBloc
   final NotificationPreferenceGateway _gateway;
   final NotificationPreferenceSessionReader _sessionReader;
 
+  /// Which preference this bloc controls. One instance drives one switch.
+  final String preferenceKey;
+
   NotificationPreferenceBloc({
     NotificationPreferenceGateway? gateway,
     NotificationPreferenceSessionReader? sessionReader,
+    this.preferenceKey = NotificationPreferenceKeys.productOffers,
   }) : _gateway = gateway ?? NotificationPreferenceService(),
        _sessionReader =
            sessionReader ?? (() => const AuthSessionService().read()),
@@ -66,7 +70,7 @@ class NotificationPreferenceBloc
       emit(
         NotificationPreferenceState(
           status: NotificationPreferenceStatus.ready,
-          productOffers: preference.productOffers,
+          productOffers: preference.valueOf(preferenceKey),
         ),
       );
     } catch (_) {
@@ -105,7 +109,8 @@ class NotificationPreferenceBloc
 
       final preference = await _gateway.update(
         token: token,
-        productOffers: event.productOffers,
+        key: preferenceKey,
+        value: event.productOffers,
       );
 
       // The returned server value is authoritative, even if it differs
@@ -113,7 +118,7 @@ class NotificationPreferenceBloc
       emit(
         NotificationPreferenceState(
           status: NotificationPreferenceStatus.ready,
-          productOffers: preference.productOffers,
+          productOffers: preference.valueOf(preferenceKey),
         ),
       );
     } catch (_) {

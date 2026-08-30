@@ -35,10 +35,7 @@ void main() {
     final service = NotificationPreferenceService(dio: dio);
 
     final loaded = await service.load(token: 'token-1');
-    final updated = await service.update(
-      token: 'token-1',
-      productOffers: false,
-    );
+    final updated = await service.update(token: 'token-1', value: false);
 
     expect(loaded.productOffers, isTrue);
     expect(updated.productOffers, isFalse);
