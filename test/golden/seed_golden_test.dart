@@ -27,6 +27,10 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/features/about_us/bloc/about_us_bloc.dart';
+import 'package:merzox/features/about_us/bloc/about_us_event.dart';
+import 'package:merzox/features/about_us/bloc/about_us_state.dart';
+import 'package:merzox/features/about_us/pages/about_us_page.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/pages/login_page.dart';
 import 'package:merzox/features/authentication/pages/signup_page.dart';
@@ -108,6 +112,46 @@ final class _OfflineHomeApiService extends ApiService {
     int? radiusMeters,
   }) async {
     throw StateError('the guest cart golden must not call businesses()');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// About Us fixture
+// ---------------------------------------------------------------------------
+
+/// The `من نحن` page is server-driven, so its seed serves the payload the
+/// artboard draws: the wordmark line, one introduction paragraph and the three
+/// collapsed sections. Nothing is expanded - the artboard shows all three shut.
+final class _SeedAboutUsApi extends ApiService {
+  @override
+  Future<AboutUsApiModel> aboutUs({required String languageCode}) async {
+    return AboutUsApiModel.fromJson(<String, dynamic>{
+      'pageTitle': 'من نحن',
+      'appLabel': 'تطبيق',
+      'appName': 'MERZOX',
+      'introduction':
+          'نص افتراضي نص افتراضي نص افتراضي نص افتراضي نص افتراضي نص افتراضي '
+          'نص افتراضي نص افتراضي نص افتراضي نص افتراضي نص افتراضي نص افتراضي '
+          'نص افتراضي',
+      'sections': <Map<String, dynamic>>[
+        <String, dynamic>{
+          'key': 'how',
+          'title': 'آلية العمل',
+          'content': 'نص افتراضي',
+        },
+        <String, dynamic>{
+          'key': 'terms',
+          'title': 'شروط العمل',
+          'content': 'نص افتراضي',
+        },
+        <String, dynamic>{
+          'key': 'rules',
+          'title': 'أحكام العمل',
+          'content': 'نص افتراضي',
+        },
+      ],
+      'updatedAt': null,
+    });
   }
 }
 
@@ -576,6 +620,40 @@ void main() {
         expect(find.text('222321'), findsOneWidget);
 
         await expectMerzoxSeedGolden('order_tracking_placed_ar_375x812.png');
+      });
+
+      // -- 8. About Us, loaded state with every section collapsed ---------
+      testWidgets('about us renders its Arabic loaded-state baseline', (
+        WidgetTester tester,
+      ) async {
+        final AboutUsBloc aboutBloc = AboutUsBloc(
+          apiService: _SeedAboutUsApi(),
+        );
+        _closeOnTearDown(aboutBloc);
+
+        final Future<AboutUsState> ready = aboutBloc.stream.firstWhere(
+          (AboutUsState state) => state.status == AboutUsStatus.ready,
+        );
+        aboutBloc.add(const AboutUsStarted('ar'));
+        await ready;
+
+        expect(aboutBloc.state.content, isNotNull);
+        expect(aboutBloc.state.expandedSectionKeys, isEmpty);
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<AboutUsBloc>.value(
+            value: aboutBloc,
+            child: withMerzoxGoldenDeviceInsets(const AboutUsPage()),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('آلية العمل'), findsOneWidget);
+        expect(find.text('شروط العمل'), findsOneWidget);
+        expect(find.text('أحكام العمل'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('about_us_loaded_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

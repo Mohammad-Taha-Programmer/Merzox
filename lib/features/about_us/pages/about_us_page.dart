@@ -70,7 +70,7 @@ class _AboutUsPageState extends State<AboutUsPage> {
 
     final content = state.content!;
     return ListView(
-      padding: const EdgeInsetsDirectional.fromSTEB(20, 4, 20, 28),
+      padding: const EdgeInsetsDirectional.fromSTEB(20, 21, 20, 28),
       children: [
         _AboutIntroduction(content: content),
         const SizedBox(height: 44),
@@ -114,7 +114,8 @@ class _AboutUsHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 82,
+      // Measured against the artboard's title band (y=64..76).
+      height: 65,
       child: Stack(
         alignment: Alignment.center,
         children: [

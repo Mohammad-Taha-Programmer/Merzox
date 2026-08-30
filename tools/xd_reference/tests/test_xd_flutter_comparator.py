@@ -356,6 +356,16 @@ class MappingContractTests(unittest.TestCase):
                     812,
                     "exact",
                 ),
+                (
+                    "about_us",
+                    "test/goldens/seed/about_us_loaded_ar_375x812.png",
+                    "من نحن",
+                    "c51f9c7e-8cfb-4934-8f9a-eb57c9132403",
+                    "artwork/artboard-d303a4d6-2e00-4aa5-9054-3435cbae17d7",
+                    375,
+                    810,
+                    "extend_final_row_to_812",
+                ),
             ],
         )
 

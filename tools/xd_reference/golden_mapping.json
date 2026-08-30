@@ -95,6 +95,19 @@
       },
       "normalization": "exact",
       "semantic_reason": "The Flutter seed renders a placed order whose only reached step is \"placed\", which is the state this exact-name 375x812 artboard draws: the success headline, the order-number card and a four-step timeline with the first entry complete. The suffixed تتبع الطلب artboards encode the later steps and are separate seeds."
+    },
+    {
+      "seed": "about_us",
+      "flutter_golden": "test/goldens/seed/about_us_loaded_ar_375x812.png",
+      "xd": {
+        "name": "من نحن",
+        "manifest_id": "c51f9c7e-8cfb-4934-8f9a-eb57c9132403",
+        "artboard_path": "artwork/artboard-d303a4d6-2e00-4aa5-9054-3435cbae17d7",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The only من نحن artboard in the corpus. The Flutter seed renders the server-driven page in its loaded state with all three sections collapsed, which is what the artboard draws. Its wordmark is the all-caps legacy form, normalized to MERZOX by the exporter without changing the XD package."
     }
   ]
 }
