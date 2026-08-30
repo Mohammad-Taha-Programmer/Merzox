@@ -324,6 +324,97 @@ class ApiService {
     return OrderListApiResponse.fromJson(data);
   }
 
+  /// Where the company delivers, and which governorates are closed.
+  ///
+  /// Public: the checkout form needs the list before anyone signs in to fill
+  /// it, and where a company delivers is not private.
+  Future<List<DeliveryRegionApiModel>> deliveryRegions() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/users/delivery-regions',
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? const {};
+    final List<dynamic> regions = data['regions'] as List<dynamic>? ?? const [];
+
+    return regions
+        .whereType<Map<String, dynamic>>()
+        .map(DeliveryRegionApiModel.fromJson)
+        .toList();
+  }
+
+  /// The caller's own saved addresses. Every write below answers with the whole
+  /// book, so a client never has to reconcile a partial update against it.
+  Future<List<SavedAddressApiModel>> myAddresses({
+    required String token,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/users/me/addresses',
+      options: _authOptions(token),
+    );
+
+    return _addressesFrom(response.data);
+  }
+
+  Future<List<SavedAddressApiModel>> createAddress({
+    required String token,
+    required Map<String, dynamic> address,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/users/me/addresses',
+      data: address,
+      options: _authOptions(token),
+    );
+
+    return _addressesFrom(response.data);
+  }
+
+  Future<List<SavedAddressApiModel>> updateAddress({
+    required String token,
+    required String addressId,
+    required Map<String, dynamic> address,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/users/me/addresses/$addressId',
+      data: address,
+      options: _authOptions(token),
+    );
+
+    return _addressesFrom(response.data);
+  }
+
+  Future<List<SavedAddressApiModel>> setDefaultAddress({
+    required String token,
+    required String addressId,
+  }) async {
+    final response = await _dio.patch<Map<String, dynamic>>(
+      '/users/me/addresses/$addressId/default',
+      options: _authOptions(token),
+    );
+
+    return _addressesFrom(response.data);
+  }
+
+  Future<List<SavedAddressApiModel>> deleteAddress({
+    required String token,
+    required String addressId,
+  }) async {
+    final response = await _dio.delete<Map<String, dynamic>>(
+      '/users/me/addresses/$addressId',
+      options: _authOptions(token),
+    );
+
+    return _addressesFrom(response.data);
+  }
+
+  static List<SavedAddressApiModel> _addressesFrom(Map<String, dynamic>? body) {
+    final data = body?['data'] as Map<String, dynamic>? ?? const {};
+    final List<dynamic> raw = data['addresses'] as List<dynamic>? ?? const [];
+
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map(SavedAddressApiModel.fromJson)
+        .toList();
+  }
+
   /// The delivery tiers and their prices, as the server charges them.
   ///
   /// Public, and deliberately not cached here: the checkout screen has to draw
@@ -3150,5 +3241,75 @@ final class DeliveryOptionsApiResponse {
     }
 
     return null;
+  }
+}
+
+/// One saved delivery address.
+final class SavedAddressApiModel {
+  final String id;
+  final String label;
+  final String fullName;
+  final String phone;
+  final String altPhone;
+  final String governorate;
+  final String city;
+  final String details;
+  final bool isDefault;
+
+  const SavedAddressApiModel({
+    required this.id,
+    required this.label,
+    required this.fullName,
+    required this.phone,
+    required this.altPhone,
+    required this.governorate,
+    required this.city,
+    required this.details,
+    required this.isDefault,
+  });
+
+  factory SavedAddressApiModel.fromJson(Map<String, dynamic> json) {
+    return SavedAddressApiModel(
+      id: json['id'] as String? ?? '',
+      label: json['label'] as String? ?? '',
+      fullName: json['fullName'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      altPhone: json['altPhone'] as String? ?? '',
+      governorate: json['governorate'] as String? ?? '',
+      city: json['city'] as String? ?? '',
+      details: json['details'] as String? ?? '',
+      isDefault: json['isDefault'] as bool? ?? false,
+    );
+  }
+
+  /// The one line an order records, matching what the server writes — a city
+  /// named after its governorate is written once.
+  String get line => <String>[
+    governorate,
+    if (city != governorate) city,
+    details,
+  ].where((String part) => part.isNotEmpty).join(' ، ');
+}
+
+/// A governorate and the cities under it, with whether it is served.
+final class DeliveryRegionApiModel {
+  final String governorate;
+  final bool open;
+  final List<String> cities;
+
+  const DeliveryRegionApiModel({
+    required this.governorate,
+    required this.open,
+    required this.cities,
+  });
+
+  factory DeliveryRegionApiModel.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> cities = json['cities'] as List<dynamic>? ?? const [];
+
+    return DeliveryRegionApiModel(
+      governorate: json['governorate'] as String? ?? '',
+      open: json['open'] as bool? ?? false,
+      cities: cities.whereType<String>().toList(),
+    );
   }
 }

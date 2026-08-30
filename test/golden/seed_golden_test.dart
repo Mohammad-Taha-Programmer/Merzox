@@ -670,6 +670,35 @@ final class _SeedPlacingApi extends _SeedDeliveryApi {
 
 /// The delivery tiers, as the order route publishes them.
 final class _SeedDeliveryApi extends _SeedProductApi {
+  /// The one saved address `تفاصيل المتجر – 16` shows, with the phone it puts
+  /// under the name.
+  @override
+  Future<List<SavedAddressApiModel>> myAddresses({
+    required String token,
+  }) async => <SavedAddressApiModel>[
+    SavedAddressApiModel.fromJson(const <String, dynamic>{
+      'id': '64e000000000000000000001',
+      'label': '',
+      'fullName': 'ياسمين عماد',
+      'phone': '0592029316',
+      'altPhone': '',
+      'governorate': 'أريحا',
+      'city': 'أريحا',
+      'details': '',
+      'isDefault': true,
+    }),
+  ];
+
+  @override
+  Future<List<DeliveryRegionApiModel>> deliveryRegions() async =>
+      <DeliveryRegionApiModel>[
+        DeliveryRegionApiModel.fromJson(const <String, dynamic>{
+          'governorate': 'أريحا',
+          'open': true,
+          'cities': <String>['أريحا'],
+        }),
+      ];
+
   @override
   Future<DeliveryOptionsApiResponse> deliveryOptions() async =>
       DeliveryOptionsApiResponse.fromJson(const <String, dynamic>{

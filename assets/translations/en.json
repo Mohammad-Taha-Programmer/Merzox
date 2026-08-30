@@ -686,5 +686,29 @@
     "goToOrders": "Go to my orders",
     "backHome": "Back to home",
     "doneTitle": "Order complete"
+  },
+  "address": {
+    "addTitle": "Add an address",
+    "editTitle": "Edit address",
+    "fullName": "Full name",
+    "fullNameHint": "Type the full name",
+    "fullNameInvalid": "Please write the full name",
+    "phone": "Phone number",
+    "phoneHint": "Type the phone number",
+    "phoneInvalid": "That phone number is not valid",
+    "governorate": "Governorate",
+    "governorateHint": "Choose your governorate",
+    "city": "City / village",
+    "cityHint": "Choose your city or village",
+    "details": "Address details",
+    "detailsHint": "Street, building number, a landmark",
+    "altPhone": "Additional phone",
+    "altPhoneHint": "Another number, mobile or landline",
+    "makeDefault": "Make this my default address",
+    "regionRequired": "Please choose a governorate and a city",
+    "closed": "Closed",
+    "savedTitle": "Use one of your saved addresses",
+    "addNew": "Add a new address",
+    "empty": "No saved address yet"
   }
 }

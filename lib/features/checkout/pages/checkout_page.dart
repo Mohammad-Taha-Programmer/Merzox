@@ -9,6 +9,7 @@ import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/cart/bloc/cart_bloc.dart';
 import 'package:merzox/features/cart/bloc/cart_event.dart';
 import 'package:merzox/features/cart/bloc/cart_state.dart';
+import 'package:merzox/features/checkout/pages/address_form_page.dart';
 import 'package:merzox/features/checkout/widgets/checkout_step_indicator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -55,6 +56,9 @@ class _CheckoutPageState extends State<CheckoutPage> {
   /// screen says the fee is still being fetched rather than guessing it.
   DeliveryOptionsApiResponse? _delivery;
   String _deliveryOption = 'standard';
+
+  /// The address the buyer step settled on, which is the one the order takes.
+  String _deliveryAddress = '';
 
   @override
   void initState() {
@@ -114,13 +118,17 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 Expanded(
                   child: switch (_step) {
                     CheckoutStep.buyerDetails => _BuyerDetailsStep(
+                      apiService: widget.apiService,
                       onContinue: () =>
                           setState(() => _step = CheckoutStep.payment),
+                      onAddressChanged: (String line) =>
+                          _deliveryAddress = line,
                     ),
                     CheckoutStep.payment => _PaymentStep(
                       state: state,
                       delivery: _delivery,
                       selectedOption: _deliveryOption,
+                      deliveryAddress: _deliveryAddress,
                       onOptionChanged: (String option) =>
                           setState(() => _deliveryOption = option),
                     ),
@@ -189,16 +197,32 @@ class _CheckoutHeader extends StatelessWidget {
 class _BuyerDetailsStep extends StatefulWidget {
   final VoidCallback onContinue;
 
-  const _BuyerDetailsStep({required this.onContinue});
+  /// Reports what the order should record, so the page can send it.
+  final ValueChanged<String> onAddressChanged;
+
+  final ApiService? apiService;
+
+  const _BuyerDetailsStep({
+    required this.onContinue,
+    required this.onAddressChanged,
+    this.apiService,
+  });
 
   @override
   State<_BuyerDetailsStep> createState() => _BuyerDetailsStepState();
 }
 
 class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
-  String _address = '';
+  List<SavedAddressApiModel> _addresses = const <SavedAddressApiModel>[];
+
+  /// The profile's single free-text address, shown when the book is empty so
+  /// an account that predates the book can still check out.
+  String _legacyAddress = '';
   String _name = '';
+  String _token = '';
   bool _loaded = false;
+
+  ApiService get _api => widget.apiService ?? ApiService();
 
   @override
   void initState() {
@@ -206,17 +230,78 @@ class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
     _load();
   }
 
-  /// Reads the delivery identity from the same place the checkout submission
-  /// reads it, so the address confirmed here is the address that is sent.
   Future<void> _load() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String token = prefs.getString(AuthBloc.tokenKey)?.trim() ?? '';
+    final String legacy = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
+    final String name = prefs.getString(AuthBloc.nameKey)?.trim() ?? '';
+
+    List<SavedAddressApiModel> addresses = const <SavedAddressApiModel>[];
+    if (token.isNotEmpty) {
+      try {
+        addresses = await _api.myAddresses(token: token);
+      } catch (_) {
+        // An unreachable book falls back to the profile address rather than
+        // blocking checkout on a list that is only a convenience.
+      }
+    }
+
     if (!mounted) return;
+    setState(() {
+      _addresses = addresses;
+      _legacyAddress = legacy;
+      _name = name;
+      _token = token;
+      _loaded = true;
+      _selected ??= _defaultId(addresses);
+    });
+    widget.onAddressChanged(_selectedLine);
+  }
+
+  String? _selected;
+
+  static String? _defaultId(List<SavedAddressApiModel> addresses) {
+    for (final SavedAddressApiModel entry in addresses) {
+      if (entry.isDefault) return entry.id;
+    }
+
+    return addresses.isEmpty ? null : addresses.first.id;
+  }
+
+  SavedAddressApiModel? get _selectedAddress {
+    for (final SavedAddressApiModel entry in _addresses) {
+      if (entry.id == _selected) return entry;
+    }
+
+    return null;
+  }
+
+  /// What the order will record, which is what the step must be showing.
+  String get _selectedLine =>
+      _selectedAddress?.line ?? (_addresses.isEmpty ? _legacyAddress : '');
+
+  Future<void> _addAddress() async {
+    if (_token.isEmpty) return;
+
+    final List<SavedAddressApiModel>? updated = await Navigator.of(context)
+        .push<List<SavedAddressApiModel>>(
+          MaterialPageRoute<List<SavedAddressApiModel>>(
+            builder: (_) =>
+                AddressFormPage(token: _token, apiService: widget.apiService),
+          ),
+        );
+    if (updated == null || !mounted) return;
 
     setState(() {
-      _address = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
-      _name = prefs.getString(AuthBloc.nameKey)?.trim() ?? '';
-      _loaded = true;
+      _addresses = updated;
+      _selected = _defaultId(updated);
     });
+    widget.onAddressChanged(_selectedLine);
+  }
+
+  void _select(String id) {
+    setState(() => _selected = id);
+    widget.onAddressChanged(_selectedLine);
   }
 
   @override
@@ -225,57 +310,64 @@ class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    final String address = _address;
-    final bool hasAddress = address.isNotEmpty;
+    final bool canContinue = _selectedLine.isNotEmpty;
 
-    return Builder(
-      builder: (BuildContext context) {
-        return ListView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          children: <Widget>[
-            Text(
-              'checkout.savedAddress'.tr(),
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: MerzoxColors.kColor2B2B2B,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      children: <Widget>[
+        Text(
+          'checkout.savedAddress'.tr(),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: MerzoxColors.kColor2B2B2B,
+          ),
+        ),
+        const SizedBox(height: 12),
+        if (_addresses.isNotEmpty)
+          for (final SavedAddressApiModel entry in _addresses)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _AddressCard(
+                address: entry.line,
+                name: entry.fullName,
+                phone: entry.phone,
+                selected: entry.id == _selected,
+                onSelected: () => _select(entry.id),
               ),
+            )
+        else if (_legacyAddress.isNotEmpty)
+          _AddressCard(
+            address: _legacyAddress,
+            name: _name,
+            phone: '',
+            selected: true,
+            onSelected: null,
+          )
+        else
+          // Honest rather than empty: there is nothing to select yet.
+          Text(
+            'checkout.noSavedAddress'.tr(),
+            style: TextStyle(fontSize: 12, color: MerzoxColors.kColor767676),
+          ),
+        const SizedBox(height: 18),
+        _AddAddressButton(onPressed: _addAddress),
+        const SizedBox(height: 26),
+        FilledButton(
+          onPressed: canContinue ? widget.onContinue : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: MerzoxColors.kColor3D5A80,
+            minimumSize: const Size.fromHeight(47),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
             ),
-            const SizedBox(height: 12),
-            if (hasAddress)
-              _AddressCard(address: address, name: _name)
-            else
-              // Honest rather than empty: there is nothing to select yet.
-              Text(
-                'checkout.noSavedAddress'.tr(),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: MerzoxColors.kColor767676,
-                ),
-              ),
-            const SizedBox(height: 18),
-            _AddAddressButton(onPressed: () => context.push('/profile/edit')),
-            const SizedBox(height: 26),
-            FilledButton(
-              onPressed: hasAddress ? widget.onContinue : null,
-              style: FilledButton.styleFrom(
-                backgroundColor: MerzoxColors.kColor3D5A80,
-                minimumSize: const Size.fromHeight(47),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(6),
-                ),
-              ),
-              child: Text(
-                'checkout.continue'.tr(),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+          child: Text(
+            'checkout.continue'.tr(),
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -284,44 +376,75 @@ class _AddressCard extends StatelessWidget {
   final String address;
   final String name;
 
-  const _AddressCard({required this.address, required this.name});
+  /// The artboard puts the phone under the name; a delivery address without
+  /// one is an address a driver cannot use.
+  final String phone;
+
+  final bool selected;
+  final VoidCallback? onSelected;
+
+  const _AddressCard({
+    required this.address,
+    required this.name,
+    required this.phone,
+    required this.selected,
+    required this.onSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: MerzoxColors.kColorB9DDF3),
-      ),
-      child: Row(
-        children: <Widget>[
-          // The only address there is, so it is the selected one. It is a
-          // radio and not a checkbox because the artboard's list is a choice -
-          // this build simply has one entry to choose from.
-          const Icon(
-            Icons.radio_button_checked,
-            size: 20,
-            color: MerzoxColors.kColor3D5A80,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Text(
-                  name.isEmpty ? address : '$name، $address',
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: MerzoxColors.kColor2B2B2B,
-                  ),
-                ),
-              ],
+    return InkWell(
+      onTap: onSelected,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: MerzoxColors.kColorB9DDF3),
+        ),
+        child: Row(
+          children: <Widget>[
+            // A radio and not a checkbox: the artboard's list is a choice of
+            // one, and an order goes to exactly one address.
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              size: 20,
+              color: selected
+                  ? MerzoxColors.kColor3D5A80
+                  : MerzoxColors.kColorBEBEBE,
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: <Widget>[
+                  Text(
+                    name.isEmpty ? address : '$name، $address',
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: MerzoxColors.kColor2B2B2B,
+                    ),
+                  ),
+                  if (phone.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 4),
+                    Text(
+                      phone,
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: MerzoxColors.kColor767676,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -364,12 +487,14 @@ class _PaymentStep extends StatelessWidget {
   final CartState state;
   final DeliveryOptionsApiResponse? delivery;
   final String selectedOption;
+  final String deliveryAddress;
   final ValueChanged<String> onOptionChanged;
 
   const _PaymentStep({
     required this.state,
     required this.delivery,
     required this.selectedOption,
+    required this.deliveryAddress,
     required this.onOptionChanged,
   });
 
@@ -439,7 +564,11 @@ class _PaymentStep extends StatelessWidget {
           strong: true,
         ),
         const SizedBox(height: 24),
-        _CheckoutActions(busy: busy, deliveryOption: selectedOption),
+        _CheckoutActions(
+          busy: busy,
+          deliveryOption: selectedOption,
+          deliveryAddress: deliveryAddress,
+        ),
       ],
     );
   }
@@ -747,8 +876,13 @@ class _DeliveryChoice extends StatelessWidget {
 class _CheckoutActions extends StatelessWidget {
   final bool busy;
   final String deliveryOption;
+  final String deliveryAddress;
 
-  const _CheckoutActions({required this.busy, required this.deliveryOption});
+  const _CheckoutActions({
+    required this.busy,
+    required this.deliveryOption,
+    required this.deliveryAddress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -761,7 +895,10 @@ class _CheckoutActions extends StatelessWidget {
                 onPressed: busy
                     ? null
                     : () => context.read<CartBloc>().add(
-                        CartCheckoutRequested(deliveryOption: deliveryOption),
+                        CartCheckoutRequested(
+                          deliveryOption: deliveryOption,
+                          deliveryAddress: deliveryAddress,
+                        ),
                       ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: MerzoxColors.kColor2B2B2B,

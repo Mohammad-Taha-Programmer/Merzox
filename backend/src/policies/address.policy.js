@@ -146,8 +146,10 @@ export function buildAddressWrite(body = {}) {
  * deleting a saved address later cannot rewrite where a past order went.
  */
 export function formatAddressLine(address) {
-  return [address.governorate, address.city, address.details]
-    .map((part) => text(part))
+  const governorate = text(address.governorate);
+  const city = text(address.city);
+
+  return [governorate, city === governorate ? '' : city, text(address.details)]
     .filter(Boolean)
     .join(' ، ');
 }
