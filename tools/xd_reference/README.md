@@ -1174,7 +1174,13 @@ source, or any production source, and it never renders the XD itself — it
 imports `xd_reference_exporter` as a sibling module and drives `XdPackage` /
 `export_artboard`, so there is exactly one AGC renderer in this repository.
 
-### The five locked mappings
+### The locked mappings
+
+The accepted corpus is this table - i.e. `golden_mapping.json` itself - not a
+constant in the comparator. Adding an aligned artboard means adding a row here;
+what the tool still guarantees structurally is that a seed name is well-formed
+(`^[a-z][a-z0-9_]*$`), that seeds, manifest ids and artboard paths are unique,
+and that the report follows this file's order exactly.
 
 | Seed | Flutter golden | XD artboard | Manifest id | XD size | Normalization |
 | --- | --- | --- | --- | --- | --- |
@@ -1183,6 +1189,7 @@ imports `xd_reference_exporter` as a sibling module and drives `XdPackage` /
 | `login` | `test/goldens/seed/login_idle_ar_375x812.png` | `تسجيل الدخول` | `7253b94f-6b60-4685-83c2-e3086ed0ac20` | 375 x 812 | `exact` |
 | `signup` | `test/goldens/seed/signup_idle_ar_375x812.png` | `إنشاء حساب` | `6a24a0b2-1988-4f8a-a643-65ed1af321e2` | 375 x 812 | `exact` |
 | `store_preview` | `test/goldens/seed/store_preview_loaded_ar_375x812.png` | `معاينة المتجر` | `693ab1c9-14b2-4448-a867-cb5553a8f813` | 375 x 810 | `extend_final_row_to_812` |
+| `cart` | `test/goldens/seed/cart_guest_ar_375x812.png` | `السلة` | `45ca383b-6a4d-4233-97d4-54d47123574b` | 375 x 812 | `exact` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1194,6 +1201,7 @@ a *different* uuid from the manifest id):
 | `login` | `artwork/artboard-b371399a-3aed-45f5-8a33-b1f7c4972ef7` |
 | `signup` | `artwork/artboard-fd764781-250c-454c-9043-41781ba5ba16` |
 | `store_preview` | `artwork/artboard-98945093-5916-454b-a1ea-946956675bf0` |
+| `cart` | `artwork/artboard-d4709d76-c6be-40e1-afa9-11aee51aa29d` |
 
 Why each one, in one line:
 
@@ -1256,10 +1264,14 @@ python tools/xd_reference/xd_flutter_comparator.py \
   --artifact-dir /tmp/artifacts
 ```
 
-`--seed` accepts `all` or one of `splash`, `onboarding`, `login`,
-`signup`, `store_preview`. With one seed, the report contains only that seed's result;
-with `all`, results follow the mapping order exactly:
-`splash`, `onboarding`, `login`, `signup`, `store_preview`.
+`--seed` accepts `all` or any seed name declared in the mapping. There is
+deliberately no argparse `choices` list: the accepted set lives in the mapping
+file, which is not read until after parsing, and a frozen list would reject
+every newly aligned artboard at the CLI boundary. An unknown seed is refused by
+`select_entries`, which names every accepted value in the error.
+
+With one seed, the report contains only that seed's result; with `all`, results
+follow the mapping order exactly.
 
 | Flag | Required | Purpose |
 | --- | --- | --- |
@@ -1316,7 +1328,7 @@ different artifact directories and output paths.
 
 A **positive** `unsupported_node_counts` for a mapped artboard is treated
 **fail-closed**: a visually incomplete XD reference is never measured as if it
-were complete. This says nothing about artboards outside these five — no claim
+were complete. This says nothing about artboards outside the mapping — no claim
 is made that the exporter supports every future artboard.
 
 ### Measurements only — there is no parity threshold

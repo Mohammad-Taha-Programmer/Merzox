@@ -37,6 +37,10 @@ import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
+import 'package:merzox/features/home/home_screen.dart';
+import 'package:merzox/features/home/presentation/bloc/home_bloc.dart';
+import 'package:merzox/features/home/presentation/bloc/home_event.dart';
+import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/onboarding/bloc/onboarding_bloc.dart';
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
 import 'package:merzox/features/splash/presentation/splash_screen.dart';
@@ -74,6 +78,32 @@ final class _OfflineAuthApiService extends ApiService {
     String gender = 'unspecified',
   }) async {
     throw StateError('an idle authentication golden must not call signup()');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Home shell fixture
+// ---------------------------------------------------------------------------
+
+/// An [ApiService] the home shell cannot reach the network through.
+///
+/// The guest cart seed never dispatches `HomeStarted`, so no catalog request
+/// belongs to this capture. A call here means the fixture drifted into a
+/// data-driven state and the test should say so rather than reach a real
+/// endpoint.
+final class _OfflineHomeApiService extends ApiService {
+  @override
+  Future<BusinessListApiResponse> businesses({
+    int page = 1,
+    int limit = 100,
+    String? search,
+    String? sort,
+    bool? discounted,
+    double? latitude,
+    double? longitude,
+    int? radiusMeters,
+  }) async {
+    throw StateError('the guest cart golden must not call businesses()');
   }
 }
 
@@ -381,6 +411,52 @@ void main() {
         expect(find.text('متجر الياسمين'), findsOneWidget);
 
         await expectMerzoxSeedGolden('store_preview_loaded_ar_375x812.png');
+      });
+
+      // -- 6. Cart, guest state -------------------------------------------
+      //
+      // `السلة` in the XD corpus is the UNAUTHENTICATED cart: the guest mark,
+      // the sign-in prompt, the two account actions and the shell's bottom
+      // navigation. `HomeScreen` owns that state through `_CartTab`, so the
+      // seed renders the real shell on tab 1 rather than a lifted-out widget.
+      testWidgets('cart renders its Arabic guest-state baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+
+        final HomeBloc homeBloc = HomeBloc(
+          apiService: _OfflineHomeApiService(),
+        );
+        _closeOnTearDown(homeBloc);
+
+        // Only the tab selection. `HomeStarted` is deliberately never
+        // dispatched: it would begin catalog loading and the location
+        // permission flow, neither of which is part of this state.
+        final Future<HomeState> cartSelected = homeBloc.stream.firstWhere(
+          (HomeState state) => state.selectedTab == 1,
+        );
+        homeBloc.add(const HomeTabChanged(1));
+        await cartSelected;
+
+        expect(homeBloc.state.shouldAskLocationPermission, isFalse);
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<HomeBloc>.value(
+            value: homeBloc,
+            child: const HomeScreen(isGuest: true),
+          ),
+        );
+
+        // The seed is the guest prompt, not a populated basket: assert the
+        // state before capturing so a silent downgrade fails the test rather
+        // than producing a misleading PNG.
+        expect(find.text('السلة'), findsOneWidget);
+        expect(find.text('إنشاء حساب'), findsOneWidget);
+        expect(find.text('تسجيل دخول'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('cart_guest_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

@@ -539,6 +539,8 @@
     "unfollow": "Unfollow",
     "enableLocationHint": "Enable location for more accurate results for businesses near you.",
     "noResultsInSection": "No results in {}",
+    "guestTitle": "Please sign in",
+    "guestLogin": "Sign in",
     "cart": {
       "guestMessage": "To view your cart contents, please log in first",
       "emptyTitle": "Sorry, your cart is empty",
@@ -577,8 +579,7 @@
     "sellerDetails": "Seller details",
     "reviewHint": "Write your review of the product you purchased here",
     "buyNow": "Buy now"
-  }
-,
+  },
   "apiErrors": {
     "contract": "Could not read the server response. Please try again.",
     "connection": "Could not connect to the server. Make sure the Merzox backend is running.",

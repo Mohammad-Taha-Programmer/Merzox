@@ -69,6 +69,19 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "This is the explicit \"معاينة المتجر\" merchant-preview artboard, containing the store sections خدماتنا, عن المتجر, المنتجات and التقييمات. The long \"معاينة\" alternatives encode shopper/product/review states with customer actions such as add-to-cart and review composition."
+    },
+    {
+      "seed": "cart",
+      "flutter_golden": "test/goldens/seed/cart_guest_ar_375x812.png",
+      "xd": {
+        "name": "السلة",
+        "manifest_id": "45ca383b-6a4d-4233-97d4-54d47123574b",
+        "artboard_path": "artwork/artboard-d4709d76-c6be-40e1-afa9-11aee51aa29d",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The Flutter seed renders the shell on tab 1 with isGuest=true, i.e. the UNAUTHENTICATED cart. This exact-name 375x812 artboard is that state: the guest avatar mark, the sign-in prompt, the two account actions and the shell bottom navigation with the cart entry active. The suffixed السلة artboards encode the authenticated basket states (populated and empty) and are separate seeds, not variants of this one."
     }
   ]
 }

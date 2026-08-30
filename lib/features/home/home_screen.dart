@@ -406,6 +406,11 @@ class _HomeNavData {
   });
 }
 
+/// The active-tab marker, measured from the XD bottom navigation.
+const double _navIndicatorWidth = 24;
+const double _navIndicatorHeight = 2;
+const double _navIndicatorGap = 13;
+
 class _HomeNavItem extends StatelessWidget {
   final _HomeNavData data;
   final bool selected;
@@ -429,19 +434,30 @@ class _HomeNavItem extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: selected ? MerzoxColors.kColorFDF1EC : Colors.transparent,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              selected ? data.selectedIcon : data.icon,
-              color: selected ? MerzoxColors.kColorEE6C4D : inactiveColor,
-              size: selected ? 26 : 25,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // The artboard marks the active tab with a 24x2 bar ABOVE the
+              // icon, measured at y=729..730 against an icon starting at
+              // y=745 - not with a filled disc behind it.
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                width: _navIndicatorWidth,
+                height: _navIndicatorHeight,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? MerzoxColors.kColorEE6C4D
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(_navIndicatorHeight),
+                ),
+              ),
+              const SizedBox(height: _navIndicatorGap),
+              Icon(
+                selected ? data.selectedIcon : data.icon,
+                color: selected ? MerzoxColors.kColorEE6C4D : inactiveColor,
+                size: 25,
+              ),
+            ],
           ),
         ),
       ),
@@ -1341,6 +1357,19 @@ class _PlainTabTitle extends StatelessWidget {
   }
 }
 
+/// Metrics measured from the XD `السلة` artboard (375x812), not chosen here.
+///
+/// The action buttons are a 227x48 rounded rectangle; the heading and the
+/// button labels are 16px and 14px text nodes; the body is 13px set on a 20px
+/// line box and breaks across two lines.
+const double _guestActionWidth = 227;
+const double _guestActionHeight = 48;
+const double _guestActionSize = 14;
+const double _guestHeadingSize = 16;
+const double _guestBodySize = 13;
+const double _guestBodyLineHeight = 20;
+const double _guestBodyWidth = 236;
+
 class _GuestLoginTabState extends StatelessWidget {
   final String title;
   final String message;
@@ -1359,64 +1388,88 @@ class _GuestLoginTabState extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(34, 18, 34, 118),
+          padding: const EdgeInsets.fromLTRB(34, 43, 34, 118),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight - 136),
             child: Column(
               children: [
                 _PlainTabTitle(title: title),
-                SizedBox(height: constraints.maxHeight < 680 ? 62 : 108),
+                SizedBox(height: constraints.maxHeight < 680 ? 44 : 88),
                 const _GuestAvatarMark(),
-                const SizedBox(height: 34),
+                const SizedBox(height: 41),
                 Text(
-                  'authGate.title'.tr(),
+                  // Deliberately not `authGate.title`: that block belongs to
+                  // the modal auth gate and the login page, which the XD login
+                  // artboard words differently from this one.
+                  'home.guestTitle'.tr(),
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18,
+                    fontSize: _guestHeadingSize,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF2B2B2B),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  message,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    height: 1.65,
-                    color: MerzoxColors.kColor767676,
-                  ),
-                ),
-                const SizedBox(height: 58),
-                FilledButton(
-                  onPressed: onSignupPressed,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: MerzoxColors.kColorEE6C4D,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
+                const SizedBox(height: 19),
+                SizedBox(
+                  // The artboard breaks this sentence across two 20px line
+                  // boxes. A full-bleed paragraph would set it on one line and
+                  // move everything below it up by a whole line.
+                  width: _guestBodyWidth,
+                  child: Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: _guestBodySize,
+                      height: _guestBodyLineHeight / _guestBodySize,
+                      color: MerzoxColors.kColor767676,
                     ),
                   ),
-                  child: Text(
-                    'authGate.signup'.tr(),
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 59),
+                SizedBox(
+                  width: _guestActionWidth,
+                  child: FilledButton(
+                    onPressed: onSignupPressed,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: MerzoxColors.kColorEE6C4D,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(_guestActionHeight),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    // The size goes on the label, never on the button's
+                    // `textStyle`: that replaces the whole style, including the
+                    // Arabic font family, and the glyphs fall back to tofu.
+                    child: Text(
+                      'authGate.signup'.tr(),
+                      style: TextStyle(
+                        fontSize: _guestActionSize,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 16),
-                OutlinedButton(
-                  onPressed: onLoginPressed,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2B2B2B),
-                    side: BorderSide(color: MerzoxColors.kColorEE6C4D),
-                    minimumSize: const Size.fromHeight(48),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(6),
+                SizedBox(
+                  width: _guestActionWidth,
+                  child: OutlinedButton(
+                    onPressed: onLoginPressed,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF2B2B2B),
+                      side: BorderSide(color: MerzoxColors.kColorEE6C4D),
+                      minimumSize: const Size.fromHeight(_guestActionHeight),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    'authGate.login'.tr(),
-                    style: TextStyle(fontWeight: FontWeight.w800),
+                    child: Text(
+                      'home.guestLogin'.tr(),
+                      style: TextStyle(
+                        fontSize: _guestActionSize,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
               ],

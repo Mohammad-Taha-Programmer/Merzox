@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import math
 import os
 import struct
@@ -58,14 +59,17 @@ REPORT_SCHEMA = "merzox.xd_flutter_comparison/1"
 TARGET_WIDTH = 375
 TARGET_HEIGHT = 812
 
-#: The five accepted seeds, in their locked deterministic order.
-ACCEPTED_SEEDS: Tuple[str, ...] = (
-    "splash",
-    "onboarding",
-    "login",
-    "signup",
-    "store_preview",
-)
+#: The seed names a mapping may declare.
+#:
+#: The accepted corpus is the mapping file itself, not a constant here: freezing
+#: the names would mean no further artboard could ever be measured. What is
+#: still guaranteed is structural - a seed name must match this shape, names
+#: must be unique, and the report follows mapping order exactly - so a mapping
+#: cannot silently acquire a malformed or duplicated entry.
+SEED_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]*$")
+
+#: The smallest corpus that is still a corpus.
+MINIMUM_MAPPING_ENTRIES = 1
 
 #: ``--seed`` value that selects every mapping entry, in mapping order.
 SEED_ALL = "all"
@@ -708,10 +712,10 @@ def validate_mapping(
     raw_entries = payload.get("entries")
     if not isinstance(raw_entries, list):
         raise ComparatorError("Mapping 'entries' must be a list.")
-    if len(raw_entries) != len(ACCEPTED_SEEDS):
+    if len(raw_entries) < MINIMUM_MAPPING_ENTRIES:
         raise ComparatorError(
-            f"Mapping must contain exactly {len(ACCEPTED_SEEDS)} entries, got "
-            f"{len(raw_entries)}."
+            f"Mapping must contain at least {MINIMUM_MAPPING_ENTRIES} entry, "
+            f"got {len(raw_entries)}."
         )
 
     entries: List[MappingEntry] = []
@@ -788,12 +792,12 @@ def validate_mapping(
     _reject_duplicates([e.xd_manifest_id for e in entries], "XD manifest id")
     _reject_duplicates([e.xd_artboard_path for e in entries], "XD artboard path")
 
-    actual_seeds = tuple(e.seed for e in entries)
-    if actual_seeds != ACCEPTED_SEEDS:
-        raise ComparatorError(
-            "Mapping seeds must be exactly "
-            f"{list(ACCEPTED_SEEDS)} in that order, got {list(actual_seeds)}."
-        )
+    for entry in entries:
+        if not SEED_NAME_PATTERN.match(entry.seed):
+            raise ComparatorError(
+                f"Seed name '{entry.seed}' is malformed; a seed must match "
+                f"{SEED_NAME_PATTERN.pattern}."
+            )
 
     return GoldenMapping(
         schema=MAPPING_SCHEMA,
@@ -837,7 +841,7 @@ def select_entries(mapping: GoldenMapping, seed: str) -> List[MappingEntry]:
             return [entry]
     raise ComparatorError(
         f"Unknown seed '{seed}'; accepted values are "
-        f"{[SEED_ALL] + list(ACCEPTED_SEEDS)}."
+        f"{[SEED_ALL] + list(mapping.seeds())}."
     )
 
 
@@ -1115,11 +1119,16 @@ def build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--xd", required=True, help="Path to the design .xd package.")
+    # Deliberately not `choices=`: the accepted set lives in the mapping file,
+    # which is not read until after parsing. `select_entries` validates the
+    # value against the loaded mapping and names every accepted seed on failure.
     parser.add_argument(
         "--seed",
         required=True,
-        choices=[SEED_ALL, *ACCEPTED_SEEDS],
-        help="Seed to measure, or 'all' for every mapping entry in mapping order.",
+        help=(
+            "Seed to measure, or 'all' for every mapping entry in mapping "
+            "order. Accepted values come from the mapping file."
+        ),
     )
     parser.add_argument(
         "--output-json", required=True, help="Path of the deterministic report."

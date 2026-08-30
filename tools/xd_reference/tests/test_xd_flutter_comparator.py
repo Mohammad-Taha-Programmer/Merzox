@@ -234,6 +234,11 @@ def base_mapping() -> Dict[str, Any]:
     }
 
 
+def base_mapping_seeds() -> tuple:
+    """The seeds of :func:`base_mapping`, in its own order."""
+    return tuple(e["seed"] for e in base_mapping()["entries"])
+
+
 class MappingContractTests(unittest.TestCase):
     """The mapping is a locked contract and fails closed on every breach."""
 
@@ -256,9 +261,12 @@ class MappingContractTests(unittest.TestCase):
         self.assertEqual(mapping.schema, cmp.MAPPING_SCHEMA)
         self.assertEqual((mapping.target_width, mapping.target_height), (375, 812))
         self.assertEqual(len(mapping.entries), 5)
-        self.assertEqual(mapping.seeds(), cmp.ACCEPTED_SEEDS)
+        self.assertEqual(
+            mapping.seeds(),
+            ("splash", "onboarding", "login", "signup", "store_preview"),
+        )
 
-    def test_real_mapping_file_matches_the_locked_five_entries(self) -> None:
+    def test_real_mapping_file_matches_its_locked_entries(self) -> None:
         mapping = cmp.load_mapping()
         self.assertEqual(mapping.schema, "merzox.xd_flutter_mapping/1")
         self.assertEqual((mapping.target_width, mapping.target_height), (375, 812))
@@ -328,6 +336,16 @@ class MappingContractTests(unittest.TestCase):
                     810,
                     "extend_final_row_to_812",
                 ),
+                (
+                    "cart",
+                    "test/goldens/seed/cart_guest_ar_375x812.png",
+                    "السلة",
+                    "45ca383b-6a4d-4233-97d4-54d47123574b",
+                    "artwork/artboard-d4709d76-c6be-40e1-afa9-11aee51aa29d",
+                    375,
+                    812,
+                    "exact",
+                ),
             ],
         )
 
@@ -363,10 +381,19 @@ class MappingContractTests(unittest.TestCase):
         del payload["target_surface"]
         self.assert_rejected(payload, "'target_surface' must be an object")
 
-    def test_wrong_entry_count_rejected(self) -> None:
+    def test_empty_corpus_rejected(self) -> None:
         payload = base_mapping()
-        payload["entries"] = payload["entries"][:4]
-        self.assert_rejected(payload, "exactly 5 entries")
+        payload["entries"] = []
+        self.assert_rejected(payload, "at least 1 entry")
+
+    def test_a_shorter_corpus_is_accepted(self) -> None:
+        # The corpus GROWS as artboards are aligned, so a subset is a valid
+        # mapping. What must never be silently accepted is a malformed or
+        # duplicated entry, which the tests below cover.
+        payload = base_mapping()
+        payload["entries"] = payload["entries"][:2]
+        mapping = self.validate(payload)
+        self.assertEqual(mapping.seeds(), ("splash", "onboarding"))
 
     def test_duplicate_seed_rejected(self) -> None:
         payload = base_mapping()
@@ -385,18 +412,31 @@ class MappingContractTests(unittest.TestCase):
             payload, "duplicate XD artboard path(s): ['artwork/artboard-a']"
         )
 
-    def test_unexpected_seed_name_rejected(self) -> None:
+    def test_a_new_seed_name_is_accepted(self) -> None:
+        # A name the tool has never seen is exactly what adding an artboard
+        # looks like. It must be accepted on its shape, not on a fixed list.
         payload = base_mapping()
         payload["entries"][2]["seed"] = "checkout"
-        self.assert_rejected(payload, "Mapping seeds must be exactly")
+        mapping = self.validate(payload)
+        self.assertIn("checkout", mapping.seeds())
 
-    def test_reordered_seeds_rejected(self) -> None:
+    def test_malformed_seed_name_rejected(self) -> None:
+        for bad in ("Checkout", "check-out", "2checkout", "", "check out"):
+            with self.subTest(seed=bad):
+                payload = base_mapping()
+                payload["entries"][2]["seed"] = bad
+                self.assert_rejected(payload, "")
+
+    def test_mapping_order_is_preserved_verbatim(self) -> None:
+        # Order is the report's order, so it is data, not a constraint: a
+        # reordered mapping is valid and simply measures in its own order.
         payload = base_mapping()
         payload["entries"][0], payload["entries"][1] = (
             payload["entries"][1],
             payload["entries"][0],
         )
-        self.assert_rejected(payload, "Mapping seeds must be exactly")
+        mapping = self.validate(payload)
+        self.assertEqual(mapping.seeds()[:2], ("onboarding", "splash"))
 
     def test_missing_required_entry_field_rejected(self) -> None:
         for field in cmp.REQUIRED_ENTRY_FIELDS:
@@ -469,7 +509,10 @@ class MappingContractTests(unittest.TestCase):
             json.dumps(base_mapping(), ensure_ascii=False), encoding="utf-8"
         )
         mapping = cmp.load_mapping(path, repo_root=self.repo_root)
-        self.assertEqual(mapping.seeds(), cmp.ACCEPTED_SEEDS)
+        self.assertEqual(
+            mapping.seeds(),
+            ("splash", "onboarding", "login", "signup", "store_preview"),
+        )
 
 
 class SeedSelectionTests(unittest.TestCase):
@@ -488,7 +531,7 @@ class SeedSelectionTests(unittest.TestCase):
         )
 
     def test_single_seed_selects_only_that_entry(self) -> None:
-        for seed in cmp.ACCEPTED_SEEDS:
+        for seed in base_mapping_seeds():
             selected = cmp.select_entries(self.mapping, seed)
             self.assertEqual([e.seed for e in selected], [seed])
 
@@ -497,13 +540,31 @@ class SeedSelectionTests(unittest.TestCase):
             cmp.select_entries(self.mapping, "cart")
         self.assertIn("Unknown seed 'cart'", str(ctx.exception))
 
-    def test_cli_seed_choices_are_exactly_all_plus_five(self) -> None:
+    def test_cli_accepts_any_seed_and_validates_against_the_mapping(self) -> None:
+        # No argparse `choices`: the accepted set lives in the mapping file,
+        # which is not read until after parsing. A frozen choices list would
+        # reject every newly mapped artboard at the CLI boundary.
         parser = cmp.build_arg_parser()
         action = next(a for a in parser._actions if a.dest == "seed")
-        self.assertEqual(
-            list(action.choices),
-            ["all", "splash", "onboarding", "login", "signup", "store_preview"],
+        self.assertIsNone(action.choices)
+
+        parsed = parser.parse_args(
+            [
+                "--xd", "d.xd",
+                "--seed", "a_freshly_mapped_screen",
+                "--output-json", "r.json",
+                "--artifact-dir", "art",
+            ]
         )
+        self.assertEqual(parsed.seed, "a_freshly_mapped_screen")
+
+        # ...and the mapping is what actually refuses it, by name.
+        with self.assertRaises(cmp.ComparatorError) as ctx:
+            cmp.select_entries(self.mapping, parsed.seed)
+        message = str(ctx.exception)
+        self.assertIn("Unknown seed 'a_freshly_mapped_screen'", message)
+        for seed in base_mapping_seeds():
+            self.assertIn(seed, message)
 
     def test_cli_requires_the_four_documented_arguments(self) -> None:
         parser = cmp.build_arg_parser()
@@ -1134,7 +1195,7 @@ class ReportTests(unittest.TestCase):
 
     def test_serialization_is_deterministic_and_sorted(self) -> None:
         report = cmp.build_report(
-            [synthetic_result(seed) for seed in cmp.ACCEPTED_SEEDS]
+            [synthetic_result(seed) for seed in base_mapping_seeds()]
         )
         first = cmp.serialize_report(report)
         second = cmp.serialize_report(copy.deepcopy(report))
@@ -1145,7 +1206,7 @@ class ReportTests(unittest.TestCase):
         # "results", and the result list order is preserved regardless.
         reloaded = json.loads(first)
         self.assertEqual(
-            [r["seed"] for r in reloaded["results"]], list(cmp.ACCEPTED_SEEDS)
+            [r["seed"] for r in reloaded["results"]], list(base_mapping_seeds())
         )
         self.assertEqual(
             list(reloaded.keys()),
@@ -1167,7 +1228,7 @@ class ReportTests(unittest.TestCase):
 
     def test_report_carries_no_volatile_provenance(self) -> None:
         text = cmp.serialize_report(
-            cmp.build_report([synthetic_result(s) for s in cmp.ACCEPTED_SEEDS])
+            cmp.build_report([synthetic_result(s) for s in base_mapping_seeds()])
         )
         lowered = text.lower()
         for banned in ("timestamp", "generated_at", "artifact_dir", "c:\\", "/tmp/"):
