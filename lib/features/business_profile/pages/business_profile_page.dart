@@ -169,9 +169,9 @@ class _BusinessProfileView extends StatelessWidget {
                 if (viewMode.allowsCustomerActions)
                   PositionedDirectional(
                     // Measured: the artboard's bubble is a 39px circle whose
-                    // left edge sits at x=16 with its top at y=655. `end` is
+                    // left edge sits at x=17 with its top at y=655. `end` is
                     // the LEFT edge in RTL, so 0 pinned it flush to the frame.
-                    end: 16,
+                    end: 12,
                     bottom: 21,
                     child: _ChatButton(
                       onPressed: () => AuthGate.run(
@@ -934,7 +934,13 @@ class _ReviewsTab extends StatefulWidget {
 
 class _ReviewsTabState extends State<_ReviewsTab> {
   final _commentController = TextEditingController();
-  int _rating = 5;
+
+  /// Zero means "not rated yet", which is the state the artboard draws.
+  ///
+  /// It is deliberately not a valid submission: `BusinessReview.rating` is
+  /// `min: 1`, so the publish action stays disabled until the customer picks a
+  /// star rather than sending a rating they never chose.
+  int _rating = 0;
 
   @override
   void dispose() {
@@ -945,6 +951,7 @@ class _ReviewsTabState extends State<_ReviewsTab> {
   @override
   Widget build(BuildContext context) {
     final saving = widget.state.status == BusinessProfileStatus.savingReview;
+    final rated = _rating > 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -987,7 +994,7 @@ class _ReviewsTabState extends State<_ReviewsTab> {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: FilledButton(
-              onPressed: saving
+              onPressed: saving || !rated
                   ? null
                   : () async {
                       final submitted = await AuthGate.run(
@@ -1006,9 +1013,12 @@ class _ReviewsTabState extends State<_ReviewsTab> {
                     },
               style: FilledButton.styleFrom(
                 backgroundColor: MerzoxColors.kColorEE6C4D,
-                // 63x31, measured: at 58 the Arabic label no longer fits and
-                // breaks across two lines inside the button.
+                // 63x31, measured. `padding` must go with it: a FilledButton
+                // keeps its default ~24px horizontal padding inside the fixed
+                // box, which left the Arabic label ~15px and broke it across
+                // two lines.
                 fixedSize: const Size(63, 31),
+                padding: EdgeInsets.zero,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(4),
                 ),

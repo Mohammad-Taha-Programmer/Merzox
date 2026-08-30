@@ -669,6 +669,58 @@ void main() {
       );
     });
 
+    testWidgets(
+      'D2 - the review composer opens unrated and refuses to publish until '
+      'a star is chosen',
+      (tester) async {
+        useAuthenticatedSession(business: false);
+
+        final api = _SpyStorefrontApi();
+        final bloc = await _startedBloc(
+          api,
+          viewMode: BusinessProfileViewMode.customer,
+          reviewEligibilityGateway: _EligibleReviewGateway(),
+          closeOnTearDown: false,
+        );
+
+        await pumpLocalized(
+          tester,
+          _storefront(bloc, viewMode: BusinessProfileViewMode.customer),
+        );
+        await _openReviewsTab(tester);
+
+        // The artboard draws five EMPTY stars: nothing is rated yet. Opening
+        // at five would submit a rating the customer never chose.
+        expect(find.byIcon(Icons.star_rounded), findsNothing);
+        expect(find.byIcon(Icons.star_border_rounded), findsNWidgets(5));
+
+        // And an unrated composer cannot publish. `BusinessReview.rating` is
+        // `min: 1`, so a zero would be refused by the server with an error the
+        // customer cannot act on - the button is disabled instead.
+        final FilledButton publish = tester.widget<FilledButton>(
+          find.widgetWithText(FilledButton, 'نشر'),
+        );
+        expect(publish.onPressed, isNull);
+
+        // Picking a star both fills it and unlocks publishing.
+        await _tapVisible(tester, find.byIcon(Icons.star_border_rounded).at(3));
+
+        expect(find.byIcon(Icons.star_rounded), findsNWidgets(4));
+        expect(
+          tester
+              .widget<FilledButton>(find.widgetWithText(FilledButton, 'نشر'))
+              .onPressed,
+          isNotNull,
+        );
+
+        // Nothing was sent while it was unrated.
+        expect(
+          api.mutations.where((String call) => call.contains('/reviews')),
+          isEmpty,
+        );
+      },
+    );
+
     testWidgets('E - preview shows a loading state while the store resolves', (
       tester,
     ) async {
