@@ -386,7 +386,10 @@ class _ConversationTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    _formatTimestamp(conversation.lastMessage.sentAt),
+                    _formatTimestamp(
+                      conversation.lastMessage.sentAt,
+                      context.locale.toLanguageTag(),
+                    ),
                     style: const TextStyle(
                       fontSize: 10,
                       color: MerzoxColors.kColor8D99AE,
@@ -449,7 +452,7 @@ class _InboxAvatar extends StatelessWidget {
 
 /// Today shows a clock, this week a weekday, anything older a short date —
 /// the compact stamp the design puts at the end of each row.
-String _formatTimestamp(DateTime? value) {
+String _formatTimestamp(DateTime? value, String localeName) {
   if (value == null) return '';
 
   final local = value.toLocal();
@@ -466,7 +469,8 @@ String _formatTimestamp(DateTime? value) {
   }
 
   if (now.difference(local).inDays < 7) {
-    return DateFormat.E().format(local);
+    // Same rule as the tracking headline: an unnamed locale is English.
+    return DateFormat.E(localeName).format(local);
   }
 
   return '${local.day}.${local.month}.${local.year}';

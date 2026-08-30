@@ -14,6 +14,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 /// The one logical surface every Merzox golden is captured on.
 ///
@@ -69,6 +70,38 @@ bool _fontsLoaded = false;
 /// for the asset reads more than once per test process. Must be called outside
 /// `testWidgets` (or inside `runAsync`): the loads are real asset I/O, which
 /// does not progress on the faked test clock.
+/// The status-bar inset every Merzox artboard draws.
+///
+/// The corpus renders the 9:41 / signal / wifi strip at the top of each 375x812
+/// artboard, and a `SafeArea`-wrapped screen sits below it on a real device. A
+/// seed that omits this is 44px out of register with its reference.
+const double merzoxGoldenStatusBarHeight = 44;
+
+/// Wraps [page] in the device surface an artboard assumes.
+///
+/// Use for any screen that wraps itself in `SafeArea`. Screens that paint
+/// full-bleed (the splash) do not, and must not, be wrapped.
+Widget withMerzoxGoldenDeviceInsets(Widget page) {
+  return MediaQuery(
+    data: const MediaQueryData(
+      size: merzoxGoldenSurfaceSize,
+      devicePixelRatio: 1,
+      padding: EdgeInsets.only(top: merzoxGoldenStatusBarHeight),
+      viewPadding: EdgeInsets.only(top: merzoxGoldenStatusBarHeight),
+    ),
+    child: page,
+  );
+}
+
+/// Loads intl's date symbols, exactly as `bootstrap()` does.
+///
+/// A golden captured without these would show English weekday names for an
+/// Arabic screen and would therefore be a baseline of a bug rather than of the
+/// shipped screen.
+Future<void> loadMerzoxGoldenDateSymbols() async {
+  await initializeDateFormatting();
+}
+
 Future<void> loadMerzoxGoldenFonts() async {
   if (_fontsLoaded) {
     return;

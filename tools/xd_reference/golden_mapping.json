@@ -82,6 +82,19 @@
       },
       "normalization": "exact",
       "semantic_reason": "The Flutter seed renders the shell on tab 1 with isGuest=true, i.e. the UNAUTHENTICATED cart. This exact-name 375x812 artboard is that state: the guest avatar mark, the sign-in prompt, the two account actions and the shell bottom navigation with the cart entry active. The suffixed السلة artboards encode the authenticated basket states (populated and empty) and are separate seeds, not variants of this one."
+    },
+    {
+      "seed": "order_tracking",
+      "flutter_golden": "test/goldens/seed/order_tracking_placed_ar_375x812.png",
+      "xd": {
+        "name": "تتبع الطلب",
+        "manifest_id": "776233af-c9be-4602-a68e-bb5c38f690bd",
+        "artboard_path": "artwork/artboard-50d681d7-a08e-4e2d-b65c-7530640a83cc",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The Flutter seed renders a placed order whose only reached step is \"placed\", which is the state this exact-name 375x812 artboard draws: the success headline, the order-number card and a four-step timeline with the first entry complete. The suffixed تتبع الطلب artboards encode the later steps and are separate seeds."
     }
   ]
 }

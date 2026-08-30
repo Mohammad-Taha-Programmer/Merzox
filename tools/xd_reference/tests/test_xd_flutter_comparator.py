@@ -346,6 +346,16 @@ class MappingContractTests(unittest.TestCase):
                     812,
                     "exact",
                 ),
+                (
+                    "order_tracking",
+                    "test/goldens/seed/order_tracking_placed_ar_375x812.png",
+                    "تتبع الطلب",
+                    "776233af-c9be-4602-a68e-bb5c38f690bd",
+                    "artwork/artboard-50d681d7-a08e-4e2d-b65c-7530640a83cc",
+                    375,
+                    812,
+                    "exact",
+                ),
             ],
         )
 

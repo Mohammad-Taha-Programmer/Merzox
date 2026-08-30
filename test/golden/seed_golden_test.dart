@@ -43,6 +43,10 @@ import 'package:merzox/features/home/presentation/bloc/home_event.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/onboarding/bloc/onboarding_bloc.dart';
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
+import 'package:merzox/features/orders/bloc/order_tracking_bloc.dart';
+import 'package:merzox/features/orders/bloc/order_tracking_event.dart';
+import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
+import 'package:merzox/features/orders/pages/order_tracking_page.dart';
 import 'package:merzox/features/splash/presentation/splash_screen.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -105,6 +109,90 @@ final class _OfflineHomeApiService extends ApiService {
   }) async {
     throw StateError('the guest cart golden must not call businesses()');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Order tracking fixture
+// ---------------------------------------------------------------------------
+
+const String _trackedOrderId = '64d000000000000000000001';
+
+/// The order the `تتبع الطلب` artboard draws: placed, nothing further reached.
+///
+/// Every tracking field is spelled out because `OrderTrackingApiModel` refuses
+/// to default them - a permission the server never sent must never be
+/// synthesized here. No courier is assigned and no courier location exists, so
+/// the live map and its network tiles are not part of this capture.
+final class _SeedOrderTrackingApi extends ApiService {
+  @override
+  Future<OrderApiModel> order({
+    required String token,
+    required String orderId,
+  }) async {
+    return OrderApiModel.fromJson(<String, dynamic>{
+      'id': orderId,
+      'publicId': '222321',
+      'business': <String, dynamic>{
+        'id': '64b000000000000000000009',
+        'name': 'متجر الياسمين',
+      },
+      'items': <Map<String, dynamic>>[],
+      'subtotal': 120,
+      'deliveryFee': 10,
+      'total': 130,
+      'currency': 'ILS',
+      'deliveryAddress': 'عنوان التوصيل للاختبار',
+      'paymentMethod': 'cash',
+      'status': 'pending',
+      'statusGroup': 'current',
+      'statusHistory': <Map<String, dynamic>>[],
+      'cancellationReason': '',
+      // The artboard's own stamp: Saturday 15.2.2022, 02:40 PM.
+      'createdAt': '2022-02-15T14:40:00.000',
+      'courier': <String, dynamic>{},
+      'tracking': <String, dynamic>{
+        'isCancelled': false,
+        'currentStep': 'placed',
+        'currentIndex': 0,
+        'steps': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'step': 'placed',
+            'reachedAt': '2022-02-15T14:40:00.000',
+            'isReached': true,
+          },
+          <String, dynamic>{
+            'step': 'preparing',
+            'reachedAt': null,
+            'isReached': false,
+          },
+          <String, dynamic>{
+            'step': 'outForDelivery',
+            'reachedAt': null,
+            'isReached': false,
+          },
+          <String, dynamic>{
+            'step': 'delivered',
+            'reachedAt': null,
+            'isReached': false,
+          },
+        ],
+        'courier': <String, dynamic>{},
+        'courierLocation': null,
+        'canCancel': true,
+        'canChangeAddress': true,
+        'canReview': false,
+      },
+    });
+  }
+}
+
+/// Installs the authenticated customer session the tracking bloc reads.
+void _useAuthenticatedCustomerSession() {
+  SharedPreferences.setMockInitialValues(<String, Object>{
+    AuthBloc.sessionKey: true,
+    AuthBloc.tokenKey: 'seed-golden-token',
+    AuthBloc.userTypeKey: 'customer',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +333,7 @@ void main() {
       setUpAll(() async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
         await EasyLocalization.ensureInitialized();
+        await loadMerzoxGoldenDateSymbols();
         await loadMerzoxGoldenFonts();
       });
 
@@ -330,17 +419,8 @@ void main() {
           tester,
           BlocProvider<AuthBloc>(
             create: (_) => AuthBloc(apiService: _OfflineAuthApiService()),
-            child: MediaQuery(
-              data: const MediaQueryData(
-                size: merzoxGoldenSurfaceSize,
-                devicePixelRatio: 1,
-                padding: EdgeInsets.only(top: 44),
-                viewPadding: EdgeInsets.only(top: 44),
-              ),
-              child: SignupPage(
-                onSignupCreated: () {},
-                onLoginRequested: () {},
-              ),
+            child: withMerzoxGoldenDeviceInsets(
+              SignupPage(onSignupCreated: () {}, onLoginRequested: () {}),
             ),
           ),
         );
@@ -444,7 +524,9 @@ void main() {
           tester,
           BlocProvider<HomeBloc>.value(
             value: homeBloc,
-            child: const HomeScreen(isGuest: true),
+            child: withMerzoxGoldenDeviceInsets(
+              const HomeScreen(isGuest: true),
+            ),
           ),
         );
 
@@ -457,6 +539,43 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
 
         await expectMerzoxSeedGolden('cart_guest_ar_375x812.png');
+      });
+
+      // -- 7. Order tracking, placed state --------------------------------
+      testWidgets('order tracking renders its Arabic placed-state baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        final OrderTrackingBloc trackingBloc = OrderTrackingBloc(
+          orderId: _trackedOrderId,
+          apiService: _SeedOrderTrackingApi(),
+        );
+        _closeOnTearDown(trackingBloc);
+
+        final Future<OrderTrackingState> ready = trackingBloc.stream.firstWhere(
+          (OrderTrackingState state) =>
+              state.status == OrderTrackingStatus.ready,
+        );
+        trackingBloc.add(const OrderTrackingStarted());
+        await ready;
+
+        // The seed must be the real LOADED order, not a spinner or an error.
+        expect(trackingBloc.state.order, isNotNull);
+        expect(trackingBloc.state.order!.publicId, '222321');
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<OrderTrackingBloc>.value(
+            value: trackingBloc,
+            child: withMerzoxGoldenDeviceInsets(const OrderTrackingPage()),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('222321'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('order_tracking_placed_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

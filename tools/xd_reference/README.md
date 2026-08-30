@@ -1190,6 +1190,7 @@ and that the report follows this file's order exactly.
 | `signup` | `test/goldens/seed/signup_idle_ar_375x812.png` | `إنشاء حساب` | `6a24a0b2-1988-4f8a-a643-65ed1af321e2` | 375 x 812 | `exact` |
 | `store_preview` | `test/goldens/seed/store_preview_loaded_ar_375x812.png` | `معاينة المتجر` | `693ab1c9-14b2-4448-a867-cb5553a8f813` | 375 x 810 | `extend_final_row_to_812` |
 | `cart` | `test/goldens/seed/cart_guest_ar_375x812.png` | `السلة` | `45ca383b-6a4d-4233-97d4-54d47123574b` | 375 x 812 | `exact` |
+| `order_tracking` | `test/goldens/seed/order_tracking_placed_ar_375x812.png` | `تتبع الطلب` | `776233af-c9be-4602-a68e-bb5c38f690bd` | 375 x 812 | `exact` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1202,6 +1203,7 @@ a *different* uuid from the manifest id):
 | `signup` | `artwork/artboard-fd764781-250c-454c-9043-41781ba5ba16` |
 | `store_preview` | `artwork/artboard-98945093-5916-454b-a1ea-946956675bf0` |
 | `cart` | `artwork/artboard-d4709d76-c6be-40e1-afa9-11aee51aa29d` |
+| `order_tracking` | `artwork/artboard-50d681d7-a08e-4e2d-b65c-7530640a83cc` |
 
 Why each one, in one line:
 

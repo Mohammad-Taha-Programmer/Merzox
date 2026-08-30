@@ -1388,15 +1388,19 @@ class _GuestLoginTabState extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(34, 43, 34, 118),
+          // No top padding: the 52px title box sits directly under the safe
+          // area, which is what puts its glyphs at the artboard's y=64.
+          padding: const EdgeInsets.fromLTRB(34, 0, 34, 118),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight - 136),
             child: Column(
               children: [
                 _PlainTabTitle(title: title),
-                SizedBox(height: constraints.maxHeight < 680 ? 44 : 88),
+                // Measured, not guessed: with the title at the artboard's
+                // y=64, everything below it sat 32px high.
+                SizedBox(height: constraints.maxHeight < 680 ? 94 : 140),
                 const _GuestAvatarMark(),
-                const SizedBox(height: 41),
+                const SizedBox(height: 34),
                 Text(
                   // Deliberately not `authGate.title`: that block belongs to
                   // the modal auth gate and the login page, which the XD login
@@ -1409,7 +1413,7 @@ class _GuestLoginTabState extends StatelessWidget {
                     color: Color(0xFF2B2B2B),
                   ),
                 ),
-                const SizedBox(height: 19),
+                const SizedBox(height: 16),
                 SizedBox(
                   // The artboard breaks this sentence across two 20px line
                   // boxes. A full-bleed paragraph would set it on one line and
@@ -1425,7 +1429,7 @@ class _GuestLoginTabState extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 59),
+                const SizedBox(height: 58),
                 SizedBox(
                   width: _guestActionWidth,
                   child: FilledButton(

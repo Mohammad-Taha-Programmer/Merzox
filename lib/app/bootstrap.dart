@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 import '../core/startup/startup_service.dart';
 import '../injection/injector.dart';
@@ -9,6 +10,11 @@ import 'app.dart';
 
 Future<void> bootstrap() async {
   await EasyLocalization.ensureInitialized();
+
+  // Without this, `DateFormat` has symbols for no locale at all and silently
+  // falls back to English - which is how an Arabic screen came to print
+  // 'Tuesday'. Loading it here means every screen can name its own locale.
+  await initializeDateFormatting();
 
   await setupInjector();
 

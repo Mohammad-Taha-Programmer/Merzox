@@ -62,7 +62,8 @@ class _TrackingHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 66,
+      // Measured against the artboard's title band (y=60..79).
+      height: 47,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -140,7 +141,7 @@ class _TrackingBody extends StatelessWidget {
       ),
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 6, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 50, 20, 32),
         children: [
           Text(
             _headlineFor(order),
@@ -153,14 +154,17 @@ class _TrackingBody extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            _formatFullDate(_headlineDate(order)),
+            _formatFullDate(
+              _headlineDate(order),
+              context.locale.toLanguageTag(),
+            ),
             textAlign: TextAlign.center,
             style: const TextStyle(
               color: MerzoxColors.kColor767676,
               fontSize: 13,
             ),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 36),
           _OrderNumberRow(publicId: order.publicId),
           const SizedBox(height: 24),
           if (tracking.isCancelled)
@@ -249,6 +253,12 @@ class _TrackingTimeline extends StatelessWidget {
   }
 }
 
+/// Timeline colours, sampled from the XD `تتبع الطلب` artboard.
+const Color _timelineReachedColor = Color(0xFF3D5A80);
+const Color _timelinePendingColor = Color(0xFFC0C0C0);
+const Color _timelineConnectorColor = Color(0xFFE6E6E6);
+const Color _timelineCheckColor = Color(0xFFFAFAFA);
+
 class _TimelineRow extends StatelessWidget {
   final OrderTrackingStepApiModel step;
   final bool isFirst;
@@ -265,8 +275,11 @@ class _TimelineRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final reached = step.isReached;
-    final activeColor = MerzoxColors.kColorEE6C4D;
-    final idleColor = MerzoxColors.kColorD8D8D8;
+    // Sampled from the artboard: the timeline is navy and grey, not brand
+    // orange. Orange is the call-to-action colour on this screen and marking a
+    // completed step with it read as an action rather than as progress.
+    final activeColor = _timelineReachedColor;
+    final idleColor = _timelinePendingColor;
 
     return IntrinsicHeight(
       child: Row(
@@ -281,33 +294,30 @@ class _TimelineRow extends StatelessWidget {
                   height: 10,
                   color: isFirst
                       ? Colors.transparent
-                      : (reached ? activeColor : idleColor),
+                      : (reached ? activeColor : _timelineConnectorColor),
                 ),
                 Container(
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                    color: reached ? activeColor : Colors.white,
+                    // Both states are FILLED discs in the artboard, and both
+                    // carry a check. A pending step is a paler disc, not an
+                    // empty ring.
+                    color: reached ? activeColor : idleColor,
                     shape: BoxShape.circle,
-                    border: Border.all(
-                      color: reached ? activeColor : idleColor,
-                      width: 2,
-                    ),
                   ),
-                  child: reached
-                      ? const Icon(
-                          Icons.check_rounded,
-                          size: 12,
-                          color: Colors.white,
-                        )
-                      : null,
+                  child: const Icon(
+                    Icons.check_rounded,
+                    size: 12,
+                    color: _timelineCheckColor,
+                  ),
                 ),
                 Expanded(
                   child: Container(
                     width: 3,
                     color: isLast
                         ? Colors.transparent
-                        : (nextReached ? activeColor : idleColor),
+                        : (nextReached ? activeColor : _timelineConnectorColor),
                   ),
                 ),
               ],
@@ -928,10 +938,15 @@ String _formatTime(DateTime? value) {
   return '$hour:$minute $suffix';
 }
 
-String _formatFullDate(DateTime? value) {
+/// The headline date, with the weekday named in [localeName].
+///
+/// The locale is passed in rather than defaulted: `DateFormat.EEEE()` with no
+/// argument resolves to intl's default locale, which is English regardless of
+/// what the app is displaying.
+String _formatFullDate(DateTime? value, String localeName) {
   if (value == null) return '';
   final local = value.toLocal();
-  final weekday = DateFormat.EEEE().format(local);
+  final weekday = DateFormat.EEEE(localeName).format(local);
 
   return '$weekday  •  ${local.day}.${local.month}.${local.year} , '
       '${_formatTime(local)}';
