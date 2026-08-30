@@ -604,7 +604,8 @@
     "profileGreeting": "{} ، أهلا",
     "registerAsMerchant": "التسجيل كتاجر",
     "ordersLabel": "الطلبات",
-    "comingSoon": "{} قريباً"
+    "comingSoon": "{} قريباً",
+    "buyNow": "اشتري الآن"
   },
   "businessProfile": {
     "followers": "متابع",

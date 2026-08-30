@@ -34,6 +34,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../authentication/bloc/auth_bloc.dart';
 import 'widgets/feature_bottom_navigation_bar.dart'
     show MerzoxNavIndicator, kMerzoxNavIndicatorGap;
+import 'widgets/home_promo_carousel.dart';
 
 class _StoredUserProfile {
   final String name;
@@ -534,7 +535,7 @@ class _HomeTab extends StatelessWidget {
       slivers: [
         SliverToBoxAdapter(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -543,13 +544,26 @@ class _HomeTab extends StatelessWidget {
                   onLogout: onLogout,
                   onProtectedAction: onProtectedAction,
                 ),
-                const SizedBox(height: 24),
-                _MerchantEnrollmentCard(onPressed: onBusinessEnrollment),
-                const SizedBox(height: 16),
-                _SearchBox(onTap: () => context.push('/search')),
-                const SizedBox(height: 28),
               ],
             ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            // The carousel bleeds past the gutter on the leading side, so the
+            // next card can peek the way the artboard shows it.
+            padding: const EdgeInsets.fromLTRB(0, 29, 17, 0),
+            child: HomePromoCarousel(
+              businesses: discountedBusinesses,
+              onOpen: (HomeBusiness business) =>
+                  _openBusinessProfile(context, business),
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 25, 16, 25),
+            child: _SearchBox(onTap: () => context.push('/search')),
           ),
         ),
         if (state.recommendationConsentEnabled)
@@ -576,6 +590,12 @@ class _HomeTab extends StatelessWidget {
             const HomeCatalogSectionRetryRequested(HomeCatalogSection.newest),
           ),
           followedBusinessIds: state.followedBusinessIds,
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+            child: _MerchantEnrollmentCard(onPressed: onBusinessEnrollment),
+          ),
         ),
         _BusinessSection(
           title: 'home.sections.bestBusinesses'.tr(),
@@ -638,7 +658,8 @@ class _HomeTopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 56,
+      // 48..84 on the artboard, over a 44 status bar.
+      height: 36,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -648,7 +669,7 @@ class _HomeTopBar extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 CircleAvatar(
-                  radius: 22,
+                  radius: 14,
                   backgroundColor: MerzoxColors.kColorDEEEF8,
                   child: Icon(
                     isGuest
@@ -666,8 +687,7 @@ class _HomeTopBar extends StatelessWidget {
                       Text(
                         'home.guestGreeting'.tr(),
                         style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
                           color: Color(0xFF2B2B2B),
                         ),
                       )
@@ -683,8 +703,7 @@ class _HomeTopBar extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
                               color: Color(0xFF2B2B2B),
                             ),
                           );
@@ -695,7 +714,7 @@ class _HomeTopBar extends StatelessWidget {
                           ? 'home.browseOnly'.tr()
                           : 'home.welcomeToMerzox'.tr(),
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 10,
                         color: MerzoxColors.kColor8D99AE,
                       ),
                     ),
@@ -710,16 +729,17 @@ class _HomeTopBar extends StatelessWidget {
                 ? IconButton(
                     tooltip: 'home.notificationsTooltip'.tr(),
                     onPressed: onProtectedAction,
+                    padding: EdgeInsets.zero,
                     icon: const Icon(
                       Icons.notifications_none_rounded,
-                      size: 28,
+                      size: 24,
                     ),
                   )
                 : NotificationBadgeButton(
                     tooltip: 'home.notificationsTooltip'.tr(),
                     onPressed: () => context.push('/notifications'),
-                    iconSize: 28,
-                    badgeSize: 9,
+                    iconSize: 24,
+                    badgeSize: 8,
                   ),
           ),
           if (!isGuest)
@@ -752,7 +772,8 @@ class _MerchantEnrollmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 142,
+      // 602..752 on the artboard.
+      height: 150,
       decoration: BoxDecoration(
         color: MerzoxColors.kColor3D5A80,
         borderRadius: BorderRadius.circular(8),
@@ -762,14 +783,15 @@ class _MerchantEnrollmentCard extends StatelessWidget {
         children: [
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   'home.merchantEnrollment.title'.tr(),
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: 17,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
                   ),
                   maxLines: 1,
@@ -778,10 +800,11 @@ class _MerchantEnrollmentCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   'home.merchantEnrollment.subtitle'.tr(),
+                  textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.82),
-                    fontSize: 12,
-                    height: 1.25,
+                    fontSize: 10,
+                    height: 1.9,
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
@@ -797,7 +820,10 @@ class _MerchantEnrollmentCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                     ),
-                    child: Text('authGate.signup'.tr()),
+                    child: Text(
+                      'authGate.signup'.tr(),
+                      style: const TextStyle(fontSize: 14),
+                    ),
                   ),
                 ),
               ],
@@ -887,13 +913,13 @@ class _BusinessSection extends StatelessWidget {
                 title,
                 textAlign: TextAlign.start,
                 style: const TextStyle(
-                  fontSize: 17,
+                  fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF2B2B2B),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 11),
             if (status == HomeSectionStatus.loading)
               const SizedBox(
                 height: 96,
@@ -914,7 +940,7 @@ class _BusinessSection extends StatelessWidget {
               )
             else
               SizedBox(
-                height: 224,
+                height: 214,
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   scrollDirection: Axis.horizontal,
