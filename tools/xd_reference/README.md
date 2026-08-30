@@ -236,7 +236,7 @@ Additional flags:
 
 | Flag | Purpose |
 | --- | --- |
-| `--normalize-merzox-brand` | Replace rendered legacy branding with `Merzox`: literal `Bictov` and the exact segmented logo tail `ictove`. |
+| `--normalize-merzox-brand` | Replace rendered legacy branding: literal `Bictov` → `Merzox`, all-caps `BICTOV` → `MERZOX`, and the exact segmented logo tail `ictove` → `Merzox`. |
 | `--list-artboards` | Print name, manifest id, path and bounds for every artboard, in manifest order. |
 | `--all-artboards` | Export every artboard into `--output-dir`. |
 | `--output-dir <dir>` | Batch destination. Required by (and only valid with) `--all-artboards`. |
@@ -361,7 +361,7 @@ artboard selector — those combinations are errors rather than guesses.
 | Mode | Behaviour | Used for |
 | --- | --- | --- |
 | **Raw** (default) | XD text is preserved exactly. `Bictov` stays `Bictov`. | Calibrating the renderer against the original XD preview — the reference and the design must agree character-for-character. |
-| **Normalized** (`--normalize-merzox-brand`) | Literal `Bictov`, or an exact rendered `ictove` logo tail, becomes `Merzox`. IDs and node names stay untouched. | Comparing against the shipped Merzox app. |
+| **Normalized** (`--normalize-merzox-brand`) | Literal `Bictov` becomes `Merzox`, all-caps `BICTOV` becomes `MERZOX` (the artboard sets it as an all-caps wordmark, so only the word changes, not the typography), and an exact rendered `ictove` logo tail becomes `Merzox`. IDs and node names stay untouched. | Comparing against the shipped Merzox app. |
 
 Normalization rules:
 

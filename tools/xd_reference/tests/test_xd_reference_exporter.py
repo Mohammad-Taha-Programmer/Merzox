@@ -1293,6 +1293,40 @@ class TestBrandNormalization(ExporterTestCase):
         self.assertNotIn(">Bictov app</text>", result.svg)
         self.assertTrue(result.report["brand_normalization_enabled"])
 
+    def test_normalized_mode_replaces_the_all_caps_wordmark(self) -> None:
+        # The `من نحن` artboard sets the wordmark in full caps ("تطبيق BICTOV").
+        # That form went straight through before, so a reference exported for
+        # app parity still showed the old brand.
+        xd_path = build_xd(self.tmp_path, [text_node("BICTOV app")])
+        result = self.export(xd_path, normalize_brand=True)
+
+        self.assertIn(">MERZOX app</text>", result.svg)
+        self.assertNotIn("BICTOV app", result.svg)
+        self.assertEqual(result.report["brand_replacement_count"], 1)
+
+    def test_all_caps_wordmark_keeps_its_case(self) -> None:
+        # Replacing the WORD is what the flag promises; restyling all-caps
+        # typography to title case would be an edit it never claimed.
+        xd_path = build_xd(self.tmp_path, [text_node("BICTOV")])
+        result = self.export(xd_path, normalize_brand=True)
+
+        self.assertIn(">MERZOX</text>", result.svg)
+        self.assertNotIn(">Merzox</text>", result.svg)
+
+    def test_all_caps_wordmark_requires_normalized_mode(self) -> None:
+        xd_path = build_xd(self.tmp_path, [text_node("BICTOV app")])
+        result = self.export(xd_path)
+
+        self.assertIn(">BICTOV app</text>", result.svg)
+        self.assertEqual(result.report["brand_replacement_count"], 0)
+
+    def test_both_brand_cases_in_one_chunk_are_both_replaced(self) -> None:
+        xd_path = build_xd(self.tmp_path, [text_node("Bictov and BICTOV")])
+        result = self.export(xd_path, normalize_brand=True)
+
+        self.assertIn(">Merzox and MERZOX</text>", result.svg)
+        self.assertEqual(result.report["brand_replacement_count"], 2)
+
     def test_normalized_report_counts_replacements(self) -> None:
         xd_path = build_xd(self.tmp_path, [text_node("Bictov and Bictov")])
         result = self.export(xd_path, normalize_brand=True)

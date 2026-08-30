@@ -143,12 +143,18 @@ BLEND_STRATEGY_UNSUPPORTED = "unsupported"
 #: Literal legacy brand token replaced when brand normalization is supplied.
 BRAND_SOURCE_TOKEN = "Bictov"
 
+#: The same wordmark set in full caps, which several artboards use inline
+#: (`تطبيق BICTOV`). It maps to the caps target so the flag replaces the WORD
+#: without also restyling the typography.
+BRAND_SOURCE_TOKEN_UPPER = "BICTOV"
+
 #: Some XD artboards store the legacy logo as a vector brand mark followed by
 #: this exact text tail. Only a complete text chunk equal to this token is
 #: normalized; ordinary text merely containing the substring is untouched.
 BRAND_SEGMENTED_SOURCE_TOKEN = "ictove"
 
 BRAND_TARGET_TOKEN = "Merzox"
+BRAND_TARGET_TOKEN_UPPER = "MERZOX"
 
 #: Font families we ship inside the SVG as data URIs.
 TAJAWAL_ALIASES = (
@@ -2893,6 +2899,15 @@ class AgcRenderer:
             self.report.brand_replacement_count += literal_count
             chunk = chunk.replace(BRAND_SOURCE_TOKEN, BRAND_TARGET_TOKEN)
 
+        # Checked separately, and after the capitalised form, so a chunk holding
+        # both is fully normalized and counted once per occurrence.
+        upper_count = chunk.count(BRAND_SOURCE_TOKEN_UPPER)
+        if upper_count:
+            self.report.brand_replacement_count += upper_count
+            chunk = chunk.replace(
+                BRAND_SOURCE_TOKEN_UPPER, BRAND_TARGET_TOKEN_UPPER
+            )
+
         # In several authentic XD artboards the visual brand mark is a vector
         # sibling and the remaining legacy word is stored as the exact text
         # chunk ``ictove``. Exact equality is deliberate: prose containing that
@@ -3693,7 +3708,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Replace legacy rendered brand text with 'Merzox', including the "
-            "literal 'Bictov' and the exact segmented logo tail 'ictove'. "
+            "literal 'Bictov', all-caps 'BICTOV', and the exact segmented "
+            "logo tail 'ictove'. "
             "The XD package, node IDs and node names are never modified."
         ),
     )
