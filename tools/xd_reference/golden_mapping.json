@@ -211,7 +211,33 @@
         "height": 808
       },
       "normalization": "extend_final_row_to_812",
-      "semantic_reason": "The MERCHANT home. Of the twelve الرئيسية artboards only two are the customer home, and both carry an unsupported backdrop blur that the comparator refuses fail-closed, so they are not seeded. This one is clean and is the merchant shell dashboard: the sales/orders/visits figures and the recent-order list. The artboard lays those orders out as a table with columns; the app lays them out as cards, which is a real presentation difference and not a metric artefact."
+      "semantic_reason": "The MERCHANT home. Of the twelve الرئيسية artboards only two are the customer home, and both carry an unsupported backdrop blur that the comparator refuses fail-closed, so they are not seeded. This one is clean and is the merchant shell dashboard: the sales/orders/visits figures and the recent-order table."
+    },
+    {
+      "seed": "merchant_orders",
+      "flutter_golden": "test/goldens/seed/merchant_orders_ar_375x812.png",
+      "xd": {
+        "name": "الرئيسية – 9",
+        "manifest_id": "462b4c73-f68d-4ba2-8112-8b9880e2157e",
+        "artboard_path": "artwork/artboard-fa535226-cafd-4177-a74d-857c39ffe28c",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The merchant shell's orders tab. The artboard titles itself \"الطلبات\", searches by order number and customer name, filters by a single order status and tabulates every status at once — which is what the seed renders. Three further artboards (11, 12, 17) are states of this same screen and are not separately seeded."
+    },
+    {
+      "seed": "merchant_products",
+      "flutter_golden": "test/goldens/seed/merchant_products_ar_375x812.png",
+      "xd": {
+        "name": "الرئيسية – 10",
+        "manifest_id": "a137e484-7ab5-4c44-88f8-0611fbce6d39",
+        "artboard_path": "artwork/artboard-8b57a3af-6385-461a-af36-9ba3b74809cb",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The merchant shell's products tab. The artboard titles itself \"المنتجات\" and lists 127-tall cards carrying a photo, a name, price, quantity, classification and a published corner. The seed serves four products with no image URL, so the photo area is the local placeholder rather than the artboard's photograph: that difference is the bulk of this seed's residual and is not a layout defect. Three further artboards (13, 15, 16) are states of this same screen."
     }
   ]
 }
