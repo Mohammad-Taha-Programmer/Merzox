@@ -319,7 +319,9 @@ class _Hero extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: Container(
-                height: 96,
+                // 107, measured down a single column at x=25: the artboard's
+                // banner runs y=113..219.
+                height: 107,
                 color: MerzoxColors.kColorEEF6FB,
                 child: CustomPaint(painter: _WavePainter()),
               ),
@@ -330,7 +332,9 @@ class _Hero extends StatelessWidget {
               top: 15,
               child: Container(
                 height: 24,
-                padding: const EdgeInsets.symmetric(horizontal: 34),
+                // 19, measured: 34 renders this badge 127px wide against the
+                // artboard's 97.
+                padding: const EdgeInsets.symmetric(horizontal: 19),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   color: MerzoxColors.kColor3D5A80,
@@ -346,9 +350,12 @@ class _Hero extends StatelessWidget {
                 ),
               ),
             ),
+          // `start`, not `end`: in an RTL layout `end` resolves to the LEFT
+          // edge, and the artboard puts this mark against the banner's right
+          // one (measured at x=325).
           const PositionedDirectional(
             top: 3,
-            end: 7,
+            start: 7,
             child: Text('🙂', style: TextStyle(fontSize: 18)),
           ),
           Positioned(
