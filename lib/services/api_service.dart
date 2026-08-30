@@ -614,20 +614,19 @@ class ApiService {
 
   /// Lists the merchant's own orders.
   ///
-  /// [statusGroup] and [status] are mutually exclusive: the server reads
-  /// `statusGroup` first, so a caller that sent both would find [status]
-  /// quietly dropped. Passing neither lists every order, which is the state
-  /// the merchant browse artboard draws.
+  /// [statusGroup] and [filter]'s status are mutually exclusive: the server
+  /// reads `statusGroup` first, so a caller that sent both would find the
+  /// status quietly dropped. Passing neither lists every order, which is the
+  /// state the merchant browse artboard draws.
   Future<OwnerOrderList> ownerOrders({
     required String token,
     String statusGroup = '',
-    String status = '',
-    String query = '',
+    MerchantOrderFilter filter = const MerchantOrderFilter(),
     int page = 1,
     int limit = 30,
   }) async {
     assert(
-      statusGroup.isEmpty || status.isEmpty,
+      statusGroup.isEmpty || filter.status == null,
       'ownerOrders takes a status group or a status, never both.',
     );
 
@@ -635,8 +634,7 @@ class ApiService {
       '/businesses/me/orders',
       queryParameters: <String, dynamic>{
         if (statusGroup.isNotEmpty) 'statusGroup': statusGroup,
-        if (status.isNotEmpty) 'status': status,
-        if (query.isNotEmpty) 'q': query,
+        ...filter.toQueryParameters(),
         'page': page,
         'limit': limit,
       },

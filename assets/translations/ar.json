@@ -331,6 +331,15 @@
       "offers": "عروض"
     }
   },
+  "merchantImages": {
+    "title": "إضافة صور أو فيديو",
+    "primary": "الصورة الأساسية",
+    "addHint": "أضف صورة عبر رابط",
+    "addTitle": "إضافة صورة",
+    "urlHint": "الصق رابط الصورة",
+    "urlInvalid": "أدخل رابطاً يبدأ بـ http أو https",
+    "manage": "إدارة الصور"
+  },
   "merchantPreview": {
     "title": "معاينة المتجر",
     "open": "معاينة المتجر كما يراه الزبون",
@@ -473,7 +482,26 @@
     "productQuantity": "الكمية",
     "productClassification": "تصنيف المنتج",
     "published": "منشور",
-    "deleteProductTitle": "هل تريد حذف المنتج نهائيًا؟"
+    "deleteProductTitle": "هل تريد حذف المنتج نهائيًا؟",
+    "filterTitle": "تصفية",
+    "orderNumberHint": "قم بكتابة رقم الطلب",
+    "orderCustomerHint": "قم بكتابة اسم العميل",
+    "orderStatusHint": "قم باختيار حالة الطلب",
+    "dateFrom": "من تاريخ",
+    "dateTo": "إلى تاريخ",
+    "datePlaceholder": "DD . MM . YYYY",
+    "productName": "اسم المنتج",
+    "productNameHint": "قم بكتابة اسم المنتج",
+    "productClassifications": "تصنيف المنتجات",
+    "productClassificationsHint": "قم باختيار تصنيف المنتجات",
+    "productState": "حالة المنتج",
+    "productStateHint": "قم باختيار حالة المنتج",
+    "hidden": "مخفي",
+    "editProduct": "تعديل المنتج",
+    "showProduct": "إظهار المنتج على المتجر",
+    "hideProduct": "إخفاء المنتج عن المتجر",
+    "duplicateProduct": "تكرار المنتج",
+    "deleteProduct": "حذف المنتج نهائيًا"
   },
   "profile": {
     "title": "الملف الشخصي"

@@ -451,3 +451,136 @@ final class OwnerProduct {
     );
   }
 }
+
+/// Everything the merchant can narrow their order list by.
+///
+/// `الرئيسية – 9` contributes the free-text search and the status chip;
+/// `الرئيسية – 12` adds an order number, a customer name and a date range as
+/// separate fields. All are optional and the server intersects them.
+final class MerchantOrderFilter {
+  /// One status, or null while the chip still reads "order status".
+  final String? status;
+
+  /// The browse screen's search field, which matches either the order number
+  /// or the customer name.
+  final String query;
+
+  /// The sheet's two needles, which match one field each.
+  final String orderNumber;
+  final String customerName;
+
+  /// Inclusive calendar days. The server extends [to] to the end of its day.
+  final DateTime? from;
+  final DateTime? to;
+
+  const MerchantOrderFilter({
+    this.status,
+    this.query = '',
+    this.orderNumber = '',
+    this.customerName = '',
+    this.from,
+    this.to,
+  });
+
+  /// True when nothing is narrowed, which is what the chip and the sheet both
+  /// show on first open.
+  bool get isEmpty =>
+      status == null &&
+      query.isEmpty &&
+      orderNumber.isEmpty &&
+      customerName.isEmpty &&
+      from == null &&
+      to == null;
+
+  /// True when the sheet — as opposed to the chip or the search field — is
+  /// narrowing the list, which is what the sheet's own indicator reflects.
+  bool get hasSheetFields =>
+      orderNumber.isNotEmpty ||
+      customerName.isNotEmpty ||
+      from != null ||
+      to != null;
+
+  MerchantOrderFilter copyWith({
+    String? status,
+    bool clearStatus = false,
+    String? query,
+    String? orderNumber,
+    String? customerName,
+    DateTime? from,
+    bool clearFrom = false,
+    DateTime? to,
+    bool clearTo = false,
+  }) => MerchantOrderFilter(
+    status: clearStatus ? null : status ?? this.status,
+    query: query ?? this.query,
+    orderNumber: orderNumber ?? this.orderNumber,
+    customerName: customerName ?? this.customerName,
+    from: clearFrom ? null : from ?? this.from,
+    to: clearTo ? null : to ?? this.to,
+  );
+
+  /// The query parameters this filter contributes, omitting every field the
+  /// merchant left alone so the server never sees an empty needle.
+  ///
+  /// Dates go as plain calendar days: the merchant picked a day on a
+  /// calendar, not an instant, so no time zone is implied either way.
+  Map<String, String> toQueryParameters() => <String, String>{
+    if (status != null) 'status': status!,
+    if (query.isNotEmpty) 'q': query,
+    if (orderNumber.isNotEmpty) 'orderNumber': orderNumber,
+    if (customerName.isNotEmpty) 'customerName': customerName,
+    if (from != null) 'from': _day(from!),
+    if (to != null) 'to': _day(to!),
+  };
+
+  static String _day(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-'
+      '${value.month.toString().padLeft(2, '0')}-'
+      '${value.day.toString().padLeft(2, '0')}';
+}
+
+/// The create payload for `الرئيسية – 13`'s "duplicate product".
+///
+/// Only fields the merchant may write are copied, in the exact shape the
+/// product editor submits, so a duplicate goes through the same server-side
+/// contract as anything typed by hand. Three deliberate omissions:
+///
+///  * no `id`, on the product or on any variant — a duplicate is a new
+///    product, and reusing a variant id would have the server update the
+///    original's variant instead of creating one;
+///  * no derived money — `finalPrice` and `inStock` are the server's to
+///    compute from price, discount and stock;
+///  * no history — sales, reviews and likes belong to the product that
+///    earned them.
+///
+/// The copy arrives hidden. A duplicate is a starting point for edits, and
+/// publishing it before the merchant has looked at it would put an unedited
+/// second listing in front of customers.
+Map<String, dynamic> duplicateProductPayload(OwnerProduct product) {
+  return <String, dynamic>{
+    'name': product.name,
+    'description': product.description,
+    'price': product.price,
+    'costPrice': product.costPrice,
+    'unlimitedStock': product.unlimitedStock,
+    if (!product.unlimitedStock) 'stockQuantity': product.stockQuantity,
+    'discountPercent': product.discountPercent,
+    'keywords': product.keywords,
+    'imageUrls': product.imageUrls,
+    'classification': product.classification,
+    'isService': product.isService,
+    'isActive': false,
+    if (product.variants.isNotEmpty)
+      'variants': <Map<String, dynamic>>[
+        for (final OwnerProductVariant variant in product.variants)
+          OwnerProductVariantDraft(
+            label: variant.label,
+            priceOverride: variant.priceOverride,
+            costPrice: variant.costPrice,
+            stockQuantity: variant.stockQuantity,
+            unlimitedStock: variant.unlimitedStock,
+            isActive: variant.isActive,
+          ).toJson(),
+      ],
+  };
+}

@@ -236,8 +236,10 @@ export const getMyBusinessDashboard = asyncHandler(async (req, res) => {
 
 export const listMyBusinessProducts = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);
+  // Deliberately unfiltered: a merchant who hides a product must still see
+  // it, or the artboard's "show on the storefront" action could never be
+  // reached again. Customer-facing routes filter on isActive themselves.
   const products = [...business.products]
-    .filter((product) => product.isActive)
     .sort((left, right) => right.createdAt - left.createdAt)
     .map((product) => business.productToOwnerJSON(product));
 
@@ -405,13 +407,16 @@ export const deleteMyBusinessProduct = asyncHandler(async (req, res) => {
     throw new AppError('Product not found', 404, 'PRODUCT_NOT_FOUND');
   }
 
-  product.isActive = false;
+  // The artboard calls this "delete permanently" and offers hiding as a
+  // separate action, so this removes the product rather than deactivating
+  // it. Nothing breaks downstream: every reader of a product id already
+  // handles the product being gone, and an order keeps its own snapshot of
+  // what was bought.
+  const removed = business.productToOwnerJSON(product);
+  product.deleteOne();
   await business.save();
 
-  res.json({
-    success: true,
-    data: { product: business.productToOwnerJSON(product) }
-  });
+  res.json({ success: true, data: { product: removed } });
 });
 
 // The order search the merchant browse artboard offers.
@@ -438,6 +443,75 @@ export function ownerOrderSearchFilter(query = {}) {
   ];
 }
 
+// One escaped, length-bounded needle from a query parameter, or null.
+function orderNeedle(value, code) {
+  if (value === undefined || value === null) return null;
+
+  if (Array.isArray(value)) {
+    throw new AppError('Order search is invalid', 400, code);
+  }
+
+  const needle = String(value).trim().slice(0, 80);
+  if (!needle) return null;
+
+  return needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// The order filter sheet's four fields, as one Mongo filter fragment.
+//
+// `الرئيسية – 12` asks for an order number and a customer name separately —
+// unlike the browse screen's single `q`, which matches either — and for a
+// date range around them. Every field is optional and they intersect.
+export function ownerOrderFilterFields(query = {}) {
+  const filter = {};
+
+  const publicId = orderNeedle(query.orderNumber, 'INVALID_ORDER_NUMBER');
+  if (publicId) filter.publicId = { $regex: publicId, $options: 'i' };
+
+  const customer = orderNeedle(query.customerName, 'INVALID_ORDER_CUSTOMER');
+  if (customer) filter.customerName = { $regex: customer, $options: 'i' };
+
+  const createdAt = {};
+  const from = orderDateBound(query.from, 'INVALID_ORDER_DATE_FROM');
+  const to = orderDateBound(query.to, 'INVALID_ORDER_DATE_TO');
+  if (from) createdAt.$gte = from;
+  // `to` names a day, and a merchant asking for orders "to the 15th" means
+  // the whole of the 15th, so the bound runs to the end of that day.
+  if (to) createdAt.$lte = new Date(to.getTime() + 86399999);
+  if (from || to) filter.createdAt = createdAt;
+
+  return filter;
+}
+
+// A calendar day from the sheet's DD.MM.YYYY field, at UTC midnight.
+function orderDateBound(value, code) {
+  if (value === undefined || value === null || value === '') return null;
+
+  if (Array.isArray(value)) {
+    throw new AppError('Order date filter is invalid', 400, code);
+  }
+
+  const text = String(value).trim();
+  if (!text) return null;
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(text);
+  if (!match) {
+    throw new AppError('Order date filter is invalid', 400, code);
+  }
+
+  const [year, month, day] = match.slice(1).map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    throw new AppError('Order date filter is invalid', 400, code);
+  }
+
+  return parsed;
+}
+
 export const listMyBusinessOrders = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);
   const { page, limit, skip } = paginationParams(req.query);
@@ -456,6 +530,8 @@ export const listMyBusinessOrders = asyncHandler(async (req, res) => {
 
   const search = ownerOrderSearchFilter(req.query);
   if (search) filter.$or = search;
+
+  Object.assign(filter, ownerOrderFilterFields(req.query));
 
   const [orders, total, groupedCounts] = await Promise.all([
     Order.find(filter).sort({ createdAt: -1, _id: -1 }).skip(skip).limit(limit),

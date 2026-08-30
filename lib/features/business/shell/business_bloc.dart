@@ -21,16 +21,15 @@ final class BusinessRefreshed extends BusinessEvent {
   const BusinessRefreshed();
 }
 
-/// A change to either half of the order filter the browse artboard draws.
+/// A change to the order filter the browse artboard and its sheet draw.
 ///
-/// A null [status] means "no status filter" — the state the chip starts in —
-/// so the chip and the search field can each move without disturbing the
-/// other.
+/// The whole filter travels together so a caller can move one field without
+/// having to restate the others; [MerchantOrderFilter.copyWith] is how the
+/// widgets build the next one.
 final class BusinessOrderFilterChanged extends BusinessEvent {
-  final String? status;
-  final String query;
+  final MerchantOrderFilter filter;
 
-  const BusinessOrderFilterChanged({this.status, this.query = ''});
+  const BusinessOrderFilterChanged(this.filter);
 }
 
 final class BusinessOrderStatusChanged extends BusinessEvent {
@@ -68,6 +67,25 @@ final class BusinessProductDeleted extends BusinessEvent {
   const BusinessProductDeleted(this.productId);
 }
 
+/// `الرئيسية – 13` offers "show on the storefront" and "hide from the
+/// storefront" as one pair of menu items, which is one flag on the product.
+final class BusinessProductVisibilityChanged extends BusinessEvent {
+  final String productId;
+  final bool visible;
+
+  const BusinessProductVisibilityChanged({
+    required this.productId,
+    required this.visible,
+  });
+}
+
+/// The menu's "duplicate product": a new product built from an existing one.
+final class BusinessProductDuplicated extends BusinessEvent {
+  final OwnerProduct product;
+
+  const BusinessProductDuplicated(this.product);
+}
+
 final class BusinessProfileSaved extends BusinessEvent {
   final Map<String, dynamic> values;
   const BusinessProfileSaved(this.values);
@@ -91,11 +109,9 @@ final class BusinessState {
   final BusinessStatus status;
   final int selectedTab;
 
-  /// The status the chip is showing, or null while it reads "order status".
-  final String? orderStatusFilter;
-
-  /// What the merchant typed into the order search field.
-  final String orderQuery;
+  /// Everything narrowing the order list: the chip, the search field and the
+  /// filter sheet.
+  final MerchantOrderFilter orderFilter;
 
   final OwnerBusiness? business;
   final BusinessDashboardData? dashboard;
@@ -113,8 +129,7 @@ final class BusinessState {
   const BusinessState({
     this.status = BusinessStatus.initial,
     this.selectedTab = 0,
-    this.orderStatusFilter,
-    this.orderQuery = '',
+    this.orderFilter = const MerchantOrderFilter(),
     this.business,
     this.dashboard,
     this.orders = const [],
@@ -128,9 +143,7 @@ final class BusinessState {
   BusinessState copyWith({
     BusinessStatus? status,
     int? selectedTab,
-    String? orderStatusFilter,
-    bool clearOrderStatusFilter = false,
-    String? orderQuery,
+    MerchantOrderFilter? orderFilter,
     OwnerBusiness? business,
     BusinessDashboardData? dashboard,
     List<OwnerOrder>? orders,
@@ -143,10 +156,7 @@ final class BusinessState {
   }) => BusinessState(
     status: status ?? this.status,
     selectedTab: selectedTab ?? this.selectedTab,
-    orderStatusFilter: clearOrderStatusFilter
-        ? null
-        : orderStatusFilter ?? this.orderStatusFilter,
-    orderQuery: orderQuery ?? this.orderQuery,
+    orderFilter: orderFilter ?? this.orderFilter,
     business: business ?? this.business,
     dashboard: dashboard ?? this.dashboard,
     orders: orders ?? this.orders,
@@ -183,6 +193,8 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     });
     on<BusinessProductSaved>(_onProductSaved);
     on<BusinessProductDeleted>(_onProductDeleted);
+    on<BusinessProductVisibilityChanged>(_onProductVisibilityChanged);
+    on<BusinessProductDuplicated>(_onProductDuplicated);
     on<BusinessProfileSaved>(_onProfileSaved);
   }
 
@@ -244,23 +256,15 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
 
   /// The one place that builds the order request, so the mutually exclusive
   /// `status` and `statusGroup` pair can never both be sent.
-  Future<OwnerOrderList> _ownerOrders(String token) => _apiService.ownerOrders(
-    token: token,
-    status: state.orderStatusFilter ?? '',
-    query: state.orderQuery,
-  );
+  Future<OwnerOrderList> _ownerOrders(String token) =>
+      _apiService.ownerOrders(token: token, filter: state.orderFilter);
 
   Future<void> _onOrderFilterChanged(
     BusinessOrderFilterChanged event,
     Emitter<BusinessState> emit,
   ) async {
     emit(
-      state.copyWith(
-        status: BusinessStatus.loading,
-        orderStatusFilter: event.status,
-        clearOrderStatusFilter: event.status == null,
-        orderQuery: event.query,
-      ),
+      state.copyWith(status: BusinessStatus.loading, orderFilter: event.filter),
     );
     try {
       final list = await _ownerOrders(await _token());
@@ -382,6 +386,70 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
         state.copyWith(
           status: BusinessStatus.ready,
           products: products,
+          revision: state.revision + 1,
+        ),
+      );
+    } catch (error) {
+      emit(
+        state.copyWith(
+          status: BusinessStatus.failure,
+          errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  /// Hiding a product takes it off the storefront and leaves it in the
+  /// merchant's own list, which is the only reason the "show" half of the
+  /// menu pair is reachable at all.
+  Future<void> _onProductVisibilityChanged(
+    BusinessProductVisibilityChanged event,
+    Emitter<BusinessState> emit,
+  ) async {
+    emit(state.copyWith(status: BusinessStatus.saving));
+    try {
+      final updated = await _apiService.updateOwnerProduct(
+        token: await _token(),
+        productId: event.productId,
+        changes: <String, dynamic>{'isActive': event.visible},
+      );
+      emit(
+        state.copyWith(
+          status: BusinessStatus.ready,
+          products: state.products
+              .map((item) => item.id == event.productId ? updated : item)
+              .toList(),
+          revision: state.revision + 1,
+        ),
+      );
+    } catch (error) {
+      emit(
+        state.copyWith(
+          status: BusinessStatus.failure,
+          errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  /// A duplicate is a create, assembled from fields the merchant may already
+  /// write. It deliberately carries no server-owned value across — no id, no
+  /// derived price, no review or sales history — so the copy is a new product
+  /// and not a second reference to the old one.
+  Future<void> _onProductDuplicated(
+    BusinessProductDuplicated event,
+    Emitter<BusinessState> emit,
+  ) async {
+    emit(state.copyWith(status: BusinessStatus.saving));
+    try {
+      final created = await _apiService.createOwnerProduct(
+        token: await _token(),
+        product: duplicateProductPayload(event.product),
+      );
+      emit(
+        state.copyWith(
+          status: BusinessStatus.ready,
+          products: <OwnerProduct>[created, ...state.products],
           revision: state.revision + 1,
         ),
       );

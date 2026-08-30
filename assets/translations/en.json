@@ -331,6 +331,15 @@
       "offers": "Offers"
     }
   },
+  "merchantImages": {
+    "title": "Add photos or video",
+    "primary": "Primary image",
+    "addHint": "Add an image by link",
+    "addTitle": "Add an image",
+    "urlHint": "Paste the image link",
+    "urlInvalid": "Enter a link starting with http or https",
+    "manage": "Manage images"
+  },
   "merchantPreview": {
     "title": "Store preview",
     "open": "Preview store as a customer",
@@ -473,7 +482,26 @@
     "productQuantity": "Quantity",
     "productClassification": "Product category",
     "published": "Published",
-    "deleteProductTitle": "Delete this product permanently?"
+    "deleteProductTitle": "Delete this product permanently?",
+    "filterTitle": "Filter",
+    "orderNumberHint": "Type the order number",
+    "orderCustomerHint": "Type the customer name",
+    "orderStatusHint": "Choose an order status",
+    "dateFrom": "From date",
+    "dateTo": "To date",
+    "datePlaceholder": "DD . MM . YYYY",
+    "productName": "Product name",
+    "productNameHint": "Type the product name",
+    "productClassifications": "Product category",
+    "productClassificationsHint": "Choose a product category",
+    "productState": "Product state",
+    "productStateHint": "Choose a product state",
+    "hidden": "Hidden",
+    "editProduct": "Edit product",
+    "showProduct": "Show on the storefront",
+    "hideProduct": "Hide from the storefront",
+    "duplicateProduct": "Duplicate product",
+    "deleteProduct": "Delete permanently"
   },
   "profile": {
     "title": "Profile"

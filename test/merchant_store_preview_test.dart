@@ -197,8 +197,7 @@ class _SpyMerchantApi extends ApiService {
   Future<OwnerOrderList> ownerOrders({
     required String token,
     String statusGroup = '',
-    String status = '',
-    String query = '',
+    MerchantOrderFilter filter = const MerchantOrderFilter(),
     int page = 1,
     int limit = 20,
   }) async => OwnerOrderList.fromJson(const {});
