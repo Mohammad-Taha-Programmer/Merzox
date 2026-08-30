@@ -217,7 +217,9 @@ class _FavoritesHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      height: 82,
+      // Measured against the artboard: its tab strip starts at y=113, which a
+      // header of 82 pushes 13px past.
+      height: 69,
       child: Stack(
         alignment: Alignment.center,
         children: [

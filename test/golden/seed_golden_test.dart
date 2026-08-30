@@ -41,6 +41,10 @@ import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
+import 'package:merzox/features/favorites/bloc/favorites_bloc.dart';
+import 'package:merzox/features/favorites/bloc/favorites_event.dart';
+import 'package:merzox/features/favorites/bloc/favorites_state.dart';
+import 'package:merzox/features/favorites/pages/favorites_page.dart';
 import 'package:merzox/features/home/home_screen.dart';
 import 'package:merzox/features/home/presentation/bloc/home_bloc.dart';
 import 'package:merzox/features/home/presentation/bloc/home_event.dart';
@@ -112,6 +116,85 @@ final class _OfflineHomeApiService extends ApiService {
     int? radiusMeters,
   }) async {
     throw StateError('the guest cart golden must not call businesses()');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Favorites fixture
+// ---------------------------------------------------------------------------
+
+/// One liked product, repeated four times as the artboard's 2x2 grid shows.
+///
+/// `imageUrl` is deliberately blank. The artboard puts a photograph in each
+/// card; a golden must not fetch one, so the card reaches its placeholder
+/// branch instead. That difference is real and is recorded in the mapping's
+/// semantic reason rather than hidden.
+Map<String, dynamic> _seedFavoriteProduct(int index) {
+  return <String, dynamic>{
+    'business': <String, dynamic>{
+      'id': '64b00000000000000000001$index',
+      'publicId': '002010$index',
+      'name': 'متجر الياسمين',
+      'category': 'أفضل المتاجر',
+    },
+    'product': <String, dynamic>{
+      'id': '64c00000000000000000001$index',
+      'name': index.isEven ? 'أساس فت مي' : 'بودرة نوت',
+      'description': '',
+      'price': index.isEven ? 65 : 40,
+      'discountPercent': 0,
+      'finalPrice': index.isEven ? 65 : 40,
+      'inStock': true,
+      'imageUrl': '',
+      'imageUrls': <String>[],
+      'classification': 'new',
+      'rating': 4,
+      'ratingCount': 12,
+      'likeCount': 3,
+      'isService': false,
+      // The product contract refuses to default these. A simple product must
+      // still expose complete price bounds - they collapse onto its single
+      // price - because a missing bound would otherwise be inferred here.
+      'hasVariants': false,
+      'variants': <Map<String, dynamic>>[],
+      'minPrice': index.isEven ? 65 : 40,
+      'maxPrice': index.isEven ? 65 : 40,
+      'minFinalPrice': index.isEven ? 65 : 40,
+      'maxFinalPrice': index.isEven ? 65 : 40,
+    },
+    'favoritedAt': '2022-02-15T14:40:00.000',
+  };
+}
+
+final class _SeedFavoritesApi extends ApiService {
+  @override
+  Future<FavoriteProductListApiResponse> favoriteProducts({
+    required String token,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return FavoriteProductListApiResponse.fromJson(<String, dynamic>{
+      'products': <Map<String, dynamic>>[
+        for (int index = 0; index < 4; index++) _seedFavoriteProduct(index),
+      ],
+      'pagination': <String, dynamic>{
+        'page': 1,
+        'total': 4,
+        'hasMore': false,
+      },
+    });
+  }
+
+  @override
+  Future<FavoriteBusinessListApiResponse> favoriteBusinesses({
+    required String token,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return FavoriteBusinessListApiResponse.fromJson(const <String, dynamic>{
+      'businesses': <Map<String, dynamic>>[],
+      'pagination': <String, dynamic>{'page': 1, 'total': 0, 'hasMore': false},
+    });
   }
 }
 
@@ -654,6 +737,45 @@ void main() {
         expect(find.text('أحكام العمل'), findsOneWidget);
 
         await expectMerzoxSeedGolden('about_us_loaded_ar_375x812.png');
+      });
+
+      // -- 9. Favorites, products tab -------------------------------------
+      testWidgets('favorites renders its Arabic products-tab baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        final FavoritesBloc favoritesBloc = FavoritesBloc(
+          apiService: _SeedFavoritesApi(),
+        );
+        _closeOnTearDown(favoritesBloc);
+
+        // The artboard shows the PRODUCTS tab selected; the bloc opens on
+        // businesses, so the seed selects it explicitly.
+        final Future<FavoritesState> ready = favoritesBloc.stream.firstWhere(
+          (FavoritesState state) =>
+              state.status == FavoritesStatus.ready &&
+              state.selectedTab == FavoritesTab.products &&
+              state.productsLoaded,
+        );
+        favoritesBloc.add(const FavoritesStarted());
+        favoritesBloc.add(const FavoritesTabChanged(FavoritesTab.products));
+        await ready;
+
+        expect(favoritesBloc.state.products, hasLength(4));
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<FavoritesBloc>.value(
+            value: favoritesBloc,
+            child: withMerzoxGoldenDeviceInsets(const FavoritesPage()),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('المفضلة'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('favorites_products_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

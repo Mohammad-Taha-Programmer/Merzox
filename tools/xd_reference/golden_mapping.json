@@ -108,6 +108,19 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "The only من نحن artboard in the corpus. The Flutter seed renders the server-driven page in its loaded state with all three sections collapsed, which is what the artboard draws. Its wordmark is the all-caps legacy form, normalized to MERZOX by the exporter without changing the XD package."
+    },
+    {
+      "seed": "favorites",
+      "flutter_golden": "test/goldens/seed/favorites_products_ar_375x812.png",
+      "xd": {
+        "name": "المفضلة",
+        "manifest_id": "9df0ef98-a4a4-418c-a2d0-c8171cf03c19",
+        "artboard_path": "artwork/artboard-8c14fb74-98d8-4e38-b0f7-0f7b7ba3805c",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The Flutter seed renders the PRODUCTS tab of the favourites page, which is the tab this artboard shows selected. NOTE: the artboard puts a photograph in every card and the seed deliberately carries no image URL - a golden must not fetch one - so each card reaches its placeholder branch. The image regions therefore differ by construction and dominate this seed's metrics; they are not a layout mismatch."
     }
   ]
 }

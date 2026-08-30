@@ -366,6 +366,16 @@ class MappingContractTests(unittest.TestCase):
                     810,
                     "extend_final_row_to_812",
                 ),
+                (
+                    "favorites",
+                    "test/goldens/seed/favorites_products_ar_375x812.png",
+                    "المفضلة",
+                    "9df0ef98-a4a4-418c-a2d0-c8171cf03c19",
+                    "artwork/artboard-8c14fb74-98d8-4e38-b0f7-0f7b7ba3805c",
+                    375,
+                    810,
+                    "extend_final_row_to_812",
+                ),
             ],
         )
 
