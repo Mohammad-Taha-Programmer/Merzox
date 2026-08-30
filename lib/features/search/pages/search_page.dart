@@ -371,7 +371,7 @@ class _ProductResults extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+        crossAxisCount: 3,
         childAspectRatio: 2.8,
         crossAxisSpacing: 22,
         mainAxisSpacing: 22,
@@ -433,7 +433,7 @@ class _BusinessResults extends StatelessWidget {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+        crossAxisCount: 3,
         childAspectRatio: 2.8,
         crossAxisSpacing: 22,
         mainAxisSpacing: 22,
