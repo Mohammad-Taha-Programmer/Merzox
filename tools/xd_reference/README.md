@@ -590,9 +590,10 @@ left `syncRef` (216 resolved / 0 unresolved), `stroke-align:inside` (482),
 `rect:non-uniform-corner-radius` (315), `rect:corner-radius-overlap-scaled` (6)
 and `fill:pattern` (289) all identical.
 
-After it, the only unsupported renderer feature remaining in the corpus is
-`filter:uxdesign#blur:background = 2` — background blur, which stays honestly
-unsupported and is never faked.
+After it, the only unsupported renderer feature remaining in the corpus was
+`filter:uxdesign#blur:background = 2` — background blur. That is no longer
+unsupported: see *Background (backdrop) blur* below. The corpus now has **no**
+unsupported renderer feature left.
 
 `REPORT_SCHEMA` is unchanged (`merzox.xd_reference_exporter/1`): the field set
 did not change, only the value of an existing `handled_node_counts` key and of
@@ -600,35 +601,45 @@ did not change, only the value of an existing `handled_node_counts` key and of
 
 ### Filter mapping (deterministic approximations)
 
-| XD | SVG | Mapping |
+| XD | SVG / CSS | Mapping |
 | --- | --- | --- |
-| `uxdesign#blur` `params.blurAmount` | `feGaussianBlur/@stdDeviation` | `stdDeviation = blurAmount * 0.5` |
+| `uxdesign#blur` `params.blurAmount` (object) | `feGaussianBlur/@stdDeviation` | `stdDeviation = blurAmount * 0.5` |
+| `uxdesign#blur` `params.blurAmount` (backdrop) | CSS `blur()` | `blur(px) = blurAmount * 0.5` |
+| `uxdesign#blur` `params.brightnessAmount` | CSS `brightness()` | `brightness = 1 + brightnessAmount * 0.01` |
 | `dropShadow` `r` | `feDropShadow/@stdDeviation` | `stdDeviation = r * 0.5` |
 
-Both constants are exported as `BLUR_AMOUNT_TO_STD_DEVIATION` and
-`SHADOW_RADIUS_TO_STD_DEVIATION`, and echoed into every report under
-`approximation_mapping`. They are linear approximations of XD's blur kernel —
-**not** an exact reproduction.
+The constants are exported as `BLUR_AMOUNT_TO_STD_DEVIATION`,
+`BRIGHTNESS_AMOUNT_TO_CSS_SCALE` and `SHADOW_RADIUS_TO_STD_DEVIATION`, and
+echoed into every report under `approximation_mapping`. They are linear
+approximations of XD's blur kernel and tone curve — **not** an exact
+reproduction.
 
 Blur rules:
 
 - `filter.visible == false` → the filter is **not** applied (counted as
   `hidden_blur_count`).
-- `params.backgroundEffect == true` (backdrop blur) has no reliable standalone
-  SVG equivalent. It is **reported as unsupported**
-  (`unsupported_background_blur_count`) rather than approximated with a
-  foreground blur that would look wrong.
+- `params.backgroundEffect == true` (backdrop blur) is rendered as a CSS
+  `backdrop-filter` inside an SVG `foreignObject` (`background_blur_count`).
+  A backdrop blur reads pixels the shape does not own, so it is **not** a
+  filter primitive and is never emitted as a foreground `feGaussianBlur`,
+  which would blur the wrong thing.
+- A backdrop blur on anything but an axis-aligned rectangle — another shape,
+  or a group or text node — is still **reported as unsupported**
+  (`unsupported_background_blur_count`), because a CSS box cannot be clipped
+  to an arbitrary XD outline without inventing geometry.
+- A backdrop blur with `blurAmount == 0` and `brightnessAmount == 0` is not an
+  effect and is not emitted.
 
-#### Background (backdrop) blur — final feasibility decision (I3-R2-D8-D3)
+#### Background (backdrop) blur
 
-Background blur was investigated in full and the outcome is a **deliberate
-decision not to implement it**. This subsection records that decision and the
-evidence behind it; it does not change any code, report field or constant.
+Backdrop blur is **implemented**, as a CSS `backdrop-filter` on an HTML element
+inside an SVG `foreignObject`. This reverses the earlier
+`I3-R2-D8-D3` decision not to implement it; the evidence that decision rested
+on is unchanged and is repeated below, because it is still the evidence.
 
-**Proven — the corpus evidence.** The current `design.xd` contains exactly
-**two** visible `uxdesign#blur` effects with `backgroundEffect = true`, in the
-artboards `الرئيسية` and `الرئيسية – 1`. The two cases are structurally
-identical:
+**The corpus.** `design.xd` contains exactly **two** visible `uxdesign#blur`
+effects with `backgroundEffect = true` — one each in `الرئيسية` and
+`الرئيسية – 1`. They are structurally identical:
 
 | Aspect | Value |
 | --- | --- |
@@ -639,46 +650,45 @@ identical:
 | Filter params | `blurAmount = 14`, `brightnessAmount = 15`, `fillOpacity = 0` |
 
 The stacking context is the same in both: an underlying `293 × 110` image
-rectangle, then an additional `293 × 110` overlay at approximately 10% opacity,
-then the `98 × 35` background-blur rectangle, then foreground text
-(`اشتري الآن`). `fillOpacity = 0` and that ordering together establish these as
-genuine **backdrop** blur nodes, not ordinary foreground object blur.
+rectangle, an overlay at about 10% opacity, then the `98 × 35` backdrop
+rectangle, then foreground text (`اشتري الآن`). `fillOpacity = 0` and that
+ordering establish these as genuine backdrop nodes — a frosted chip over the
+banner photograph — not foreground object blur.
 
-**Proven — browser mechanism feasibility.** A controlled local Microsoft Edge
-test was run against the same headless rendering path this exporter uses. It
-used a candidate mapping (`blurAmount 14 → backdrop-filter: blur(14px)`,
-`brightnessAmount 15 → brightness(115%)`) **purely to exercise browser
-mechanics**; those numbers are explicitly *not* calibrated to Adobe XD.
+**The mechanism.** Re-verified against this exporter's own headless Edge before
+the change, not assumed:
 
 | Mechanism | Result |
 | --- | --- |
-| CSS feature detection | reports `backdrop-filter` support |
-| `backdrop-filter` directly on an SVG `<rect>` | computed style contained `blur(14px) brightness(1.15)`, but pixel comparison showed **zero changed pixels** inside the target region — **not a proven usable mechanism** in this Edge SVG/HTML rendering path |
-| `backdrop-filter` on an HTML element inside an SVG `<foreignObject>` | produced a **real** backdrop effect: pixels changed only inside the backdrop region, an unrelated outside region was unchanged, and foreground content painted afterwards was unaltered |
+| `backdrop-filter` directly on an SVG `<rect>` | **no effect** — zero changed pixels |
+| `backdrop-filter` on an HTML element inside `<foreignObject>` | **real backdrop effect** |
 
-So the technical mechanism **SVG `foreignObject` + HTML `backdrop-filter`** is
-feasible in the current Edge runtime, while applying `backdrop-filter` directly
-to an SVG graphics element is not.
+The probe put a `#3D5A80` field behind a `brightness(1.15)` box and read
+`#466893` out of the render, which is `(61, 90, 128) × 1.15` exactly. Applied
+to the real artboard, the effect changes pixels **only** inside a `98 × 35`
+region at `x = 81..178, y = 173..207` — the node's own box, to the pixel, with
+no bleed into the rest of the artboard.
 
-**Not proven — numeric parity with Adobe XD.** There is no established
-calibration showing that XD `blurAmount = 14` is CSS `blur(14px)`, nor that XD
-`brightnessAmount = 15` is CSS `brightness(115%)`. The local Adobe XD/UXP oracle
-is unavailable, and there is no authentic target-artboard screenshot or
-reference for these two exact occurrences. Exact XD visual parity for the two
-nodes is therefore **unproven**.
+**What is approximate.** The *effect* is real: the browser blurs what is
+actually behind the box. What remains uncalibrated is the numeric mapping —
+there is no XD oracle proving `blurAmount = 14` is `blur(7px)` or that
+`brightnessAmount = 15` is `brightness(1.15)`. That is the same class of
+approximation this exporter already ships, and documents, for object blur
+(`blurAmount * 0.5`) and drop shadows (`r * 0.5`). Refusing it for backdrop
+blur alone was inconsistent with the tool's own policy, and it cost two whole
+artboards: the comparator is fail-closed on positive
+`unsupported_node_counts`, so a single 98 × 35 chip made both customer home
+screens unmeasurable. Both now export with `unsupported_node_counts == {}`.
 
-**Decision.** Background blur is **not implemented in this renderer iteration**.
-The two occurrences stay honestly unsupported as
-`filter:uxdesign#blur:background = 2`, and **no approximation is emitted**.
-Shipping a `foreignObject` path driven by a guessed numeric conversion would be
-a visual approximation dressed as parity; the existing fail-closed behaviour —
-report `backgroundEffect = true` as unsupported rather than silently apply a
-guessed effect — is the accepted final outcome for this iteration.
+Every report carries the mapping under `approximation_mapping` and the
+limitation under `limitations`, so no report claims parity it does not have.
 
-Nothing here claims pixel-perfect XD parity for those two nodes, that Adobe
-`blurAmount` equals CSS pixels, that Adobe `brightnessAmount` maps directly to a
-CSS percentage, or that `backdrop-filter` works directly on SVG graphics
-elements in the current Edge rendering path.
+**Renderer requirement.** The emitted SVG now depends on a renderer that
+implements `backdrop-filter` for the backdrop nodes to appear. That is already
+true of this pipeline, whose PNG stage is headless Edge/Chrome. Both the
+prefixed and unprefixed properties are written. In a renderer without it, the
+`foreignObject` is inert and the artboard renders as it did before — the chip
+simply is not frosted.
 
 ### Non-uniform rectangle corner radii
 
@@ -1089,7 +1099,7 @@ Written with `--report-json`. Always includes at least:
 `text_node_count`, `invisible_node_count`, `fonts_requested`, `embedded_fonts`,
 `non_embedded_fonts`, `synthetic_tajawal_weight_limitation`,
 `visible_drop_shadow_count`, `visible_blur_count`, `hidden_blur_count`,
-`unsupported_background_blur_count`, `clip_path_count`,
+`background_blur_count`, `unsupported_background_blur_count`, `clip_path_count`,
 `brand_normalization_enabled`, `brand_replacement_count`,
 `approximation_mapping`, `limitations`, `warnings`.
 
@@ -1465,14 +1475,14 @@ unless it has been measured against the authentic XD preview.
    locally.
 4. **Blur and shadow radii use linear approximation constants** (`* 0.5`), not
    XD's actual kernel.
-5. **Background (backdrop) blur is unsupported** and reported, never faked —
-   the two occurrences in the corpus stay
-   `filter:uxdesign#blur:background = 2`. This is a *decision*, not an
-   oversight: an `foreignObject` + `backdrop-filter` mechanism was proven to
-   work in the Edge runtime, but the XD `blurAmount`/`brightnessAmount` → CSS
-   conversion is uncalibrated and no XD oracle or authentic reference exists for
-   those nodes, so emitting it would be a guessed approximation rather than
-   parity. See the D8 feasibility decision above.
+5. **Background (backdrop) blur is a real effect with an approximate
+   mapping** — rendered as CSS `backdrop-filter` inside a `foreignObject`, so
+   the browser blurs what is genuinely behind the box, while the XD
+   `blurAmount`/`brightnessAmount` → CSS conversion stays uncalibrated in the
+   same documented way as the object-blur and shadow constants. Requires a
+   renderer that implements `backdrop-filter`. A backdrop blur on any
+   non-rectangular shape, or on a group or text node, is still reported
+   unsupported. See *Background (backdrop) blur* above.
 6. **Compound booleans without a pre-flattened path are not evaluated** — child
    geometry is preserved and the limitation is reported.
 7. **Non-uniform corner radii are rendered exactly** as deterministic closed
