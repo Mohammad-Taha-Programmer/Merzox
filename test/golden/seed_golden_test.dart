@@ -1,4 +1,4 @@
-// MERZOX-UI-GOLDEN-I4-I1 - the four deterministic seed goldens.
+// MERZOX-UI-GOLDEN-I4-I1 - the five deterministic seed goldens.
 //
 // These are Flutter rendering baselines captured on the canonical Windows
 // golden environment. They are NOT evidence of Adobe XD parity: nothing here
@@ -29,6 +29,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/pages/login_page.dart';
+import 'package:merzox/features/authentication/pages/signup_page.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/preview/store_preview_page.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
@@ -50,8 +51,8 @@ import 'merzox_golden_harness.dart';
 
 /// An [ApiService] that cannot reach the network.
 ///
-/// The idle login golden never submits the form, so any call here means the
-/// capture drifted into a request-driven state and the test should say so
+/// The idle authentication goldens never submit a form, so any call here
+/// means a capture drifted into a request-driven state and the test should say so
 /// rather than quietly hit a real endpoint.
 final class _OfflineAuthApiService extends ApiService {
   @override
@@ -59,7 +60,7 @@ final class _OfflineAuthApiService extends ApiService {
     required String identifier,
     required String password,
   }) async {
-    throw StateError('the idle login golden must not call login()');
+    throw StateError('an idle authentication golden must not call login()');
   }
 
   @override
@@ -72,7 +73,7 @@ final class _OfflineAuthApiService extends ApiService {
     String address = '',
     String gender = 'unspecified',
   }) async {
-    throw StateError('the idle login golden must not call signup()');
+    throw StateError('an idle authentication golden must not call signup()');
   }
 }
 
@@ -291,7 +292,41 @@ void main() {
         await expectMerzoxSeedGolden('login_idle_ar_375x812.png');
       });
 
-      // -- 4. Store preview, loaded state ---------------------------------
+      // -- 4. Signup, idle customer state ---------------------------------
+      testWidgets('signup renders its Arabic idle-state baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<AuthBloc>(
+            create: (_) => AuthBloc(apiService: _OfflineAuthApiService()),
+            child: MediaQuery(
+              data: const MediaQueryData(
+                size: merzoxGoldenSurfaceSize,
+                devicePixelRatio: 1,
+                padding: EdgeInsets.only(top: 44),
+                viewPadding: EdgeInsets.only(top: 44),
+              ),
+              child: SignupPage(
+                onSignupCreated: () {},
+                onLoginRequested: () {},
+              ),
+            ),
+          ),
+        );
+
+        // The seed is the untouched customer form: no typing, validation,
+        // submission, navigation or network request is part of this capture.
+        expect(find.text('إنشاء حساب'), findsOneWidget);
+        expect(find.text('إنشاء الحساب'), findsWidgets);
+        expect(find.text('أنثى'), findsOneWidget);
+        expect(find.text('ذكر'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('signup_idle_ar_375x812.png');
+      });
+
+      // -- 5. Store preview, loaded state ---------------------------------
       testWidgets('store preview renders its Arabic loaded-state baseline', (
         WidgetTester tester,
       ) async {

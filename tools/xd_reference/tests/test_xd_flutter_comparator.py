@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Unit tests for the XD ↔ Flutter golden comparator (MERZOX-UI-GOLDEN-I5-I1).
+"""Unit tests for the XD ↔ Flutter golden comparator (MERZOX-UI-GOLDEN-I5-I6-D3).
 
 The suite is hermetic: it never requires the real ``design.xd``, a browser, a
 Flutter toolchain or any third-party package. Every image is a synthetic PNG
@@ -160,7 +160,7 @@ def image_from(width: int, height: int, pixels: Sequence[Pixel]) -> cmp.DecodedI
 
 
 def base_mapping() -> Dict[str, Any]:
-    """A structurally valid four-entry mapping, shaped like the real one."""
+    """A structurally valid five-entry mapping, shaped like the real one."""
     return {
         "schema": cmp.MAPPING_SCHEMA,
         "target_surface": {"width": 375, "height": 812},
@@ -205,6 +205,19 @@ def base_mapping() -> Dict[str, Any]:
                 "semantic_reason": "reason c",
             },
             {
+                "seed": "signup",
+                "flutter_golden": "test/goldens/seed/signup_idle_ar_375x812.png",
+                "xd": {
+                    "name": "E",
+                    "manifest_id": "id-e",
+                    "artboard_path": "artwork/artboard-e",
+                    "width": 375,
+                    "height": 812,
+                },
+                "normalization": "exact",
+                "semantic_reason": "reason e",
+            },
+            {
                 "seed": "store_preview",
                 "flutter_golden": "test/goldens/seed/store_preview_loaded_ar_375x812.png",
                 "xd": {
@@ -242,10 +255,10 @@ class MappingContractTests(unittest.TestCase):
         mapping = self.validate(base_mapping())
         self.assertEqual(mapping.schema, cmp.MAPPING_SCHEMA)
         self.assertEqual((mapping.target_width, mapping.target_height), (375, 812))
-        self.assertEqual(len(mapping.entries), 4)
+        self.assertEqual(len(mapping.entries), 5)
         self.assertEqual(mapping.seeds(), cmp.ACCEPTED_SEEDS)
 
-    def test_real_mapping_file_matches_the_locked_four_entries(self) -> None:
+    def test_real_mapping_file_matches_the_locked_five_entries(self) -> None:
         mapping = cmp.load_mapping()
         self.assertEqual(mapping.schema, "merzox.xd_flutter_mapping/1")
         self.assertEqual((mapping.target_width, mapping.target_height), (375, 812))
@@ -291,6 +304,16 @@ class MappingContractTests(unittest.TestCase):
                     "تسجيل الدخول",
                     "7253b94f-6b60-4685-83c2-e3086ed0ac20",
                     "artwork/artboard-b371399a-3aed-45f5-8a33-b1f7c4972ef7",
+                    375,
+                    812,
+                    "exact",
+                ),
+                (
+                    "signup",
+                    "test/goldens/seed/signup_idle_ar_375x812.png",
+                    "إنشاء حساب",
+                    "6a24a0b2-1988-4f8a-a643-65ed1af321e2",
+                    "artwork/artboard-fd764781-250c-454c-9043-41781ba5ba16",
                     375,
                     812,
                     "exact",
@@ -342,8 +365,8 @@ class MappingContractTests(unittest.TestCase):
 
     def test_wrong_entry_count_rejected(self) -> None:
         payload = base_mapping()
-        payload["entries"] = payload["entries"][:3]
-        self.assert_rejected(payload, "exactly 4 entries")
+        payload["entries"] = payload["entries"][:4]
+        self.assert_rejected(payload, "exactly 5 entries")
 
     def test_duplicate_seed_rejected(self) -> None:
         payload = base_mapping()
@@ -399,7 +422,7 @@ class MappingContractTests(unittest.TestCase):
 
     def test_extend_normalization_with_wrong_dimensions_rejected(self) -> None:
         payload = base_mapping()
-        payload["entries"][3]["xd"]["height"] = 812
+        payload["entries"][4]["xd"]["height"] = 812
         self.assert_rejected(payload, "requires XD dimensions 375x810")
 
     def test_non_integer_dimension_rejected(self) -> None:
@@ -461,7 +484,7 @@ class SeedSelectionTests(unittest.TestCase):
         selected = cmp.select_entries(self.mapping, cmp.SEED_ALL)
         self.assertEqual(
             [e.seed for e in selected],
-            ["splash", "onboarding", "login", "store_preview"],
+            ["splash", "onboarding", "login", "signup", "store_preview"],
         )
 
     def test_single_seed_selects_only_that_entry(self) -> None:
@@ -474,12 +497,12 @@ class SeedSelectionTests(unittest.TestCase):
             cmp.select_entries(self.mapping, "cart")
         self.assertIn("Unknown seed 'cart'", str(ctx.exception))
 
-    def test_cli_seed_choices_are_exactly_all_plus_four(self) -> None:
+    def test_cli_seed_choices_are_exactly_all_plus_five(self) -> None:
         parser = cmp.build_arg_parser()
         action = next(a for a in parser._actions if a.dest == "seed")
         self.assertEqual(
             list(action.choices),
-            ["all", "splash", "onboarding", "login", "store_preview"],
+            ["all", "splash", "onboarding", "login", "signup", "store_preview"],
         )
 
     def test_cli_requires_the_four_documented_arguments(self) -> None:
@@ -1025,7 +1048,7 @@ class ExporterIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(
             [cmp.artifact_stem(e) for e in mapping.entries],
-            ["splash.xd", "onboarding.xd", "login.xd", "store_preview.xd"],
+            ["splash.xd", "onboarding.xd", "login.xd", "signup.xd", "store_preview.xd"],
         )
 
     def test_run_comparison_rejects_a_missing_xd_package(self) -> None:
@@ -1106,7 +1129,7 @@ class ReportTests(unittest.TestCase):
         report = cmp.build_report([synthetic_result(e.seed) for e in entries])
         self.assertEqual(
             [r["seed"] for r in report["results"]],
-            ["splash", "onboarding", "login", "store_preview"],
+            ["splash", "onboarding", "login", "signup", "store_preview"],
         )
 
     def test_serialization_is_deterministic_and_sorted(self) -> None:

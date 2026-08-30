@@ -55,3 +55,6 @@ backend/*google-credential*.json
 backend/**/*service-account*.json
 backend/**/*firebase-admin*.json
 backend/**/*google-credential*.json
+
+# Flutter golden comparison failure artefacts (diagnostic output, never source)
+test/golden/failures/

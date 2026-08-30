@@ -38,6 +38,7 @@ const String merzoxSeedGoldenDirectory = '../goldens/seed/';
 /// Read through [rootBundle] rather than the filesystem so the harness stays
 /// tied to the same asset bundle the app ships.
 const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
+  'MaterialIcons': <String>['fonts/MaterialIcons-Regular.otf'],
   'Tajawal': <String>['assets/fonts/Tajawal-Regular.ttf'],
   'Concept': <String>['assets/fonts/Concept Medium.ttf'],
   'Minion': <String>['assets/fonts/MINIONVARIABLECONCEPT-ROMAN.OTF'],

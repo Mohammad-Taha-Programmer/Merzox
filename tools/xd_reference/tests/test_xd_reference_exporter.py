@@ -1298,6 +1298,31 @@ class TestBrandNormalization(ExporterTestCase):
         result = self.export(xd_path, normalize_brand=True)
         self.assertEqual(result.report["brand_replacement_count"], 2)
 
+    def test_normalized_mode_replaces_exact_segmented_logo_tail(self) -> None:
+        xd_path = build_xd(self.tmp_path, [text_node("ictove")])
+        result = self.export(xd_path, normalize_brand=True)
+
+        self.assertIn(">Merzox</text>", result.svg)
+        self.assertNotIn(">ictove</text>", result.svg)
+        self.assertEqual(result.report["brand_replacement_count"], 1)
+
+    def test_segmented_logo_tail_requires_normalized_mode(self) -> None:
+        xd_path = build_xd(self.tmp_path, [text_node("ictove")])
+        result = self.export(xd_path)
+
+        self.assertIn(">ictove</text>", result.svg)
+        self.assertNotIn(">Merzox</text>", result.svg)
+        self.assertEqual(result.report["brand_replacement_count"], 0)
+
+    def test_segmented_logo_tail_match_is_exact_not_substring(self) -> None:
+        content = "prefix ictove suffix"
+        xd_path = build_xd(self.tmp_path, [text_node(content)])
+        result = self.export(xd_path, normalize_brand=True)
+
+        self.assertIn(f">{content}</text>", result.svg)
+        self.assertNotIn(">Merzox</text>", result.svg)
+        self.assertEqual(result.report["brand_replacement_count"], 0)
+
     def test_normalization_does_not_touch_ids_or_names(self) -> None:
         """Only rendered text is normalised - never JSON identifiers or names."""
         xd_path = build_xd(

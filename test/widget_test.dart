@@ -87,6 +87,30 @@ final class _RecordingLoginApiService extends ApiService {
   }
 }
 
+final class _RecordingSignupApiService extends ApiService {
+  String? submittedEmail;
+  String? submittedPhone;
+
+  @override
+  Future<SignupApiResponse> signup({
+    required String name,
+    String? email,
+    String? phone,
+    required String password,
+    required String userType,
+    String address = '',
+    String gender = 'unspecified',
+  }) async {
+    submittedEmail = email;
+    submittedPhone = phone;
+
+    return const SignupApiResponse(
+      requiresEmailVerification: true,
+      emailSent: true,
+    );
+  }
+}
+
 Future<AuthState> _dispatchForAuthStatus(
   AuthBloc bloc,
   AuthEvent event,
@@ -294,6 +318,8 @@ void main() {
     );
 
     expect(find.text('الاسم كاملاً'), findsOneWidget);
+    expect(find.text('رقم الجوال'), findsOneWidget);
+    expect(find.text('قم بإدخال رقم الجوال'), findsOneWidget);
     expect(find.text('الجنس'), findsOneWidget);
     expect(find.text('أنثى'), findsOneWidget);
     expect(find.text('ذكر'), findsOneWidget);
@@ -303,6 +329,70 @@ void main() {
       Directionality.of(tester.element(find.text('الاسم كاملاً'))),
       TextDirection.rtl,
     );
+  });
+
+  testWidgets('signup back control uses semantic back navigation', (
+    tester,
+  ) async {
+    var loginRequested = false;
+
+    await _pumpLocalized(
+      tester,
+      home: BlocProvider(
+        create: (_) => AuthBloc(apiService: _RecordingSignupApiService()),
+        child: SignupPage(
+          onSignupCreated: () {},
+          onLoginRequested: () {
+            loginRequested = true;
+          },
+        ),
+      ),
+    );
+
+    final backControl = find.byIcon(Icons.arrow_back_ios_new_rounded);
+
+    expect(backControl, findsOneWidget);
+    expect(find.byIcon(Icons.arrow_forward_ios_rounded), findsNothing);
+
+    await tester.tap(backControl);
+    await tester.pump();
+
+    expect(loginRequested, isTrue);
+  });
+
+  testWidgets('signup still submits an email identifier under the Arabic '
+      'mobile-number copy', (tester) async {
+    final api = _RecordingSignupApiService();
+
+    await _pumpLocalized(
+      tester,
+      home: BlocProvider(
+        create: (_) => AuthBloc(apiService: api),
+        child: SignupPage(onSignupCreated: () {}, onLoginRequested: () {}),
+      ),
+    );
+
+    final fields = find.byType(TextFormField);
+    expect(fields, findsNWidgets(3));
+
+    await tester.enterText(fields.at(0), 'Owner');
+    await tester.enterText(fields.at(1), 'owner@example.com');
+    await tester.enterText(fields.at(2), 'secret123');
+    await tester.pump();
+
+    final submitButton = find.widgetWithText(FilledButton, 'إنشاء الحساب');
+
+    await tester.ensureVisible(submitButton);
+    await tester.pumpAndSettle();
+    await tester.tap(submitButton);
+    await tester.pump();
+    await tester.pump();
+
+    expect(api.submittedEmail, 'owner@example.com');
+    expect(api.submittedPhone, isNull);
+
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 
   test(

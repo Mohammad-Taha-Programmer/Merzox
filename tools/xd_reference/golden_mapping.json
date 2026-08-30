@@ -45,6 +45,19 @@
       "semantic_reason": "The Flutter seed renders businessMode=false, i.e. the customer flow, and this XD artboard is the customer login (\"لمواصلة استخدام التطبيق\"). The alternative artboard e1a55414-b8c0-4225-be71-3e7df543e421 is the merchant login and explicitly says \"كتاجر\"."
     },
     {
+      "seed": "signup",
+      "flutter_golden": "test/goldens/seed/signup_idle_ar_375x812.png",
+      "xd": {
+        "name": "إنشاء حساب",
+        "manifest_id": "6a24a0b2-1988-4f8a-a643-65ed1af321e2",
+        "artboard_path": "artwork/artboard-fd764781-250c-454c-9043-41781ba5ba16",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The Flutter seed renders the untouched customer SignupPage in its Arabic idle state. This exact-name 375x812 XD artboard is the customer signup state and links directly to the locked customer login artboard. The suffixed artboards are separate signup variants. Its legacy logo stores a vector mark beside the exact text tail 'ictove'; the shared exporter normalizes that rendered tail to 'Merzox' without changing the XD package, node ids or node names."
+    },
+    {
       "seed": "store_preview",
       "flutter_golden": "test/goldens/seed/store_preview_loaded_ar_375x812.png",
       "xd": {

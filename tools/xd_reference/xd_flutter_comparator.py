@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Deterministic XD ↔ Flutter golden comparator (``MERZOX-UI-GOLDEN-I5-I1``).
+"""Deterministic XD ↔ Flutter golden comparator (``MERZOX-UI-GOLDEN-I5-I6-D3``).
 
 This tool produces **reproducible measurements** between an already accepted
 Flutter baseline golden and the locked XD reference artboard for the same seed.
@@ -46,7 +46,7 @@ import xd_reference_exporter as xdref  # noqa: E402  (sibling module, path set a
 # ---------------------------------------------------------------------------
 
 #: Iteration stamp for this comparator.
-COMPARATOR_ITERATION = "MERZOX-UI-GOLDEN-I5-I1"
+COMPARATOR_ITERATION = "MERZOX-UI-GOLDEN-I5-I6-D3"
 
 #: Schema of ``golden_mapping.json``.
 MAPPING_SCHEMA = "merzox.xd_flutter_mapping/1"
@@ -58,8 +58,14 @@ REPORT_SCHEMA = "merzox.xd_flutter_comparison/1"
 TARGET_WIDTH = 375
 TARGET_HEIGHT = 812
 
-#: The four accepted seeds, in their locked deterministic order.
-ACCEPTED_SEEDS: Tuple[str, ...] = ("splash", "onboarding", "login", "store_preview")
+#: The five accepted seeds, in their locked deterministic order.
+ACCEPTED_SEEDS: Tuple[str, ...] = (
+    "splash",
+    "onboarding",
+    "login",
+    "signup",
+    "store_preview",
+)
 
 #: ``--seed`` value that selects every mapping entry, in mapping order.
 SEED_ALL = "all"

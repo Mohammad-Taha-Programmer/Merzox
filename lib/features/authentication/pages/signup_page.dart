@@ -125,9 +125,9 @@ class _SignupPageState extends State<SignupPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       _SignupHeader(onBack: widget.onLoginRequested),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 2),
                       const _Logo(),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 37),
                       Text(
                         'authGate.signup'.tr(),
                         textAlign: TextAlign.center,
@@ -137,7 +137,7 @@ class _SignupPageState extends State<SignupPage> {
                           color: Color(0xFF2B2B2B),
                         ),
                       ),
-                      const SizedBox(height: 22),
+                      const SizedBox(height: 13),
                       Text(
                         'auth.signupSubtitle'.tr(),
                         textAlign: TextAlign.center,
@@ -171,7 +171,7 @@ class _SignupPageState extends State<SignupPage> {
                           onChanged: (_) => setState(() {}),
                           decoration: _fieldDecoration(
                             hintText: 'auth.signupIdentifierHint'.tr(),
-                            prefixIcon: _identifierIsEmail
+                            suffixIcon: _identifierIsEmail
                                 ? null
                                 : _DialCodeDropdown(
                                     value: _selectedDialCode,
@@ -185,10 +185,10 @@ class _SignupPageState extends State<SignupPage> {
                                       });
                                     },
                                   ),
-                            prefixIconConstraints: _identifierIsEmail
+                            suffixIconConstraints: _identifierIsEmail
                                 ? null
                                 : const BoxConstraints.tightFor(
-                                    width: 120,
+                                    width: 82,
                                     height: 46,
                                   ),
                           ),
@@ -205,7 +205,7 @@ class _SignupPageState extends State<SignupPage> {
                           textAlign: TextAlign.start,
                           decoration: _fieldDecoration(
                             hintText: 'auth.passwordHint'.tr(),
-                            prefixIcon: IconButton(
+                            suffixIcon: IconButton(
                               tooltip: _obscurePassword
                                   ? 'auth.showPassword'.tr()
                                   : 'auth.hidePassword'.tr(),
@@ -261,7 +261,7 @@ class _SignupPageState extends State<SignupPage> {
                                 });
                               },
                             ),
-                            const SizedBox(width: 28),
+                            const SizedBox(width: 44),
                             _GenderRadio(
                               label: 'auth.male'.tr(),
                               value: _Gender.male,
@@ -275,10 +275,10 @@ class _SignupPageState extends State<SignupPage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 42),
+                      const SizedBox(height: 50),
                       Center(
                         child: SizedBox(
-                          width: 221,
+                          width: 227,
                           height: 47,
                           child: FilledButton(
                             onPressed: isLoading ? null : () => _submit(bloc),
@@ -307,7 +307,7 @@ class _SignupPageState extends State<SignupPage> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 26),
+                      const SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -383,6 +383,10 @@ class _SignupHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final horizontalOffset = Directionality.of(context) == TextDirection.rtl
+        ? 12.0
+        : -12.0;
+
     return SizedBox(
       height: 44,
       child: Stack(
@@ -398,13 +402,16 @@ class _SignupHeader extends StatelessWidget {
           ),
           Align(
             alignment: AlignmentDirectional.centerStart,
-            child: IconButton(
-              tooltip: 'common.back'.tr(),
-              onPressed: onBack,
-              icon: const Icon(
-                Icons.arrow_forward_ios_rounded,
-                size: 26,
-                color: Color(0xFF3B3B3B),
+            child: Transform.translate(
+              offset: Offset(horizontalOffset, 3),
+              child: IconButton(
+                tooltip: 'common.back'.tr(),
+                onPressed: onBack,
+                icon: const Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  size: 26,
+                  color: Color(0xFF3B3B3B),
+                ),
               ),
             ),
           ),
@@ -419,10 +426,19 @@ class _Logo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
-      'assets/images/MERZOX_LOGO.png',
+    return SizedBox(
       height: 80,
-      fit: BoxFit.contain,
+      child: Transform.translate(
+        offset: const Offset(0, 16),
+        child: Transform.scale(
+          scale: 1.9,
+          child: Image.asset(
+            'assets/images/MERZOX_LOGO.png',
+            height: 80,
+            fit: BoxFit.contain,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -456,15 +472,15 @@ class _LabeledField extends StatelessWidget {
 
 InputDecoration _fieldDecoration({
   required String hintText,
-  Widget? prefixIcon,
-  BoxConstraints? prefixIconConstraints,
+  Widget? suffixIcon,
+  BoxConstraints? suffixIconConstraints,
 }) {
   return InputDecoration(
     hintText: hintText,
     hintStyle: TextStyle(fontSize: 13, color: MerzoxColors.kColorC7C7C7),
-    prefixIcon: prefixIcon,
-    prefixIconConstraints:
-        prefixIconConstraints ??
+    suffixIcon: suffixIcon,
+    suffixIconConstraints:
+        suffixIconConstraints ??
         const BoxConstraints(minWidth: 48, minHeight: 46),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     filled: true,
@@ -486,7 +502,7 @@ class _DialCodeDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 120,
+      width: 82,
       height: 46,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -508,7 +524,10 @@ class _DialCodeDropdown extends StatelessWidget {
                 onChanged: onChanged,
                 selectedItemBuilder: (context) {
                   return _dialCodes
-                      .map((dialCode) => _DialCodeView(dialCode: dialCode))
+                      .map(
+                        (dialCode) =>
+                            _DialCodeView(dialCode: dialCode, showFlag: false),
+                      )
                       .toList();
                 },
                 items: _dialCodes.map((dialCode) {
@@ -528,8 +547,9 @@ class _DialCodeDropdown extends StatelessWidget {
 
 class _DialCodeView extends StatelessWidget {
   final _DialCode dialCode;
+  final bool showFlag;
 
-  const _DialCodeView({required this.dialCode});
+  const _DialCodeView({required this.dialCode, this.showFlag = true});
 
   @override
   Widget build(BuildContext context) {
@@ -537,12 +557,14 @@ class _DialCodeView extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       textDirection: TextDirection.ltr,
       children: [
-        Text(dialCode.flag, style: const TextStyle(fontSize: 14)),
-        const SizedBox(width: 4),
+        if (showFlag) ...<Widget>[
+          Text(dialCode.flag, style: const TextStyle(fontSize: 14)),
+          const SizedBox(width: 4),
+        ],
         Text(
           dialCode.prefix,
           textDirection: TextDirection.ltr,
-          style: const TextStyle(fontSize: 13, color: Color(0xFF2B2B2B)),
+          style: const TextStyle(fontSize: 12, color: Color(0xFF2B2B2B)),
         ),
       ],
     );
@@ -570,8 +592,6 @@ class _GenderRadio extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(label, style: TextStyle(color: MerzoxColors.kColor707070)),
-          const SizedBox(width: 8),
           AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             width: 18,
@@ -595,6 +615,8 @@ class _GenderRadio extends StatelessWidget {
               ),
             ),
           ),
+          const SizedBox(width: 8),
+          Text(label, style: TextStyle(color: MerzoxColors.kColor707070)),
         ],
       ),
     );

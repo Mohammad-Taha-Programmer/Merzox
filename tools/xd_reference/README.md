@@ -236,7 +236,7 @@ Additional flags:
 
 | Flag | Purpose |
 | --- | --- |
-| `--normalize-merzox-brand` | Replace the literal rendered text `Bictov` with `Merzox`. |
+| `--normalize-merzox-brand` | Replace rendered legacy branding with `Merzox`: literal `Bictov` and the exact segmented logo tail `ictove`. |
 | `--list-artboards` | Print name, manifest id, path and bounds for every artboard, in manifest order. |
 | `--all-artboards` | Export every artboard into `--output-dir`. |
 | `--output-dir <dir>` | Batch destination. Required by (and only valid with) `--all-artboards`. |
@@ -361,7 +361,7 @@ artboard selector — those combinations are errors rather than guesses.
 | Mode | Behaviour | Used for |
 | --- | --- | --- |
 | **Raw** (default) | XD text is preserved exactly. `Bictov` stays `Bictov`. | Calibrating the renderer against the original XD preview — the reference and the design must agree character-for-character. |
-| **Normalized** (`--normalize-merzox-brand`) | The literal string `Bictov` in *rendered text content* becomes `Merzox`. | Comparing against the shipped Merzox app. |
+| **Normalized** (`--normalize-merzox-brand`) | Literal `Bictov`, or an exact rendered `ictove` logo tail, becomes `Merzox`. IDs and node names stay untouched. | Comparing against the shipped Merzox app. |
 
 Normalization rules:
 
@@ -1160,7 +1160,7 @@ tests and documentation belong in git while calibration is still in progress.
 
 ## Flutter golden comparison
 
-`MERZOX-UI-GOLDEN-I5-I1` adds a second, independent tool beside the exporter:
+`MERZOX-UI-GOLDEN-I5-I6-D3` maintains the independent comparison tool beside the exporter:
 
 ```
 tools/xd_reference/golden_mapping.json        the locked XD <-> Flutter mapping
@@ -1174,13 +1174,14 @@ source, or any production source, and it never renders the XD itself — it
 imports `xd_reference_exporter` as a sibling module and drives `XdPackage` /
 `export_artboard`, so there is exactly one AGC renderer in this repository.
 
-### The four locked mappings
+### The five locked mappings
 
 | Seed | Flutter golden | XD artboard | Manifest id | XD size | Normalization |
 | --- | --- | --- | --- | --- | --- |
 | `splash` | `test/goldens/seed/splash_page_ar_375x812.png` | `سبلاش – 1` | `1ff58a48-0e8d-49eb-be2f-4b7a24adcf9c` | 375 x 812 | `exact` |
 | `onboarding` | `test/goldens/seed/onboarding_initial_ar_375x812.png` | `شاشة ترحيبية` | `670c3191-2903-4423-85bc-4dcfcdaf3a6f` | 375 x 812 | `exact` |
 | `login` | `test/goldens/seed/login_idle_ar_375x812.png` | `تسجيل الدخول` | `7253b94f-6b60-4685-83c2-e3086ed0ac20` | 375 x 812 | `exact` |
+| `signup` | `test/goldens/seed/signup_idle_ar_375x812.png` | `إنشاء حساب` | `6a24a0b2-1988-4f8a-a643-65ed1af321e2` | 375 x 812 | `exact` |
 | `store_preview` | `test/goldens/seed/store_preview_loaded_ar_375x812.png` | `معاينة المتجر` | `693ab1c9-14b2-4448-a867-cb5553a8f813` | 375 x 810 | `extend_final_row_to_812` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
@@ -1191,6 +1192,7 @@ a *different* uuid from the manifest id):
 | `splash` | `artwork/artboard-29c52d7e-0f4c-439b-87cc-5d4a5cd8f229` |
 | `onboarding` | `artwork/artboard-39b3dc74-2728-41f4-a7ff-52ab7d2bbc1f` |
 | `login` | `artwork/artboard-b371399a-3aed-45f5-8a33-b1f7c4972ef7` |
+| `signup` | `artwork/artboard-fd764781-250c-454c-9043-41781ba5ba16` |
 | `store_preview` | `artwork/artboard-98945093-5916-454b-a1ea-946956675bf0` |
 
 Why each one, in one line:
@@ -1207,6 +1209,10 @@ Why each one, in one line:
   flow, matching this artboard's `لمواصلة استخدام التطبيق`. The alternative
   `e1a55414-b8c0-4225-be71-3e7df543e421` is the **merchant** login and
   explicitly says `كتاجر`.
+- **signup** — the untouched Arabic customer registration form maps to the
+  exact-name `إنشاء حساب` artboard. It is 375 x 812 and links back to the
+  locked customer login. Its segmented legacy `ictove` logo tail is normalized
+  by the shared exporter; the XD package and metadata remain unchanged.
 - **store_preview** — the explicit `معاينة المتجر` merchant-preview artboard,
   containing `خدماتنا`, `عن المتجر`, `المنتجات` and `التقييمات`. The long
   `معاينة` alternatives encode shopper/product/review states with customer
@@ -1251,9 +1257,9 @@ python tools/xd_reference/xd_flutter_comparator.py \
 ```
 
 `--seed` accepts `all` or one of `splash`, `onboarding`, `login`,
-`store_preview`. With one seed, the report contains only that seed's result;
+`signup`, `store_preview`. With one seed, the report contains only that seed's result;
 with `all`, results follow the mapping order exactly:
-`splash`, `onboarding`, `login`, `store_preview`.
+`splash`, `onboarding`, `login`, `signup`, `store_preview`.
 
 | Flag | Required | Purpose |
 | --- | --- | --- |
@@ -1310,7 +1316,7 @@ different artifact directories and output paths.
 
 A **positive** `unsupported_node_counts` for a mapped artboard is treated
 **fail-closed**: a visually incomplete XD reference is never measured as if it
-were complete. This says nothing about artboards outside these four — no claim
+were complete. This says nothing about artboards outside these five — no claim
 is made that the exporter supports every future artboard.
 
 ### Measurements only — there is no parity threshold

@@ -140,8 +140,14 @@ CALIBRATED_BLEND_MODE = "soft-light"
 BLEND_STRATEGY_SAFE_OPACITY_GROUP = "safe-opacity-group"
 BLEND_STRATEGY_UNSUPPORTED = "unsupported"
 
-#: Literal brand token replaced when ``--normalize-merzox-brand`` is supplied.
+#: Literal legacy brand token replaced when brand normalization is supplied.
 BRAND_SOURCE_TOKEN = "Bictov"
+
+#: Some XD artboards store the legacy logo as a vector brand mark followed by
+#: this exact text tail. Only a complete text chunk equal to this token is
+#: normalized; ordinary text merely containing the substring is untouched.
+BRAND_SEGMENTED_SOURCE_TOKEN = "ictove"
+
 BRAND_TARGET_TOKEN = "Merzox"
 
 #: Font families we ship inside the SVG as data URIs.
@@ -2878,10 +2884,23 @@ class AgcRenderer:
         return out
 
     def _text_content(self, chunk: str) -> str:
-        """Brand normalisation applies to *rendered text only*, never to IDs."""
-        if self.options.normalize_brand and BRAND_SOURCE_TOKEN in chunk:
-            self.report.brand_replacement_count += chunk.count(BRAND_SOURCE_TOKEN)
+        """Normalize legacy brand text without touching IDs or node names."""
+        if not self.options.normalize_brand:
+            return chunk
+
+        literal_count = chunk.count(BRAND_SOURCE_TOKEN)
+        if literal_count:
+            self.report.brand_replacement_count += literal_count
             chunk = chunk.replace(BRAND_SOURCE_TOKEN, BRAND_TARGET_TOKEN)
+
+        # In several authentic XD artboards the visual brand mark is a vector
+        # sibling and the remaining legacy word is stored as the exact text
+        # chunk ``ictove``. Exact equality is deliberate: prose containing that
+        # substring is not a brand node and must stay byte-for-byte unchanged.
+        if chunk == BRAND_SEGMENTED_SOURCE_TOKEN:
+            self.report.brand_replacement_count += 1
+            chunk = BRAND_TARGET_TOKEN
+
         return chunk
 
     def _text_element(
@@ -3673,8 +3692,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--normalize-merzox-brand",
         action="store_true",
         help=(
-            "Replace the literal text 'Bictov' with 'Merzox' in rendered text only. "
-            "The XD package is never modified."
+            "Replace legacy rendered brand text with 'Merzox', including the "
+            "literal 'Bictov' and the exact segmented logo tail 'ictove'. "
+            "The XD package, node IDs and node names are never modified."
         ),
     )
     parser.add_argument("--font", help="Override the Tajawal TTF embedded in the SVG.")
