@@ -31,6 +31,8 @@ import 'package:merzox/services/recommendation_preference_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../authentication/bloc/auth_bloc.dart';
+import 'widgets/feature_bottom_navigation_bar.dart'
+    show MerzoxNavIndicator, kMerzoxNavIndicatorGap;
 
 class _StoredUserProfile {
   final String name;
@@ -406,11 +408,6 @@ class _HomeNavData {
   });
 }
 
-/// The active-tab marker, measured from the XD bottom navigation.
-const double _navIndicatorWidth = 24;
-const double _navIndicatorHeight = 2;
-const double _navIndicatorGap = 13;
-
 class _HomeNavItem extends StatelessWidget {
   final _HomeNavData data;
   final bool selected;
@@ -437,21 +434,8 @@ class _HomeNavItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // The artboard marks the active tab with a 24x2 bar ABOVE the
-              // icon, measured at y=729..730 against an icon starting at
-              // y=745 - not with a filled disc behind it.
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: _navIndicatorWidth,
-                height: _navIndicatorHeight,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? MerzoxColors.kColorEE6C4D
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(_navIndicatorHeight),
-                ),
-              ),
-              const SizedBox(height: _navIndicatorGap),
+              MerzoxNavIndicator(selected: selected),
+              const SizedBox(height: kMerzoxNavIndicatorGap),
               Icon(
                 selected ? data.selectedIcon : data.icon,
                 color: selected ? MerzoxColors.kColorEE6C4D : inactiveColor,

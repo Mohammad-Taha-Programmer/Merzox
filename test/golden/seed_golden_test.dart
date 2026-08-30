@@ -41,6 +41,7 @@ import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
+import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/favorites/bloc/favorites_bloc.dart';
 import 'package:merzox/features/favorites/bloc/favorites_event.dart';
 import 'package:merzox/features/favorites/bloc/favorites_state.dart';
@@ -177,11 +178,7 @@ final class _SeedFavoritesApi extends ApiService {
       'products': <Map<String, dynamic>>[
         for (int index = 0; index < 4; index++) _seedFavoriteProduct(index),
       ],
-      'pagination': <String, dynamic>{
-        'page': 1,
-        'total': 4,
-        'hasMore': false,
-      },
+      'pagination': <String, dynamic>{'page': 1, 'total': 4, 'hasMore': false},
     });
   }
 
@@ -782,6 +779,66 @@ void main() {
         expect(find.text('المفضلة'), findsOneWidget);
 
         await expectMerzoxSeedGolden('favorites_products_ar_375x812.png');
+      });
+
+      // -- 10. Store details, the CUSTOMER view of the same storefront -----
+      //
+      // `تفاصيل المتجر` and `معاينة المتجر` are the same page in its two view
+      // modes, which is exactly the distinction `BusinessProfileViewMode`
+      // draws. The customer artboard carries the notification bell, the chat
+      // affordance and the shell's bottom navigation; the merchant preview
+      // carries a close control and none of the three. Seeding both keeps that
+      // difference measured rather than assumed.
+      testWidgets('store details renders its Arabic customer-view baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+
+        final BusinessProfileBloc storefrontBloc = BusinessProfileBloc(
+          apiService: _SeedStorefrontApi(),
+          viewMode: BusinessProfileViewMode.customer,
+        );
+
+        final Future<BusinessProfileState> ready = storefrontBloc.stream
+            .firstWhere(
+              (BusinessProfileState state) =>
+                  state.status == BusinessProfileStatus.ready,
+            );
+        storefrontBloc.add(const BusinessProfileStarted(_previewBusinessId));
+        await ready;
+
+        expect(storefrontBloc.state.business, isNotNull);
+        expect(
+          storefrontBloc.state.detailsStatus,
+          BusinessProfileSectionStatus.ready,
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          withMerzoxGoldenDeviceInsets(
+            BusinessProfilePage(
+              // The customer route arrives with the catalog's identity and the
+              // page fills the rest from the public detail payload.
+              business: const HomeBusiness(
+                id: _previewBusinessId,
+                name: '',
+                category: '',
+                address: '',
+                products: <String>[],
+                rating: 0,
+                colorValue: 0xffdeeef8,
+              ),
+              onNavChanged: (_) {},
+              // The page's own `BlocProvider` takes ownership and disposes it.
+              bloc: storefrontBloc,
+            ),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('متجر الياسمين'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('store_details_customer_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

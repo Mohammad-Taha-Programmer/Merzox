@@ -10,6 +10,8 @@ import 'package:merzox/features/business_profile/bloc/business_profile_state.dar
 import 'package:merzox/features/reviews/widgets/review_eligibility_notice.dart';
 import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
+import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart'
+    show MerzoxNavIndicator, kMerzoxNavIndicatorGap;
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/services/api_service.dart';
@@ -166,8 +168,11 @@ class _BusinessProfileView extends StatelessWidget {
                 // store, so the affordance is absent rather than disabled.
                 if (viewMode.allowsCustomerActions)
                   PositionedDirectional(
-                    end: 0,
-                    bottom: 106,
+                    // Measured: the artboard's bubble is a 39px circle whose
+                    // left edge sits at x=16 with its top at y=655. `end` is
+                    // the LEFT edge in RTL, so 0 pinned it flush to the frame.
+                    end: 16,
+                    bottom: 21,
                     child: _ChatButton(
                       onPressed: () => AuthGate.run(
                         context,
@@ -595,7 +600,10 @@ class _AboutTab extends StatelessWidget {
           Wrap(
             spacing: 12,
             runSpacing: 12,
-            alignment: WrapAlignment.end,
+            // `start`, not `end`: Wrap's main axis follows the ambient
+            // Directionality, so in RTL `end` pushes the tiles to the LEFT
+            // edge - away from the heading they belong under.
+            alignment: WrapAlignment.start,
             children: services
                 .map(
                   (service) => SizedBox(
@@ -1225,7 +1233,7 @@ class _ChatButton extends StatelessWidget {
       style: IconButton.styleFrom(
         backgroundColor: MerzoxColors.kColor3D5A80,
         foregroundColor: Colors.white,
-        fixedSize: const Size(42, 42),
+        fixedSize: const Size(39, 39),
       ),
       icon: const Icon(Icons.chat_bubble_outline_rounded, size: 22),
     );
@@ -1418,12 +1426,21 @@ class _ProfileNavIcon extends StatelessWidget {
       customBorder: const CircleBorder(),
       onTap: onTap,
       child: Center(
-        child: Icon(
-          selected ? selectedIcon : icon,
-          color: selected
-              ? MerzoxColors.kColorEE6C4D
-              : MerzoxColors.kColor8D99AE,
-          size: selected ? 26 : 25,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // This bar drew no marker at all; the artboard puts one above the
+            // active icon at y=726..727 with the icon starting at y=743.
+            MerzoxNavIndicator(selected: selected),
+            const SizedBox(height: kMerzoxNavIndicatorGap),
+            Icon(
+              selected ? selectedIcon : icon,
+              color: selected
+                  ? MerzoxColors.kColorEE6C4D
+                  : MerzoxColors.kColor8D99AE,
+              size: 25,
+            ),
+          ],
         ),
       ),
     );

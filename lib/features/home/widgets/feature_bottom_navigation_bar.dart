@@ -3,6 +3,34 @@ import 'package:flutter/material.dart';
 
 import '../../../core/constants/colors.dart';
 
+/// The active-tab marker every Merzox bottom navigation bar draws.
+///
+/// Measured from the artboards, not chosen here: a 24x2 bar sitting above the
+/// icon, never a disc behind it.
+const double kMerzoxNavIndicatorWidth = 24;
+const double kMerzoxNavIndicatorHeight = 2;
+const double kMerzoxNavIndicatorGap = 13;
+
+/// The marker itself, so the three bars cannot render it differently.
+class MerzoxNavIndicator extends StatelessWidget {
+  final bool selected;
+
+  const MerzoxNavIndicator({super.key, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: kMerzoxNavIndicatorWidth,
+      height: kMerzoxNavIndicatorHeight,
+      decoration: BoxDecoration(
+        color: selected ? MerzoxColors.kColorEE6C4D : Colors.transparent,
+        borderRadius: BorderRadius.circular(kMerzoxNavIndicatorHeight),
+      ),
+    );
+  }
+}
+
 class FeatureBottomNavigationBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onChanged;
@@ -168,21 +196,19 @@ class _NavButton extends StatelessWidget {
         customBorder: const CircleBorder(),
         onTap: onTap,
         child: Center(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: selected ? MerzoxColors.kColorFDF1EC : Colors.transparent,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              selected ? selectedIcon : icon,
-              color: selected
-                  ? MerzoxColors.kColorEE6C4D
-                  : MerzoxColors.kColor8D99AE,
-              size: selected ? 26 : 25,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              MerzoxNavIndicator(selected: selected),
+              const SizedBox(height: kMerzoxNavIndicatorGap),
+              Icon(
+                selected ? selectedIcon : icon,
+                color: selected
+                    ? MerzoxColors.kColorEE6C4D
+                    : MerzoxColors.kColor8D99AE,
+                size: 25,
+              ),
+            ],
           ),
         ),
       ),

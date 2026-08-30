@@ -121,6 +121,19 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "The Flutter seed renders the PRODUCTS tab of the favourites page, which is the tab this artboard shows selected. NOTE: the artboard puts a photograph in every card and the seed deliberately carries no image URL - a golden must not fetch one - so each card reaches its placeholder branch. The image regions therefore differ by construction and dominate this seed's metrics; they are not a layout mismatch."
+    },
+    {
+      "seed": "store_details",
+      "flutter_golden": "test/goldens/seed/store_details_customer_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 1",
+        "manifest_id": "749086a1-b2c8-4d36-b23d-5961376e5911",
+        "artboard_path": "artwork/artboard-94914543-915f-4653-af97-285b87ebcdfb",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The entry state of the 40-artboard تفاصيل المتجر family, and the only one at 375x810 - the rest are taller scroll states. It is the CUSTOMER view of the same page معاينة المتجر shows in merchant preview: it carries the notification bell, the chat affordance and the shell bottom navigation, which the preview artboard deliberately has none of. Seeding both modes keeps that difference measured rather than assumed. The logo card holds the artboard's sample store artwork against the seed's placeholder, for the same reason as every other image-bearing seed: a golden cannot fetch one."
     }
   ]
 }
