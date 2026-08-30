@@ -4,6 +4,27 @@ import validator from 'validator';
 
 import { formatBirthDate } from '../policies/birth-date.policy.js';
 
+/**
+ * One saved delivery address.
+ *
+ * Every field is bounded here as well as in the policy: the policy guards the
+ * route, and this guards the database, so a write that ever reaches the model
+ * by another path still cannot store an unbounded string.
+ */
+const addressSchema = new mongoose.Schema(
+  {
+    label: { type: String, trim: true, maxlength: 40, default: '' },
+    fullName: { type: String, trim: true, required: true, maxlength: 80 },
+    phone: { type: String, trim: true, required: true, maxlength: 20 },
+    altPhone: { type: String, trim: true, default: '', maxlength: 20 },
+    governorate: { type: String, trim: true, required: true, maxlength: 60 },
+    city: { type: String, trim: true, required: true, maxlength: 60 },
+    details: { type: String, trim: true, default: '', maxlength: 250 },
+    isDefault: { type: Boolean, default: false }
+  },
+  { _id: true, timestamps: true }
+);
+
 const phoneSchema = new mongoose.Schema(
   {
     value: {
@@ -94,12 +115,16 @@ const userSchema = new mongoose.Schema(
       match: [/^\+?[0-9]{7,15}$/, 'Phone number must be international format']
     },
     phones: { type: [phoneSchema], default: [] },
+    // The profile's single free-text address. Kept as it was: an account that
+    // never opens the address book still has exactly this, and every existing
+    // order was placed against it.
     address: {
       type: String,
       trim: true,
       maxlength: 250,
       default: ''
     },
+    addresses: { type: [addressSchema], default: [] },
     userType: {
       type: String,
       enum: ['normal', 'business'],
@@ -184,6 +209,17 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     phone: this.phone ?? null,
     phones: this.phones,
     address: this.address,
+    addresses: this.addresses.map((entry) => ({
+      id: entry._id.toString(),
+      label: entry.label,
+      fullName: entry.fullName,
+      phone: entry.phone,
+      altPhone: entry.altPhone,
+      governorate: entry.governorate,
+      city: entry.city,
+      details: entry.details,
+      isDefault: entry.isDefault
+    })),
     userType: this.userType,
     gender: this.gender,
     // Date-only on the wire. A full ISO timestamp would invite a client-side
