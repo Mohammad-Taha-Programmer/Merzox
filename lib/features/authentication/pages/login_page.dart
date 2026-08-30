@@ -44,7 +44,10 @@ const double _kTopBarHeight = 44;
 ///
 /// This gap spans XD's own app-bar band (44..88); Merzox leaves it white rather
 /// than recreating chrome it does not own.
-const double _kTopBarToLogo = 56;
+// 12, not 56. The 44 removed here was compensating for a golden captured with
+// no status-bar inset; SafeArea supplies that on a real device, so the surplus
+// was double-counted on every phone.
+const double _kTopBarToLogo = 12;
 
 /// The brand mark. The asset keeps its current size; only the surrounding
 /// spacing is tuned, so the normalized "Merzox" wordmark under it centres on
@@ -767,10 +770,6 @@ class _PrimaryAuthButton extends StatelessWidget {
           onPressed: isLoading ? null : onPressed,
           style: FilledButton.styleFrom(
             backgroundColor: MerzoxColors.kColorEE6C4D,
-            textStyle: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(_kPrimaryButtonRadius),
             ),
@@ -784,7 +783,16 @@ class _PrimaryAuthButton extends StatelessWidget {
                     color: Colors.white,
                   ),
                 )
-              : Text(label),
+              // The size and weight go on the LABEL. Setting `textStyle` on the
+              // button style replaces the whole style including the Arabic font
+              // family, and every glyph falls back to tofu.
+              : Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
         ),
       ),
     );

@@ -504,7 +504,9 @@ void main() {
             // `BlocProvider` owns and disposes the bloc, exactly as the
             // existing onboarding widget tests do.
             create: (_) => OnboardingBloc(),
-            child: OnboardingScreen(onFinished: () {}),
+            child: withMerzoxGoldenDeviceInsets(
+              OnboardingScreen(onFinished: () {}),
+            ),
           ),
         );
 
@@ -525,12 +527,14 @@ void main() {
           tester,
           BlocProvider<AuthBloc>(
             create: (_) => AuthBloc(apiService: _OfflineAuthApiService()),
-            child: LoginPage(
-              onAuthenticated: () {},
-              onBrowseAsGuest: () {},
-              onSignupRequested: () {},
-              onForgotPasswordRequested: () {},
-              businessMode: false,
+            child: withMerzoxGoldenDeviceInsets(
+              LoginPage(
+                onAuthenticated: () {},
+                onBrowseAsGuest: () {},
+                onSignupRequested: () {},
+                onForgotPasswordRequested: () {},
+                businessMode: false,
+              ),
             ),
           ),
         );
@@ -610,7 +614,9 @@ void main() {
             value: merchantBloc,
             // `storefrontBloc` is the production test seam; the page's own
             // `BlocProvider` takes ownership and disposes it.
-            child: StorePreviewPage(storefrontBloc: storefrontBloc),
+            child: withMerzoxGoldenDeviceInsets(
+              StorePreviewPage(storefrontBloc: storefrontBloc),
+            ),
           ),
         );
 
