@@ -215,11 +215,16 @@ test('an order snapshots the address as one line', () => {
       city: 'أريحا',
       details: 'شارع القدس'
     }),
-    'أريحا ، أريحا ، شارع القدس'
+    'أريحا ، شارع القدس'
   );
+  // A city named after its governorate is written once, not twice.
   assert.equal(
     formatAddressLine({ governorate: 'جنين', city: 'جنين', details: '' }),
-    'جنين ، جنين'
+    'جنين'
+  );
+  assert.equal(
+    formatAddressLine({ governorate: 'أريحا', city: 'أريحا', details: 'شارع' }),
+    'أريحا ، شارع'
   );
 });
 

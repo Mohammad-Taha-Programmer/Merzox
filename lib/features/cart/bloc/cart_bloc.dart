@@ -80,7 +80,12 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         throw StateError('Authentication required');
       }
 
-      final address = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
+      // The address the buyer chose wins; the profile's stored one is the
+      // fallback for an account that predates the address book.
+      final storedAddress = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
+      final address = event.deliveryAddress.trim().isEmpty
+          ? storedAddress
+          : event.deliveryAddress.trim();
       final groups = <String, List<CartItem>>{};
       for (final item in state.items) {
         groups.putIfAbsent(item.businessId, () => []).add(item);
