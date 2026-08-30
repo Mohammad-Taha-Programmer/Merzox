@@ -68,6 +68,25 @@ final class _SignupMessageApiService extends ApiService {
   }
 }
 
+/// Records the identifier the login screen actually submits.
+///
+/// The call is failed deliberately: this fake exists to observe the identifier
+/// the page normalized, not to drive a successful session through the
+/// realtime/push wiring the authenticated branch performs.
+final class _RecordingLoginApiService extends ApiService {
+  String? submittedIdentifier;
+
+  @override
+  Future<AuthApiResponse> login({
+    required String identifier,
+    required String password,
+  }) async {
+    submittedIdentifier = identifier;
+
+    throw StateError('login is observed, never completed, in this test');
+  }
+}
+
 Future<AuthState> _dispatchForAuthStatus(
   AuthBloc bloc,
   AuthEvent event,
@@ -149,6 +168,11 @@ void main() {
     );
 
     expect(find.text('تسجيل الدخول'), findsWidgets);
+    // MERZOX-UI-GOLDEN-I5-I1: the Arabic identifier copy now reads as the XD
+    // reference does. It is a display change only - see the email-login
+    // regression test below.
+    expect(find.text('رقم الجوال'), findsOneWidget);
+    expect(find.text('قم بإدخال رقم الجوال'), findsOneWidget);
     expect(find.text('المتابعة كضيف'), findsOneWidget);
     expect(find.text('ألا تملك حساب؟'), findsOneWidget);
     expect(find.text('قم بإنشاء حساب'), findsOneWidget);
@@ -163,6 +187,47 @@ void main() {
     await tester.pump();
 
     expect(forgotPasswordRequested, isTrue);
+  });
+
+  testWidgets('login still submits an email identifier under the Arabic '
+      'mobile-number copy', (tester) async {
+    final api = _RecordingLoginApiService();
+
+    await _pumpLocalized(
+      tester,
+      home: BlocProvider(
+        create: (_) => AuthBloc(apiService: api),
+        child: LoginPage(
+          onAuthenticated: () {},
+          onBrowseAsGuest: () {},
+          onSignupRequested: () {},
+          onForgotPasswordRequested: () {},
+        ),
+      ),
+    );
+
+    // The identifier field is the first of the two on the page.
+    await tester.enterText(
+      find.byType(TextFormField).first,
+      'shopper@example.com',
+    );
+    await tester.enterText(find.byType(TextFormField).last, 'secret123');
+    await tester.pump();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'تسجيل الدخول'));
+    // Pumped frame by frame rather than settled: the loading state renders a
+    // CircularProgressIndicator, which never goes idle.
+    await tester.pump();
+    await tester.pump();
+
+    // The '@' branch must win over the selected +972 dial code: an email is
+    // forwarded verbatim, never rewritten into a phone number.
+    expect(api.submittedIdentifier, 'shopper@example.com');
+
+    // Drain the failure SnackBar so its auto-dismiss timer does not outlive
+    // the test.
+    await tester.pump(const Duration(seconds: 5));
+    await tester.pumpAndSettle();
   });
 
   testWidgets('login renders localized English auth and guest actions', (

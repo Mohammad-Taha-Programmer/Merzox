@@ -341,8 +341,8 @@
   },
   "auth": {
     "loginSubtitle": "الرجاء تسجيل الدخول لمواصلة استخدام التطبيق",
-    "loginIdentifierLabel": "رقم الجوال أو البريد الإلكتروني",
-    "loginIdentifierHint": "قم بإدخال رقم الجوال أو البريد الإلكتروني",
+    "loginIdentifierLabel": "رقم الجوال",
+    "loginIdentifierHint": "قم بإدخال رقم الجوال",
     "password": "كلمة المرور",
     "passwordHint": "الرجاء قم بإدخال كلمة المرور",
     "showPassword": "إظهار كلمة المرور",
