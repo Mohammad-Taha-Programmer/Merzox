@@ -96,6 +96,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
           token: token,
           businessId: entry.key,
           deliveryAddress: address,
+          deliveryOption: event.deliveryOption,
           clientOrderId: '$checkoutId-$index',
           items: entry.value
               .map(
