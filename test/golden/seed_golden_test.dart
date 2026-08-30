@@ -58,6 +58,7 @@ import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
 import 'package:merzox/features/orders/pages/order_tracking_page.dart';
 import 'package:merzox/features/splash/presentation/splash_screen.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'merzox_golden_harness.dart';
@@ -381,6 +382,33 @@ const BusinessProductApiModel _seedService = BusinessProductApiModel(
   isService: true,
 );
 
+/// One catalogue product, in the shape the strict product contract demands.
+Map<String, dynamic> _seedStorefrontProduct(int index) {
+  final int price = index.isEven ? 65 : 40;
+  return <String, dynamic>{
+    'id': '64c00000000000000000002$index',
+    'name': 'أساس فت مي',
+    'description': '',
+    'price': price,
+    'discountPercent': 0,
+    'finalPrice': price,
+    'inStock': true,
+    'imageUrl': '',
+    'imageUrls': <String>[],
+    'classification': 'new',
+    'rating': 4,
+    'ratingCount': 12,
+    'likeCount': 3,
+    'isService': false,
+    'hasVariants': false,
+    'variants': <Map<String, dynamic>>[],
+    'minPrice': price,
+    'maxPrice': price,
+    'minFinalPrice': price,
+    'maxFinalPrice': price,
+  };
+}
+
 /// Serves the PUBLIC storefront contracts the preview reads.
 ///
 /// Every payload is chosen so the loaded storefront renders from local
@@ -426,6 +454,59 @@ final class _SeedStorefrontApi extends ApiService {
   Future<List<BusinessReviewApiModel>> businessReviews({
     required String businessId,
   }) async => const <BusinessReviewApiModel>[];
+}
+
+/// Answers the eligibility question the way the artboard's state implies: a
+/// signed-in customer who may write a review. The verdict is still the
+/// gateway's to give - the page never derives it.
+final class _SeedEligibleReviewer implements ReviewEligibilityGateway {
+  const _SeedEligibleReviewer();
+
+  @override
+  Future<ReviewEligibilityDecision> businessEligibility({
+    required String token,
+    required String businessId,
+  }) async => const ReviewEligibilityDecision(eligible: true, reason: null);
+
+  @override
+  Future<ReviewEligibilityDecision> productEligibility({
+    required String token,
+    required String businessId,
+    required String productId,
+  }) async => const ReviewEligibilityDecision(eligible: true, reason: null);
+}
+
+/// The same storefront, but with the catalogue and reviews the tab artboards
+/// draw. Kept separate so the About-tab seeds keep their empty sections.
+final class _SeedStorefrontTabsApi extends _SeedStorefrontApi {
+  @override
+  Future<List<BusinessProductApiModel>> businessProducts({
+    required String businessId,
+    required String classification,
+  }) async {
+    return <BusinessProductApiModel>[
+      for (int index = 0; index < 4; index++)
+        BusinessProductApiModel.fromJson(_seedStorefrontProduct(index)),
+    ];
+  }
+
+  @override
+  Future<List<BusinessReviewApiModel>> businessReviews({
+    required String businessId,
+  }) async {
+    return <BusinessReviewApiModel>[
+      for (int index = 0; index < 3; index++)
+        BusinessReviewApiModel.fromJson(<String, dynamic>{
+          'id': '64e00000000000000000000$index',
+          'userName': index.isEven ? 'ياسمين خالد' : 'حمود حسين',
+          'rating': index.isEven ? 5 : 4,
+          'comment':
+              'المتجر جدًا رائع ومميز ، وأغراضه مميزة وذات جودة عالية، وراقي '
+              'جدًا في التعامل',
+          'createdAt': '2022-02-15T14:40:00.000',
+        }),
+    ];
+  }
 }
 
 /// Installs the authenticated merchant session `BusinessBloc` resolves its
@@ -839,6 +920,102 @@ void main() {
         expect(find.text('متجر الياسمين'), findsOneWidget);
 
         await expectMerzoxSeedGolden('store_details_customer_ar_375x812.png');
+      });
+
+      // -- 11/12. The storefront's other two tabs -------------------------
+      //
+      // Both artboards are taller than the viewport because the corpus draws
+      // below-the-fold content inline. The mapping crops them to the first
+      // 812 rows, which is the state a first-frame golden can be compared
+      // against; `below_fold_row_count` records what was left unmeasured.
+      Future<BusinessProfileBloc> openStorefrontTab(int index) async {
+        final BusinessProfileBloc bloc = BusinessProfileBloc(
+          apiService: _SeedStorefrontTabsApi(),
+          reviewEligibilityGateway: const _SeedEligibleReviewer(),
+          viewMode: BusinessProfileViewMode.customer,
+        );
+
+        final Future<BusinessProfileState> ready = bloc.stream.firstWhere(
+          (BusinessProfileState state) =>
+              state.status == BusinessProfileStatus.ready,
+        );
+        bloc.add(const BusinessProfileStarted(_previewBusinessId));
+        await ready;
+
+        // Opening a tab STARTS its section load, so waiting on the tab index
+        // alone would capture the spinner. Wait for the section itself.
+        final Future<BusinessProfileState> loaded = bloc.stream.firstWhere(
+          (BusinessProfileState state) =>
+              state.mainTabIndex == index &&
+              (index == 1
+                      ? state.productsStatus
+                      : state.reviewsStatus) ==
+                  BusinessProfileSectionStatus.ready,
+        );
+        bloc.add(BusinessProfileMainTabChanged(index));
+        await loaded;
+
+        return bloc;
+      }
+
+      Widget storefrontPage(BusinessProfileBloc bloc) {
+        return withMerzoxGoldenDeviceInsets(
+          BusinessProfilePage(
+            business: const HomeBusiness(
+              id: _previewBusinessId,
+              name: '',
+              category: '',
+              address: '',
+              products: <String>[],
+              rating: 0,
+              colorValue: 0xffdeeef8,
+            ),
+            onNavChanged: (_) {},
+            bloc: bloc,
+          ),
+        );
+      }
+
+      testWidgets('storefront products tab renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+
+        final BusinessProfileBloc bloc = await openStorefrontTab(1);
+        expect(bloc.state.products, hasLength(4));
+
+        await pumpMerzoxGoldenPage(tester, storefrontPage(bloc));
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('أساس فت مي'), findsWidgets);
+
+        await expectMerzoxSeedGolden(
+          'storefront_products_ar_375x812.png',
+        );
+      });
+
+      testWidgets('storefront reviews tab renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        // The artboard draws the composer, which only a signed-in eligible
+        // customer sees.
+        _useAuthenticatedCustomerSession();
+
+        final BusinessProfileBloc bloc = await openStorefrontTab(2);
+        expect(bloc.state.reviews, hasLength(3));
+        expect(
+          bloc.state.reviewEligibilityStatus,
+          ReviewEligibilityStatus.eligible,
+        );
+
+        await pumpMerzoxGoldenPage(tester, storefrontPage(bloc));
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('ياسمين خالد'), findsWidgets);
+
+        await expectMerzoxSeedGolden(
+          'storefront_reviews_ar_375x812.png',
+        );
       });
     },
     skip: merzoxGoldenPlatformSkip,

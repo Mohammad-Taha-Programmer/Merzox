@@ -1006,7 +1006,9 @@ class _ReviewsTabState extends State<_ReviewsTab> {
                     },
               style: FilledButton.styleFrom(
                 backgroundColor: MerzoxColors.kColorEE6C4D,
-                fixedSize: const Size(58, 32),
+                // 63x31, measured: at 58 the Arabic label no longer fits and
+                // breaks across two lines inside the button.
+                fixedSize: const Size(63, 31),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(4),
                 ),

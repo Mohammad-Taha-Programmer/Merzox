@@ -134,6 +134,32 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "The entry state of the 40-artboard تفاصيل المتجر family, and the only one at 375x810 - the rest are taller scroll states. It is the CUSTOMER view of the same page معاينة المتجر shows in merchant preview: it carries the notification bell, the chat affordance and the shell bottom navigation, which the preview artboard deliberately has none of. Seeding both modes keeps that difference measured rather than assumed. The logo card holds the artboard's sample store artwork against the seed's placeholder, for the same reason as every other image-bearing seed: a golden cannot fetch one."
+    },
+    {
+      "seed": "storefront_products",
+      "flutter_golden": "test/goldens/seed/storefront_products_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 2",
+        "manifest_id": "4223d0ec-2ddf-4489-b92a-b1d5469e5887",
+        "artboard_path": "artwork/artboard-ce11c718-5740-4715-9ead-9235df87d4db",
+        "width": 375,
+        "height": 1165
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The المنتجات tab of the storefront: the tab strip with the middle entry active, the الجديدة/الأكثر مبيعًا/عروض filter row and the product grid. Six artboards in the family draw this state; this is the first. Cropped to the first viewport - the artboard draws its below-the-fold grid inline. Product images are the artboard's photographs against the seed's placeholders, and the floating chat bubble is pinned to the viewport in the app while the artboard draws it at the document end."
+    },
+    {
+      "seed": "storefront_reviews",
+      "flutter_golden": "test/goldens/seed/storefront_reviews_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 7",
+        "manifest_id": "217c3127-5350-4faa-883a-21ea8fb283d5",
+        "artboard_path": "artwork/artboard-59f2d5d4-9b0f-4824-8d24-2c464abec4ee",
+        "width": 375,
+        "height": 1300
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The التقييمات tab: the composer - stars, comment field and publish button - above the published list. The composer is only rendered for a signed-in customer the backend has judged eligible, so the seed supplies both rather than capturing the sign-in gate, which is a different state from this artboard. Cropped to the first viewport."
     }
   ]
 }
