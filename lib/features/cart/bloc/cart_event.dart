@@ -13,5 +13,8 @@ final class CartItemRemoved extends CartEvent {
 }
 
 final class CartCheckoutRequested extends CartEvent {
-  const CartCheckoutRequested();
+  /// The delivery tier the buyer picked, by name. Its price is the server's.
+  final String deliveryOption;
+
+  const CartCheckoutRequested({this.deliveryOption = 'standard'});
 }

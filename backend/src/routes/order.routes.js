@@ -7,6 +7,7 @@ import {
   cancelMyOrder,
   createOrder,
   getMyOrder,
+  listDeliveryOptions,
   listMyOrders,
   updateMyOrderAddress
 } from '../controllers/order.controller.js';
@@ -25,6 +26,10 @@ router.patch(
   validateCourierLocationUpdate,
   updateCourierLocationByCapability
 );
+
+// Public: the fee is the same for everyone, and a shopper deciding
+// whether to check out should not have to sign in to see it.
+router.get('/delivery-options', listDeliveryOptions);
 
 router.use(requireAuth);
 router.get('/', listMyOrders);

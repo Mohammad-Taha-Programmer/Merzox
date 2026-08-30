@@ -324,12 +324,28 @@ class ApiService {
     return OrderListApiResponse.fromJson(data);
   }
 
+  /// The delivery tiers and their prices, as the server charges them.
+  ///
+  /// Public, and deliberately not cached here: the checkout screen has to draw
+  /// two prices and must draw the server's, not a copy that can drift.
+  Future<DeliveryOptionsApiResponse> deliveryOptions() async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/orders/delivery-options',
+    );
+
+    return DeliveryOptionsApiResponse.fromJson(
+      response.data?['data'] as Map<String, dynamic>? ?? const {},
+    );
+  }
+
   Future<OrderApiModel> createOrder({
     required String token,
     required String businessId,
     required List<OrderItemRequest> items,
     required String deliveryAddress,
     String paymentMethod = 'cash',
+    // A tier name, never a price: the fee is the server's to decide.
+    String deliveryOption = 'standard',
     String? clientOrderId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
@@ -339,6 +355,7 @@ class ApiService {
         'items': items.map((item) => item.toJson()).toList(),
         'deliveryAddress': deliveryAddress,
         'paymentMethod': paymentMethod,
+        'deliveryOption': deliveryOption,
         if (clientOrderId != null) 'clientOrderId': clientOrderId,
       },
       options: _authOptions(token),
@@ -3085,5 +3102,53 @@ class NotificationListApiResponse {
       page: (pagination['page'] as num?)?.toInt() ?? 1,
       hasMore: pagination['hasMore'] as bool? ?? false,
     );
+  }
+}
+
+/// A delivery tier and what the server charges for it.
+final class DeliveryOptionApiModel {
+  final String option;
+  final double fee;
+
+  const DeliveryOptionApiModel({required this.option, required this.fee});
+
+  factory DeliveryOptionApiModel.fromJson(Map<String, dynamic> json) {
+    return DeliveryOptionApiModel(
+      option: json['option'] as String? ?? '',
+      fee: (json['fee'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
+/// Every tier a buyer may choose between, and which one is assumed.
+final class DeliveryOptionsApiResponse {
+  final List<DeliveryOptionApiModel> options;
+  final String defaultOption;
+
+  const DeliveryOptionsApiResponse({
+    required this.options,
+    required this.defaultOption,
+  });
+
+  factory DeliveryOptionsApiResponse.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> raw = json['options'] as List<dynamic>? ?? const [];
+
+    return DeliveryOptionsApiResponse(
+      options: raw
+          .whereType<Map<String, dynamic>>()
+          .map(DeliveryOptionApiModel.fromJson)
+          .where((DeliveryOptionApiModel option) => option.option.isNotEmpty)
+          .toList(),
+      defaultOption: json['defaultOption'] as String? ?? 'standard',
+    );
+  }
+
+  /// The fee for [option], or null when the server did not offer it.
+  double? feeFor(String option) {
+    for (final DeliveryOptionApiModel candidate in options) {
+      if (candidate.option == option) return candidate.fee;
+    }
+
+    return null;
   }
 }

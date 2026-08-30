@@ -23,7 +23,10 @@ import {
 } from '../policies/checkout-intent.policy.js';
 import {
   CHECKOUT_ERRORS,
+  DEFAULT_DELIVERY_OPTION,
+  DELIVERY_OPTIONS,
   deliveryFeeFor,
+  isDeliveryOption,
   normalizeRequestedItems,
   resolveOrderLines,
   subtotalFor,
@@ -694,6 +697,26 @@ async function awaitConvergence(intentId) {
   return null;
 }
 
+// The delivery tiers a buyer may choose between, priced by the policy that
+// charges them.
+//
+// The checkout screen has to draw both prices, and a price the client carries
+// is a price the client can be wrong about — so it reads them from here
+// instead. Public: nothing about it is per-user, and a shopper deciding
+// whether to check out should not have to authenticate to see the fee.
+export const listDeliveryOptions = asyncHandler(async (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      defaultOption: DEFAULT_DELIVERY_OPTION,
+      options: Object.entries(DELIVERY_OPTIONS).map(([option, fee]) => ({
+        option,
+        fee
+      }))
+    }
+  });
+});
+
 export const createOrder = asyncHandler(async (req, res) => {
   const clientOrderId = checkoutKey(cleanClientOrderId(req.body.clientOrderId));
 
@@ -740,11 +763,24 @@ export const createOrder = asyncHandler(async (req, res) => {
   }
 
   const paymentMethod = req.body.paymentMethod ?? 'cash';
+
+  // The buyer names a tier and nothing more: its price is the policy's, and an
+  // unknown name is refused here rather than resolved to the cheapest one.
+  const deliveryOption = req.body.deliveryOption ?? DEFAULT_DELIVERY_OPTION;
+  if (!isDeliveryOption(deliveryOption)) {
+    throw new AppError(
+      'Delivery option is invalid',
+      400,
+      'INVALID_DELIVERY_OPTION'
+    );
+  }
+
   const fingerprint = checkoutFingerprint({
     businessId,
     items: normalized.items,
     deliveryAddress,
-    paymentMethod
+    paymentMethod,
+    deliveryOption
   });
   const intentLines = lines.map((line) => ({
     productId: line.product._id,
@@ -879,8 +915,11 @@ export const createOrder = asyncHandler(async (req, res) => {
         variant: line.variantLabel ?? ''
       })),
       subtotal,
-      deliveryFee: deliveryFeeFor(subtotal),
-      total: totalFor(subtotal),
+      // The buyer names a tier; its price comes from the policy, never from
+      // the request body.
+      deliveryOption,
+      deliveryFee: deliveryFeeFor(subtotal, deliveryOption),
+      total: totalFor(subtotal, deliveryOption),
       deliveryAddress,
       paymentMethod
     }

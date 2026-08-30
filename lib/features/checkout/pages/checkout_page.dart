@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/constants/money.dart';
+import 'package:merzox/services/api_service.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/cart/bloc/cart_bloc.dart';
 import 'package:merzox/features/cart/bloc/cart_event.dart';
@@ -35,7 +36,11 @@ class CheckoutPage extends StatefulWidget {
   /// Where a completed checkout returns to.
   final VoidCallback? onCompleted;
 
-  const CheckoutPage({super.key, this.onCompleted});
+  /// Reads the delivery tiers. Injectable so a test can serve them without a
+  /// network, which is also the only way a golden can render them at all.
+  final ApiService? apiService;
+
+  const CheckoutPage({super.key, this.onCompleted, this.apiService});
 
   @override
   State<CheckoutPage> createState() => _CheckoutPageState();
@@ -43,6 +48,35 @@ class CheckoutPage extends StatefulWidget {
 
 class _CheckoutPageState extends State<CheckoutPage> {
   CheckoutStep _step = CheckoutStep.buyerDetails;
+
+  /// The tiers the server charges, and which one the buyer picked.
+  ///
+  /// Null until the request answers. Nothing is invented in the meantime: the
+  /// screen says the fee is still being fetched rather than guessing it.
+  DeliveryOptionsApiResponse? _delivery;
+  String _deliveryOption = 'standard';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDeliveryOptions();
+  }
+
+  Future<void> _loadDeliveryOptions() async {
+    try {
+      final DeliveryOptionsApiResponse options =
+          await (widget.apiService ?? ApiService()).deliveryOptions();
+      if (!mounted) return;
+
+      setState(() {
+        _delivery = options;
+        _deliveryOption = options.defaultOption;
+      });
+    } catch (_) {
+      // A tier list that did not arrive leaves the screen on its default,
+      // which is the tier the server charges when none is named.
+    }
+  }
 
   void _back() {
     if (_step == CheckoutStep.payment) {
@@ -80,7 +114,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
                           onContinue: () =>
                               setState(() => _step = CheckoutStep.payment),
                         )
-                      : _PaymentStep(state: state),
+                      : _PaymentStep(
+                          state: state,
+                          delivery: _delivery,
+                          selectedOption: _deliveryOption,
+                          onOptionChanged: (String option) =>
+                              setState(() => _deliveryOption = option),
+                        ),
                 ),
               ],
             );
@@ -312,8 +352,19 @@ class _AddAddressButton extends StatelessWidget {
 
 class _PaymentStep extends StatelessWidget {
   final CartState state;
+  final DeliveryOptionsApiResponse? delivery;
+  final String selectedOption;
+  final ValueChanged<String> onOptionChanged;
 
-  const _PaymentStep({required this.state});
+  const _PaymentStep({
+    required this.state,
+    required this.delivery,
+    required this.selectedOption,
+    required this.onOptionChanged,
+  });
+
+  /// The fee the server charges for the picked tier, or null while unknown.
+  double? get _fee => delivery?.feeFor(selectedOption);
 
   @override
   Widget build(BuildContext context) {
@@ -337,10 +388,18 @@ class _PaymentStep extends StatelessWidget {
         const SizedBox(height: 18),
         _SectionLabel(text: 'checkout.delivery'.tr()),
         const SizedBox(height: 8),
-        // No fee is printed here. `deliveryFeeFor` is a SERVER rule, and a
-        // number computed in the client is a number the server never agreed
-        // to - which is the class of defect the checkout hardening removed.
-        const _SelectedOption(labelKey: 'checkout.standardDelivery'),
+        // Every figure below came from the server. The screen picks a tier by
+        // name and prints the price it was sent; it never computes one, which
+        // is the class of defect the checkout hardening removed.
+        if (delivery == null)
+          const _SelectedOption(labelKey: 'checkout.standardDelivery')
+        else
+          for (final DeliveryOptionApiModel option in delivery!.options)
+            _DeliveryChoice(
+              option: option,
+              selected: option.option == selectedOption,
+              onSelected: () => onOptionChanged(option.option),
+            ),
         const SizedBox(height: 22),
         const Divider(height: 1),
         const SizedBox(height: 16),
@@ -353,20 +412,24 @@ class _PaymentStep extends StatelessWidget {
         const SizedBox(height: 8),
         _InvoiceRow(
           label: 'orders.delivery'.tr(),
-          value: 'home.cart.deliveryCalculatedLater'.tr(),
+          value: _fee == null
+              ? 'home.cart.deliveryCalculatedLater'.tr()
+              : '₪ ${merzoxAmount(_fee!)}',
         ),
         const SizedBox(height: 8),
         _InvoiceRow(
-          // Stated as the relationship, not as an invented figure: the total
-          // is the subtotal plus a fee only the server can compute.
+          // With the fee known the total is stated; without it, stated as the
+          // relationship rather than as an invented figure.
           label: 'home.cart.total'.tr(),
-          value: 'checkout.totalPending'.tr(
-            args: <String>['₪ ${merzoxAmount(state.subtotal)}'],
-          ),
+          value: _fee == null
+              ? 'checkout.totalPending'.tr(
+                  args: <String>['₪ ${merzoxAmount(state.subtotal)}'],
+                )
+              : '₪ ${merzoxAmount(state.subtotal + _fee!)}',
           strong: true,
         ),
         const SizedBox(height: 24),
-        _CheckoutActions(busy: busy),
+        _CheckoutActions(busy: busy, deliveryOption: selectedOption),
       ],
     );
   }
@@ -516,10 +579,71 @@ class _InvoiceRow extends StatelessWidget {
   }
 }
 
+/// One delivery tier, priced by the server and picked by name.
+class _DeliveryChoice extends StatelessWidget {
+  final DeliveryOptionApiModel option;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  const _DeliveryChoice({
+    required this.option,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onSelected,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              size: 18,
+              color: selected
+                  ? MerzoxColors.kColor3D5A80
+                  : MerzoxColors.kColorBEBEBE,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '₪ ${merzoxAmount(option.fee)}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: MerzoxColors.kColor2B2B2B,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'checkout.deliveryOptions.${option.option}'.tr(),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: MerzoxColors.kColor767676,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CheckoutActions extends StatelessWidget {
   final bool busy;
+  final String deliveryOption;
 
-  const _CheckoutActions({required this.busy});
+  const _CheckoutActions({required this.busy, required this.deliveryOption});
 
   @override
   Widget build(BuildContext context) {
@@ -532,7 +656,7 @@ class _CheckoutActions extends StatelessWidget {
                 onPressed: busy
                     ? null
                     : () => context.read<CartBloc>().add(
-                        const CartCheckoutRequested(),
+                        CartCheckoutRequested(deliveryOption: deliveryOption),
                       ),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: MerzoxColors.kColor2B2B2B,

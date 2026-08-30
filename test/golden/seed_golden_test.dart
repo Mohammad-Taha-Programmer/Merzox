@@ -620,6 +620,19 @@ final class _SeedHomeApi extends ApiService {
       FavoriteBusinessListApiResponse.fromJson(const <String, dynamic>{});
 }
 
+/// The delivery tiers, as the order route publishes them.
+final class _SeedDeliveryApi extends _SeedProductApi {
+  @override
+  Future<DeliveryOptionsApiResponse> deliveryOptions() async =>
+      DeliveryOptionsApiResponse.fromJson(const <String, dynamic>{
+        'defaultOption': 'standard',
+        'options': <Map<String, dynamic>>[
+          <String, dynamic>{'option': 'standard', 'fee': 10},
+          <String, dynamic>{'option': 'express', 'fee': 30},
+        ],
+      });
+}
+
 /// One inbox row, in the shape `الرسائل – 4` lists them.
 Map<String, dynamic> _seedConversation(int index, {required bool unread}) {
   return <String, dynamic>{
@@ -1436,7 +1449,7 @@ void main() {
           ],
         });
 
-        final CartBloc bloc = CartBloc(apiService: _SeedProductApi());
+        final CartBloc bloc = CartBloc(apiService: _SeedDeliveryApi());
         _closeOnTearDown(bloc);
 
         final Future<CartState> ready = bloc.stream.firstWhere(
@@ -1457,7 +1470,9 @@ void main() {
           tester,
           BlocProvider<CartBloc>.value(
             value: cart,
-            child: withMerzoxGoldenDeviceInsets(const CheckoutPage()),
+            child: withMerzoxGoldenDeviceInsets(
+              CheckoutPage(apiService: _SeedDeliveryApi()),
+            ),
           ),
         );
 
@@ -1477,7 +1492,9 @@ void main() {
           tester,
           BlocProvider<CartBloc>.value(
             value: cart,
-            child: withMerzoxGoldenDeviceInsets(const CheckoutPage()),
+            child: withMerzoxGoldenDeviceInsets(
+              CheckoutPage(apiService: _SeedDeliveryApi()),
+            ),
           ),
         );
 

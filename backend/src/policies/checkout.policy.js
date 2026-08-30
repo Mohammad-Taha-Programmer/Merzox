@@ -14,6 +14,7 @@
  * executed here, which keeps this module free of I/O and directly testable.
  */
 
+import { AppError } from '../utils/AppError.js';
 import {
   finalPriceFor,
   hasProductVariants,
@@ -230,16 +231,46 @@ export function subtotalFor(lines) {
 }
 
 /**
- * The flat delivery fee. Charged only when something is actually payable, so a
- * fully discounted basket is not handed a delivery charge on its own.
+ * The delivery tiers, priced here and nowhere else.
+ *
+ * The buyer picks a tier; the price of that tier is never sent by the client
+ * and never trusted from it. `standard` is the fee this system has always
+ * charged, so an order that names no option is charged exactly what it was
+ * charged before this choice existed.
  */
-export function deliveryFeeFor(subtotal) {
-  return subtotal > 0 ? 10 : 0;
+export const DELIVERY_OPTIONS = Object.freeze({
+  standard: 10,
+  express: 30
+});
+
+export const DEFAULT_DELIVERY_OPTION = 'standard';
+
+export function isDeliveryOption(value) {
+  return Object.prototype.hasOwnProperty.call(DELIVERY_OPTIONS, value);
+}
+
+/**
+ * The delivery fee for a subtotal and a tier. Charged only when something is
+ * actually payable, so a fully discounted basket is not handed a delivery
+ * charge on its own.
+ */
+export function deliveryFeeFor(subtotal, option = DEFAULT_DELIVERY_OPTION) {
+  if (subtotal <= 0) return 0;
+  // An unrecognised tier must not silently resolve to the cheapest one.
+  if (!isDeliveryOption(option)) {
+    throw new AppError(
+      'Delivery option is invalid',
+      400,
+      'INVALID_DELIVERY_OPTION'
+    );
+  }
+
+  return DELIVERY_OPTIONS[option];
 }
 
 /** The payable total, always derived from the server-side subtotal. */
-export function totalFor(subtotal) {
-  return roundMoney(subtotal + deliveryFeeFor(subtotal));
+export function totalFor(subtotal, option = DEFAULT_DELIVERY_OPTION) {
+  return roundMoney(subtotal + deliveryFeeFor(subtotal, option));
 }
 
 /**

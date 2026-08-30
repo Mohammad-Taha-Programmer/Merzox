@@ -95,6 +95,7 @@ class _SelectionApi extends ApiService {
     required List<OrderItemRequest> items,
     required String deliveryAddress,
     String paymentMethod = 'cash',
+    String deliveryOption = 'standard',
     String? clientOrderId,
   }) async {
     createOrderCalls += 1;

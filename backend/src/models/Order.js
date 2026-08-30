@@ -149,6 +149,13 @@ const orderSchema = new mongoose.Schema(
     },
     subtotal: { type: Number, required: true, min: 0 },
     deliveryFee: { type: Number, required: true, min: 0, default: 10 },
+    // Which tier produced deliveryFee. Existing orders predate the
+    // choice and read back as the standard one they were charged.
+    deliveryOption: {
+      type: String,
+      enum: ['standard', 'express'],
+      default: 'standard'
+    },
     total: { type: Number, required: true, min: 0 },
     currency: { type: String, enum: ['ILS'], default: 'ILS' },
     deliveryAddress: {
@@ -320,6 +327,7 @@ orderSchema.methods.toClientJSON = function toClientJSON() {
     })),
     subtotal: this.subtotal,
     deliveryFee: this.deliveryFee,
+    deliveryOption: this.deliveryOption ?? 'standard',
     total: this.total,
     currency: this.currency,
     deliveryAddress: this.deliveryAddress,
@@ -354,6 +362,7 @@ orderSchema.methods.toMerchantJSON = function toMerchantJSON() {
     })),
     subtotal: this.subtotal,
     deliveryFee: this.deliveryFee,
+    deliveryOption: this.deliveryOption ?? 'standard',
     total: this.total,
     currency: this.currency,
     deliveryAddress: this.deliveryAddress,

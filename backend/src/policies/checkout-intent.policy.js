@@ -354,10 +354,18 @@ export function canonicalCheckoutPayload({
   businessId,
   items,
   deliveryAddress,
-  paymentMethod
+  paymentMethod,
+  deliveryOption
 }) {
+  const tier = String(deliveryOption ?? '').trim();
+
   return {
     businessId: String(businessId ?? '').trim(),
+
+    // Absent for the standard tier, which is what every order was before the
+    // choice existed. Fingerprints written then stay byte-identical, so a
+    // retry spanning this change still finds its own intent.
+    ...(tier && tier !== 'standard' ? { deliveryOption: tier } : {}),
 
     // `normalizeRequestedItems` has already merged identical sellable
     // identities. A simple-product item deliberately keeps the historical
