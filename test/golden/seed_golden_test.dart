@@ -620,6 +620,54 @@ final class _SeedHomeApi extends ApiService {
       FavoriteBusinessListApiResponse.fromJson(const <String, dynamic>{});
 }
 
+/// A checkout that succeeds, so the confirmation has a number to show.
+final class _SeedPlacingApi extends _SeedDeliveryApi {
+  @override
+  Future<OrderApiModel> createOrder({
+    required String token,
+    required String businessId,
+    required List<OrderItemRequest> items,
+    required String deliveryAddress,
+    String paymentMethod = 'cash',
+    String deliveryOption = 'standard',
+    String? clientOrderId,
+  }) async {
+    return OrderApiModel.fromJson(<String, dynamic>{
+      'id': '64f000000000000000000001',
+      'publicId': '222321',
+      'business': <String, dynamic>{'id': businessId, 'name': 'متجر الياسمين'},
+      'items': const <Map<String, dynamic>>[],
+      'subtotal': 5.5,
+      'deliveryFee': 10,
+      'total': 15.5,
+      'currency': 'ILS',
+      'status': 'pending',
+      'statusGroup': 'current',
+      'deliveryAddress': deliveryAddress,
+      'paymentMethod': paymentMethod,
+      'deliveryOption': deliveryOption,
+      'createdAt': '2022-02-15T14:40:00.000Z',
+      'tracking': <String, dynamic>{
+        'isCancelled': false,
+        'currentStep': 'placed',
+        'currentIndex': 0,
+        'steps': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'step': 'placed',
+            'reachedAt': '2022-02-15T14:40:00.000',
+            'isReached': true,
+          },
+        ],
+        'courier': <String, dynamic>{},
+        'courierLocation': null,
+        'canCancel': true,
+        'canChangeAddress': true,
+        'canReview': false,
+      },
+    });
+  }
+}
+
 /// The delivery tiers, as the order route publishes them.
 final class _SeedDeliveryApi extends _SeedProductApi {
   @override
@@ -1431,7 +1479,7 @@ void main() {
       //
       // A basket with one line, an authenticated customer and a saved
       // delivery address: the preconditions both artboards assume.
-      Future<CartBloc> loadedCart() async {
+      Future<CartBloc> loadedCart({ApiService? api}) async {
         SharedPreferences.setMockInitialValues(<String, Object>{
           AuthBloc.sessionKey: true,
           AuthBloc.tokenKey: 'seed-golden-token',
@@ -1444,12 +1492,14 @@ void main() {
             // too rather than letting the line fall back to its snapshot.
             '{"businessId":"64b000000000000000000001",'
                 '"productId":"64c000000000000000000099",'
+                '"variantId":"64d000000000000000000100",'
+                '"variantLabel":"01",'
                 '"name":"أساس فت مي","price":5.5,"quantity":1,'
                 '"imageUrl":""}',
           ],
         });
 
-        final CartBloc bloc = CartBloc(apiService: _SeedDeliveryApi());
+        final CartBloc bloc = CartBloc(apiService: api ?? _SeedDeliveryApi());
         _closeOnTearDown(bloc);
 
         final Future<CartState> ready = bloc.stream.firstWhere(
@@ -1507,6 +1557,33 @@ void main() {
         expect(find.text('تأكيد الطلب'), findsOneWidget);
 
         await expectMerzoxSeedGolden('checkout_payment_ar_375x812.png');
+      });
+
+      testWidgets('checkout confirmation renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final CartBloc cart = await loadedCart(api: _SeedPlacingApi());
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<CartBloc>.value(
+            value: cart,
+            child: withMerzoxGoldenDeviceInsets(
+              CheckoutPage(apiService: _SeedPlacingApi()),
+            ),
+          ),
+        );
+
+        // Reached the way a customer reaches it, not by setting the step.
+        await tester.tap(find.text('متابعة'));
+        await settleMerzoxGoldenFrames(tester);
+        await tester.tap(find.text('تأكيد الطلب'));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('تم تأكيد الطلبية بنجاح'), findsOneWidget);
+        expect(find.text('رقم الطلب: #222321'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('checkout_done_ar_375x812.png');
       });
 
       // -- 16. Merchant dashboard -----------------------------------------

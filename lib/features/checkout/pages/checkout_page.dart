@@ -96,10 +96,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
               previous.messageCode != current.messageCode &&
               current.messageCode.isNotEmpty,
           listener: (BuildContext context, CartState state) {
-            // The cart clears itself on success, so a placed order is an empty
-            // cart plus its message. Leaving the customer on a stale review
-            // screen would invite a second submission.
-            if (state.items.isEmpty) widget.onCompleted?.call();
+            // The cart clears itself on success, so a placed order is an
+            // empty cart plus its message. Moving to the confirmation both
+            // shows the customer their order number and takes the review
+            // screen away, so there is nothing left to submit twice.
+            if (state.items.isEmpty) {
+              setState(() => _step = CheckoutStep.confirmed);
+            }
           },
           builder: (BuildContext context, CartState state) {
             return Column(
@@ -109,18 +112,23 @@ class _CheckoutPageState extends State<CheckoutPage> {
                 CheckoutStepIndicator(current: _step),
                 const SizedBox(height: 26),
                 Expanded(
-                  child: _step == CheckoutStep.buyerDetails
-                      ? _BuyerDetailsStep(
-                          onContinue: () =>
-                              setState(() => _step = CheckoutStep.payment),
-                        )
-                      : _PaymentStep(
-                          state: state,
-                          delivery: _delivery,
-                          selectedOption: _deliveryOption,
-                          onOptionChanged: (String option) =>
-                              setState(() => _deliveryOption = option),
-                        ),
+                  child: switch (_step) {
+                    CheckoutStep.buyerDetails => _BuyerDetailsStep(
+                      onContinue: () =>
+                          setState(() => _step = CheckoutStep.payment),
+                    ),
+                    CheckoutStep.payment => _PaymentStep(
+                      state: state,
+                      delivery: _delivery,
+                      selectedOption: _deliveryOption,
+                      onOptionChanged: (String option) =>
+                          setState(() => _deliveryOption = option),
+                    ),
+                    CheckoutStep.confirmed => _ConfirmedStep(
+                      orderIds: state.placedOrderIds,
+                      onDone: widget.onCompleted,
+                    ),
+                  },
                 ),
               ],
             );
@@ -146,9 +154,11 @@ class _CheckoutHeader extends StatelessWidget {
         alignment: Alignment.center,
         children: <Widget>[
           Text(
-            step == CheckoutStep.buyerDetails
-                ? 'checkout.buyerTitle'.tr()
-                : 'checkout.paymentTitle'.tr(),
+            switch (step) {
+              CheckoutStep.buyerDetails => 'checkout.buyerTitle'.tr(),
+              CheckoutStep.payment => 'checkout.paymentTitle'.tr(),
+              CheckoutStep.confirmed => 'checkout.doneTitle'.tr(),
+            },
             style: const TextStyle(
               color: MerzoxColors.kColor2B2B2B,
               fontSize: 16,
@@ -430,6 +440,101 @@ class _PaymentStep extends StatelessWidget {
         ),
         const SizedBox(height: 24),
         _CheckoutActions(busy: busy, deliveryOption: selectedOption),
+      ],
+    );
+  }
+}
+
+/// The confirmation of `تفاصيل المتجر – 17`.
+///
+/// The artboard draws a courier, a success line, the order number and two ways
+/// on: to the customer's orders, or back to the home screen. There is no
+/// courier illustration in the asset bundle, so the icon that stands in for it
+/// is the same one the order-tracking screen uses for a delivery in progress —
+/// borrowed rather than invented.
+class _ConfirmedStep extends StatelessWidget {
+  final List<String> orderIds;
+  final VoidCallback? onDone;
+
+  const _ConfirmedStep({required this.orderIds, this.onDone});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
+      children: <Widget>[
+        const SizedBox(height: 20),
+        const Icon(
+          Icons.delivery_dining_rounded,
+          size: 120,
+          color: MerzoxColors.kColor98C1D9,
+        ),
+        const SizedBox(height: 40),
+        Text(
+          'checkout.orderPlaced'.tr(),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: MerzoxColors.kColor2B2B2B,
+          ),
+        ),
+        const SizedBox(height: 12),
+        // A basket spanning two stores becomes two orders, and the customer is
+        // owed both numbers rather than whichever one happened to be first.
+        for (final String id in orderIds)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              'checkout.orderNumber'.tr(args: <String>[id]),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 13,
+                color: MerzoxColors.kColor767676,
+              ),
+            ),
+          ),
+        const SizedBox(height: 36),
+        SizedBox(
+          height: 44,
+          child: FilledButton(
+            onPressed: () {
+              onDone?.call();
+              context.go('/orders');
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: MerzoxColors.kColorEE6C4D,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            child: Text(
+              'checkout.goToOrders'.tr(),
+              style: const TextStyle(fontSize: 14, color: Colors.white),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 44,
+          child: OutlinedButton(
+            onPressed: () {
+              onDone?.call();
+              context.go('/home');
+            },
+            style: OutlinedButton.styleFrom(
+              foregroundColor: MerzoxColors.kColor2B2B2B,
+              side: const BorderSide(color: MerzoxColors.kColorEE6C4D),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            child: Text(
+              'checkout.backHome'.tr(),
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ),
       ],
     );
   }

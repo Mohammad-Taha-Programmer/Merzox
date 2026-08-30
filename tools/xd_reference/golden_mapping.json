@@ -303,6 +303,19 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "The notifications list. It is drawn inside the الرسائل family but is a different surface: its own page, its own bloc, and rows that carry an event rather than a conversation."
+    },
+    {
+      "seed": "checkout_done",
+      "flutter_golden": "test/goldens/seed/checkout_done_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 17",
+        "manifest_id": "79fbe6cf-c0c1-4334-8f73-d12771d63c7b",
+        "artboard_path": "artwork/artboard-dba6cf14-27cd-47e0-a3be-a4963b18bf96",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The third and last checkout step. The artboard draws a courier, a success line, the order number and two ways on. The app declared this step in its enum and never rendered it: a successful checkout emptied the cart and the page popped itself away, so the customer got a snackbar where the design gives them their order number. The courier illustration is not in the asset bundle, so the icon standing in for it is the one the tracking screen already uses for a delivery in progress."
     }
   ]
 }

@@ -91,8 +91,9 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       await prefs.setString(CartStorageKeys.checkoutId, checkoutId);
 
       var index = 0;
+      final placed = <String>[];
       for (final entry in groups.entries) {
-        await _apiService.createOrder(
+        final order = await _apiService.createOrder(
           token: token,
           businessId: entry.key,
           deliveryAddress: address,
@@ -108,6 +109,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
               )
               .toList(),
         );
+        if (order.publicId.isNotEmpty) placed.add(order.publicId);
         index += 1;
       }
 
@@ -118,6 +120,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
           status: CartStatus.ready,
           items: const [],
           messageCode: 'orders.checkoutSuccess',
+          placedOrderIds: placed,
         ),
       );
     } catch (error) {
