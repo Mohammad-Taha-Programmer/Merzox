@@ -19,7 +19,10 @@ import '../../orders/order_status_policy.dart';
 import '../orders/merchant_order_detail_page.dart';
 import '../settings/store_settings_page.dart';
 import 'business_bloc.dart';
+import 'merchant_alert_bloc.dart';
 import 'merchant_browse_widgets.dart';
+import 'merchant_filter_sheets.dart';
+import 'merchant_product_images_page.dart';
 
 class BusinessShellPage extends StatelessWidget {
   final VoidCallback onLoggedOut;
@@ -171,13 +174,24 @@ class BusinessShellPage extends StatelessWidget {
           return Scaffold(
             backgroundColor: const Color(0xFFF9FAFC),
             body: SafeArea(
-              child: switch (state.selectedTab) {
-                0 => _Dashboard(state: state),
-                1 => _Orders(state: state),
-                3 => _Products(state: state),
-                4 => _Profile(state: state, onLogout: _logout),
-                _ => _Dashboard(state: state),
-              },
+              child: Stack(
+                children: <Widget>[
+                  switch (state.selectedTab) {
+                    0 => _Dashboard(state: state),
+                    1 => _Orders(state: state),
+                    3 => _Products(state: state),
+                    4 => _Profile(state: state, onLogout: _logout),
+                    _ => _Dashboard(state: state),
+                  },
+                  const Positioned(
+                    left: 0,
+                    right: 0,
+                    // Over the list, at the height the artboard draws it.
+                    top: 345,
+                    child: _AlertBannerHost(),
+                  ),
+                ],
+              ),
             ),
             bottomNavigationBar: _BusinessNavigation(
               selectedIndex: state.selectedTab,
@@ -548,16 +562,26 @@ class _Metric extends StatelessWidget {
 
 /// The merchant order list, as `الرئيسية – 9` draws it.
 ///
-/// One table holding every status at once, filtered by the chip above it and
-/// searched by number or customer name — the segmented current/completed/
-/// cancelled control this replaces is not in the design.
+/// One table holding every status at once, filtered by the chip above it,
+/// searched by number or customer name, and narrowed further by the sheet the
+/// orange button raises. The segmented current/completed/cancelled control
+/// this replaces is not in the design.
 class _Orders extends StatelessWidget {
   final BusinessState state;
   const _Orders({required this.state});
 
+  Map<String, String> get _statusLabels => <String, String>{
+    for (final String status in _kOrderFilterStatuses)
+      status: _statusLabel(status),
+  };
+
   @override
   Widget build(BuildContext context) {
     final BusinessBloc bloc = context.read<BusinessBloc>();
+    final MerchantOrderFilter filter = state.orderFilter;
+
+    void apply(MerchantOrderFilter next) =>
+        bloc.add(BusinessOrderFilterChanged(next));
 
     return Column(
       children: <Widget>[
@@ -574,25 +598,27 @@ class _Orders extends StatelessWidget {
         const SizedBox(height: kMerchantTopBarToSearch),
         MerchantSearchRow(
           hint: 'businessShell.orderSearchPlaceholder'.tr(),
-          onChanged: (String value) => bloc.add(
-            BusinessOrderFilterChanged(
-              status: state.orderStatusFilter,
-              query: value,
-            ),
-          ),
+          onChanged: (String value) => apply(filter.copyWith(query: value)),
+          filterIsActive: filter.hasSheetFields,
+          onFilterPressed: () async {
+            final MerchantOrderFilter? next =
+                await showMerchantOrderFilterSheet(
+                  context,
+                  current: filter,
+                  statusLabels: _statusLabels,
+                );
+            if (next != null) apply(next);
+          },
         ),
         const SizedBox(height: kMerchantSearchToSection),
         MerchantSectionRow(
           heading: 'businessShell.allOrders'.tr(),
           trailing: MerchantStatusFilterChip(
-            selected: state.orderStatusFilter,
+            selected: filter.status,
             options: _kOrderFilterStatuses,
             labelOf: _statusLabel,
-            onSelected: (String? status) => bloc.add(
-              BusinessOrderFilterChanged(
-                status: status,
-                query: state.orderQuery,
-              ),
+            onSelected: (String? status) => apply(
+              filter.copyWith(status: status, clearStatus: status == null),
             ),
           ),
         ),
@@ -619,6 +645,83 @@ class _Orders extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Shows the newest business notification as `الرئيسية – 17`'s strip, then
+/// takes it away again.
+///
+/// The bloc holds no timer of its own: how long a banner stays up is a
+/// presentation decision, so it lives with the widget that presents it.
+class _AlertBannerHost extends StatelessWidget {
+  const _AlertBannerHost();
+
+  @override
+  Widget build(BuildContext context) {
+    final RealtimeService? realtime = locator.isRegistered<RealtimeService>()
+        ? locator<RealtimeService>()
+        : null;
+
+    return BlocProvider<MerchantAlertBloc>(
+      create: (_) => MerchantAlertBloc(
+        realtimeInvalidations: realtime?.notificationInvalidations,
+      )..add(const MerchantAlertStarted()),
+      child: const _AlertBanner(),
+    );
+  }
+}
+
+class _AlertBanner extends StatefulWidget {
+  const _AlertBanner();
+
+  @override
+  State<_AlertBanner> createState() => _AlertBannerHostState();
+}
+
+class _AlertBannerHostState extends State<_AlertBanner> {
+  static const Duration _visibleFor = Duration(seconds: 5);
+
+  Timer? _timer;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  void _dismiss(BuildContext context) {
+    _timer?.cancel();
+    _timer = null;
+    context.read<MerchantAlertBloc>().add(const MerchantAlertDismissed());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<MerchantAlertBloc, MerchantAlertState>(
+      listenWhen: (MerchantAlertState previous, MerchantAlertState current) =>
+          previous.message != current.message,
+      listener: (BuildContext context, MerchantAlertState state) {
+        _timer?.cancel();
+        if (state.message == null) return;
+
+        _timer = Timer(_visibleFor, () {
+          if (mounted) _dismiss(context);
+        });
+      },
+      builder: (BuildContext context, MerchantAlertState state) {
+        final String? message = state.message;
+
+        return AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: message == null
+              ? const SizedBox.shrink()
+              : MerchantAlertBanner(
+                  message: message,
+                  onDismissed: () => _dismiss(context),
+                ),
+        );
+      },
     );
   }
 }
@@ -828,8 +931,9 @@ class _StatusBadge extends StatelessWidget {
 
 /// The merchant product list, as `الرئيسية – 10` draws it.
 ///
-/// The whole catalogue arrives in one response, so the search field filters it
-/// here rather than asking the server for a page it already holds.
+/// The whole catalogue arrives in one response, so both the search field and
+/// `الرئيسية – 16`'s sheet filter it here rather than asking the server for a
+/// page it already holds.
 class _Products extends StatefulWidget {
   final BusinessState state;
   const _Products({required this.state});
@@ -839,24 +943,43 @@ class _Products extends StatefulWidget {
 }
 
 class _ProductsState extends State<_Products> {
-  String _query = '';
+  String _search = '';
+  MerchantProductFilter _filter = const MerchantProductFilter();
 
-  List<OwnerProduct> get _visible {
-    final String needle = _query.trim().toLowerCase();
-    if (needle.isEmpty) return widget.state.products;
+  static const Map<String, String> _classificationKeys = <String, String>{
+    'new': 'merchantProduct.classifications.new',
+    'bestSelling': 'merchantProduct.classifications.bestSelling',
+    'offers': 'merchantProduct.classifications.offers',
+  };
 
-    return widget.state.products
-        .where(
-          (OwnerProduct product) =>
-              product.name.toLowerCase().contains(needle) ||
-              product.description.toLowerCase().contains(needle),
-        )
-        .toList();
+  void _onAction(OwnerProduct product, MerchantProductAction action) {
+    final BusinessBloc bloc = context.read<BusinessBloc>();
+
+    switch (action) {
+      case MerchantProductAction.edit:
+        _showProductEditor(context, product: product);
+      case MerchantProductAction.show:
+      case MerchantProductAction.hide:
+        bloc.add(
+          BusinessProductVisibilityChanged(
+            productId: product.id,
+            visible: action == MerchantProductAction.show,
+          ),
+        );
+      case MerchantProductAction.duplicate:
+        bloc.add(BusinessProductDuplicated(product));
+      case MerchantProductAction.delete:
+        _confirmProductDeletion(context, product);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final List<OwnerProduct> products = _visible;
+    final List<OwnerProduct> products = _filter.apply(
+      widget.state.products,
+      search: _search,
+    );
+    final bool narrowed = _search.isNotEmpty || !_filter.isEmpty;
 
     return Column(
       children: <Widget>[
@@ -875,7 +998,21 @@ class _ProductsState extends State<_Products> {
         const SizedBox(height: kMerchantTopBarToSearch),
         MerchantSearchRow(
           hint: 'businessShell.productSearchPlaceholder'.tr(),
-          onChanged: (String value) => setState(() => _query = value),
+          onChanged: (String value) => setState(() => _search = value),
+          filterIsActive: !_filter.isEmpty,
+          onFilterPressed: () async {
+            final MerchantProductFilter? next =
+                await showMerchantProductFilterSheet(
+                  context,
+                  current: _filter,
+                  classificationLabels: <String, String>{
+                    for (final MapEntry<String, String> entry
+                        in _classificationKeys.entries)
+                      entry.key: entry.value.tr(),
+                  },
+                );
+            if (next != null) setState(() => _filter = next);
+          },
         ),
         const SizedBox(height: kMerchantSearchToSection),
         MerchantSectionRow(
@@ -902,7 +1039,7 @@ class _ProductsState extends State<_Products> {
           child: products.isEmpty
               ? _Empty(
                   message: 'businessShell.noProducts'.tr(),
-                  action: _query.isNotEmpty
+                  action: narrowed
                       ? null
                       : FilledButton.icon(
                           onPressed: () => _showProductEditor(context),
@@ -922,8 +1059,8 @@ class _ProductsState extends State<_Products> {
                     product: products[index],
                     onOpen: () =>
                         _showProductEditor(context, product: products[index]),
-                    onActionsPressed: () =>
-                        _confirmProductDeletion(context, products[index]),
+                    onAction: (MerchantProductAction action) =>
+                        _onAction(products[index], action),
                   ),
                 ),
         ),
@@ -1476,6 +1613,19 @@ class _ProductEditorState extends State<_ProductEditor> {
       .where((url) => url.isNotEmpty)
       .toList();
 
+  /// Opens the image manager on the URLs the field currently holds, and
+  /// writes back whatever came out of it.
+  Future<void> _manageImages() async {
+    final List<String>? next = await Navigator.of(context).push<List<String>>(
+      MaterialPageRoute<List<String>>(
+        builder: (_) => MerchantProductImagesPage(imageUrls: _parsedImages()),
+      ),
+    );
+    if (next == null) return;
+
+    setState(() => _images.text = next.join('\n'));
+  }
+
   void _addVariant() {
     if (_variants.length >= _maxVariants) return;
 
@@ -1745,6 +1895,17 @@ class _ProductEditorState extends State<_ProductEditor> {
                       validator: (_) => _parsedImages().length > 8
                           ? 'merchantProduct.tooManyImages'.tr()
                           : null,
+                    ),
+                    Align(
+                      alignment: AlignmentDirectional.centerStart,
+                      child: TextButton.icon(
+                        onPressed: _manageImages,
+                        icon: const Icon(
+                          Icons.photo_library_outlined,
+                          size: 18,
+                        ),
+                        label: Text('merchantImages.manage'.tr()),
+                      ),
                     ),
                     SwitchListTile(
                       value: _isService,

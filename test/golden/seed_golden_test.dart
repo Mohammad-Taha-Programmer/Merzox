@@ -430,8 +430,7 @@ final class _SeedMerchantApi extends ApiService {
   Future<OwnerOrderList> ownerOrders({
     required String token,
     String statusGroup = '',
-    String status = '',
-    String query = '',
+    MerchantOrderFilter filter = const MerchantOrderFilter(),
     int page = 1,
     int limit = 20,
   }) async => OwnerOrderList.fromJson(const <String, dynamic>{});
@@ -490,8 +489,7 @@ final class _SeedMerchantOrdersApi extends _SeedMerchantApi {
   Future<OwnerOrderList> ownerOrders({
     required String token,
     String statusGroup = '',
-    String status = '',
-    String query = '',
+    MerchantOrderFilter filter = const MerchantOrderFilter(),
     int page = 1,
     int limit = 20,
   }) async {
@@ -531,7 +529,7 @@ final class _SeedMerchantProductsApi extends _SeedMerchantApi {
           'inStock': true,
           'keywords': const <String>[],
           'imageUrls': const <String>[],
-          'classification': 'جديد',
+          'classification': 'new',
           'isService': false,
           'isActive': true,
           'variants': const <Map<String, dynamic>>[],

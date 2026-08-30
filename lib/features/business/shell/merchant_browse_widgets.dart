@@ -16,6 +16,21 @@ import 'package:merzox/core/constants/money.dart';
 
 import '../models/business_models.dart';
 
+/// The label for one of the server's product classifications.
+///
+/// The card used to print the stored value, so a product classified `new`
+/// read as "new" rather than as the word the artboard shows.
+String merchantClassificationLabel(String classification) {
+  const Map<String, String> keys = <String, String>{
+    'new': 'merchantProduct.classifications.new',
+    'bestSelling': 'merchantProduct.classifications.bestSelling',
+    'offers': 'merchantProduct.classifications.offers',
+  };
+  final String? key = keys[classification];
+
+  return key == null ? 'businessShell.unspecified'.tr() : key.tr();
+}
+
 /// Both artboards inset their content 16 from each edge.
 const double kMerchantGutter = 16;
 
@@ -80,12 +95,16 @@ class MerchantSearchRow extends StatelessWidget {
   final VoidCallback? onFilterPressed;
   final TextEditingController? controller;
 
+  /// Whether the sheet behind the button is currently narrowing the list.
+  final bool filterIsActive;
+
   const MerchantSearchRow({
     super.key,
     required this.hint,
     required this.onChanged,
     this.onFilterPressed,
     this.controller,
+    this.filterIsActive = false,
   });
 
   @override
@@ -99,7 +118,7 @@ class MerchantSearchRow extends StatelessWidget {
           // the right in Arabic, so this row keeps that order in both locales.
           textDirection: TextDirection.ltr,
           children: <Widget>[
-            _FilterButton(onPressed: onFilterPressed),
+            _FilterButton(onPressed: onFilterPressed, isActive: filterIsActive),
             const SizedBox(width: 16),
             Expanded(
               child: DecoratedBox(
@@ -155,8 +174,9 @@ class MerchantSearchRow extends StatelessWidget {
 /// why it is sized rather than left to an [IconButton]'s own metrics.
 class _FilterButton extends StatelessWidget {
   final VoidCallback? onPressed;
+  final bool isActive;
 
-  const _FilterButton({this.onPressed});
+  const _FilterButton({this.onPressed, this.isActive = false});
 
   @override
   Widget build(BuildContext context) {
@@ -169,11 +189,37 @@ class _FilterButton extends StatelessWidget {
         child: InkWell(
           onTap: onPressed,
           borderRadius: BorderRadius.circular(6),
-          child: const Icon(Icons.tune_rounded, size: 22, color: Colors.white),
+          child: Stack(
+            alignment: Alignment.center,
+            children: <Widget>[
+              const Icon(Icons.tune_rounded, size: 22, color: Colors.white),
+              if (isActive)
+                const PositionedDirectional(
+                  end: 6,
+                  top: 6,
+                  child: _ActiveDot(),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
+}
+
+/// The mark on the filter button while a sheet filter is applied.
+class _ActiveDot extends StatelessWidget {
+  const _ActiveDot();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 7,
+    height: 7,
+    decoration: const BoxDecoration(
+      color: Colors.white,
+      shape: BoxShape.circle,
+    ),
+  );
 }
 
 /// The "all orders" / "all products" line, with whatever the artboard puts on
@@ -303,13 +349,13 @@ class MerchantStatusFilterChip extends StatelessWidget {
 class MerchantProductCard extends StatelessWidget {
   final OwnerProduct product;
   final VoidCallback onOpen;
-  final VoidCallback onActionsPressed;
+  final ValueChanged<MerchantProductAction> onAction;
 
   const MerchantProductCard({
     super.key,
     required this.product,
     required this.onOpen,
-    required this.onActionsPressed,
+    required this.onAction,
   });
 
   static const double height = 127;
@@ -349,7 +395,10 @@ class MerchantProductCard extends StatelessWidget {
                   PositionedDirectional(
                     end: 10,
                     top: 10,
-                    child: _ActionsButton(onPressed: onActionsPressed),
+                    child: MerchantProductActionsMenu(
+                      product: product,
+                      onSelected: onAction,
+                    ),
                   ),
                 ],
               ),
@@ -463,9 +512,7 @@ class _Details extends StatelessWidget {
         const SizedBox(height: 10),
         _Field(
           label: 'businessShell.productClassification'.tr(),
-          value: product.classification.isEmpty
-              ? 'businessShell.unspecified'.tr()
-              : product.classification,
+          value: merchantClassificationLabel(product.classification),
         ),
       ],
     );
@@ -509,28 +556,116 @@ class _Field extends StatelessWidget {
 }
 
 class _ActionsButton extends StatelessWidget {
-  final VoidCallback onPressed;
-
-  const _ActionsButton({required this.onPressed});
+  const _ActionsButton();
 
   @override
-  Widget build(BuildContext context) => SizedBox(
+  Widget build(BuildContext context) => Container(
     width: 24,
     height: 24,
-    child: Material(
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
       color: MerzoxColors.kColorEE6C4D,
       borderRadius: BorderRadius.circular(5),
-      child: InkWell(
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(5),
-        child: const Icon(
-          Icons.more_horiz_rounded,
-          size: 16,
-          color: Colors.white,
-        ),
-      ),
     ),
+    child: const Icon(Icons.more_horiz_rounded, size: 16, color: Colors.white),
   );
+}
+
+/// What `الرئيسية – 13` offers on one product.
+enum MerchantProductAction { edit, show, hide, duplicate, delete }
+
+/// The artboard's action menu, anchored under the card's button.
+///
+/// Rows are 30 tall with a 10 medium label, which is what the artboard
+/// measures; the pair of visibility rows collapses to whichever one is not
+/// already true, since the design draws both but only one can ever apply.
+class MerchantProductActionsMenu extends StatelessWidget {
+  final OwnerProduct product;
+  final ValueChanged<MerchantProductAction> onSelected;
+
+  const MerchantProductActionsMenu({
+    super.key,
+    required this.product,
+    required this.onSelected,
+  });
+
+  static const double _rowHeight = 30;
+  static const double _width = 174;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<MerchantProductAction>(
+      tooltip: 'businessShell.editProduct'.tr(),
+      position: PopupMenuPosition.under,
+      color: Colors.white,
+      constraints: const BoxConstraints(minWidth: _width, maxWidth: _width),
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: MerzoxColors.kColorEE6C4D),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      onSelected: onSelected,
+      itemBuilder: (_) => <PopupMenuEntry<MerchantProductAction>>[
+        _row(
+          MerchantProductAction.edit,
+          'businessShell.editProduct',
+          Icons.edit_outlined,
+        ),
+        if (product.isActive)
+          _row(
+            MerchantProductAction.hide,
+            'businessShell.hideProduct',
+            Icons.visibility_off_outlined,
+          )
+        else
+          _row(
+            MerchantProductAction.show,
+            'businessShell.showProduct',
+            Icons.visibility_outlined,
+          ),
+        _row(
+          MerchantProductAction.duplicate,
+          'businessShell.duplicateProduct',
+          Icons.copy_rounded,
+        ),
+        _row(
+          MerchantProductAction.delete,
+          'businessShell.deleteProduct',
+          Icons.delete_outline_rounded,
+        ),
+      ],
+      child: const _ActionsButton(),
+    );
+  }
+
+  PopupMenuItem<MerchantProductAction> _row(
+    MerchantProductAction action,
+    String label,
+    IconData icon,
+  ) {
+    return PopupMenuItem<MerchantProductAction>(
+      value: action,
+      height: _rowHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: <Widget>[
+          Icon(icon, size: 16, color: MerzoxColors.kColor98C1D9),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label.tr(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w500,
+                color: MerzoxColors.kColor3B3B3B,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// The blue quarter-disc in the card's trailing bottom corner.
@@ -572,4 +707,57 @@ class _PublishedCorner extends StatelessWidget {
       ),
     ),
   );
+}
+
+/// The in-app notification strip of `الرئيسية – 17`.
+///
+/// 48 tall, full width, laid over the list rather than inserted into it: the
+/// artboard draws it covering an order row, not displacing one.
+class MerchantAlertBanner extends StatelessWidget {
+  final String message;
+  final VoidCallback onDismissed;
+
+  const MerchantAlertBanner({
+    super.key,
+    required this.message,
+    required this.onDismissed,
+  });
+
+  static const double height = 48;
+
+  @override
+  Widget build(BuildContext context) {
+    return Dismissible(
+      key: ValueKey<String>(message),
+      direction: DismissDirection.horizontal,
+      onDismissed: (_) => onDismissed(),
+      child: Container(
+        height: height,
+        color: MerzoxColors.kColorEE6C4D,
+        padding: const EdgeInsets.symmetric(horizontal: 19),
+        child: Row(
+          children: <Widget>[
+            const Icon(
+              Icons.star_border_rounded,
+              size: 22,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
