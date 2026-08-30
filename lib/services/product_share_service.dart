@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:share_plus/share_plus.dart';
 
+import 'package:merzox/core/constants/money.dart';
+
 enum ProductShareOutcome { selected, dismissed }
 
 final class ProductSharePayload {
@@ -34,7 +36,7 @@ final class ProductShareService implements ProductShareGateway {
     final cleanBusinessName = businessName.trim();
 
     // Match the price precision currently rendered on ProductDetailsPage.
-    final visiblePrice = displayPrice.toStringAsFixed(0);
+    final visiblePrice = merzoxAmount(displayPrice);
 
     if (languageCode == 'en') {
       return ProductSharePayload(

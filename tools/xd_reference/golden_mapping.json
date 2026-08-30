@@ -160,6 +160,19 @@
       },
       "normalization": "crop_top_to_812",
       "semantic_reason": "The التقييمات tab: the composer - stars, comment field and publish button - above the published list. The composer is only rendered for a signed-in customer the backend has judged eligible, so the seed supplies both rather than capturing the sign-in gate, which is a different state from this artboard. Cropped to the first viewport."
+    },
+    {
+      "seed": "product_details",
+      "flutter_golden": "test/goldens/seed/product_details_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 8",
+        "manifest_id": "4b0b3ac3-0022-4de2-a0e5-756601280607",
+        "artboard_path": "artwork/artboard-cde06fe1-416a-421b-94cb-cd280aa1056a",
+        "width": 375,
+        "height": 800
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The product page in its idle description state: the image carousel, the price and name, the الوصف tab selected, the quantity stepper, the shade variants and the seller block. Chosen over تفاصيل المتجر – 14, which draws the transient \"added to cart\" toast, and over the 1141-tall artboards, which are its التقييمات tab. Despite the family name these artboards are the PRODUCT page, not the storefront. Product photography is the artboard's against the seed's placeholder, as in every image-bearing seed."
     }
   ]
 }

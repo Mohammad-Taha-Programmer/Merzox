@@ -51,6 +51,10 @@ import 'package:merzox/features/home/presentation/bloc/home_bloc.dart';
 import 'package:merzox/features/home/presentation/bloc/home_event.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/onboarding/bloc/onboarding_bloc.dart';
+import 'package:merzox/features/product_details/bloc/product_details_bloc.dart';
+import 'package:merzox/features/product_details/bloc/product_details_event.dart';
+import 'package:merzox/features/product_details/bloc/product_details_state.dart';
+import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
 import 'package:merzox/features/orders/bloc/order_tracking_bloc.dart';
 import 'package:merzox/features/orders/bloc/order_tracking_event.dart';
@@ -234,6 +238,69 @@ final class _SeedAboutUsApi extends ApiService {
       'updatedAt': null,
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Product details fixture
+// ---------------------------------------------------------------------------
+
+/// The product the `تفاصيل المتجر – 8` artboard draws: one foundation with
+/// three shade variants, priced 5.5, in stock.
+///
+/// Variants are spelled out because the artboard shows the shade chips, and
+/// the product contract refuses to infer either the variants or the price
+/// bounds they imply.
+Map<String, dynamic> _seedDetailedProduct() {
+  return <String, dynamic>{
+    'id': '64c000000000000000000099',
+    'name': 'أساس فت مي',
+    'description':
+        'كريم أساس بتغطية متوسطة وثبات طويل، يمنح البشرة مظهرًا طبيعيًا '
+        'ومتجانسًا طوال اليوم.',
+    'price': 5.5,
+    'discountPercent': 0,
+    'finalPrice': 5.5,
+    'inStock': true,
+    'imageUrl': '',
+    'imageUrls': <String>[],
+    'classification': 'new',
+    'rating': 5,
+    'ratingCount': 50,
+    'likeCount': 12,
+    'isService': false,
+    'hasVariants': true,
+    'variants': <Map<String, dynamic>>[
+      for (final (int index, String shade)
+          in <String>['01', '02', '03'].indexed)
+        <String, dynamic>{
+          // A real object id: the variant contract refuses anything else.
+          'id': '64d00000000000000000010$index',
+          // The contract names it `label`, and refuses an empty one.
+          'label': shade,
+          'price': 5.5,
+          'finalPrice': 5.5,
+          'inStock': true,
+        },
+    ],
+    'minPrice': 5.5,
+    'maxPrice': 5.5,
+    'minFinalPrice': 5.5,
+    'maxFinalPrice': 5.5,
+  };
+}
+
+final class _SeedProductApi extends ApiService {
+  @override
+  Future<BusinessProductApiModel> businessProduct({
+    required String businessId,
+    required String productId,
+  }) async => BusinessProductApiModel.fromJson(_seedDetailedProduct());
+
+  @override
+  Future<List<BusinessReviewApiModel>> productReviews({
+    required String businessId,
+    required String productId,
+  }) async => const <BusinessReviewApiModel>[];
 }
 
 // ---------------------------------------------------------------------------
@@ -1015,6 +1082,63 @@ void main() {
 
         await expectMerzoxSeedGolden(
           'storefront_reviews_ar_375x812.png',
+        );
+      });
+
+      // -- 13. Product details, description tab ---------------------------
+      testWidgets('product details renders its Arabic description baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+
+        final ProductDetailsBloc bloc = ProductDetailsBloc(
+          apiService: _SeedProductApi(),
+        );
+
+        final BusinessProductApiModel seedProduct =
+            BusinessProductApiModel.fromJson(_seedDetailedProduct());
+
+        final Future<ProductDetailsState> ready = bloc.stream.firstWhere(
+          (ProductDetailsState state) =>
+              state.detailsStatus == ProductDetailsSectionStatus.ready,
+        );
+        bloc.add(
+          ProductDetailsStarted(
+            businessId: _previewBusinessId,
+            initialProduct: seedProduct,
+          ),
+        );
+        await ready;
+
+        // The seed is the untouched description tab: quantity 1, no variant
+        // chosen, nothing added to a cart.
+        expect(bloc.state.selectedTabIndex, 0);
+        expect(bloc.state.quantity, 1);
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          withMerzoxGoldenDeviceInsets(
+            ProductDetailsPage(
+              business: const HomeBusiness(
+                id: _previewBusinessId,
+                name: 'متجر الياسمين',
+                category: '',
+                address: 'رام الله، دوار المنارة',
+                products: <String>[],
+                rating: 0,
+                colorValue: 0xffdeeef8,
+              ),
+              product: seedProduct,
+              bloc: bloc,
+            ),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('أساس فت مي'), findsWidgets);
+
+        await expectMerzoxSeedGolden(
+          'product_details_ar_375x812.png',
         );
       });
     },

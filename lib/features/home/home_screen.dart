@@ -28,6 +28,7 @@ import 'package:merzox/services/realtime_service.dart';
 import 'package:merzox/services/location_permission_service.dart';
 import 'package:merzox/services/notification_preference_service.dart';
 import 'package:merzox/services/recommendation_preference_service.dart';
+import 'package:merzox/core/constants/money.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../authentication/bloc/auth_bloc.dart';
@@ -1867,7 +1868,7 @@ class _CartItemTile extends StatelessWidget {
                   textDirection: Directionality.of(context),
                   children: [
                     Text(
-                      '\u20AA ${item.total.toStringAsFixed(0)}',
+                      '\u20AA ${merzoxAmount(item.total)}',
                       textDirection: TextDirection.ltr,
                       style: TextStyle(
                         fontSize: 14,
@@ -2656,7 +2657,7 @@ class _CartSummaryCard extends StatelessWidget {
         children: [
           _SummaryRow(
             label: 'home.cart.subtotal'.tr(),
-            value: '\u20AA ${subtotal.toStringAsFixed(0)}',
+            value: '\u20AA ${merzoxAmount(subtotal)}',
           ),
           const SizedBox(height: 8),
           _SummaryRow(
@@ -2666,7 +2667,7 @@ class _CartSummaryCard extends StatelessWidget {
           const Divider(height: 24),
           _SummaryRow(
             label: 'home.cart.total'.tr(),
-            value: '\u20AA ${subtotal.toStringAsFixed(0)}',
+            value: '\u20AA ${merzoxAmount(subtotal)}',
             isStrong: true,
           ),
           const SizedBox(height: 14),

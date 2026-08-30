@@ -406,6 +406,16 @@ class MappingContractTests(unittest.TestCase):
                     1300,
                     "crop_top_to_812",
                 ),
+                (
+                    "product_details",
+                    "test/goldens/seed/product_details_ar_375x812.png",
+                    "تفاصيل المتجر – 8",
+                    "4b0b3ac3-0022-4de2-a0e5-756601280607",
+                    "artwork/artboard-cde06fe1-416a-421b-94cb-cd280aa1056a",
+                    375,
+                    800,
+                    "extend_final_row_to_812",
+                ),
             ],
         )
 

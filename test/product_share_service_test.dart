@@ -35,7 +35,9 @@ void main() {
       languageCode: 'ar',
     );
 
-    // ProductDetailsPage currently renders displayPrice with zero decimals.
-    expect(payload.message, 'منتج تجريبي\nالمتجر: متجر تجريبي\nالسعر: ₪ 80');
+    // The share text quotes the price the product page shows, and that price
+    // keeps its decimals. This used to read the rounded 80 for a product
+    // costing 79.6 - a message naming a price nobody would be charged.
+    expect(payload.message, 'منتج تجريبي\nالمتجر: متجر تجريبي\nالسعر: ₪ 79.6');
   });
 }

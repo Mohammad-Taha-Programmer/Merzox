@@ -15,6 +15,7 @@ import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart'
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/core/constants/money.dart';
 
 class BusinessProfilePage extends StatelessWidget {
   final HomeBusiness business;
@@ -849,7 +850,7 @@ class _ProductCard extends StatelessWidget {
                   // when the server actually says a discount applies.
                   if (product.hasDiscount) ...[
                     Text(
-                      '₪ ${product.price.toStringAsFixed(0)}',
+                      '₪ ${merzoxAmount(product.price)}',
                       style: TextStyle(
                         fontSize: 10,
                         color: MerzoxColors.kColor8D99AE,
@@ -859,7 +860,7 @@ class _ProductCard extends StatelessWidget {
                     const SizedBox(width: 4),
                   ],
                   Text(
-                    '₪ ${product.displayPrice.toStringAsFixed(0)}',
+                    '₪ ${merzoxAmount(product.displayPrice)}',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,

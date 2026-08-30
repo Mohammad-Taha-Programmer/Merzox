@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/core/constants/money.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../services/api_service.dart';
@@ -512,7 +513,7 @@ class _FavoriteProductCard extends StatelessWidget {
                   const Spacer(),
                   if (product.hasDiscount) ...[
                     Text(
-                      '₪ ${product.price.toStringAsFixed(0)}',
+                      '₪ ${merzoxAmount(product.price)}',
                       textDirection: TextDirection.ltr,
                       style: TextStyle(
                         color: MerzoxColors.kColor8D99AE,
@@ -523,7 +524,7 @@ class _FavoriteProductCard extends StatelessWidget {
                     const SizedBox(width: 4),
                   ],
                   Text(
-                    '₪ ${product.displayPrice.toStringAsFixed(0)}',
+                    '₪ ${merzoxAmount(product.displayPrice)}',
                     textDirection: TextDirection.ltr,
                     style: const TextStyle(
                       color: MerzoxColors.kColor3B3B3B,

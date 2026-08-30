@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/core/constants/money.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/colors.dart';
@@ -294,7 +295,7 @@ class _Dashboard extends StatelessWidget {
                 Expanded(
                   child: _Metric(
                     'businessShell.sales'.tr(),
-                    '${data?.sales.toStringAsFixed(0) ?? '0'} ₪',
+                    '${data == null ? '0' : merzoxAmount(data.sales)} ₪',
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -550,7 +551,7 @@ class _OrderTile extends StatelessWidget {
                       'businessShell.orderSummary'.tr(
                         args: [
                           order.items.length.toString(),
-                          order.total.toStringAsFixed(0),
+                          merzoxAmount(order.total),
                         ],
                       ),
                       style: TextStyle(
@@ -655,7 +656,7 @@ class _Products extends StatelessWidget {
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       subtitle: Text(
-                        '${product.price.toStringAsFixed(0)} ₪ • '
+                        '${merzoxAmount(product.price)} ₪ • '
                         '${product.isService ? 'businessShell.service'.tr() : 'businessShell.product'.tr()}',
                       ),
                       trailing: PopupMenuButton<String>(
@@ -1654,8 +1655,7 @@ class _ProductEditorState extends State<_ProductEditor> {
   }
 }
 
-String _trimNumber(double value) =>
-    value % 1 == 0 ? value.toStringAsFixed(0) : value.toString();
+String _trimNumber(double value) => merzoxAmount(value);
 
 /// Shows what the customer will pay. Presentation only - the server recomputes
 /// the authoritative final price from the stored base price and discount.

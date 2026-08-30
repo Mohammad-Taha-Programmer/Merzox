@@ -10,6 +10,7 @@ import 'package:merzox/features/orders/bloc/orders_bloc.dart';
 import 'package:merzox/features/orders/bloc/orders_event.dart';
 import 'package:merzox/features/orders/bloc/orders_state.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/core/constants/money.dart';
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -759,8 +760,5 @@ String _formatDate(DateTime? value) {
 }
 
 String _money(double value) {
-  final formatted = value == value.roundToDouble()
-      ? value.toStringAsFixed(0)
-      : value.toStringAsFixed(2);
-  return '$formatted ${'common.currency'.tr()}';
+  return '${merzoxAmount(value)} ${'common.currency'.tr()}';
 }

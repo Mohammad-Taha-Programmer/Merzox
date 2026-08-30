@@ -11,6 +11,7 @@ import 'package:merzox/features/product_details/bloc/product_details_state.dart'
 import 'package:merzox/features/reviews/widgets/review_eligibility_notice.dart';
 import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/core/constants/money.dart';
 
 class ProductDetailsPage extends StatelessWidget {
   final HomeBusiness business;
@@ -269,14 +270,14 @@ class _ProductHeader extends StatelessWidget {
     if (product.hasVariants && product.variants.isEmpty) {
       priceText = 'catalog.priceUnavailable'.tr();
     } else if (selected != null) {
-      priceText = '₪ ${selected.finalPrice.toStringAsFixed(0)}';
+      priceText = '₪ ${merzoxAmount(selected.finalPrice)}';
     } else if (product.hasVariants && product.hasPriceRange) {
       priceText =
-          '₪ ${product.minFinalPrice!.toStringAsFixed(0)}'
+          '₪ ${merzoxAmount(product.minFinalPrice!)}'
           ' – '
-          '₪ ${product.maxFinalPrice!.toStringAsFixed(0)}';
+          '₪ ${merzoxAmount(product.maxFinalPrice!)}';
     } else {
-      priceText = '₪ ${product.displayPrice.toStringAsFixed(0)}';
+      priceText = '₪ ${merzoxAmount(product.displayPrice)}';
     }
 
     final double? listPrice;
@@ -318,7 +319,7 @@ class _ProductHeader extends StatelessWidget {
               ),
               if (listPrice != null)
                 Text(
-                  '₪ ${listPrice.toStringAsFixed(0)}',
+                  '₪ ${merzoxAmount(listPrice)}',
                   textDirection: TextDirection.ltr,
                   style: TextStyle(
                     fontSize: 13,
