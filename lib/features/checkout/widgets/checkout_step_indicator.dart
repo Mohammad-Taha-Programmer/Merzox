@@ -37,10 +37,7 @@ class CheckoutStepIndicator extends StatelessWidget {
         children: <Widget>[
           for (int step = 0; step < _icons.length; step++) ...<Widget>[
             if (step > 0) const _StepConnector(width: _gap),
-            _StepChip(
-              icon: _icons[step],
-              active: step == current.index,
-            ),
+            _StepChip(icon: _icons[step], active: step == current.index),
           ],
         ],
       ),

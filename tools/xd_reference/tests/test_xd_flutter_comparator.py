@@ -436,6 +436,16 @@ class MappingContractTests(unittest.TestCase):
                     808,
                     "extend_final_row_to_812",
                 ),
+                (
+                    "merchant_dashboard",
+                    "test/goldens/seed/merchant_dashboard_ar_375x812.png",
+                    "الرئيسية – 2",
+                    "49f58f63-2e9e-495a-97c2-1fdefa120458",
+                    "artwork/artboard-bfc8675f-3c35-4690-acba-a0e53da0548e",
+                    375,
+                    808,
+                    "extend_final_row_to_812",
+                ),
             ],
         )
 

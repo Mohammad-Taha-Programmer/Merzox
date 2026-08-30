@@ -204,9 +204,7 @@ class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
                 ),
               ),
             const SizedBox(height: 18),
-            _AddAddressButton(
-              onPressed: () => context.push('/profile/edit'),
-            ),
+            _AddAddressButton(onPressed: () => context.push('/profile/edit')),
             const SizedBox(height: 26),
             FilledButton(
               onPressed: hasAddress ? widget.onContinue : null,
@@ -405,9 +403,7 @@ class _CheckoutLine extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   '${'checkout.unitPrice'.tr()} ${merzoxAmount(item.price)}'
-                  '   ${'home.cart.quantity'.tr(args: <String>[
-                        '${item.quantity}',
-                      ])}',
+                  '   ${'home.cart.quantity'.tr(args: <String>['${item.quantity}'])}',
                   style: TextStyle(
                     fontSize: 11,
                     color: MerzoxColors.kColor767676,
@@ -512,7 +508,10 @@ class _InvoiceRow extends StatelessWidget {
 
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: <Widget>[Text(label, style: style), Text(value, style: style)],
+      children: <Widget>[
+        Text(label, style: style),
+        Text(value, style: style),
+      ],
     );
   }
 }

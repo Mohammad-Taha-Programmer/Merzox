@@ -334,16 +334,129 @@ class _Dashboard extends StatelessWidget {
               ],
             ),
           ),
+          // Measured: the artboard's table header sits at y=393; without this
+          // the section heading crowds straight into it 42px early.
+          const SizedBox(height: 42),
           if (data == null || data.recentOrders.isEmpty)
             _Empty(message: 'businessShell.noRecentOrders'.tr())
           else
-            ...data.recentOrders.map(
-              (order) => _OrderTile(order: order, compact: true),
-            ),
+            _RecentOrdersTable(orders: data.recentOrders),
         ],
       ),
     );
   }
+}
+
+/// The dashboard's "أحدث الطلبات" summary, as the artboard draws it.
+///
+/// A table rather than the cards the orders tab uses: a merchant scanning the
+/// day's orders reads five short columns faster than five stacked cards, which
+/// is presumably why the design puts one here and not there.
+class _RecentOrdersTable extends StatelessWidget {
+  final List<OwnerOrder> orders;
+
+  const _RecentOrdersTable({required this.orders});
+
+  static const double _headerHeight = 48;
+  static const double _rowHeight = 37;
+
+  /// Column weights, in reading order: number, date, customer, price, status.
+  static const List<int> _weights = <int>[4, 4, 4, 2, 4];
+
+  @override
+  Widget build(BuildContext context) {
+    final List<String> headings = <String>[
+      'businessShell.orderNumber'.tr(),
+      'businessShell.orderDate'.tr(),
+      'businessShell.orderCustomer'.tr(),
+      'businessShell.orderPrice'.tr(),
+      'businessShell.orderStatus'.tr(),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Column(
+          children: <Widget>[
+            Container(
+              height: _headerHeight,
+              color: MerzoxColors.kColor3D5A80,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
+                children: <Widget>[
+                  for (int column = 0; column < headings.length; column++)
+                    Expanded(
+                      flex: _weights[column],
+                      child: Text(
+                        headings[column],
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            for (final OwnerOrder order in orders)
+              SizedBox(
+                height: _rowHeight,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  child: Row(
+                    children: <Widget>[
+                      _Cell(flex: _weights[0], text: '#${order.publicId}'),
+                      _Cell(
+                        flex: _weights[1],
+                        text: _shortDate(order.createdAt),
+                      ),
+                      _Cell(flex: _weights[2], text: order.customerName),
+                      _Cell(flex: _weights[3], text: merzoxAmount(order.total)),
+                      Expanded(
+                        flex: _weights[4],
+                        child: Center(child: _StatusBadge(order.status)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Cell extends StatelessWidget {
+  final int flex;
+  final String text;
+
+  const _Cell({required this.flex, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      flex: flex,
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontSize: 10, color: MerzoxColors.kColor3B3B3B),
+      ),
+    );
+  }
+}
+
+String _shortDate(DateTime? value) {
+  if (value == null) return '';
+  final DateTime local = value.toLocal();
+  return '${local.day}/${local.month}/${local.year}';
 }
 
 class _Metric extends StatelessWidget {
@@ -488,9 +601,8 @@ void _openOrderDetail(
 
 class _OrderTile extends StatelessWidget {
   final OwnerOrder order;
-  final bool compact;
   final VoidCallback? onOpen;
-  const _OrderTile({required this.order, this.compact = false, this.onOpen});
+  const _OrderTile({required this.order, this.onOpen});
 
   @override
   Widget build(BuildContext context) {
@@ -562,30 +674,30 @@ class _OrderTile extends StatelessWidget {
                   ],
                 ),
               ),
-              if (compact)
-                _StatusBadge(order.status)
-              else
-                DropdownButton<String>(
-                  value: currentStatus,
-                  underline: const SizedBox.shrink(),
-                  items: options
-                      .map(
-                        (status) => DropdownMenuItem(
-                          value: status,
-                          child: Text(_statusLabel(status)),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: options.length == 1
-                      ? null
-                      : (status) {
-                          if (status != null && status != order.status) {
-                            context.read<BusinessBloc>().add(
-                              BusinessOrderStatusChanged(order.id, status),
-                            );
-                          }
-                        },
-                ),
+              // Always the editable control now: the dashboard's read-only
+              // summary moved to `_RecentOrdersTable`, so this tile is only
+              // ever the orders tab, where a merchant changes the status.
+              DropdownButton<String>(
+                value: currentStatus,
+                underline: const SizedBox.shrink(),
+                items: options
+                    .map(
+                      (status) => DropdownMenuItem(
+                        value: status,
+                        child: Text(_statusLabel(status)),
+                      ),
+                    )
+                    .toList(),
+                onChanged: options.length == 1
+                    ? null
+                    : (status) {
+                        if (status != null && status != order.status) {
+                          context.read<BusinessBloc>().add(
+                            BusinessOrderStatusChanged(order.id, status),
+                          );
+                        }
+                      },
+              ),
             ],
           ),
         ),
@@ -604,17 +716,35 @@ String _statusLabel(String status) => switch (status) {
   _ => status,
 };
 
+/// Each status carries its own colour, sampled from the artboard's table.
+///
+/// One colour for every status made the column decorative; five make it
+/// scannable, which is the whole point of showing status in a table.
+const Map<String, Color> _statusColors = <String, Color>{
+  'pending': Color(0xFFB9DDF3),
+  'confirmed': Color(0xFFB9DDF3),
+  'preparing': Color(0xFFF3EBB9),
+  'outForDelivery': Color(0xFFC6B9F3),
+  'delivered': Color(0xFFBFF3B9),
+  'cancelled': Color(0xFFF3B9B9),
+};
+
 class _StatusBadge extends StatelessWidget {
   final String status;
   const _StatusBadge(this.status);
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
     decoration: BoxDecoration(
-      color: MerzoxColors.kColorDEEEF8,
-      borderRadius: BorderRadius.circular(20),
+      color: _statusColors[status] ?? MerzoxColors.kColorDEEEF8,
+      borderRadius: BorderRadius.circular(4),
     ),
-    child: Text(_statusLabel(status), style: const TextStyle(fontSize: 11)),
+    child: Text(
+      _statusLabel(status),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(fontSize: 10, color: MerzoxColors.kColor3B3B3B),
+    ),
   );
 }
 

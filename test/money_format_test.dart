@@ -19,10 +19,13 @@ void main() {
       expect(merzoxAmount(4.49), '4.49');
     });
 
-    test('a trailing zero is dropped, so it reads as a price not a machine', () {
-      expect(merzoxAmount(5.50), '5.5');
-      expect(merzoxAmount(12.10), '12.1');
-    });
+    test(
+      'a trailing zero is dropped, so it reads as a price not a machine',
+      () {
+        expect(merzoxAmount(5.50), '5.5');
+        expect(merzoxAmount(12.10), '12.1');
+      },
+    );
 
     test('the tail stops at the agora', () {
       // Two decimals at most: a longer tail would be a floating-point artefact

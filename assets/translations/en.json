@@ -457,7 +457,12 @@
     "loadFailed": "Could not load business account",
     "statuses": {
       "confirmed": "Confirmed"
-    }
+    },
+    "orderNumber": "Order no.",
+    "orderDate": "Date",
+    "orderCustomer": "Customer",
+    "orderPrice": "Price",
+    "orderStatus": "Status"
   },
   "profile": {
     "title": "Profile"

@@ -199,6 +199,19 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "Step two. Cash on delivery is the whole payment list in the artboard and in the backend alike - every other method is refused with PAYMENT_METHOD_UNAVAILABLE. The artboard also prints a delivery fee and a grand total; the client cannot know either, because deliveryFeeFor is a server rule, so the invoice states the subtotal it knows and the total as that plus a fee computed on confirmation."
+    },
+    {
+      "seed": "merchant_dashboard",
+      "flutter_golden": "test/goldens/seed/merchant_dashboard_ar_375x812.png",
+      "xd": {
+        "name": "الرئيسية – 2",
+        "manifest_id": "49f58f63-2e9e-495a-97c2-1fdefa120458",
+        "artboard_path": "artwork/artboard-bfc8675f-3c35-4690-acba-a0e53da0548e",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The MERCHANT home. Of the twelve الرئيسية artboards only two are the customer home, and both carry an unsupported backdrop blur that the comparator refuses fail-closed, so they are not seeded. This one is clean and is the merchant shell dashboard: the sales/orders/visits figures and the recent-order list. The artboard lays those orders out as a table with columns; the app lays them out as cards, which is a real presentation difference and not a metric artefact."
     }
   ]
 }

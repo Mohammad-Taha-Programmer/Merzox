@@ -37,6 +37,7 @@ import 'package:merzox/features/authentication/pages/signup_page.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/preview/store_preview_page.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
+import 'package:merzox/features/business/shell/business_shell_page.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
@@ -275,8 +276,11 @@ Map<String, dynamic> _seedDetailedProduct() {
     'isService': false,
     'hasVariants': true,
     'variants': <Map<String, dynamic>>[
-      for (final (int index, String shade)
-          in <String>['01', '02', '03'].indexed)
+      for (final (int index, String shade) in <String>[
+        '01',
+        '02',
+        '03',
+      ].indexed)
         <String, dynamic>{
           // A real object id: the variant contract refuses anything else.
           'id': '64d00000000000000000010$index',
@@ -433,6 +437,49 @@ final class _SeedMerchantApi extends ApiService {
   @override
   Future<List<OwnerProduct>> ownerProducts({required String token}) async =>
       const <OwnerProduct>[];
+}
+
+/// One recent order row, in the shape the merchant dashboard table draws.
+Map<String, dynamic> _seedOwnerOrder(int index) {
+  const List<String> statuses = <String>[
+    'pending',
+    'preparing',
+    'delivered',
+    'outForDelivery',
+    'cancelled',
+  ];
+  return <String, dynamic>{
+    'id': '64f00000000000000000000$index',
+    'publicId': '22232$index',
+    'customerName': index.isEven ? 'ياسمين خالد' : 'أحلام محمد',
+    'total': index.isEven ? 45 : 120,
+    'status': statuses[index],
+    'statusGroup': statuses[index] == 'cancelled' ? 'past' : 'current',
+    'createdAt': '2022-02-15T14:40:00.000',
+    'items': <Map<String, dynamic>>[],
+    'customerPhone': '0590000000',
+    'deliveryAddress': 'رام الله',
+    'paymentMethod': 'cash',
+  };
+}
+
+/// The merchant shell in its dashboard state, with the figures and the recent
+/// order table the `الرئيسية – 2` artboard shows.
+final class _SeedDashboardApi extends _SeedMerchantApi {
+  @override
+  Future<BusinessDashboardData> businessDashboard({
+    required String token,
+  }) async {
+    return BusinessDashboardData.fromJson(<String, dynamic>{
+      'sales': 98000,
+      'orderCount': 25,
+      'activeOrderCount': 4,
+      'viewCount': 3368,
+      'recentOrders': <Map<String, dynamic>>[
+        for (int index = 0; index < 5; index++) _seedOwnerOrder(index),
+      ],
+    });
+  }
 }
 
 /// The single service the Store Preview artboard shows under "About".
@@ -1019,9 +1066,7 @@ void main() {
         final Future<BusinessProfileState> loaded = bloc.stream.firstWhere(
           (BusinessProfileState state) =>
               state.mainTabIndex == index &&
-              (index == 1
-                      ? state.productsStatus
-                      : state.reviewsStatus) ==
+              (index == 1 ? state.productsStatus : state.reviewsStatus) ==
                   BusinessProfileSectionStatus.ready,
         );
         bloc.add(BusinessProfileMainTabChanged(index));
@@ -1061,9 +1106,7 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
         expect(find.text('أساس فت مي'), findsWidgets);
 
-        await expectMerzoxSeedGolden(
-          'storefront_products_ar_375x812.png',
-        );
+        await expectMerzoxSeedGolden('storefront_products_ar_375x812.png');
       });
 
       testWidgets('storefront reviews tab renders its Arabic baseline', (
@@ -1085,9 +1128,7 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
         expect(find.text('ياسمين خالد'), findsWidgets);
 
-        await expectMerzoxSeedGolden(
-          'storefront_reviews_ar_375x812.png',
-        );
+        await expectMerzoxSeedGolden('storefront_reviews_ar_375x812.png');
       });
 
       // -- 13. Product details, description tab ---------------------------
@@ -1142,9 +1183,7 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
         expect(find.text('أساس فت مي'), findsWidgets);
 
-        await expectMerzoxSeedGolden(
-          'product_details_ar_375x812.png',
-        );
+        await expectMerzoxSeedGolden('product_details_ar_375x812.png');
       });
 
       // -- 14/15. The two checkout steps ----------------------------------
@@ -1223,6 +1262,46 @@ void main() {
         expect(find.text('تأكيد الطلب'), findsOneWidget);
 
         await expectMerzoxSeedGolden('checkout_payment_ar_375x812.png');
+      });
+
+      // -- 16. Merchant dashboard -----------------------------------------
+      //
+      // `الرئيسية – 2` is the MERCHANT home, not the customer one: it draws
+      // the sales/orders/visits figures and the recent-order table. The two
+      // customer `الرئيسية` artboards carry an unsupported backdrop blur and
+      // are refused by the comparator, so they are not seeded here.
+      testWidgets('merchant dashboard renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedMerchantSession();
+
+        final BusinessBloc merchantBloc = BusinessBloc(
+          apiService: _SeedDashboardApi(),
+        );
+        _closeOnTearDown(merchantBloc);
+
+        final Future<BusinessState> ready = merchantBloc.stream.firstWhere(
+          (BusinessState state) => state.status == BusinessStatus.ready,
+        );
+        merchantBloc.add(const BusinessStarted());
+        await ready;
+
+        expect(merchantBloc.state.dashboard, isNotNull);
+        expect(merchantBloc.state.dashboard!.recentOrders, hasLength(5));
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: merchantBloc,
+            child: withMerzoxGoldenDeviceInsets(
+              BusinessShellPage(onLoggedOut: () {}),
+            ),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('merchant_dashboard_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

@@ -457,7 +457,12 @@
     "loadFailed": "تعذر تحميل حساب الأعمال",
     "statuses": {
       "confirmed": "تم التأكيد"
-    }
+    },
+    "orderNumber": "رقم الطلب",
+    "orderDate": "التاريخ",
+    "orderCustomer": "اسم العميل",
+    "orderPrice": "السعر",
+    "orderStatus": "حالة الطلب"
   },
   "profile": {
     "title": "الملف الشخصي"
