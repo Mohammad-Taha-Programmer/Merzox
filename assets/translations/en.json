@@ -604,7 +604,8 @@
     "profileGreeting": "Hello, {}",
     "registerAsMerchant": "Register as a merchant",
     "ordersLabel": "Orders",
-    "comingSoon": "{} coming soon"
+    "comingSoon": "{} coming soon",
+    "buyNow": "Buy now"
   },
   "businessProfile": {
     "followers": "followers",

@@ -68,6 +68,8 @@ import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
 import 'package:merzox/features/orders/pages/order_tracking_page.dart';
 import 'package:merzox/features/splash/presentation/splash_screen.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/device_location_service.dart';
+import 'package:merzox/services/location_permission_service.dart';
 import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -536,6 +538,78 @@ final class _SeedMerchantProductsApi extends _SeedMerchantApi {
         }),
     ];
   }
+}
+
+/// One catalogue row, in the shape the home sections read.
+Map<String, dynamic> _seedHomeBusiness(int index, {String? discount}) {
+  return <String, dynamic>{
+    'id': '64e00000000000000000000$index',
+    'publicId': '002010$index',
+    'name': 'متجر الياسمين',
+    'englishName': 'Alyasmeen',
+    'category': 'مستحضرات تجميل',
+    'address': 'رام الله',
+    'products': const <String>[],
+    'productCount': 12,
+    'rating': 4,
+    'ratingCount': 20,
+    'followerCount': 8,
+    'viewCount': 300,
+    if (discount != null) 'discount': discount,
+    'colorValue': 0xFFDEEEF8,
+  };
+}
+
+/// Location is a platform channel, and a widget test has none: left to the
+/// real services the home bloc waits forever. The nearby shelf is below the
+/// fold on both artboards, so a denied permission changes nothing measured.
+final class _SeedDeniedLocation extends LocationPermissionService {
+  @override
+  Future<bool> isLocationGranted() async => false;
+}
+
+final class _SeedNoDeviceLocation extends DeviceLocationService {
+  @override
+  Future<bool> isServiceEnabled() async => false;
+}
+
+/// The customer catalogue, with the shelves `الرئيسية` draws.
+///
+/// The promotional carousel reads the discounted shelf, so that one carries a
+/// discount label and the others do not.
+final class _SeedHomeApi extends ApiService {
+  @override
+  Future<BusinessListApiResponse> businesses({
+    int page = 1,
+    int limit = 100,
+    String? search,
+    String? sort,
+    bool? discounted,
+    double? latitude,
+    double? longitude,
+    int? radiusMeters,
+  }) async {
+    return BusinessListApiResponse.fromJson(<String, dynamic>{
+      'businesses': <Map<String, dynamic>>[
+        for (int index = 0; index < 3; index++)
+          _seedHomeBusiness(index, discount: discounted == true ? '50%' : null),
+      ],
+      'pagination': const <String, dynamic>{
+        'page': 1,
+        'limit': 20,
+        'total': 3,
+        'hasMore': false,
+      },
+    });
+  }
+
+  @override
+  Future<FavoriteBusinessListApiResponse> favoriteBusinesses({
+    required String token,
+    int page = 1,
+    int limit = 20,
+  }) async =>
+      FavoriteBusinessListApiResponse.fromJson(const <String, dynamic>{});
 }
 
 /// The single service the Store Preview artboard shows under "About".
@@ -1437,6 +1511,81 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
 
         await expectMerzoxSeedGolden('merchant_products_ar_375x812.png');
+      });
+
+      // -- 19/20. The customer home, guest and signed in -------------------
+      //
+      // `الرئيسية` and `الرئيسية – 1` differ only in their header, so the two
+      // seeds share an API and differ only in the session behind them. Both
+      // artboards are 1716 tall: the corpus draws what scrolling reveals as
+      // one tall board, and the comparator crops to the 812 a device shows.
+      Future<HomeBloc> customerHome({required bool isGuest}) async {
+        final HomeBloc bloc = HomeBloc(
+          apiService: _SeedHomeApi(),
+          deviceLocationService: _SeedNoDeviceLocation(),
+          locationPermissionService: _SeedDeniedLocation(),
+        );
+        _closeOnTearDown(bloc);
+
+        final Future<HomeState> ready = bloc.stream.firstWhere(
+          (HomeState state) =>
+              state.newBusinessesStatus == HomeSectionStatus.ready &&
+              state.discountedBusinessesStatus == HomeSectionStatus.ready,
+        );
+        bloc.add(HomeStarted(isGuest: isGuest));
+        await ready;
+
+        return bloc;
+      }
+
+      testWidgets('customer home renders its Arabic guest baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(const <String, Object>{});
+
+        final HomeBloc bloc = await customerHome(isGuest: true);
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<HomeBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              const HomeScreen(isGuest: true),
+            ),
+          ),
+        );
+
+        expect(find.text('اشتري الآن'), findsWidgets);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('home_guest_ar_375x812.png');
+      });
+
+      testWidgets('customer home renders its Arabic signed-in baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          AuthBloc.sessionKey: true,
+          AuthBloc.tokenKey: 'seed-golden-token',
+          AuthBloc.userTypeKey: 'customer',
+          AuthBloc.nameKey: 'ياسمين خالد',
+        });
+
+        final HomeBloc bloc = await customerHome(isGuest: false);
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<HomeBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              const HomeScreen(isGuest: false),
+            ),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('home_customer_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

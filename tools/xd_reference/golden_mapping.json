@@ -238,6 +238,32 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "The merchant shell's products tab. The artboard titles itself \"المنتجات\" and lists 127-tall cards carrying a photo, a name, price, quantity, classification and a published corner. The seed serves four products with no image URL, so the photo area is the local placeholder rather than the artboard's photograph: that difference is the bulk of this seed's residual and is not a layout defect. Three further artboards (13, 15, 16) are states of this same screen."
+    },
+    {
+      "seed": "home_guest",
+      "flutter_golden": "test/goldens/seed/home_guest_ar_375x812.png",
+      "xd": {
+        "name": "الرئيسية",
+        "manifest_id": "a41c8bc2-71ac-4606-821d-149d12ce9382",
+        "artboard_path": "artwork/artboard-4ce70ade-791d-4694-a64b-40a1a992f158",
+        "width": 375,
+        "height": 1716
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The customer home in its GUEST state: the header greets a visitor with a plain avatar and no name. Both home artboards were unmeasurable until the exporter learned to render backdrop blur: a single 98x35 frosted chip on the promotional card counted as an unsupported node, and the comparator is fail-closed. The 1716 height is the corpus convention for drawing what scrolling reveals, so only the top 812 - what a device shows - is measured. Two thirds of this seed's residual is photography, not layout: the artboard's promotional card is a dark sale photograph and its store cards carry a logo, while the catalogue API exposes no artwork for a business at all - only the deterministic placeholder colour the cards already use. The 112-row carousel band alone measures ~150 mean delta against a flat placeholder. The structural bands themselves land within a few pixels: carousel 113..223 exactly, dots and search within one, section heading and shelf within four. The bottom navigation is ~11 shorter on the artboard; it is shared with five other seeds, so it is left alone rather than re-baselining them for about a point of MAE."
+    },
+    {
+      "seed": "home_customer",
+      "flutter_golden": "test/goldens/seed/home_customer_ar_375x812.png",
+      "xd": {
+        "name": "الرئيسية – 1",
+        "manifest_id": "e6bf665a-2299-4c2b-8fb3-08aece9f263a",
+        "artboard_path": "artwork/artboard-addec5a9-709e-4acd-acc0-a518a0f97df6",
+        "width": 375,
+        "height": 1716
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The same screen SIGNED IN: the header carries the customer photo and name. It is the only difference between the two artboards, which is why they share one seed API and differ only in the session. Both home artboards were unmeasurable until the exporter learned to render backdrop blur: a single 98x35 frosted chip on the promotional card counted as an unsupported node, and the comparator is fail-closed. The 1716 height is the corpus convention for drawing what scrolling reveals, so only the top 812 - what a device shows - is measured. Two thirds of this seed's residual is photography, not layout: the artboard's promotional card is a dark sale photograph and its store cards carry a logo, while the catalogue API exposes no artwork for a business at all - only the deterministic placeholder colour the cards already use. The 112-row carousel band alone measures ~150 mean delta against a flat placeholder. The structural bands themselves land within a few pixels: carousel 113..223 exactly, dots and search within one, section heading and shelf within four. The bottom navigation is ~11 shorter on the artboard; it is shared with five other seeds, so it is left alone rather than re-baselining them for about a point of MAE."
     }
   ]
 }

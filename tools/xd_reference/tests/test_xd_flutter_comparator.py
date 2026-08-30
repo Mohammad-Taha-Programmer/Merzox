@@ -466,6 +466,26 @@ class MappingContractTests(unittest.TestCase):
                     808,
                     "extend_final_row_to_812",
                 ),
+                (
+                    "home_guest",
+                    "test/goldens/seed/home_guest_ar_375x812.png",
+                    "الرئيسية",
+                    "a41c8bc2-71ac-4606-821d-149d12ce9382",
+                    "artwork/artboard-4ce70ade-791d-4694-a64b-40a1a992f158",
+                    375,
+                    1716,
+                    "crop_top_to_812",
+                ),
+                (
+                    "home_customer",
+                    "test/goldens/seed/home_customer_ar_375x812.png",
+                    "الرئيسية – 1",
+                    "e6bf665a-2299-4c2b-8fb3-08aece9f263a",
+                    "artwork/artboard-addec5a9-709e-4acd-acc0-a518a0f97df6",
+                    375,
+                    1716,
+                    "crop_top_to_812",
+                ),
             ],
         )
 
