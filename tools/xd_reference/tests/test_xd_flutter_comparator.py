@@ -462,8 +462,47 @@ class MappingContractTests(unittest.TestCase):
 
     def test_extend_normalization_with_wrong_dimensions_rejected(self) -> None:
         payload = base_mapping()
-        payload["entries"][4]["xd"]["height"] = 812
-        self.assert_rejected(payload, "requires XD dimensions 375x810")
+        payload["entries"][0]["normalization"] = "extend_final_row_to_812"
+        payload["entries"][0]["xd"]["height"] = 812
+        self.assert_rejected(payload, "requires an XD height below 812")
+
+    def test_extend_normalization_accepts_any_shorter_height(self) -> None:
+        # 808, 807, 805, 800 all occur in the corpus. Only 810 used to be
+        # accepted, which left those artboards unmeasurable.
+        for height in (800, 805, 807, 808, 810, 811):
+            with self.subTest(height=height):
+                payload = base_mapping()
+                payload["entries"][0]["normalization"] = "extend_final_row_to_812"
+                payload["entries"][0]["xd"]["height"] = height
+                mapping = self.validate(payload)
+                self.assertEqual(mapping.entries[0].xd_height, height)
+
+    def test_crop_normalization_requires_a_taller_artboard(self) -> None:
+        payload = base_mapping()
+        payload["entries"][0]["normalization"] = "crop_top_to_812"
+        payload["entries"][0]["xd"]["height"] = 812
+        self.assert_rejected(payload, "requires an XD height above 812")
+
+    def test_crop_normalization_accepts_a_scrollable_artboard(self) -> None:
+        for height in (1165, 1300, 1716):
+            with self.subTest(height=height):
+                payload = base_mapping()
+                payload["entries"][0]["normalization"] = "crop_top_to_812"
+                payload["entries"][0]["xd"]["height"] = height
+                mapping = self.validate(payload)
+                self.assertEqual(mapping.entries[0].normalization, "crop_top_to_812")
+
+    def test_height_policies_reject_a_non_canonical_width(self) -> None:
+        for policy, height in (
+            ("extend_final_row_to_812", 808),
+            ("crop_top_to_812", 1165),
+        ):
+            with self.subTest(policy=policy):
+                payload = base_mapping()
+                payload["entries"][0]["normalization"] = policy
+                payload["entries"][0]["xd"]["width"] = 390
+                payload["entries"][0]["xd"]["height"] = height
+                self.assert_rejected(payload, "requires an XD width of 375")
 
     def test_non_integer_dimension_rejected(self) -> None:
         payload = base_mapping()
@@ -793,7 +832,76 @@ class NormalizationTests(unittest.TestCase):
                 declared_width=375,
                 declared_height=812,
             )
-        self.assertIn("requires mapping XD dimensions 375x810", str(ctx.exception))
+        # The declared shape must be the shape that actually decoded, and that
+        # is now checked BEFORE the height policy - a mapping that disagrees
+        # with its own artboard is a structural failure, not a reshape.
+        self.assertIn(
+            "requires a decoded XD reference of 375x812, got 375x810",
+            str(ctx.exception),
+        )
+
+    def test_crop_top_keeps_the_first_viewport_byte_for_byte(self) -> None:
+        # A tall artboard is a scrollable screen: the comparable state is the
+        # top 812 rows exactly, with nothing scaled and nothing invented.
+        source = image_from(375, 1716, gradient_pixels(375, 1716))
+        result = cmp.normalize_reference(
+            source,
+            policy="crop_top_to_812",
+            declared_width=375,
+            declared_height=1716,
+        )
+        self.assertEqual((result.image.width, result.image.height), (375, 812))
+        self.assertEqual(result.below_fold_row_count, 1716 - 812)
+        self.assertEqual(result.appended_row_count, 0)
+        # Every kept row is the SAME row it was in the source.
+        for y in range(812):
+            self.assertEqual(result.image.row(y), source.row(y), f"row {y}")
+
+    def test_crop_top_reports_itself_as_cropped(self) -> None:
+        source = image_from(375, 1165, gradient_pixels(375, 1165))
+        result = cmp.normalize_reference(
+            source,
+            policy="crop_top_to_812",
+            declared_width=375,
+            declared_height=1165,
+        )
+        record = result.to_dict()
+        self.assertTrue(record["cropped"])
+        self.assertEqual(record["below_fold_row_count"], 1165 - 812)
+        for never in ("scaled", "interpolated", "translated", "color_adjusted"):
+            self.assertFalse(record[never], never)
+
+    def test_crop_top_refuses_an_artboard_that_is_not_taller(self) -> None:
+        source = image_from(375, 812, gradient_pixels(375, 812))
+        with self.assertRaises(cmp.ComparatorError) as ctx:
+            cmp.normalize_reference(
+                source,
+                policy="crop_top_to_812",
+                declared_width=375,
+                declared_height=812,
+            )
+        self.assertIn("requires an XD height above the target 812", str(ctx.exception))
+
+    def test_extend_final_row_generalizes_below_the_target(self) -> None:
+        for height in (800, 807, 808, 810):
+            with self.subTest(height=height):
+                source = image_from(375, height, gradient_pixels(375, height))
+                result = cmp.normalize_reference(
+                    source,
+                    policy="extend_final_row_to_812",
+                    declared_width=375,
+                    declared_height=height,
+                )
+                self.assertEqual(result.image.height, 812)
+                self.assertEqual(result.appended_row_count, 812 - height)
+                self.assertEqual(result.below_fold_row_count, 0)
+                # The real rows survive untouched...
+                for y in range(height):
+                    self.assertEqual(result.image.row(y), source.row(y), f"row {y}")
+                # ...and every appended row is a copy of the last real one.
+                last = source.row(height - 1)
+                for y in range(height, 812):
+                    self.assertEqual(result.image.row(y), last, f"row {y}")
 
     def test_extend_final_row_rejects_non_canonical_target(self) -> None:
         source = image_from(375, 810, gradient_pixels(375, 810))

@@ -1248,7 +1248,21 @@ Two normalization policies exist, and nothing else:
 | Policy | Requires | Does |
 | --- | --- | --- |
 | `exact` | mapping *and* decoded XD reference already 375 x 812 | nothing |
-| `extend_final_row_to_812` | mapping *and* decoded XD reference exactly 375 x 810 | preserves all 375 x 810 real pixels, then appends the **final decoded row exactly twice** |
+| `extend_final_row_to_812` | mapping *and* decoded XD reference 375 x H, `0 < H < 812` | preserves all 375 x H real pixels, then appends the **final decoded row** `812 - H` times |
+| `crop_top_to_812` | mapping *and* decoded XD reference 375 x H, `H > 812` | keeps the **top 812 rows byte for byte** and discards the rest |
+
+### Why a tall artboard is cropped, not scaled
+
+A 375 x 1716 artboard is **not a 1716-tall screen**. The corpus draws a screen
+whose content extends past the fold as one tall artboard so the reader can see
+what scrolling reveals. The device viewport is still 375 x 812, so the state a
+Flutter first-frame golden can be compared against is the artboard's **top 812
+rows** - the screen before the user scrolls. `below_fold_row_count` in the
+report records exactly how many rows were left unmeasured, so a partial
+measurement can never be mistaken for a whole-screen one.
+
+Squashing 1716 rows into 812 would compare a screen against a picture of itself
+that no device ever shows.
 
 The extension performs **no scaling, no interpolation, no cropping, no
 translation, no colour adjustment and no visual correction**. Any other shape

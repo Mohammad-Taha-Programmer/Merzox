@@ -77,16 +77,23 @@ SEED_ALL = "all"
 #: Accepted normalization policies.
 NORMALIZATION_EXACT = "exact"
 NORMALIZATION_EXTEND_FINAL_ROW = "extend_final_row_to_812"
+#: A tall artboard is a SCROLLABLE screen, not a tall screen. The corpus draws
+#: below-the-fold content inline so it is visible to the reader; the device
+#: viewport is still 375x812, so the comparable state is the artboard's TOP
+#: 812 rows - the screen before the user scrolls.
+NORMALIZATION_CROP_TOP = "crop_top_to_812"
 SUPPORTED_NORMALIZATIONS: Tuple[str, ...] = (
     NORMALIZATION_EXACT,
     NORMALIZATION_EXTEND_FINAL_ROW,
+    NORMALIZATION_CROP_TOP,
 )
 
-#: ``extend_final_row_to_812`` only ever accepts this exact source shape …
-EXTEND_SOURCE_WIDTH = 375
-EXTEND_SOURCE_HEIGHT = 810
-#: … and appends the final decoded row exactly this many times.
-EXTEND_APPENDED_ROW_COUNT = 2
+#: Both height policies require the artboard to be the target width exactly.
+#: A different width is a real shape mismatch, never something to paper over.
+NORMALIZATION_SOURCE_WIDTH = 375
+
+#: Retained for the report and for callers that named the original constants.
+EXTEND_SOURCE_WIDTH = NORMALIZATION_SOURCE_WIDTH
 
 #: The only measurement status this tool emits. Never "passed"/"parity".
 MEASUREMENT_STATUS_MEASURED = "measured"
@@ -428,6 +435,9 @@ class NormalizationResult:
     source_width: int
     source_height: int
     appended_row_count: int
+    #: Rows dropped from the BOTTOM by `crop_top_to_812`, i.e. the artboard's
+    #: below-the-fold content. Zero for every other policy.
+    below_fold_row_count: int = 0
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -437,9 +447,10 @@ class NormalizationResult:
             "normalized_width": self.image.width,
             "normalized_height": self.image.height,
             "appended_row_count": self.appended_row_count,
+            "below_fold_row_count": self.below_fold_row_count,
             "scaled": False,
             "interpolated": False,
-            "cropped": False,
+            "cropped": self.below_fold_row_count > 0,
             "translated": False,
             "color_adjusted": False,
             "normalized_rgba_sha256": self.image.sha256(),
@@ -481,44 +492,96 @@ def normalize_reference(
         )
 
     if policy == NORMALIZATION_EXTEND_FINAL_ROW:
-        if (target_width, target_height) != (TARGET_WIDTH, TARGET_HEIGHT):
+        _require_height_policy_target(policy, target_width, target_height)
+        _require_declared_matches_decoded(policy, image, declared_width, declared_height)
+        if declared_height >= target_height:
             raise ComparatorError(
-                f"Normalization '{policy}' only targets "
-                f"{TARGET_WIDTH}x{TARGET_HEIGHT}, got {target_width}x{target_height}."
+                f"Normalization '{policy}' requires an XD height below the "
+                f"target {target_height}, got {declared_height}. An artboard "
+                f"at or above the target is '{NORMALIZATION_EXACT}' or "
+                f"'{NORMALIZATION_CROP_TOP}'."
             )
-        if (declared_width, declared_height) != (
-            EXTEND_SOURCE_WIDTH,
-            EXTEND_SOURCE_HEIGHT,
-        ):
-            raise ComparatorError(
-                f"Normalization '{policy}' requires mapping XD dimensions "
-                f"{EXTEND_SOURCE_WIDTH}x{EXTEND_SOURCE_HEIGHT}, got "
-                f"{declared_width}x{declared_height}."
-            )
-        if (image.width, image.height) != (EXTEND_SOURCE_WIDTH, EXTEND_SOURCE_HEIGHT):
-            raise ComparatorError(
-                f"Normalization '{policy}' requires a decoded XD reference of "
-                f"{EXTEND_SOURCE_WIDTH}x{EXTEND_SOURCE_HEIGHT}, got "
-                f"{image.width}x{image.height}."
-            )
+
+        appended = target_height - image.height
         final_row = image.row(image.height - 1)
-        extended = image.pixels + final_row * EXTEND_APPENDED_ROW_COUNT
+        extended = image.pixels + final_row * appended
         return NormalizationResult(
             image=DecodedImage(
                 width=image.width,
-                height=image.height + EXTEND_APPENDED_ROW_COUNT,
+                height=target_height,
                 pixels=extended,
             ),
             policy=policy,
             source_width=image.width,
             source_height=image.height,
-            appended_row_count=EXTEND_APPENDED_ROW_COUNT,
+            appended_row_count=appended,
+        )
+
+    if policy == NORMALIZATION_CROP_TOP:
+        _require_height_policy_target(policy, target_width, target_height)
+        _require_declared_matches_decoded(policy, image, declared_width, declared_height)
+        if declared_height <= target_height:
+            raise ComparatorError(
+                f"Normalization '{policy}' requires an XD height above the "
+                f"target {target_height}, got {declared_height}. An artboard "
+                f"at or below the target is '{NORMALIZATION_EXACT}' or "
+                f"'{NORMALIZATION_EXTEND_FINAL_ROW}'."
+            )
+
+        # The first viewport, byte for byte. Rows below it are the artboard's
+        # below-the-fold content: the screen has them, the user has not
+        # scrolled to them, and this measurement is of the unscrolled state.
+        kept = image.pixels[: target_height * image.stride]
+        return NormalizationResult(
+            image=DecodedImage(
+                width=image.width,
+                height=target_height,
+                pixels=kept,
+            ),
+            policy=policy,
+            source_width=image.width,
+            source_height=image.height,
+            appended_row_count=0,
+            below_fold_row_count=image.height - target_height,
         )
 
     raise ComparatorError(
         f"Unsupported normalization policy '{policy}'; accepted policies are "
         f"{list(SUPPORTED_NORMALIZATIONS)}."
     )
+
+
+def _require_height_policy_target(
+    policy: str, target_width: int, target_height: int
+) -> None:
+    """Both height policies exist only for the canonical Merzox surface."""
+    if (target_width, target_height) != (TARGET_WIDTH, TARGET_HEIGHT):
+        raise ComparatorError(
+            f"Normalization '{policy}' only targets "
+            f"{TARGET_WIDTH}x{TARGET_HEIGHT}, got {target_width}x{target_height}."
+        )
+
+
+def _require_declared_matches_decoded(
+    policy: str, image: "DecodedImage", declared_width: int, declared_height: int
+) -> None:
+    """The mapping's declared shape must be the shape that actually decoded.
+
+    Checked before either height policy runs, so a mapping that quietly
+    disagrees with its own artboard is a structural failure rather than a
+    silently reshaped measurement.
+    """
+    if declared_width != NORMALIZATION_SOURCE_WIDTH:
+        raise ComparatorError(
+            f"Normalization '{policy}' requires an XD width of "
+            f"{NORMALIZATION_SOURCE_WIDTH}, got {declared_width}."
+        )
+    if (image.width, image.height) != (declared_width, declared_height):
+        raise ComparatorError(
+            f"Normalization '{policy}' requires a decoded XD reference of "
+            f"{declared_width}x{declared_height}, got "
+            f"{image.width}x{image.height}."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -761,15 +824,28 @@ def validate_mapping(
                 f"dimensions {target_width}x{target_height}, got "
                 f"{xd_width}x{xd_height}."
             )
-        if normalization == NORMALIZATION_EXTEND_FINAL_ROW and (
-            xd_width,
-            xd_height,
-        ) != (EXTEND_SOURCE_WIDTH, EXTEND_SOURCE_HEIGHT):
-            raise ComparatorError(
-                f"{where}: normalization '{NORMALIZATION_EXTEND_FINAL_ROW}' "
-                f"requires XD dimensions {EXTEND_SOURCE_WIDTH}x"
-                f"{EXTEND_SOURCE_HEIGHT}, got {xd_width}x{xd_height}."
-            )
+        if normalization in (
+            NORMALIZATION_EXTEND_FINAL_ROW,
+            NORMALIZATION_CROP_TOP,
+        ):
+            if xd_width != NORMALIZATION_SOURCE_WIDTH:
+                raise ComparatorError(
+                    f"{where}: normalization '{normalization}' requires an XD "
+                    f"width of {NORMALIZATION_SOURCE_WIDTH}, got {xd_width}."
+                )
+            if normalization == NORMALIZATION_EXTEND_FINAL_ROW:
+                if not 0 < xd_height < target_height:
+                    raise ComparatorError(
+                        f"{where}: normalization "
+                        f"'{NORMALIZATION_EXTEND_FINAL_ROW}' requires an XD "
+                        f"height below {target_height}, got {xd_height}."
+                    )
+            elif xd_height <= target_height:
+                raise ComparatorError(
+                    f"{where}: normalization '{NORMALIZATION_CROP_TOP}' "
+                    f"requires an XD height above {target_height}, got "
+                    f"{xd_height}."
+                )
 
         # Fail closed on a golden path that leaves the repository.
         resolve_repo_relative(flutter_golden, root)
