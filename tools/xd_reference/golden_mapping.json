@@ -316,6 +316,45 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "The third and last checkout step. The artboard draws a courier, a success line, the order number and two ways on. The app declared this step in its enum and never rendered it: a successful checkout emptied the cart and the page popped itself away, so the customer got a snackbar where the design gives them their order number. The courier illustration is not in the asset bundle, so the icon standing in for it is the one the tracking screen already uses for a delivery in progress."
+    },
+    {
+      "seed": "search_history",
+      "flutter_golden": "test/goldens/seed/search_history_ar_375x812.png",
+      "xd": {
+        "name": "البحث",
+        "manifest_id": "88eb7e0d-5581-462d-bf65-1e9a187adff1",
+        "artboard_path": "artwork/artboard-9533152e-bb79-4567-8432-729e77a5e023",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The search screen before a query: the field, the \"previously searched\" heading with its clear link, and the recent rows each with their own remove. One sibling board is the same surface."
+    },
+    {
+      "seed": "search_products",
+      "flutter_golden": "test/goldens/seed/search_products_ar_375x812.png",
+      "xd": {
+        "name": "بحث منتجات",
+        "manifest_id": "ae2906ae-bb0b-45f6-b4db-7ea6d52ccd44",
+        "artboard_path": "artwork/artboard-8ee8ca5f-413b-4b22-88a6-a66584b9e13d",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "Search results on the products tab. The artboard grids them three across; the app grids two, which is the bulk of this residual."
+    },
+    {
+      "seed": "search_stores",
+      "flutter_golden": "test/goldens/seed/search_stores_ar_375x812.png",
+      "xd": {
+        "name": "بحث متاجر",
+        "manifest_id": "6553f38c-e202-4b21-862d-618382dbd840",
+        "artboard_path": "artwork/artboard-197919fa-9f91-40f2-ab11-2f6f6d3cecc8",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The same results on the stores tab. Both artboards draw a store logo the catalogue does not expose, so the tiles here carry the placeholder the rest of the app uses."
     }
   ]
 }

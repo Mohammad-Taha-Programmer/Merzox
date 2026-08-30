@@ -1218,6 +1218,9 @@ and that the report follows this file's order exactly.
 | `messages_empty` | `test/goldens/seed/messages_empty_ar_375x812.png` | `الرسائل` | `9a36e5d5-79fa-4d67-a19a-d24abb6652c9` | 375 x 812 | `exact` |
 | `notifications` | `test/goldens/seed/notifications_ar_375x812.png` | `الرسائل – 5` | `d753df9e-964a-4b98-9031-514ecf513efc` | 375 x 810 | `extend_final_row_to_812` |
 | `checkout_done` | `test/goldens/seed/checkout_done_ar_375x812.png` | `تفاصيل المتجر – 17` | `79fbe6cf-c0c1-4334-8f73-d12771d63c7b` | 375 x 808 | `extend_final_row_to_812` |
+| `search_history` | `test/goldens/seed/search_history_ar_375x812.png` | `البحث` | `88eb7e0d-5581-462d-bf65-1e9a187adff1` | 375 x 810 | `extend_final_row_to_812` |
+| `search_products` | `test/goldens/seed/search_products_ar_375x812.png` | `بحث منتجات` | `ae2906ae-bb0b-45f6-b4db-7ea6d52ccd44` | 375 x 810 | `extend_final_row_to_812` |
+| `search_stores` | `test/goldens/seed/search_stores_ar_375x812.png` | `بحث متاجر` | `6553f38c-e202-4b21-862d-618382dbd840` | 375 x 810 | `extend_final_row_to_812` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1248,6 +1251,9 @@ a *different* uuid from the manifest id):
 | `messages_empty` | `artwork/artboard-f0930cf3-1088-4cc0-b844-23ea1df2230b` |
 | `notifications` | `artwork/artboard-e8d050b5-eac3-4f9e-a0ca-842e4b25e508` |
 | `checkout_done` | `artwork/artboard-dba6cf14-27cd-47e0-a3be-a4963b18bf96` |
+| `search_history` | `artwork/artboard-9533152e-bb79-4567-8432-729e77a5e023` |
+| `search_products` | `artwork/artboard-8ee8ca5f-413b-4b22-88a6-a66584b9e13d` |
+| `search_stores` | `artwork/artboard-197919fa-9f91-40f2-ab11-2f6f6d3cecc8` |
 
 Why each one, in one line:
 

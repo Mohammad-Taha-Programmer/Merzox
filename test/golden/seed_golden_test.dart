@@ -68,6 +68,10 @@ import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
 import 'package:merzox/features/orders/pages/order_tracking_page.dart';
 import 'package:merzox/features/splash/presentation/splash_screen.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/features/search/bloc/search_bloc.dart';
+import 'package:merzox/features/search/bloc/search_event.dart';
+import 'package:merzox/features/search/bloc/search_state.dart';
+import 'package:merzox/features/search/pages/search_page.dart';
 import 'package:merzox/features/notifications/bloc/notifications_bloc.dart';
 import 'package:merzox/features/notifications/bloc/notifications_event.dart';
 import 'package:merzox/features/messages/bloc/messages_bloc.dart';
@@ -667,6 +671,47 @@ final class _SeedPlacingApi extends _SeedDeliveryApi {
     });
   }
 }
+
+/// The catalogue search, with the results both result artboards list.
+final class _SeedSearchApi extends ApiService {
+  @override
+  Future<SearchApiResponse> searchCatalog({
+    required String query,
+    int limit = 30,
+  }) async {
+    return SearchApiResponse.fromJson(<String, dynamic>{
+      'query': query,
+      'products': <Map<String, dynamic>>[
+        for (int index = 0; index < 6; index++)
+          <String, dynamic>{
+            ..._seedDetailedProduct(),
+            'id': '64c00000000000000000010$index',
+            'name': 'بوت حريمي',
+            'business': _seedSearchBusiness(index),
+          },
+      ],
+      'businesses': <Map<String, dynamic>>[
+        for (int index = 0; index < 6; index++) _seedSearchBusiness(index),
+      ],
+    });
+  }
+}
+
+Map<String, dynamic> _seedSearchBusiness(int index) => <String, dynamic>{
+  'id': '64b00000000000000000020$index',
+  'publicId': '002010$index',
+  'name': 'متجر حرير شوب',
+  'englishName': 'Harir Shop',
+  'category': 'أحذية',
+  'address': 'رام الله',
+  'products': const <String>[],
+  'productCount': 8,
+  'rating': 4,
+  'ratingCount': 12,
+  'followerCount': 5,
+  'viewCount': 120,
+  'colorValue': 0xFFDEEEF8,
+};
 
 /// The delivery tiers, as the order route publishes them.
 final class _SeedDeliveryApi extends _SeedProductApi {
@@ -1613,6 +1658,97 @@ void main() {
         expect(find.text('رقم الطلب: #222321'), findsOneWidget);
 
         await expectMerzoxSeedGolden('checkout_done_ar_375x812.png');
+      });
+
+      // -- 25/26/27. Search ------------------------------------------------
+      //
+      // `البحث` before a query, then its two result tabs.
+      Future<SearchBloc> search({String query = '', int tab = 0}) async {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          SearchBloc.historyKey: <String>[
+            'حذاء حريمي',
+            'متجر جوميا',
+            'حذاء حريمي',
+            'حذاء حريمي',
+            'حذاء حريمي',
+          ],
+        });
+
+        final SearchBloc bloc = SearchBloc(apiService: _SeedSearchApi());
+        _closeOnTearDown(bloc);
+
+        final Future<SearchState> ready = bloc.stream.firstWhere(
+          (SearchState state) => state.status != SearchStatus.initial,
+        );
+        bloc.add(const SearchStarted());
+        await ready;
+
+        if (query.isEmpty) return bloc;
+
+        final Future<SearchState> results = bloc.stream.firstWhere(
+          (SearchState state) =>
+              state.status == SearchStatus.success ||
+              state.status == SearchStatus.failure,
+        );
+        bloc.add(SearchSubmitted(query));
+        final SearchState settled = await results;
+        expect(
+          settled.status,
+          SearchStatus.success,
+          reason: 'search fixture rejected: ${settled.errorMessage}',
+        );
+
+        if (tab != 0) {
+          bloc.add(SearchTabChanged(tab));
+          await bloc.stream.firstWhere(
+            (SearchState state) => state.selectedTab == tab,
+          );
+        }
+
+        return bloc;
+      }
+
+      Future<void> pumpSearch(WidgetTester tester, SearchBloc bloc) =>
+          pumpMerzoxGoldenPage(
+            tester,
+            BlocProvider<SearchBloc>.value(
+              value: bloc,
+              child: withMerzoxGoldenDeviceInsets(const SearchPage()),
+            ),
+          );
+
+      testWidgets('search history renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final SearchBloc bloc = await search();
+        expect(bloc.state.history, hasLength(5));
+
+        await pumpSearch(tester, bloc);
+
+        expect(find.text('حذاء حريمي'), findsWidgets);
+        await expectMerzoxSeedGolden('search_history_ar_375x812.png');
+      });
+
+      testWidgets('search product results render their Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final SearchBloc bloc = await search(query: 'بوت');
+        expect(bloc.state.products, hasLength(6));
+
+        await pumpSearch(tester, bloc);
+
+        await expectMerzoxSeedGolden('search_products_ar_375x812.png');
+      });
+
+      testWidgets('search store results render their Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final SearchBloc bloc = await search(query: 'حرير', tab: 1);
+        expect(bloc.state.businesses, hasLength(6));
+
+        await pumpSearch(tester, bloc);
+
+        await expectMerzoxSeedGolden('search_stores_ar_375x812.png');
       });
 
       // -- 16. Merchant dashboard -----------------------------------------
