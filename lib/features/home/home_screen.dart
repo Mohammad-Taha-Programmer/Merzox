@@ -1621,13 +1621,14 @@ class _CartItemsView extends StatelessWidget {
               const SizedBox(height: 18),
               _CartSummaryCard(
                 subtotal: state.subtotal,
+                // The basket no longer submits itself: the customer confirms
+                // the address and the invoice first, and that screen dispatches
+                // the same event this button used to.
                 onCheckoutPressed: state.status == CartStatus.checkingOut
                     ? null
                     : () => AuthGate.run(
                         context,
-                        onAuthenticated: () => context.read<CartBloc>().add(
-                          const CartCheckoutRequested(),
-                        ),
+                        onAuthenticated: () => context.push('/checkout'),
                       ),
               ),
             ],

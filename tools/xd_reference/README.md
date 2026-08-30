@@ -1197,6 +1197,8 @@ and that the report follows this file's order exactly.
 | `storefront_products` | `test/goldens/seed/storefront_products_ar_375x812.png` | `تفاصيل المتجر – 2` | `4223d0ec-2ddf-4489-b92a-b1d5469e5887` | 375 x 1165 | `crop_top_to_812` |
 | `storefront_reviews` | `test/goldens/seed/storefront_reviews_ar_375x812.png` | `تفاصيل المتجر – 7` | `217c3127-5350-4faa-883a-21ea8fb283d5` | 375 x 1300 | `crop_top_to_812` |
 | `product_details` | `test/goldens/seed/product_details_ar_375x812.png` | `تفاصيل المتجر – 8` | `4b0b3ac3-0022-4de2-a0e5-756601280607` | 375 x 800 | `extend_final_row_to_812` |
+| `checkout_buyer` | `test/goldens/seed/checkout_buyer_ar_375x812.png` | `تفاصيل المتجر – 16` | `6220e04a-82bd-42fb-8fb6-b194f1e212a6` | 375 x 808 | `extend_final_row_to_812` |
+| `checkout_payment` | `test/goldens/seed/checkout_payment_ar_375x812.png` | `تفاصيل المتجر – 24` | `2f14e240-c8db-4781-862d-3391ecd8efc1` | 375 x 808 | `extend_final_row_to_812` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1216,6 +1218,8 @@ a *different* uuid from the manifest id):
 | `storefront_products` | `artwork/artboard-ce11c718-5740-4715-9ead-9235df87d4db` |
 | `storefront_reviews` | `artwork/artboard-59f2d5d4-9b0f-4824-8d24-2c464abec4ee` |
 | `product_details` | `artwork/artboard-cde06fe1-416a-421b-94cb-cd280aa1056a` |
+| `checkout_buyer` | `artwork/artboard-3212cea6-6eac-4c2b-92d4-fc25f3c5fc04` |
+| `checkout_payment` | `artwork/artboard-af467938-91c0-4054-8d18-fe752b10ab60` |
 
 Why each one, in one line:
 

@@ -57,6 +57,9 @@ import '../features/search/bloc/search_event.dart';
 import '../features/search/pages/search_page.dart';
 import '../features/share_app/bloc/share_app_bloc.dart';
 import '../features/share_app/pages/share_app_page.dart';
+import 'package:merzox/features/cart/bloc/cart_bloc.dart';
+import 'package:merzox/features/cart/bloc/cart_event.dart';
+import 'package:merzox/features/checkout/pages/checkout_page.dart';
 
 class AppRouter {
   final StartupDestination destination;
@@ -254,6 +257,19 @@ class AppRouter {
             child: HomeScreen(isGuest: showGuestPresentation),
           );
         },
+      ),
+      GoRoute(
+        path: '/checkout',
+        builder: (context, __) => BlocProvider<CartBloc>(
+          // Its own cart instance: the flow reads the basket it is about to
+          // submit, and submits through the same event the cart tab used.
+          create: (_) => CartBloc()..add(const CartStarted()),
+          child: CheckoutPage(
+            onCompleted: () {
+              if (context.canPop()) context.pop();
+            },
+          ),
+        ),
       ),
       GoRoute(
         path: '/orders',

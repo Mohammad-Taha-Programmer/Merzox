@@ -42,6 +42,11 @@ import 'package:merzox/features/business_profile/bloc/business_profile_event.dar
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
+import 'package:merzox/features/cart/bloc/cart_bloc.dart';
+import 'package:merzox/features/cart/bloc/cart_event.dart';
+import 'package:merzox/features/cart/bloc/cart_state.dart';
+import 'package:merzox/features/cart/cart_storage_keys.dart';
+import 'package:merzox/features/checkout/pages/checkout_page.dart';
 import 'package:merzox/features/favorites/bloc/favorites_bloc.dart';
 import 'package:merzox/features/favorites/bloc/favorites_event.dart';
 import 'package:merzox/features/favorites/bloc/favorites_state.dart';
@@ -1140,6 +1145,84 @@ void main() {
         await expectMerzoxSeedGolden(
           'product_details_ar_375x812.png',
         );
+      });
+
+      // -- 14/15. The two checkout steps ----------------------------------
+      //
+      // A basket with one line, an authenticated customer and a saved
+      // delivery address: the preconditions both artboards assume.
+      Future<CartBloc> loadedCart() async {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          AuthBloc.sessionKey: true,
+          AuthBloc.tokenKey: 'seed-golden-token',
+          AuthBloc.userTypeKey: 'customer',
+          AuthBloc.nameKey: 'ياسمين عماد',
+          AuthBloc.addressKey: 'أريحا',
+          CartStorageKeys.items: <String>[
+            // The stored line is JSON, and the bloc REVALIDATES it against the
+            // public product contract on load, so the seed serves that product
+            // too rather than letting the line fall back to its snapshot.
+            '{"businessId":"64b000000000000000000001",'
+                '"productId":"64c000000000000000000099",'
+                '"name":"أساس فت مي","price":5.5,"quantity":1,'
+                '"imageUrl":""}',
+          ],
+        });
+
+        final CartBloc bloc = CartBloc(apiService: _SeedProductApi());
+        _closeOnTearDown(bloc);
+
+        final Future<CartState> ready = bloc.stream.firstWhere(
+          (CartState state) => state.status == CartStatus.ready,
+        );
+        bloc.add(const CartStarted());
+        await ready;
+
+        return bloc;
+      }
+
+      testWidgets('checkout buyer step renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final CartBloc cart = await loadedCart();
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<CartBloc>.value(
+            value: cart,
+            child: withMerzoxGoldenDeviceInsets(const CheckoutPage()),
+          ),
+        );
+
+        expect(find.text('تفاصيل المشتري'), findsOneWidget);
+        expect(find.text('أضف عنوان جديد'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('checkout_buyer_ar_375x812.png');
+      });
+
+      testWidgets('checkout payment step renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final CartBloc cart = await loadedCart();
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<CartBloc>.value(
+            value: cart,
+            child: withMerzoxGoldenDeviceInsets(const CheckoutPage()),
+          ),
+        );
+
+        // Step two is reached the way a customer reaches it.
+        await tester.tap(find.text('متابعة'));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('الدفع'), findsWidgets);
+        expect(find.text('الدفع عند الاستلام'), findsOneWidget);
+        expect(find.text('تأكيد الطلب'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('checkout_payment_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

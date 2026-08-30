@@ -416,6 +416,26 @@ class MappingContractTests(unittest.TestCase):
                     800,
                     "extend_final_row_to_812",
                 ),
+                (
+                    "checkout_buyer",
+                    "test/goldens/seed/checkout_buyer_ar_375x812.png",
+                    "تفاصيل المتجر – 16",
+                    "6220e04a-82bd-42fb-8fb6-b194f1e212a6",
+                    "artwork/artboard-3212cea6-6eac-4c2b-92d4-fc25f3c5fc04",
+                    375,
+                    808,
+                    "extend_final_row_to_812",
+                ),
+                (
+                    "checkout_payment",
+                    "test/goldens/seed/checkout_payment_ar_375x812.png",
+                    "تفاصيل المتجر – 24",
+                    "2f14e240-c8db-4781-862d-3391ecd8efc1",
+                    "artwork/artboard-af467938-91c0-4054-8d18-fe752b10ab60",
+                    375,
+                    808,
+                    "extend_final_row_to_812",
+                ),
             ],
         )
 

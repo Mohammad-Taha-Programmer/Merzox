@@ -615,5 +615,22 @@
     "shareAccess": "إرسال بيانات الوصول",
     "shareFailed": "تعذر فتح نافذة المشاركة في النظام.",
     "discardAccess": "تجاهل الرمز"
+  },
+  "checkout": {
+    "buyerTitle": "تفاصيل المشتري",
+    "paymentTitle": "الدفع",
+    "savedAddress": "استخدم أحد العناوين السابقة",
+    "noSavedAddress": "لا يوجد عنوان محفوظ بعد، أضف عنوانك للمتابعة",
+    "addAddress": "أضف عنوان جديد",
+    "continue": "متابعة",
+    "cashOnDelivery": "الدفع عند الاستلام",
+    "delivery": "التوصيل",
+    "standardDelivery": "التوصيل القياسي",
+    "invoice": "فاتورة المشتريات",
+    "unitPrice": "السعر",
+    "totalPending": "{} + التوصيل",
+    "confirm": "تأكيد الطلب",
+    "cancel": "إلغاء الطلب",
+    "cancellationWindow": "يمكن إلغاء الطلب خلال 24 ساعة من تأكيده"
   }
 }

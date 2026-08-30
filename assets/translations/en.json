@@ -615,5 +615,22 @@
     "shareAccess": "Share access details",
     "shareFailed": "The system share sheet could not be opened.",
     "discardAccess": "Discard code"
+  },
+  "checkout": {
+    "buyerTitle": "Buyer details",
+    "paymentTitle": "Payment",
+    "savedAddress": "Use one of your saved addresses",
+    "noSavedAddress": "No saved address yet — add one to continue",
+    "addAddress": "Add a new address",
+    "continue": "Continue",
+    "cashOnDelivery": "Cash on delivery",
+    "delivery": "Delivery",
+    "standardDelivery": "Standard delivery",
+    "invoice": "Purchase invoice",
+    "unitPrice": "Price",
+    "totalPending": "{} + delivery",
+    "confirm": "Confirm order",
+    "cancel": "Cancel order",
+    "cancellationWindow": "An order can be cancelled within 24 hours"
   }
 }
