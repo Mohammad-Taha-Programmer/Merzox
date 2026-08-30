@@ -680,6 +680,11 @@
     "deliveryOptions": {
       "standard": "Estimated delivery in one to three days",
       "express": "Estimated delivery: immediate"
-    }
+    },
+    "orderPlaced": "Your order is confirmed",
+    "orderNumber": "Order number: #{}",
+    "goToOrders": "Go to my orders",
+    "backHome": "Back to home",
+    "doneTitle": "Order complete"
   }
 }

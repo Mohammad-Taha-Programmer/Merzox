@@ -70,10 +70,18 @@ final class CartState {
   final String messageCode;
   final String errorMessage;
 
+  /// The public numbers of the orders the last checkout placed.
+  ///
+  /// A basket spanning two stores becomes two orders, so this is a list. It is
+  /// cleared by the next checkout, not read from storage: it describes what
+  /// just happened, not what is saved.
+  final List<String> placedOrderIds;
+
   const CartState({
     this.status = CartStatus.initial,
     this.items = const [],
     this.messageCode = '',
+    this.placedOrderIds = const <String>[],
     this.errorMessage = '',
   });
 
@@ -86,12 +94,14 @@ final class CartState {
     CartStatus? status,
     List<CartItem>? items,
     String? messageCode,
+    List<String>? placedOrderIds,
     String? errorMessage,
   }) {
     return CartState(
       status: status ?? this.status,
       items: items ?? this.items,
       messageCode: messageCode ?? this.messageCode,
+      placedOrderIds: placedOrderIds ?? this.placedOrderIds,
       errorMessage: errorMessage ?? this.errorMessage,
     );
   }
