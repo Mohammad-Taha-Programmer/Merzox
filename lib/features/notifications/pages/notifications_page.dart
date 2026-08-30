@@ -271,80 +271,35 @@ class _NotificationTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: unread ? MerzoxColors.kColorFDF1EC : Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: unread
-                  ? MerzoxColors.kColorFEE3DC
-                  : MerzoxColors.kColorEFEFEF,
-            ),
-          ),
+          height: 48,
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          color: unread ? MerzoxColors.kColorFDF1EC : Colors.white,
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: unread
-                      ? MerzoxColors.kColorEE6C4D
-                      : MerzoxColors.kColorDEEEF8,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  _iconFor(notification.type),
-                  size: 20,
-                  color: unread ? Colors.white : MerzoxColors.kColor3D5A80,
-                ),
-              ),
-              const SizedBox(width: 12),
+            children: <Widget>[
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      notification.title,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: MerzoxColors.kColor2B2B2B,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      notification.body,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        height: 1.5,
-                        color: MerzoxColors.kColor767676,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _formatTimestamp(notification.createdAt),
-                      style: const TextStyle(
-                        fontSize: 9,
-                        color: MerzoxColors.kColor8D99AE,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (unread)
-                Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(top: 4),
-                  decoration: const BoxDecoration(
-                    color: MerzoxColors.kColorEE6C4D,
-                    shape: BoxShape.circle,
+                child: Text(
+                  notification.body.isEmpty
+                      ? notification.title
+                      : '${notification.title} · ${notification.body}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
+                    color: MerzoxColors.kColor3B3B3B,
                   ),
                 ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                _formatTimestamp(notification.createdAt),
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: MerzoxColors.kColor8D99AE,
+                ),
+              ),
             ],
           ),
         ),

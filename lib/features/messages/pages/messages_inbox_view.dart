@@ -101,7 +101,9 @@ class _MessagesInboxViewState extends State<MessagesInboxView> {
                 filter: state.filter,
                 unreadCount: state.unreadConversationCount,
               ),
-              const SizedBox(height: 18),
+              // The artboard opens its first row at 179, under a 44-tall tab
+              // band that starts at 112.
+              const SizedBox(height: 41),
               ..._buildBody(context, state),
             ],
           ),
@@ -332,15 +334,13 @@ class _ConversationTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: MerzoxColors.kColorEFEFEF),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          // An unread row carries the tint; the rest of the band is the page.
+          // The artboard draws no card, no border and no gap between rows.
+          color: conversation.hasUnread
+              ? MerzoxColors.kColorEEF6FB
+              : Colors.white,
           child: Row(
             children: [
               _InboxAvatar(
@@ -369,7 +369,9 @@ class _ConversationTile extends StatelessWidget {
                       conversation.lastMessage.body.isEmpty
                           ? 'messages.noMessagesYet'.tr()
                           : conversation.lastMessage.body,
-                      maxLines: 1,
+                      // The artboard wraps a long last message onto a second
+                      // line rather than cutting it at the first.
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 10,

@@ -68,6 +68,14 @@ import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
 import 'package:merzox/features/orders/pages/order_tracking_page.dart';
 import 'package:merzox/features/splash/presentation/splash_screen.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/features/notifications/bloc/notifications_bloc.dart';
+import 'package:merzox/features/notifications/bloc/notifications_event.dart';
+import 'package:merzox/features/messages/bloc/messages_bloc.dart';
+import 'package:merzox/features/messages/bloc/messages_event.dart';
+import 'package:merzox/features/messages/bloc/messages_state.dart';
+import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
+import 'package:merzox/features/notifications/pages/notifications_page.dart';
+import 'package:merzox/features/notifications/bloc/notifications_state.dart';
 import 'package:merzox/services/device_location_service.dart';
 import 'package:merzox/services/location_permission_service.dart';
 import 'package:merzox/services/review_eligibility_service.dart';
@@ -610,6 +618,96 @@ final class _SeedHomeApi extends ApiService {
     int limit = 20,
   }) async =>
       FavoriteBusinessListApiResponse.fromJson(const <String, dynamic>{});
+}
+
+/// One inbox row, in the shape `الرسائل – 4` lists them.
+Map<String, dynamic> _seedConversation(int index, {required bool unread}) {
+  return <String, dynamic>{
+    'id': '64a00000000000000000000$index',
+    'title': index.isEven ? 'متجر الياسمين' : 'متجر حرير شوب',
+    'avatarUrl': '',
+    'business': <String, dynamic>{
+      'id': '64b000000000000000000001',
+      'name': index.isEven ? 'متجر الياسمين' : 'متجر حرير شوب',
+      'avatarUrl': '',
+    },
+    'lastMessage': <String, dynamic>{
+      'body': index.isEven
+          ? 'متى المتجر بيفتح؟'
+          : 'متوفر المزيد من العروض بداخل المتجر',
+      'sentAt': '2022-02-15T09:43:00.000Z',
+      'senderType': 'business',
+    },
+    'unreadCount': unread ? 1 : 0,
+    'messageCount': 6,
+    'updatedAt': '2022-02-15T09:43:00.000Z',
+  };
+}
+
+/// The inbox with the four rows `الرسائل – 4` draws, alternating read state.
+final class _SeedMessagesApi extends ApiService {
+  @override
+  Future<ConversationListApiResponse> conversations({
+    required String token,
+    bool unreadOnly = false,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return ConversationListApiResponse.fromJson(<String, dynamic>{
+      'conversations': <Map<String, dynamic>>[
+        for (int index = 0; index < 4; index++)
+          _seedConversation(index, unread: index.isEven),
+      ],
+      'unreadConversationCount': 2,
+      'pagination': const <String, dynamic>{'page': 1, 'hasMore': false},
+    });
+  }
+}
+
+/// The same inbox with nothing in it, which `الرسائل` draws as its own board.
+final class _SeedEmptyMessagesApi extends ApiService {
+  @override
+  Future<ConversationListApiResponse> conversations({
+    required String token,
+    bool unreadOnly = false,
+    int page = 1,
+    int limit = 20,
+  }) async => ConversationListApiResponse.fromJson(const <String, dynamic>{
+    'conversations': <Map<String, dynamic>>[],
+    'unreadConversationCount': 0,
+    'pagination': <String, dynamic>{'page': 1, 'hasMore': false},
+  });
+}
+
+/// The notifications list of `الرسائل – 5`.
+final class _SeedNotificationsApi extends ApiService {
+  @override
+  Future<NotificationListApiResponse> notifications({
+    required String token,
+    bool businessAudience = false,
+    bool unreadOnly = false,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return NotificationListApiResponse.fromJson(<String, dynamic>{
+      'notifications': <Map<String, dynamic>>[
+        for (int index = 0; index < 7; index++)
+          <String, dynamic>{
+            'id': '64c00000000000000000000$index',
+            'type': index == 1 ? 'review' : 'order',
+            'title': index == 1
+                ? 'قامت ياسمين خالد بتقييم المتجر'
+                : 'طلبات جديده',
+            'body': index == 1 ? '' : 'يوجد لديك طلبات جديدة',
+            'data': const <String, dynamic>{},
+            'isRead': index > 2,
+            'createdAt': '2022-02-15T09:43:00.000Z',
+          },
+      ],
+      'unreadCount': 3,
+      'pagination': const <String, dynamic>{'page': 1, 'hasMore': false},
+    });
+  }
 }
 
 /// The single service the Store Preview artboard shows under "About".
@@ -1586,6 +1684,113 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
 
         await expectMerzoxSeedGolden('home_customer_ar_375x812.png');
+      });
+
+      // -- 21/22/23. The messaging family ----------------------------------
+      //
+      // `الرسائل` is the corpus's largest untouched family: an inbox with
+      // all/unread tabs, its empty state, and the notifications list drawn as
+      // `الرسائل – 5`.
+      Future<MessagesBloc> inbox(ApiService api) async {
+        _useAuthenticatedCustomerSession();
+
+        final MessagesBloc bloc = MessagesBloc(apiService: api);
+        _closeOnTearDown(bloc);
+
+        final Future<MessagesState> ready = bloc.stream.firstWhere(
+          (MessagesState state) => state.status == MessagesStatus.ready,
+        );
+        bloc.add(const MessagesStarted());
+        await ready;
+
+        return bloc;
+      }
+
+      testWidgets('messages inbox renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final MessagesBloc bloc = await inbox(_SeedMessagesApi());
+        expect(bloc.state.conversations, hasLength(4));
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<MessagesBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              Scaffold(
+                backgroundColor: Colors.white,
+                body: SafeArea(
+                  child: Builder(
+                    builder: (BuildContext context) =>
+                        MessagesInboxView(title: 'messages.title'.tr()),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(find.text('متجر الياسمين'), findsWidgets);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('messages_inbox_ar_375x812.png');
+      });
+
+      testWidgets('empty messages inbox renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final MessagesBloc bloc = await inbox(_SeedEmptyMessagesApi());
+        expect(bloc.state.conversations, isEmpty);
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<MessagesBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              Scaffold(
+                backgroundColor: Colors.white,
+                body: SafeArea(
+                  child: Builder(
+                    builder: (BuildContext context) =>
+                        MessagesInboxView(title: 'messages.title'.tr()),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        await expectMerzoxSeedGolden('messages_empty_ar_375x812.png');
+      });
+
+      testWidgets('notifications list renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        final NotificationsBloc bloc = NotificationsBloc(
+          apiService: _SeedNotificationsApi(),
+        );
+        _closeOnTearDown(bloc);
+
+        final Future<NotificationsState> ready = bloc.stream.firstWhere(
+          (NotificationsState state) =>
+              state.status == NotificationsStatus.ready,
+        );
+        bloc.add(const NotificationsStarted());
+        await ready;
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<NotificationsBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(const NotificationsPage()),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('notifications_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

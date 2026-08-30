@@ -264,6 +264,45 @@
       },
       "normalization": "crop_top_to_812",
       "semantic_reason": "The same screen SIGNED IN: the header carries the customer photo and name. It is the only difference between the two artboards, which is why they share one seed API and differ only in the session. Both home artboards were unmeasurable until the exporter learned to render backdrop blur: a single 98x35 frosted chip on the promotional card counted as an unsupported node, and the comparator is fail-closed. The 1716 height is the corpus convention for drawing what scrolling reveals, so only the top 812 - what a device shows - is measured. Two thirds of this seed's residual is photography, not layout: the artboard's promotional card is a dark sale photograph and its store cards carry a logo, while the catalogue API exposes no artwork for a business at all - only the deterministic placeholder colour the cards already use. The 112-row carousel band alone measures ~150 mean delta against a flat placeholder. The structural bands themselves land within a few pixels: carousel 113..223 exactly, dots and search within one, section heading and shelf within four. The bottom navigation is ~11 shorter on the artboard; it is shared with five other seeds, so it is left alone rather than re-baselining them for about a point of MAE."
+    },
+    {
+      "seed": "messages_inbox",
+      "flutter_golden": "test/goldens/seed/messages_inbox_ar_375x812.png",
+      "xd": {
+        "name": "الرسائل – 4",
+        "manifest_id": "bdbe6b50-5093-4d15-9e14-c3aec8821e2d",
+        "artboard_path": "artwork/artboard-2c2fafd3-b228-4e8a-99bc-9a366839092f",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The conversation inbox with its all/unread tabs, on the \"all\" tab: four rows alternating read and unread, which is what this board draws. Three sibling boards (الرسائل – 3, and two more) are the same surface on the other tab or with a different row count. The seed renders the inbox view alone rather than inside the customer shell, because the merchant shell hosts the same widget and the artboard draws no chrome around it beyond the bottom navigation."
+    },
+    {
+      "seed": "messages_empty",
+      "flutter_golden": "test/goldens/seed/messages_empty_ar_375x812.png",
+      "xd": {
+        "name": "الرسائل",
+        "manifest_id": "9a36e5d5-79fa-4d67-a19a-d24abb6652c9",
+        "artboard_path": "artwork/artboard-f0930cf3-1088-4cc0-b844-23ea1df2230b",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The inbox with nothing in it. The artboard draws a paper-plane illustration over an apology and a hint to go ask a store about a product; the app draws an icon over the same two lines."
+    },
+    {
+      "seed": "notifications",
+      "flutter_golden": "test/goldens/seed/notifications_ar_375x812.png",
+      "xd": {
+        "name": "الرسائل – 5",
+        "manifest_id": "d753df9e-964a-4b98-9031-514ecf513efc",
+        "artboard_path": "artwork/artboard-e8d050b5-eac3-4f9e-a0ca-842e4b25e508",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The notifications list. It is drawn inside the الرسائل family but is a different surface: its own page, its own bloc, and rows that carry an event rather than a conversation."
     }
   ]
 }
