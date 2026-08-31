@@ -195,6 +195,10 @@ const orderSchema = new mongoose.Schema(
     cancellationReason: { type: String, trim: true, maxlength: 250, default: '' },
     cancelledAt: { type: Date, default: null },
     deliveredAt: { type: Date, default: null },
+    // When the merchant last re-sent the current status to the customer by
+    // hand. Only the cooldown reads it, and only the server writes it: a
+    // client-supplied timestamp would be a client-supplied rate limit.
+    lastManualNotifyAt: { type: Date, default: null },
     courier: { type: courierSchema, default: () => ({}) },
     courierLocationCapability: {
       type: courierLocationCapabilitySchema,
@@ -373,6 +377,7 @@ orderSchema.methods.toMerchantJSON = function toMerchantJSON() {
     cancellationReason: this.cancellationReason,
     cancelledAt: this.cancelledAt,
     deliveredAt: this.deliveredAt,
+    lastManualNotifyAt: this.lastManualNotifyAt ?? null,
     courier: this.courierJSON(),
     createdAt: this.createdAt,
     updatedAt: this.updatedAt,

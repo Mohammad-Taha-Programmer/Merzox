@@ -62,6 +62,10 @@ import 'package:merzox/features/product_details/bloc/product_details_event.dart'
 import 'package:merzox/features/product_details/bloc/product_details_state.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
+import 'package:merzox/features/business/orders/merchant_order_detail_page.dart';
+import 'package:merzox/features/business/orders/merchant_order_invoice_page.dart';
+import 'package:merzox/features/business/products/merchant_product_editor_page.dart';
+import 'package:merzox/features/business/products/merchant_product_options_dialog.dart';
 import 'package:merzox/features/orders/bloc/orders_bloc.dart';
 import 'package:merzox/features/orders/bloc/orders_event.dart';
 import 'package:merzox/features/orders/bloc/orders_state.dart';
@@ -473,6 +477,44 @@ final class _SeedNoCustomerOrdersApi extends ApiService {
       'counts': <String, dynamic>{'total': 0},
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Merchant order detail fixture
+// ---------------------------------------------------------------------------
+
+/// The order `تفاصيل الطلب` draws: 35 + 10 = 45, placed 15.2.2022 by
+/// `ياسمين خالد`, one unit of `أساس فت مي`.
+OwnerOrder _seedDetailOrder({String status = 'pending'}) {
+  return OwnerOrder.fromJson(<String, dynamic>{
+    'id': '64d000000000000000000201',
+    'publicId': '222321',
+    'customerName': 'ياسمين خالد',
+    'customerPhone': '0592029316',
+    'items': <Map<String, dynamic>>[
+      <String, dynamic>{
+        'productId': '64c000000000000000000201',
+        'variantId': null,
+        'name': 'أساس فت مي',
+        'imageUrl': '',
+        'unitPrice': 35,
+        'quantity': 1,
+        'variant': '',
+      },
+    ],
+    'subtotal': 35,
+    'deliveryFee': 10,
+    'total': 45,
+    'currency': 'ILS',
+    'deliveryAddress': 'أريحا ، النبي موسى',
+    'paymentMethod': 'cash',
+    'status': status,
+    'statusGroup': status == 'pending' ? 'current' : 'current',
+    'statusHistory': const <Map<String, dynamic>>[],
+    'cancellationReason': '',
+    'createdAt': '2022-02-15T10:00:00.000',
+    'courier': const <String, dynamic>{},
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2517,6 +2559,204 @@ void main() {
         expect(find.text('عذراً، لا يوجد لديك طلبات'), findsOneWidget);
 
         await expectMerzoxSeedGolden('orders_empty_ar_375x812.png');
+      });
+
+      // -- 36/37/38. إضافة منتجات, the merchant's product form ---------------
+      //
+      // Three boards of one screen: the form as it opens, the form with both
+      // tick boxes set — which drops the quantity field and raises the
+      // discounted price — and the options dialog over it. The two form boards
+      // are 1334 tall and the dialog board 1251, all drawn with the shell's
+      // own bar across the fold, so the comparator crops each to the 812 a
+      // device shows.
+      Future<BusinessBloc> productEditorBloc() async {
+        _useAuthenticatedMerchantSession();
+
+        final BusinessBloc bloc = BusinessBloc(
+          apiService: _SeedMerchantProductsApi(),
+        );
+        _closeOnTearDown(bloc);
+
+        return bloc;
+      }
+
+      Future<void> pumpProductEditor(
+        WidgetTester tester,
+        BusinessBloc bloc,
+      ) async {
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              const MerchantProductEditorPage(),
+            ),
+          ),
+        );
+      }
+
+      testWidgets('the product form renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpProductEditor(tester, await productEditorBloc());
+
+        expect(find.text('إضافة منتجات'), findsOneWidget);
+        expect(find.text('الكمية المتوفرة للمنتج'), findsOneWidget);
+        // `الصور` and everything under it is what scrolling reveals, so the
+        // list has not built it and this capture does not show it - which is
+        // what the artboard's own fold says too.
+        expect(find.text('إضافة خيارات أخرى'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('add_product_ar_375x812.png');
+      });
+
+      testWidgets('the product form renders its Arabic ticked baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpProductEditor(tester, await productEditorBloc());
+
+        await tester.tap(find.text('غير محدودة'));
+        await tester.tap(find.text('هناك تخفيض'));
+        await settleMerzoxGoldenFrames(tester);
+
+        // Unlimited stock takes the quantity field away; a discount puts the
+        // price the customer pays in its place.
+        expect(find.text('الكمية المتوفرة للمنتج'), findsNothing);
+        expect(find.text('السعر بعد التخفيض'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('add_product_ticked_ar_375x812.png');
+      });
+
+      testWidgets('the product options dialog renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpProductEditor(tester, await productEditorBloc());
+
+        await tester.tap(find.text('إضافة خيارات أخرى'));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('خيارات إضافية للمنتج'), findsOneWidget);
+
+        // The artboard draws two options already named, which is this dialog
+        // after two rounds of type-and-add.
+        for (final String label in <String>['الخيار1', 'الخيار2']) {
+          await tester.enterText(
+            find.widgetWithText(TextField, 'اسم الخيار (اللون ، الحجم)'),
+            label,
+          );
+          // The form's own plus is still in the tree behind the dialog, so
+          // the tap has to name the one inside it.
+          await tester.tap(
+            find.descendant(
+              of: find.byType(ProductOptionsDialog),
+              matching: find.byIcon(Icons.add),
+            ),
+          );
+          await settleMerzoxGoldenFrames(tester);
+        }
+
+        expect(find.text('الخيار1'), findsOneWidget);
+        expect(find.text('الخيار2'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('add_product_options_ar_375x812.png');
+      });
+
+      // -- 39/40/41/42. تفاصيل الطلب, one order in the merchant's hands -----
+      //
+      // The screen, its status menu open, the confirmation it raises once the
+      // customer has been told, and the invoice `عرض الفاتورة` opens. All four
+      // boards are 375x808 and none of them carries a page title.
+      Widget orderDetail({String status = 'pending', VoidCallback? onNotify}) {
+        return withMerzoxGoldenDeviceInsets(
+          MerchantOrderDetailPage(
+            order: _seedDetailOrder(status: status),
+            businessName: 'متجر الياسمين',
+            businessAddress: 'رام الله',
+            onStatusSelected: (_) {},
+            onNotifyCustomer: onNotify ?? () {},
+          ),
+        );
+      }
+
+      testWidgets('the merchant order screen renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(tester, orderDetail());
+
+        expect(find.text('حالة الطلب'), findsOneWidget);
+        expect(find.text('جديد'), findsOneWidget);
+        expect(find.text('المنتجات (1)'), findsOneWidget);
+        expect(find.text('إرسال إشعار'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('merchant_order_detail_ar_375x812.png');
+      });
+
+      testWidgets('the merchant order status menu renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(tester, orderDetail());
+
+        await tester.tap(find.text('جديد'));
+        await settleMerzoxGoldenFrames(tester);
+
+        // The board lists four - قيد التجهيز, في الطريق, تم التسليم, ملغي -
+        // which is every status except the one a new order can actually move
+        // to next. The server enforces the lifecycle and would answer three of
+        // those four with a 409, so the menu offers what is permitted rather
+        // than what is drawn.
+        for (final String label in <String>['تم الاستلام', 'ملغي']) {
+          expect(find.text(label), findsOneWidget);
+        }
+        expect(find.text('تم التسليم'), findsNothing);
+
+        await expectMerzoxSeedGolden(
+          'merchant_order_status_menu_ar_375x812.png',
+        );
+      });
+
+      testWidgets('the notified merchant order renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(tester, orderDetail(status: 'preparing'));
+
+        // The bar is the screen's own confirmation, so the seed raises the one
+        // the page builds rather than a copy of it.
+        tester
+            .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
+            .showSnackBar(
+              merchantOrderNoticeSnackBar(
+                'merchantOrder.notificationSent'.tr(),
+              ),
+            );
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('قيد التجهيز'), findsOneWidget);
+        expect(find.text('تم إرسال إشعار بحالة الطلب'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('merchant_order_notified_ar_375x812.png');
+      });
+
+      testWidgets('the merchant invoice renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(
+          tester,
+          withMerzoxGoldenDeviceInsets(
+            MerchantOrderInvoicePage(
+              order: _seedDetailOrder(status: 'preparing'),
+              businessName: 'متجر الياسمين',
+              businessAddress: 'رام الله',
+            ),
+          ),
+        );
+
+        expect(find.text('تفاصيل الأسعار'), findsOneWidget);
+        expect(
+          find.text('شكراً لشرائك من المتجر، نتمنى لك يوماً رائعاً'),
+          findsOneWidget,
+        );
+
+        await expectMerzoxSeedGolden('merchant_order_invoice_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

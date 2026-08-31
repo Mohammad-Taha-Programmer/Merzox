@@ -10,7 +10,8 @@
     "edit": "تعديل",
     "delete": "حذف",
     "logout": "تسجيل الخروج",
-    "remove": "إزالة"
+    "remove": "إزالة",
+    "done": "تم"
   },
   "authGate": {
     "title": "تسجيل الدخول مطلوب",
@@ -265,7 +266,11 @@
       "bankTransfer": "تحويل بنكي",
       "assisted": "شراء لشخص آخر"
     },
-    "customerNameUnavailable": "اسم العميل غير متوفر"
+    "customerNameUnavailable": "اسم العميل غير متوفر",
+    "sendNotification": "إرسال إشعار",
+    "notificationSent": "تم إرسال إشعار بحالة الطلب",
+    "notifyCooldown": "تم إرسال إشعار قبل قليل، انتظر دقيقة",
+    "productsPlain": "المنتجات"
   },
   "storeSettings": {
     "title": "إعدادات المتجر",
@@ -287,7 +292,7 @@
     "categoryLabel": "ما نوع المنتجات التي تبيعها"
   },
   "merchantProduct": {
-    "addTitle": "إضافة منتج جديد",
+    "addTitle": "إضافة منتجات",
     "editTitle": "تعديل المنتج",
     "name": "اسم المنتج",
     "nameHint": "قم بكتابة اسم المنتج",
@@ -300,7 +305,6 @@
     "quantityHint": "الكمية المتوفرة للمنتج",
     "unlimited": "غير محدودة",
     "hasDiscount": "هناك تخفيض",
-    "discountPercent": "نسبة التخفيض %",
     "priceAfterDiscount": "السعر بعد التخفيض",
     "classification": "تصنيف المنتجات",
     "keywords": "كلمات دلالية",
@@ -335,7 +339,18 @@
       "new": "جديد",
       "bestSelling": "الأكثر مبيعاً",
       "offers": "عروض"
-    }
+    },
+    "priceHint": "السعر",
+    "classificationHint": "قم بتصنيف المنتجات",
+    "moreOptions": "إضافة خيارات أخرى",
+    "imagesDrop": "اسحب واسقط الصور هنا",
+    "preview": "معاينة",
+    "deleteProduct": "حذف المنتج",
+    "optionsTitle": "خيارات إضافية للمنتج",
+    "optionsBody": "في حالة وجود خيارات مثل الحجم واللون .. إلخ وإضافة ماركة للمنتج",
+    "optionNameHint": "اسم الخيار (اللون ، الحجم)",
+    "addOptions": "إضافة خيارات",
+    "invalidPriceAfterDiscount": "السعر بعد التخفيض يجب أن يكون أقل من السعر"
   },
   "merchantImages": {
     "title": "إضافة صور أو فيديو",

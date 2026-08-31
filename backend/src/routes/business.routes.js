@@ -29,6 +29,7 @@ import {
   revokeMyBusinessOrderCourierLocation,
   updateMyBusiness,
   updateMyBusinessOrderCourier,
+  notifyMyBusinessOrderCustomer,
   updateMyBusinessOrderStatus,
   updateMyBusinessProduct
 } from '../controllers/merchant.controller.js';
@@ -70,6 +71,12 @@ router.patch(
   requireBusinessUser,
   validateBusinessOrderStatus,
   updateMyBusinessOrderStatus
+);
+router.post(
+  '/me/orders/:orderId/notify',
+  requireAuth,
+  requireBusinessUser,
+  notifyMyBusinessOrderCustomer
 );
 router.patch(
   '/me/orders/:orderId/courier',

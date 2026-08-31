@@ -38,6 +38,13 @@ final class BusinessOrderStatusChanged extends BusinessEvent {
   const BusinessOrderStatusChanged(this.orderId, this.status);
 }
 
+/// `إرسال إشعار` on `تفاصيل الطلب`: tell the customer the status again,
+/// unchanged. The server rate-limits it; nothing here needs to.
+final class BusinessOrderCustomerNotified extends BusinessEvent {
+  final String orderId;
+  const BusinessOrderCustomerNotified(this.orderId);
+}
+
 /// Filling in the driver is what makes the courier card appear on the
 /// customer's tracking screen.
 final class BusinessOrderCourierAssigned extends BusinessEvent {
@@ -119,6 +126,13 @@ final class BusinessState {
   final Map<String, int> orderCounts;
   final List<OwnerProduct> products;
   final String? errorMessage;
+
+  /// A one-shot translation key for something that went right, read once by
+  /// whatever is on screen. It travels like `errorMessage` — set by the emit
+  /// that earned it and cleared by the next one — so a notice can never be
+  /// shown twice for one action.
+  final String? noticeCode;
+
   final int revision;
 
   /// One-shot memory-only bridge between the successful merchant assignment
@@ -136,6 +150,7 @@ final class BusinessState {
     this.orderCounts = const {},
     this.products = const [],
     this.errorMessage,
+    this.noticeCode,
     this.revision = 0,
     this.courierLocationHandoff,
   });
@@ -150,6 +165,7 @@ final class BusinessState {
     Map<String, int>? orderCounts,
     List<OwnerProduct>? products,
     String? errorMessage,
+    String? noticeCode,
     int? revision,
     CourierLocationHandoff? courierLocationHandoff,
     bool clearCourierLocationHandoff = false,
@@ -163,6 +179,7 @@ final class BusinessState {
     orderCounts: orderCounts ?? this.orderCounts,
     products: products ?? this.products,
     errorMessage: errorMessage,
+    noticeCode: noticeCode,
     revision: revision ?? this.revision,
     courierLocationHandoff: clearCourierLocationHandoff
         ? null
@@ -187,6 +204,7 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     on<BusinessRefreshed>(_onRefreshed);
     on<BusinessOrderFilterChanged>(_onOrderFilterChanged);
     on<BusinessOrderStatusChanged>(_onOrderStatusChanged);
+    on<BusinessOrderCustomerNotified>(_onOrderCustomerNotified);
     on<BusinessOrderCourierAssigned>(_onOrderCourierAssigned);
     on<BusinessCourierLocationHandoffConsumed>((event, emit) {
       emit(state.copyWith(clearCourierLocationHandoff: true));
@@ -307,6 +325,37 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
           orderCounts: list.counts,
           dashboard: dashboard,
           revision: state.revision + 1,
+        ),
+      );
+    } catch (error) {
+      emit(
+        state.copyWith(
+          status: BusinessStatus.failure,
+          errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  Future<void> _onOrderCustomerNotified(
+    BusinessOrderCustomerNotified event,
+    Emitter<BusinessState> emit,
+  ) async {
+    emit(state.copyWith(status: BusinessStatus.saving));
+
+    try {
+      final order = await _apiService.notifyOrderCustomer(
+        token: await _token(),
+        orderId: event.orderId,
+      );
+
+      emit(
+        state.copyWith(
+          status: BusinessStatus.ready,
+          orders: state.orders
+              .map((candidate) => candidate.id == order.id ? order : candidate)
+              .toList(),
+          noticeCode: 'merchantOrder.notificationSent',
         ),
       );
     } catch (error) {

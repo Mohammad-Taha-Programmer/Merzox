@@ -768,6 +768,24 @@ class ApiService {
     );
   }
 
+  /// Re-sends the order's current status to the customer.
+  ///
+  /// Deliberately carries no body: what the customer is told is whatever the
+  /// server already believes the order's status to be, so a merchant cannot
+  /// announce a state the order is not in.
+  Future<OwnerOrder> notifyOrderCustomer({
+    required String token,
+    required String orderId,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/businesses/me/orders/$orderId/notify',
+      options: _authOptions(token),
+    );
+    return OwnerOrder.fromJson(
+      requiredEntity(response.data, 'order', endpoint: 'ownerOrder'),
+    );
+  }
+
   Future<List<OwnerProduct>> ownerProducts({required String token}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/businesses/me/products',

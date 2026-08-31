@@ -1229,6 +1229,13 @@ and that the report follows this file's order exactly.
 | `orders_completed` | `test/goldens/seed/orders_completed_ar_375x812.png` | `تفاصيل المتجر – 19` | `ef447a75-53a1-4d3c-9005-7357605d2e8b` | 375 x 808 | `extend_final_row_to_812` |
 | `orders_cancelled` | `test/goldens/seed/orders_cancelled_ar_375x812.png` | `تفاصيل المتجر – 23` | `34f26b42-ea88-4537-8295-afd91400184d` | 375 x 808 | `extend_final_row_to_812` |
 | `orders_empty` | `test/goldens/seed/orders_empty_ar_375x812.png` | `السلة – 4` | `735d3a5c-dcc8-4b1e-811f-85995ae388ea` | 375 x 812 | `exact` |
+| `add_product` | `test/goldens/seed/add_product_ar_375x812.png` | `إضافة منتجات` | `2a394bd3-6aeb-46c2-afda-a1daddd6f168` | 375 x 1334 | `crop_top_to_812` |
+| `add_product_ticked` | `test/goldens/seed/add_product_ticked_ar_375x812.png` | `إضافة منتجات – 1` | `b2c5f0c2-0331-45e9-946e-f569c9613c13` | 375 x 1334 | `crop_top_to_812` |
+| `add_product_options` | `test/goldens/seed/add_product_options_ar_375x812.png` | `إضافة منتجات – 2` | `8f8d98d3-9baf-4022-949b-aabe4a8b3787` | 375 x 1251 | `crop_top_to_812` |
+| `merchant_order_detail` | `test/goldens/seed/merchant_order_detail_ar_375x812.png` | `تفاصيل الطلب` | `a32801f2-9040-44e7-9b96-c70292b895a1` | 375 x 808 | `extend_final_row_to_812` |
+| `merchant_order_status_menu` | `test/goldens/seed/merchant_order_status_menu_ar_375x812.png` | `تفاصيل الطلب – 1` | `97eec35d-b20f-4b41-941b-b7618cc70707` | 375 x 808 | `extend_final_row_to_812` |
+| `merchant_order_notified` | `test/goldens/seed/merchant_order_notified_ar_375x812.png` | `تفاصيل الطلب – 2` | `7951c97c-80fc-4d15-b687-30c6c19b24f2` | 375 x 808 | `extend_final_row_to_812` |
+| `merchant_order_invoice` | `test/goldens/seed/merchant_order_invoice_ar_375x812.png` | `تفاصيل الطلب – 3` | `cb71b94e-cef4-4fb6-b10c-00d497cd6314` | 375 x 808 | `extend_final_row_to_812` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1270,6 +1277,13 @@ a *different* uuid from the manifest id):
 | `orders_completed` | `artwork/artboard-516a509b-3b66-48cf-b19f-56264eacce6e` |
 | `orders_cancelled` | `artwork/artboard-6f540fc1-797c-49d6-ac59-525f45c91472` |
 | `orders_empty` | `artwork/artboard-5c73099e-976f-4302-aaac-7b3d6054ac04` |
+| `add_product` | `artwork/artboard-6712b392-dfa0-4ed5-bf54-05ff139e5f61` |
+| `add_product_ticked` | `artwork/artboard-eb2c1d36-4549-4de8-ba74-b04047a024fd` |
+| `add_product_options` | `artwork/artboard-92a3d46f-b20e-4914-801c-3c5d8bc01ead` |
+| `merchant_order_detail` | `artwork/artboard-7516e705-d2df-40d0-b0d4-9123b034baae` |
+| `merchant_order_status_menu` | `artwork/artboard-255ea64d-f256-445e-95cb-cde1a183583b` |
+| `merchant_order_notified` | `artwork/artboard-a26e2eb5-3be8-47f8-b48c-8ca0332cd8f4` |
+| `merchant_order_invoice` | `artwork/artboard-aeed8791-0e43-4abe-a9e9-8d39dde8b469` |
 
 Why each one, in one line:
 
