@@ -82,8 +82,7 @@ export function createDefaultAboutUsContent() {
       ...section,
       title: { ...section.title },
       content: { ...section.content }
-    })),
-    isPublished: true
+    }))
   };
 }
 
@@ -119,8 +118,12 @@ const aboutUsContentSchema = new mongoose.Schema(
         },
         message: 'About Us content requires four distinct sections'
       }
-    },
-    isPublished: { type: Boolean, default: true, index: true }
+    }
+    // There was an `isPublished` flag here, defaulted true and indexed. The
+    // one query this collection has selects on `key` alone and never read it,
+    // so setting it false unpublished nothing. There is no surface anywhere
+    // that could set it, either. A field that promises a capability it does
+    // not have is worse than no field.
   },
   { timestamps: true }
 );

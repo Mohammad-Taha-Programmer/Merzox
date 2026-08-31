@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:merzox/core/localization/api_error_codes.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 
@@ -89,13 +88,16 @@ class ApiService {
     defaultValue: '',
   );
 
+  /// The development host. A shipped build passes `MERZOX_API_BASE_URL` at
+  /// compile time; without it the app talks to the LAN address a developer
+  /// runs the API on.
+  ///
+  /// There used to be an Android arm here returning the same string as the
+  /// fallback below it, which read as a platform difference that did not
+  /// exist.
   static String get defaultBaseUrl {
     if (configuredBaseUrl.isNotEmpty) {
       return configuredBaseUrl;
-    }
-
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://$ipAddress:4000/api/v1';
     }
 
     return 'http://$ipAddress:4000/api/v1';

@@ -72,6 +72,25 @@ preview of a storefront says the same things the customer's view of it does.
 | `checkout_cancel`, `checkout_cancelling` | تفاصيل المتجر – 30, – 24 | 2 |
 | `profile_form_empty` | الملف الشخصي | 1 |
 
+## Where a seeded surface deliberately says something else
+
+One board is measured but does not match its own words, and the difference is
+recorded here rather than left to be rediscovered.
+
+`الرئيسية – 14` draws a dashed drop area under the title «إضافة صور أو فيديو»,
+with the hint «اسحب واسقط الصور هنا». It depicts dragging a file in from the
+device.
+
+The product has no file upload of any kind: no picker, no multipart route, no
+storage, no CDN — and no video anywhere in it, not a model field, not a player,
+not another board. An image is added by pasting its link, which is what the app
+has always done and what its hint has always said.
+
+So the title said «أو فيديو» over a screen that could not take one. It now says
+«إضافة صور». Building the other reading would mean building file upload and a
+video pipeline the design specifies nowhere else, which is a product decision
+and not an alignment one.
+
 ## What is not covered
 
 One surface. What is known about it is written below, and no more than that.

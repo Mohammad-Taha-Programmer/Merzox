@@ -338,7 +338,7 @@
     "invalidPriceAfterDiscount": "The discounted price must be below the price"
   },
   "merchantImages": {
-    "title": "Add photos or video",
+    "title": "Add photos",
     "primary": "Primary image",
     "addHint": "Add an image by link",
     "addTitle": "Add an image",
@@ -639,6 +639,8 @@
     "invalidVerificationToken": "This verification link is invalid or expired.",
     "invalidResetToken": "This reset code is invalid or expired.",
     "passwordRateLimited": "Too many attempts. Wait a moment and try again.",
+    "loginRateLimited": "Too many sign-in attempts. Wait fifteen minutes and try again.",
+    "signupRateLimited": "Too many sign-up attempts. Wait fifteen minutes and try again.",
     "invalidCurrentPassword": "Your current password is not correct.",
     "invalidPassword": "The password must be at least 6 characters.",
     "invalidEmail": "That email is invalid.",

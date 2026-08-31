@@ -12,6 +12,8 @@ import {
 import { requireAuth } from '../middleware/auth.js';
 import {
   forgotPasswordLimiter,
+  loginLimiter,
+  signupLimiter,
   resetPasswordLimiter
 } from '../middleware/security.js';
 import {
@@ -23,9 +25,9 @@ import {
 
 const router = Router();
 
-router.post('/signup', validateSignup, signup);
+router.post('/signup', signupLimiter, validateSignup, signup);
 router.get('/verify-email', verifyEmail);
-router.post('/login', validateLogin, login);
+router.post('/login', loginLimiter, validateLogin, login);
 router.post(
   '/forgot-password',
   validateForgotPassword,

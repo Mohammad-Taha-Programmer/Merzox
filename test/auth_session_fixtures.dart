@@ -1,3 +1,5 @@
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:merzox/core/auth/secure_token_store.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -7,6 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// so these helpers install the three stored shapes that contract has to tell
 /// apart: a real session, a leftover token with no session, and a session
 /// whose token is blank.
+///
+/// The session flag lives in preferences and the token lives in secure
+/// storage, so each shape has to be installed in both places.
 
 /// CASE C — an active session with a usable token.
 void useAuthenticatedSession({
@@ -15,9 +20,9 @@ void useAuthenticatedSession({
 }) {
   SharedPreferences.setMockInitialValues({
     AuthBloc.sessionKey: true,
-    AuthBloc.tokenKey: token,
     AuthBloc.userTypeKey: business ? 'business' : 'normal',
   });
+  FlutterSecureStorage.setMockInitialValues({SecureTokenStore.key: token});
 }
 
 /// CASE A — a token left behind after logout. It still looks valid, but the
@@ -27,16 +32,16 @@ void useStaleTokenWithoutSession({
 }) {
   SharedPreferences.setMockInitialValues({
     AuthBloc.sessionKey: false,
-    AuthBloc.tokenKey: token,
     AuthBloc.userTypeKey: 'normal',
   });
+  FlutterSecureStorage.setMockInitialValues({SecureTokenStore.key: token});
 }
 
 /// CASE B — the session flag is set but the stored token is whitespace only.
 void useBlankTokenSession({String token = '   '}) {
   SharedPreferences.setMockInitialValues({
     AuthBloc.sessionKey: true,
-    AuthBloc.tokenKey: token,
     AuthBloc.userTypeKey: 'normal',
   });
+  FlutterSecureStorage.setMockInitialValues({SecureTokenStore.key: token});
 }
