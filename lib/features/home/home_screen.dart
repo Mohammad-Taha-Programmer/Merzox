@@ -2234,7 +2234,13 @@ class _BusinessesTabState extends State<_BusinessesTab> {
             title: searching
                 ? 'search.noResults'.tr()
                 : 'home.businesses.emptyTitle'.tr(),
-            message: 'home.businesses.noResultsMessage'.tr(),
+            // Advice to search differently only makes sense to someone who
+            // searched. On a catalogue with nothing in it yet - which is what
+            // the first customer of a new deployment meets - it read as a
+            // suggestion to fix a search they had not made.
+            message: searching
+                ? 'home.businesses.noResultsMessage'.tr()
+                : 'home.businesses.emptyMessage'.tr(),
           )
         else ...[
           ...rows,

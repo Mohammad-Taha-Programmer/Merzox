@@ -50,8 +50,12 @@ if (!environment.enabled) {
   process.env.NODE_ENV = 'test';
   // This suite issues far more requests in a minute than a person could. Rate
   // limiting is not what is under test here, and a 429 would only mask the
-  // assertions, so the limiter is lifted for this process only.
+  // assertions, so the limiters are lifted for this process only. The
+  // credential ones matter as much as the global one: the suite seeds dozens
+  // of accounts through the real sign-up endpoint.
   process.env.RATE_LIMIT_MAX = '100000';
+  process.env.SIGNUP_RATE_LIMIT_MAX = '100000';
+  process.env.LOGIN_RATE_LIMIT_MAX = '100000';
 
   const mongoose = (await import('mongoose')).default;
   const { default: app } = await import('../../src/app.js');
