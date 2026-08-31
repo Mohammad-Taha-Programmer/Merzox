@@ -400,13 +400,13 @@
       "flutter_golden": "test/goldens/seed/store_settings_ar_375x812.png",
       "xd": {
         "name": "اعدادات المتجر",
-        "manifest_id": "4c608328-df08-4187-ae3a-9d849332167a",
-        "artboard_path": "artwork/artboard-0c361447-1919-45e7-a177-a5baa10f9401",
+        "manifest_id": "3de9948d-4451-4604-8df7-3e0ad9131c33",
+        "artboard_path": "artwork/artboard-5b3bc09f-9c9c-4d4f-b7d5-339b777d0163",
         "width": 375,
         "height": 807
       },
       "normalization": "extend_final_row_to_812",
-      "semantic_reason": "Store settings, in the state the screen opens in. The family is five boards of one screen with a different collapsible section open; the others are that same surface. The page existed and was referenced by nothing at all — the merchant profile's settings row opened a dialog editor instead — so the artboards' four-section screen was unreachable until this pass."
+      "semantic_reason": "Store settings in the state the screen opens in: the first section showing. Re-pointed from `4c608328`, which is the same screen with every section collapsed and is seeded separately as `store_settings_closed` — the app opens one section, so measuring it against the closed board was measuring the wrong state."
     },
     {
       "seed": "orders_current",
@@ -784,6 +784,162 @@
       },
       "normalization": "crop_top_to_812",
       "semantic_reason": "Step two: what they are opening. Reached the way a merchant reaches it, because the first step will not hand over an unfilled form."
+    },
+    {
+      "seed": "messages_gate",
+      "flutter_golden": "test/goldens/seed/messages_gate_ar_375x812.png",
+      "xd": {
+        "name": "الرسائل – 1",
+        "manifest_id": "564e1f27-bbb1-435c-8979-9dad96f50719",
+        "artboard_path": "artwork/artboard-3611cfde-6a3e-4585-914c-2f3352ecd66e",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The gate in front of the inbox, for a customer who has not signed in."
+    },
+    {
+      "seed": "messages_unread",
+      "flutter_golden": "test/goldens/seed/messages_unread_ar_375x812.png",
+      "xd": {
+        "name": "الرسائل",
+        "manifest_id": "2181a84f-83ec-461a-984e-d95b5e9a1fe5",
+        "artboard_path": "artwork/artboard-428a0849-f6b7-4dec-bf98-884042e3d229",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The inbox on its unread tab. The seeded `messages_inbox` is the same view on `الكل`; the second board of this surface is this one with a second row."
+    },
+    {
+      "seed": "chat_customer",
+      "flutter_golden": "test/goldens/seed/chat_customer_ar_375x812.png",
+      "xd": {
+        "name": "الرسائل – 2",
+        "manifest_id": "be534a86-cd28-466c-ab2b-69f6945494d1",
+        "artboard_path": "artwork/artboard-be72caa1-2792-4c91-b0e8-32630f9c10da",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "A conversation from the customer’s side. The board puts what you wrote at the START of the row in #3D5A80 and what you were told at the end in #F9F9F9 — the sides a reader of any direction expects, rather than mirroring with the language; this screen had it the other way round and in orange. The board draws no per-bubble timestamps and a paperclip and an emoji in the composer: the times are kept, because a conversation without them is worse, and there is no upload endpoint anywhere in this repository for the paperclip to reach."
+    },
+    {
+      "seed": "chat_merchant",
+      "flutter_golden": "test/goldens/seed/chat_merchant_ar_375x812.png",
+      "xd": {
+        "name": "الرسائل",
+        "manifest_id": "9db2c0ee-7a4f-4f68-befd-33e26951a58d",
+        "artboard_path": "artwork/artboard-a7385d90-932c-4978-bdc4-ce522ab3c1c5",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The same six lines from the other end. `isMine` is what decides a bubble’s side, so the shop’s screen is the customer’s with that flag inverted."
+    },
+    {
+      "seed": "merchant_order_filter",
+      "flutter_golden": "test/goldens/seed/merchant_order_filter_ar_375x812.png",
+      "xd": {
+        "name": "الرئيسية – 12",
+        "manifest_id": "47a7e81f-cd9a-41a8-8d19-f2f92a263e0f",
+        "artboard_path": "artwork/artboard-beec9796-17f3-48ec-bb5c-9b74a1365522",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The orders filter raised over the orders tab: order number, customer name, a date range and a status."
+    },
+    {
+      "seed": "merchant_product_menu",
+      "flutter_golden": "test/goldens/seed/merchant_product_menu_ar_375x812.png",
+      "xd": {
+        "name": "الرئيسية – 13",
+        "manifest_id": "88b38d89-3dec-433d-9d76-c2a52d727ca7",
+        "artboard_path": "artwork/artboard-f72f1e4b-bae1-4439-9ea5-ad83fbd4b20a",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "What a product card’s menu offers. A live product is offered hiding and never showing, and deleting asks first — `– 15`, the board this one clusters with, is that question."
+    },
+    {
+      "seed": "merchant_product_filter",
+      "flutter_golden": "test/goldens/seed/merchant_product_filter_ar_375x812.png",
+      "xd": {
+        "name": "الرئيسية – 16",
+        "manifest_id": "94b228cf-ae93-42f6-9264-6c61e0337d20",
+        "artboard_path": "artwork/artboard-26470fcb-ac25-47b7-9087-401627a1b8bb",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The products filter: a name, a state and a classification."
+    },
+    {
+      "seed": "merchant_product_images",
+      "flutter_golden": "test/goldens/seed/merchant_product_images_ar_375x812.png",
+      "xd": {
+        "name": "الرئيسية – 14",
+        "manifest_id": "99b9e7b0-ec6e-49bf-9282-ec29f2793cc3",
+        "artboard_path": "artwork/artboard-434bb904-38e9-48de-bbbb-d02b8da24f02",
+        "width": 375,
+        "height": 1009
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The product’s images. Built with a documented departure that still stands: no upload endpoint, storage or multipart route exists anywhere in this repository, so the screen orders and names image URLs rather than accepting a file."
+    },
+    {
+      "seed": "store_settings_closed",
+      "flutter_golden": "test/goldens/seed/store_settings_closed_ar_375x812.png",
+      "xd": {
+        "name": "اعدادات المتجر",
+        "manifest_id": "4c608328-df08-4187-ae3a-9d849332167a",
+        "artboard_path": "artwork/artboard-0c361447-1919-45e7-a177-a5baa10f9401",
+        "width": 375,
+        "height": 807
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The same screen with every section collapsed, which is what tapping the open one gives back — the menu the four editors hang off."
+    },
+    {
+      "seed": "chat_empty",
+      "flutter_golden": "test/goldens/seed/chat_empty_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 18",
+        "manifest_id": "b81ea3ec-9c49-4b2f-b386-d3a04cab8d62",
+        "artboard_path": "artwork/artboard-ea9279d7-1a37-4839-b5e9-c43c335c1c83",
+        "width": 375,
+        "height": 805
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "A thread nobody has written in yet. The board opens it with a banner rather than a line of grey text: keep the conversation here, and here is who to tell if something goes wrong — which is a safety notice, not decoration, so it replaced the generic line. The board also draws a camera in the composer and an attached photo above it; no upload endpoint exists anywhere in this repository."
+    },
+    {
+      "seed": "chat_storefront",
+      "flutter_golden": "test/goldens/seed/chat_storefront_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 20",
+        "manifest_id": "f279de6a-80b5-4f99-b5f1-db80a20ea94a",
+        "artboard_path": "artwork/artboard-912a5591-8704-4951-902f-7fd9c17fb286",
+        "width": 375,
+        "height": 805
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The same thread three lines in. The banner is gone by then, on the board and here: it belongs to a thread nobody has written in yet."
+    },
+    {
+      "seed": "checkout_cancel",
+      "flutter_golden": "test/goldens/seed/checkout_cancel_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 30",
+        "manifest_id": "b4af8a63-e4d2-44fa-9f9b-09f8e7482422",
+        "artboard_path": "artwork/artboard-c3cebb35-cca9-4bca-99f3-1e65ec0eee0d",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "What `الغاء الطلب` asks before it throws the basket away — it used to ask nothing. The board asks twice: first whether to cancel, then for a reason under a second button. The reason half belongs to cancelling a PLACED order, and `طلباتي` already asks for one there; nothing has been placed at this point in the wizard, so there is nothing to record a reason against. Most of what is left after matching the scrim is that difference in size: a panel that asks one question is a good deal smaller than one that asks two and carries a text area between them."
     }
   ]
 }

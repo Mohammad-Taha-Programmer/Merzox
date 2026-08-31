@@ -165,7 +165,9 @@
     "guestTitle": "Please sign in",
     "guestHint": "Sign in first to see your messages",
     "readSyncFailed": "The read receipt did not sync; your messages are still up to date",
-    "openError": "Could not open the conversation"
+    "openError": "Could not open the conversation",
+    "threadPrivacy": "For your privacy we recommend keeping every conversation inside Merzox. If anything goes wrong, tell our support team.",
+    "threadSupportHours": "Our team is here around the clock"
   },
   "notifications": {
     "title": "Notifications",

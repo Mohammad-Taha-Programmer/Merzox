@@ -63,6 +63,11 @@ import 'package:merzox/features/product_details/bloc/product_details_state.dart'
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
 import 'package:merzox/features/checkout/pages/address_form_page.dart';
+import 'package:merzox/features/business/shell/merchant_product_images_page.dart';
+import 'package:merzox/features/messages/bloc/chat_bloc.dart';
+import 'package:merzox/features/messages/bloc/chat_event.dart';
+import 'package:merzox/features/messages/bloc/chat_state.dart';
+import 'package:merzox/features/messages/pages/chat_page.dart';
 import 'package:merzox/features/business/enrollment/business_enrollment_bloc.dart';
 import 'package:merzox/features/business/enrollment/business_enrollment_page.dart';
 import 'package:merzox/features/business/orders/merchant_order_detail_page.dart';
@@ -363,6 +368,95 @@ final class _SeedProductApi extends ApiService {
         }),
     ];
   }
+}
+
+// ---------------------------------------------------------------------------
+// Conversation fixture
+// ---------------------------------------------------------------------------
+
+/// The exchange `الرسائل – 2` and its merchant twin draw, in the order they
+/// draw it.
+///
+/// `isMine` is what decides which side a bubble sits on, so the two seeds are
+/// the same six lines with that flag inverted: the customer's own words are on
+/// one side of their screen and on the other side of the shop's.
+final class _SeedChatApi extends ApiService {
+  /// Whether the capture is the customer's screen or the shop's.
+  final bool asCustomer;
+
+  /// How many of the six lines the thread has reached. Zero is the thread a
+  /// customer opens for the first time, which `تفاصيل المتجر – 18` draws.
+  final int lineCount;
+
+  _SeedChatApi({required this.asCustomer, this.lineCount = 6});
+
+  static const List<(String, bool)> _lines = <(String, bool)>[
+    ('مرحبا ، عندي استفسار ؟', true),
+    ('هلا ، تفضلي شو عاوزة ؟', false),
+    ('قديه بدها الطلبية لتوصلني؟', true),
+    ('مو كثير ، إن شاء الله يومين', false),
+    ('تمام ، شكرا كثير', true),
+    ('ولو العفو ، أهلا وسهلا', false),
+  ];
+
+  ConversationApiModel get _conversation => ConversationApiModel(
+    id: 'c-seed',
+    title: asCustomer ? 'متجر الياسمين' : 'ياسمين خالد',
+    avatarUrl: '',
+    business: const ConversationPartyApiModel(
+      id: '64b000000000000000000009',
+      name: 'متجر الياسمين',
+      logoUrl: '',
+    ),
+    customer: const ConversationPartyApiModel(
+      id: '64a000000000000000000009',
+      name: 'ياسمين خالد',
+      logoUrl: '',
+    ),
+    lastMessage: ConversationLastMessageApiModel(
+      body: _lines.last.$1,
+      senderType: 'business',
+      sentAt: DateTime.utc(2022, 2, 15, 9, 43),
+    ),
+    unreadCount: 0,
+    messageCount: lineCount,
+    updatedAt: DateTime.utc(2022, 2, 15, 9, 43),
+  );
+
+  @override
+  Future<ConversationMessagesApiResponse> conversationMessages({
+    required String token,
+    required String conversationId,
+    int page = 1,
+    int limit = 30,
+  }) async {
+    return ConversationMessagesApiResponse(
+      conversation: _conversation,
+      messages: <MessageApiModel>[
+        for (int index = 0; index < lineCount; index++)
+          MessageApiModel(
+            id: 'm$index',
+            conversationId: 'c-seed',
+            // The customer wrote the odd-indexed-false lines; on the shop's
+            // screen those are the incoming ones.
+            senderType: _lines[index].$2 ? 'customer' : 'business',
+            senderName: _lines[index].$2 ? 'ياسمين خالد' : 'متجر الياسمين',
+            body: _lines[index].$1,
+            isMine: asCustomer ? _lines[index].$2 : !_lines[index].$2,
+            readAt: null,
+            createdAt: DateTime.utc(2022, 2, 15, 9, 40 + index),
+          ),
+      ],
+      page: page,
+      hasMore: false,
+    );
+  }
+
+  @override
+  Future<ConversationApiModel> markConversationRead({
+    required String token,
+    required String conversationId,
+  }) async => _conversation;
 }
 
 // ---------------------------------------------------------------------------
@@ -1967,6 +2061,34 @@ void main() {
         await expectMerzoxSeedGolden('checkout_payment_ar_375x812.png');
       });
 
+      testWidgets('the checkout cancel question renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final CartBloc cart = await loadedCart();
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<CartBloc>.value(
+            value: cart,
+            child: withMerzoxGoldenDeviceInsets(
+              CheckoutPage(apiService: _SeedDeliveryApi()),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('متابعة'));
+        await settleMerzoxGoldenFrames(tester);
+
+        await tester.tap(find.text('إلغاء الطلب'));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('هل أنت متأكد من عملية إلغاء الطلب؟'), findsOneWidget);
+        expect(find.text('نعم'), findsOneWidget);
+        expect(find.text('لا'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('checkout_cancel_ar_375x812.png');
+      });
+
       testWidgets('checkout confirmation renders its Arabic baseline', (
         WidgetTester tester,
       ) async {
@@ -2239,6 +2361,21 @@ void main() {
         expect(find.text('وصف المتجر'), findsOneWidget);
 
         await expectMerzoxSeedGolden('store_settings_ar_375x812.png');
+      });
+
+      testWidgets('store settings renders its Arabic collapsed baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpStoreSettings(tester);
+
+        // Tapping the open section closes it, which is the fifth board: the
+        // menu the four editors hang off.
+        await tester.tap(find.text('إعدادات المتجر').last);
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('اسم المتجر بالعربية أو الإنجليزية'), findsNothing);
+
+        await expectMerzoxSeedGolden('store_settings_closed_ar_375x812.png');
       });
 
       testWidgets('store settings logo section renders its Arabic baseline', (
@@ -3376,6 +3513,282 @@ void main() {
         expect(find.text('تم وصول طلبك بنجاح'), findsWidgets);
 
         await expectMerzoxSeedGolden('order_tracking_review_ar_375x812.png');
+      });
+
+      // -- 61/62/63/64. الرسائل, past the inbox -----------------------------
+      //
+      // The inbox, its empty state and the notifications list are seeded. What
+      // was left is the gate in front of them and the conversation itself,
+      // which the corpus draws twice: once from the customer's side and once
+      // from the shop's.
+      testWidgets('the messages gate renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(const <String, Object>{});
+
+        final HomeBloc homeBloc = await customerHome(isGuest: true);
+
+        final Future<HomeState> chatSelected = homeBloc.stream.firstWhere(
+          (HomeState state) => state.selectedTab == 3,
+        );
+        homeBloc.add(const HomeTabChanged(3));
+        await chatSelected;
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<HomeBloc>.value(
+            value: homeBloc,
+            child: withMerzoxGoldenDeviceInsets(
+              const HomeScreen(isGuest: true),
+            ),
+          ),
+        );
+
+        expect(find.text('تسجيل دخول'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('messages_gate_ar_375x812.png');
+      });
+
+      testWidgets('the unread inbox renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final MessagesBloc bloc = await inbox(_SeedMessagesApi());
+
+        final Future<MessagesState> filtered = bloc.stream.firstWhere(
+          (MessagesState state) =>
+              state.filter == MessagesFilter.unread &&
+              state.status == MessagesStatus.ready,
+        );
+        bloc.add(const MessagesFilterChanged(MessagesFilter.unread));
+        await filtered;
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<MessagesBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              Scaffold(
+                backgroundColor: Colors.white,
+                body: SafeArea(
+                  child: Builder(
+                    builder: (BuildContext context) =>
+                        MessagesInboxView(title: 'messages.title'.tr()),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('messages_unread_ar_375x812.png');
+      });
+
+      Future<void> pumpChat(
+        WidgetTester tester, {
+        required bool asCustomer,
+        int lineCount = 6,
+      }) async {
+        _useAuthenticatedCustomerSession();
+
+        final ChatBloc bloc = ChatBloc(
+          apiService: _SeedChatApi(
+            asCustomer: asCustomer,
+            lineCount: lineCount,
+          ),
+          conversationId: 'c-seed',
+        );
+        _closeOnTearDown(bloc);
+
+        final Future<ChatState> ready = bloc.stream.firstWhere(
+          (ChatState state) =>
+              state.status == ChatStatus.ready &&
+              state.messages.length == lineCount,
+        );
+        bloc.add(const ChatStarted());
+        await ready;
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<ChatBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(const ChatPage()),
+          ),
+        );
+      }
+
+      testWidgets('an empty conversation renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpChat(tester, asCustomer: true, lineCount: 0);
+
+        // `تفاصيل المتجر – 18` opens an empty thread with a banner rather than
+        // a line of grey text: keep the conversation here, and here is who to
+        // tell if something goes wrong.
+        expect(
+          find.textContaining('ننصحك بالاحتفاظ بجميع المحادثات'),
+          findsOneWidget,
+        );
+        expect(
+          find.text('فريقنا متواجد على مدار الساعة لخدمتكم'),
+          findsOneWidget,
+        );
+
+        await expectMerzoxSeedGolden('chat_empty_ar_375x812.png');
+      });
+
+      testWidgets('a short conversation renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpChat(tester, asCustomer: true, lineCount: 3);
+
+        // Three lines in, the banner is gone: it belongs to a thread nobody
+        // has written in yet.
+        expect(
+          find.textContaining('ننصحك بالاحتفاظ بجميع المحادثات'),
+          findsNothing,
+        );
+
+        await expectMerzoxSeedGolden('chat_storefront_ar_375x812.png');
+      });
+
+      testWidgets('a conversation renders its Arabic customer baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpChat(tester, asCustomer: true);
+
+        expect(find.text('متجر الياسمين'), findsOneWidget);
+        expect(find.text('اكتب رسالتك هنا'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('chat_customer_ar_375x812.png');
+      });
+
+      testWidgets('a conversation renders its Arabic merchant baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpChat(tester, asCustomer: false);
+
+        // The same six lines, from the other end: the shop's own replies are
+        // the ones on its side now.
+        expect(find.text('ياسمين خالد'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('chat_merchant_ar_375x812.png');
+      });
+
+      // -- 65/66/67/68. The merchant overlays -------------------------------
+      //
+      // `الرئيسية – 12`, `– 13`, `– 16` and `– 14` are the orders filter, the
+      // product menu, the product filter and the images screen. All four were
+      // built in an earlier pass and none of them had ever been measured.
+      testWidgets('the merchant order filter renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final BusinessBloc bloc = await merchantShell(
+          _SeedMerchantOrdersApi(),
+          1,
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              BusinessShellPage(onLoggedOut: () {}),
+            ),
+          ),
+        );
+
+        await tester.tap(find.byIcon(Icons.tune_rounded));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('تصفية'), findsOneWidget);
+        expect(find.text('من تاريخ'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('merchant_order_filter_ar_375x812.png');
+      });
+
+      testWidgets('the merchant product menu renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final BusinessBloc bloc = await merchantShell(
+          _SeedMerchantProductsApi(),
+          3,
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              BusinessShellPage(onLoggedOut: () {}),
+            ),
+          ),
+        );
+
+        await tester.tap(find.byIcon(Icons.more_horiz_rounded).first);
+        await settleMerzoxGoldenFrames(tester);
+
+        // A live product is offered hiding, never showing.
+        expect(find.text('إخفاء المنتج عن المتجر'), findsOneWidget);
+        expect(find.text('حذف المنتج نهائيًا'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('merchant_product_menu_ar_375x812.png');
+      });
+
+      testWidgets('the merchant product filter renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final BusinessBloc bloc = await merchantShell(
+          _SeedMerchantProductsApi(),
+          3,
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              BusinessShellPage(onLoggedOut: () {}),
+            ),
+          ),
+        );
+
+        await tester.tap(find.byIcon(Icons.tune_rounded));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('قم باختيار تصنيف المنتجات'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('merchant_product_filter_ar_375x812.png');
+      });
+
+      testWidgets('the merchant images screen renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(const <String, Object>{});
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          withMerzoxGoldenDeviceInsets(
+            const MerchantProductImagesPage(
+              // The board draws two images under the drop panel, each with its
+              // own delete, crop and "primary" controls. They resolve to the
+              // broken-image placeholder here, which is what a golden
+              // environment with no network does; the row's own chrome is what
+              // this seed measures.
+              imageUrls: <String>[
+                'https://merzox.test/seed/fit-me-1.png',
+                'https://merzox.test/seed/fit-me-2.png',
+              ],
+            ),
+          ),
+        );
+
+        // `حفظ` sits under both rows, which on this board and on this screen
+        // is below the fold.
+        expect(find.text('الصورة الأساسية'), findsNWidgets(2));
+
+        await expectMerzoxSeedGolden('merchant_product_images_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

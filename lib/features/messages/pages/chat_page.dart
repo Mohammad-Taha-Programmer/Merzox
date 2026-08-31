@@ -207,16 +207,41 @@ class _ChatBody extends StatelessWidget {
     }
 
     if (state.messages.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Text(
-            'messages.threadEmpty'.tr(),
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: MerzoxColors.kColor8D99AE,
-              fontSize: 13,
-            ),
+      // `تفاصيل المتجر – 18` opens an empty thread with a banner rather than a
+      // line of grey text: keep the conversation here, and here is who to tell
+      // if something goes wrong. A thread that already has messages does not
+      // draw it, and neither does this.
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+          decoration: BoxDecoration(
+            color: MerzoxColors.kColorEEF6FB,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Text(
+                'messages.threadPrivacy'.tr(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: MerzoxColors.kColor3B3B3B,
+                  fontSize: 12,
+                  height: 1.7,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'messages.threadSupportHours'.tr(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: MerzoxColors.kColor8D99AE,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -264,12 +289,16 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final isMine = message.isMine;
 
+    // `الرسائل – 2` puts what you wrote at the START of the row in
+    // #3D5A80 and what you were told at the end in #F9F9F9 — the sides a
+    // reader of any direction expects, rather than mirroring with the
+    // language. The tail is the corner that points back at whoever spoke.
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment: isMine
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.end,
         children: [
           Flexible(
             child: Container(
@@ -279,13 +308,13 @@ class _MessageBubble extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: isMine
-                    ? MerzoxColors.kColorEE6C4D
-                    : MerzoxColors.kColorF3F7FA,
+                    ? MerzoxColors.kColor3D5A80
+                    : MerzoxColors.kColorF9F9F9,
                 borderRadius: BorderRadiusDirectional.only(
                   topStart: const Radius.circular(14),
                   topEnd: const Radius.circular(14),
-                  bottomStart: Radius.circular(isMine ? 14 : 2),
-                  bottomEnd: Radius.circular(isMine ? 2 : 14),
+                  bottomStart: Radius.circular(isMine ? 2 : 14),
+                  bottomEnd: Radius.circular(isMine ? 14 : 2),
                 ),
               ),
               child: Column(
