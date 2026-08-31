@@ -352,6 +352,10 @@ void main() {
       );
     });
 
+    // `NAME_CHANGE_LIMIT` used to stand here, until every operational code
+    // gained a sentence. The fallback still matters - a code added to the
+    // server before it is added to the map has to say something - so the case
+    // is kept with a code that is genuinely absent.
     test('an unmapped server message is still passed through', () {
       final message = ApiService.messageFromError(
         DioException(
@@ -361,7 +365,7 @@ void main() {
             statusCode: 400,
             data: const {
               'success': false,
-              'error': {'code': 'NAME_CHANGE_LIMIT', 'message': 'Name limit'},
+              'error': {'code': 'NO_SUCH_SERVER_CODE', 'message': 'Name limit'},
             },
           ),
         ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:merzox/core/localization/api_error_localizer.dart';
 import 'package:merzox/services/api_service.dart';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
@@ -258,7 +259,11 @@ class HomeScreen extends StatelessWidget {
                 recommendationPreferenceSessionReader:
                     recommendationPreferenceSessionReader,
               ),
-              _ => _ComingSoonTab(index: state.selectedTab),
+              // Unreachable: both entry points clamp the tab to 0..4 and
+              // every one of those has an arm above. Dart still requires the
+              // wildcard, so it draws nothing rather than a `coming soon`
+              // screen for a tab that cannot be selected.
+              _ => const SizedBox.shrink(),
             },
           ),
           bottomNavigationBar: _HomeBottomNavigationBar(
@@ -1355,9 +1360,7 @@ class _CatalogFailureState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final message = errorMessage.contains('.')
-        ? errorMessage.tr()
-        : errorMessage;
+    final message = localizeApiErrorOrRaw(errorMessage);
 
     return Container(
       constraints: const BoxConstraints(minHeight: 96),
@@ -1661,14 +1664,13 @@ class _CartItemsView extends StatelessWidget {
           previous.messageCode != current.messageCode ||
           previous.errorMessage != current.errorMessage,
       listener: (context, state) {
-        final code = state.messageCode.isNotEmpty
-            ? state.messageCode
-            : state.errorMessage;
+        final bool isCode = state.messageCode.isNotEmpty;
+        final String code = isCode ? state.messageCode : state.errorMessage;
         if (code.isEmpty) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(code.tr()),
+            content: Text(isCode ? code.tr() : localizeApiErrorOrRaw(code)),
             action: state.messageCode.isEmpty
                 ? null
                 : SnackBarAction(
@@ -3020,31 +3022,6 @@ class _BusinessProfileTopBar extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ComingSoonTab extends StatelessWidget {
-  final int index;
-
-  const _ComingSoonTab({required this.index});
-
-  @override
-  Widget build(BuildContext context) {
-    const titleKeys = [
-      'nav.home',
-      'nav.stores',
-      'home.ordersLabel',
-      'nav.messages',
-      'nav.profile',
-    ];
-    final title = titleKeys[index].tr();
-
-    return Center(
-      child: Text(
-        'home.comingSoon'.tr(args: [title]),
-        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
       ),
     );
   }

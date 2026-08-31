@@ -59,6 +59,12 @@ final class BusinessOrderCourierAssigned extends BusinessEvent {
   });
 }
 
+final class BusinessCourierLocationRevoked extends BusinessEvent {
+  final String orderId;
+
+  const BusinessCourierLocationRevoked(this.orderId);
+}
+
 final class BusinessCourierLocationHandoffConsumed extends BusinessEvent {
   const BusinessCourierLocationHandoffConsumed();
 }
@@ -206,6 +212,7 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     on<BusinessOrderStatusChanged>(_onOrderStatusChanged);
     on<BusinessOrderCustomerNotified>(_onOrderCustomerNotified);
     on<BusinessOrderCourierAssigned>(_onOrderCourierAssigned);
+    on<BusinessCourierLocationRevoked>(_onCourierLocationRevoked);
     on<BusinessCourierLocationHandoffConsumed>((event, emit) {
       emit(state.copyWith(clearCourierLocationHandoff: true));
     });
@@ -325,6 +332,10 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
           orderCounts: list.counts,
           dashboard: dashboard,
           revision: state.revision + 1,
+          // The server notifies the customer as part of the same request, so
+          // the merchant is told both things happened. Without this the list
+          // simply redrew and nothing said the customer had been informed.
+          noticeCode: 'merchantOrder.statusUpdated',
         ),
       );
     } catch (error) {
@@ -399,6 +410,43 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
             capabilityToken: assignment.capability.token,
             expiresAt: assignment.capability.expiresAt,
           ),
+        ),
+      );
+    } catch (error) {
+      emit(
+        state.copyWith(
+          status: BusinessStatus.failure,
+          errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  /// The kill switch behind `تجاهل الرمز`.
+  ///
+  /// The label always promised the credential was discarded; until this it only
+  /// closed the dialog. Revoking is idempotent server-side, so the worst case
+  /// of a double tap is a second success.
+  Future<void> _onCourierLocationRevoked(
+    BusinessCourierLocationRevoked event,
+    Emitter<BusinessState> emit,
+  ) async {
+    emit(state.copyWith(status: BusinessStatus.saving));
+
+    try {
+      final order = await _apiService.revokeOrderCourierLocation(
+        token: await _token(),
+        orderId: event.orderId,
+      );
+
+      emit(
+        state.copyWith(
+          status: BusinessStatus.ready,
+          orders: state.orders
+              .map((candidate) => candidate.id == order.id ? order : candidate)
+              .toList(growable: false),
+          revision: state.revision + 1,
+          noticeCode: 'courierLocation.accessRevoked',
         ),
       );
     } catch (error) {

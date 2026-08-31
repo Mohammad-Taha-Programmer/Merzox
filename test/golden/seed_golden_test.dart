@@ -1470,10 +1470,11 @@ void main() {
 
       // -- 1. Splash ------------------------------------------------------
       //
-      // `lib/features/splash/presentation/pages/splash_page.dart` is commented
-      // out in full and exports no `SplashPage` type, so the current stable
-      // page-level splash representation is `SplashScreen`. It is instantiated
-      // as shipped; nothing about it is adjusted for the capture.
+      // `SplashScreen` is the page-level splash representation. A
+      // `splash_page.dart` sat beside it commented out in full, exporting no
+      // type at all, and has since been deleted. `SplashScreen` is
+      // instantiated as shipped; nothing about it is adjusted for the
+      // capture.
       testWidgets('splash renders its Arabic seed baseline', (
         WidgetTester tester,
       ) async {
