@@ -3443,7 +3443,7 @@ void main() {
       ) async {
         await pumpOnboardingSlide(tester, 2);
 
-        expect(find.text('دفع وطلبات بمرونة'), findsOneWidget);
+        expect(find.text('طلباتك بسهولة'), findsOneWidget);
         // The last slide drops the skip, because there is nothing left to
         // skip.
         expect(find.text('تخطي'), findsNothing);

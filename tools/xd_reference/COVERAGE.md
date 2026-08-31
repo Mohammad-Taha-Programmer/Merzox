@@ -116,56 +116,16 @@ So the title said «أو فيديو» over a screen that could not take one. It 
 video pipeline the design specifies nowhere else, which is a product decision
 and not an alignment one.
 
-## Where a seeded surface deliberately says something else
+### The payment slide does not promise unavailable methods
 
-One board is measured but does not match its own words, and the difference is
-recorded here rather than left to be rediscovered.
+The XD payment-onboarding board says «دفع وطلبات بمرونة» and asks the user to
+choose a suitable payment method. Merzox currently operates cash on delivery
+only; card, bank-transfer and assisted values are refused by the API.
 
-`الرئيسية – 14` draws a dashed drop area under the title «إضافة صور أو فيديو»,
-with the hint «اسحب واسقط الصور هنا». It depicts dragging a file in from the
-device.
-
-The product has no file upload of any kind: no picker, no multipart route, no
-storage, no CDN — and no video anywhere in it, not a model field, not a player,
-not another board. An image is added by pasting its link, which is what the app
-has always done and what its hint has always said.
-
-So the title said «أو فيديو» over a screen that could not take one. It now says
-«إضافة صور». Building the other reading would mean building file upload and a
-video pipeline the design specifies nowhere else, which is a product decision
-and not an alignment one.
-
-## What is not covered
-
-One surface. What is known about it is written below, and no more than that.
-
-| Board | Surface | What was found |
-| --- | --- | --- |
-| `الخريطة` | the map | Its ready state cannot be set up yet; the page itself renders. |
-
-`NearbyMapPage` renders correctly and is reachable at `/map`. What has never
-been captured is the map in its ready state, with the tile layer live.
-
-An earlier version of this file said the page "never finishes" a frame at
-375x812, and listed a bisection to prove it. That was measured wrongly, and the
-correction is worth recording because the wrong reading stood for a while:
-
-- The page **does** render at 375x812. `test/nearby_map_surface_test.dart`
-  pumps it there through the golden harness and reads its permission-request
-  state back.
-- What never finished was `bloc.close()` in teardown, after a pump inside
-  `runAsync`. Every earlier bisection - removing the marker layer, the results
-  chips, the attribution - changed the tree and left teardown untouched, so
-  every one of them still hung, which read as "the page hangs at this size".
-- The golden seeds had already been working around the same thing for other
-  boards by closing their blocs with `unawaited`, without anyone writing down
-  why.
-
-What is still open is narrower than it looked: the ready state needs the bloc
-to report shops near the seeded position, and a stub returning one shop still
-arrives with `businesses` empty, so the seed cannot yet be set up. The tile
-layer itself has not been ruled in or out, because nothing has got past that
-point.
+The shipped slide therefore says «طلباتك بسهولة» and describes ordering and
+tracking without promising a payment choice. The original payment wording can
+return after an operational provider and its capture, webhook and refund
+lifecycle are implemented.
 
 ## Reproducing this
 

@@ -76,7 +76,7 @@ language-aware sharing payloads are generated in Arabic or English at runtime.
 | State management | `flutter_bloc` |
 | Navigation | `go_router` |
 | Networking | `dio` |
-| Local persistence | Shared Preferences, Hive, Flutter Secure Storage |
+| Local persistence | Shared Preferences, Flutter Secure Storage |
 | Maps and location | `flutter_map`, OpenStreetMap, Geolocator |
 | Backend | Node.js, Express |
 | Database | MongoDB, Mongoose |
@@ -280,10 +280,14 @@ review, production secret management, monitoring, backups, or dependency audits.
 
 ## Roadmap
 
-Every remaining item is blocked on something outside the repository. They are
-enumerated, with their current state and what each needs, under *What cannot be
-finished from inside this repository* below.
+The remaining work falls into two groups: repository-owned preparation that can
+still be implemented and tested here, and production activation that requires
+owner decisions, accounts, credentials, commercial relationships, or hardware.
+Both groups are recorded below so neither is mistaken for completed work.
 
+- Finish repository-owned release preparation: add a production database index
+  plan/apply command, run the XD tooling tests in CI, and keep documentation
+  synchronized with tested behavior.
 - Finalize the permanent mobile application identity, Firebase platform
   registrations/APNs setup, and production activation of the already implemented
   realtime and background push transport.
@@ -291,18 +295,18 @@ finished from inside this repository* below.
 - Accept uploaded images and video rather than image links.
 - Production deployment, observability, and store publication.
 
-## What cannot be finished from inside this repository
+## What still needs owner decisions or production access
 
-Everything below is implemented as far as code alone can take it, and is
-blocked on something that does not live in a repository: an account, a
-credential, a piece of hardware, a commercial relationship, or a decision only
-the product owner can make. Each entry says what already exists, what is
-missing, and what changes once the missing thing arrives — so an assistant
-reading this file can walk the owner through it without first re-deriving the
-state of the code.
+The entries below describe boundaries that need product-owner decisions,
+production credentials, external accounts, commercial relationships, or real
+hardware. Some also have repository preparation that should be completed before
+those external inputs are used; item 7 records one such task explicitly. Each
+entry says what exists, what remains, and what changes when its dependency is
+available.
 
-Nothing here is a defect. The defects found by review are fixed; these are the
-edges of what a repository can reach by itself.
+Most entries are activation boundaries rather than defects. They remain open
+release work and must not be described as completed until their stated evidence
+exists.
 
 ### 1. The application identity is still `com.example.merzox`
 
@@ -356,11 +360,10 @@ the technical work is downstream of choosing the provider: the capture and
 refund lifecycle, the webhook endpoint and its signature verification, and
 whether card data touches this system at all — which sets the PCI scope.
 
-**A copy decision that comes with it.** The third onboarding slide reads
-«اطلب المنتجات والخدمات، وتتبع طلباتك، واختر طريقة الدفع المناسبة لك». It
-offers a choice of payment method the product does not have. Either the
-provider work closes that gap, or the sentence should be softened until it
-does. That is a product decision, not a code one.
+**Current copy.** The third onboarding slide no longer promises a choice of
+payment method while cash is the only operational method. Its wording now
+focuses on ordering products and services and tracking orders. It can be
+expanded again after a payment provider and its supported lifecycle exist.
 
 **Needed from the owner.** A payment provider and merchant account for the
 target market, its credentials, and a decision on PCI scope.
@@ -421,10 +424,13 @@ falls back to a scan when it is absent — that fallback was added after a revie
 found the missing index returning `500` — but a fallback is not a substitute
 for the index at any real catalogue size.
 
-**Needed from the owner.** A one-time index build against the production
-cluster, run by whoever holds its credentials, and a decision about where that
-step lives afterwards: a release runbook, or a migration script this repository
-does not yet have.
+**Repository work still required.** Add a fail-closed, idempotent index command
+that can print the expected plan without connecting, compare expected and actual
+indexes, and apply only explicitly approved changes. Cover it with unit tests
+and document its release usage before production credentials are supplied.
+
+**Needed from the owner after that.** A production MongoDB URI and authorization
+for the operator who will review the plan and run the one-time apply step.
 
 ### 8. Production email and deployment configuration
 

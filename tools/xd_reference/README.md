@@ -13,7 +13,7 @@
 > - In the current `design.xd` this repairs exactly **six** occurrences across
 >   **three** artboards, counted as
 >   `handled_node_counts["fill:pattern:path-bounds-derived"]`.
-> - Background blur remains honestly unsupported.
+> - Background blur is rendered through the documented approximate backdrop-filter mapping.
 
 > **I3-R2-I4 changes at a glance**
 > - **Non-uniform rounded rectangles are now rendered exactly**, as deterministic
@@ -1569,12 +1569,14 @@ Measured over the full 112-artboard corpus after the accepted repairs:
 | Image pattern fills handled | 289 |
 | Derived path bounds for pattern fills | 6 |
 | `fill:pattern:no-shape-bounds` unsupported | 0 |
-| `filter:uxdesign#blur:background` unsupported | **2** |
+| Background (backdrop) blur handled | 2 |
+| `filter:uxdesign#blur:background` unsupported | 0 |
 
-Background blur is the **only** remaining known unsupported renderer feature in
-this corpus — see the D8 feasibility decision above. Coverage counts are not
-fidelity claims: an artboard with no unsupported features is still uncalibrated
-unless it has been measured against the authentic XD preview.
+Both corpus backdrop-blur nodes are handled by the documented approximate
+mapping, so the current corpus has no known unsupported renderer features.
+Coverage counts are not fidelity claims: an artboard with no unsupported
+features is still uncalibrated unless it has been measured against the
+authentic XD preview.
 
 ## Current limitations (summary)
 
@@ -1640,5 +1642,5 @@ unless it has been measured against the authentic XD preview.
     empty region — but no artboard other than Splash has been measured against
     the authentic XD preview, so none of the 108 affected artboards is claimed
     pixel-perfect. Re-export and re-read the reports rather than assuming.
-13. **PNG output depends on a locally installed Edge/Chrome**, and on the fonts
+14. **PNG output depends on a locally installed Edge/Chrome**, and on the fonts
     that browser can see.
