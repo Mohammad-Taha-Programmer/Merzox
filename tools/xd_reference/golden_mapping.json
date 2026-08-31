@@ -602,6 +602,19 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "The city picker, which only ever holds cities of the governorate above it — the board lists the towns of رام الله والبيرة, and so does this seed, because that is the governorate it was reached through."
+    },
+    {
+      "seed": "stores",
+      "flutter_golden": "test/goldens/seed/stores_ar_375x812.png",
+      "xd": {
+        "name": "المتاجر",
+        "manifest_id": "3b375ebd-f5ed-4d9a-ae28-f15de08c4e9f",
+        "artboard_path": "artwork/artboard-56d49dd7-a2b0-462c-b8de-60a328405091",
+        "width": 375,
+        "height": 1492
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "Every registered shop, two to a row, under a search field of its own. Not a tall screen: 1492 is what scrolling reveals, and `المتاجر – 1` is this board with the bottom bar drawn across the fold, which is where it sits on a device. The board reserves a `مساحة إعلانية` banner after every four cards; nothing in this app or its server has ad inventory, and a slot with nothing in it is worse than no slot, so it is not built. The two round faces on each card are emoji, which the golden environment has no font for and a device does. Above the first card the two agree closely; the cards themselves differ mostly because the board carries each shop’s real wordmark and the capture falls back to a placeholder."
     }
   ]
 }

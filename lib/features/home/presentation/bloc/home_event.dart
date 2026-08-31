@@ -53,6 +53,17 @@ final class HomeAllBusinessesNextPageRequested extends HomeEvent {
   const HomeAllBusinessesNextPageRequested();
 }
 
+/// What was typed into `المتاجر`'s own search field.
+///
+/// It reaches the server rather than filtering the page in place: the list is
+/// paged, so a filter applied here could only ever search what had already
+/// been fetched.
+final class HomeAllBusinessesSearchChanged extends HomeEvent {
+  final String query;
+
+  const HomeAllBusinessesSearchChanged(this.query);
+}
+
 final class HomeCatalogSectionRetryRequested extends HomeEvent {
   final HomeCatalogSection section;
 

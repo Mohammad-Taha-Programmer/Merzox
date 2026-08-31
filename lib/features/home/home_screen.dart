@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -864,6 +866,47 @@ class _SearchBox extends StatelessWidget {
         textInputAction: TextInputAction.search,
         decoration: InputDecoration(
           hintText: 'home.searchHint'.tr(),
+          hintStyle: TextStyle(color: MerzoxColors.kColor9F9F9F, fontSize: 14),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            color: MerzoxColors.kColor98C1D9,
+          ),
+          filled: true,
+          fillColor: MerzoxColors.kColorF9F9F9,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+        ),
+      ),
+    );
+  }
+}
+
+/// `المتاجر`'s own search field.
+///
+/// Typed into rather than tapped through to the search screen, because what it
+/// narrows is the list underneath it. The server matches a shop's name, its
+/// category and its products, which is what the placeholder promises.
+class _StoresSearchField extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  const _StoresSearchField({required this.controller, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 48,
+      child: TextField(
+        controller: controller,
+        onChanged: onChanged,
+        onSubmitted: onChanged,
+        textInputAction: TextInputAction.search,
+        style: const TextStyle(fontSize: 14),
+        decoration: InputDecoration(
+          hintText: 'home.businesses.searchHint'.tr(),
           hintStyle: TextStyle(color: MerzoxColors.kColor9F9F9F, fontSize: 14),
           prefixIcon: Icon(
             Icons.search_rounded,
@@ -1954,21 +1997,40 @@ class _BusinessesTab extends StatefulWidget {
 }
 
 class _BusinessesTabState extends State<_BusinessesTab> {
+  /// How long typing has to stop before the query is sent.
+  ///
+  /// The search reaches the server, so a request per keystroke would be a
+  /// request per keystroke.
+  static const Duration _typingPause = Duration(milliseconds: 350);
+
   late final ScrollController _scrollController;
+  late final TextEditingController _search;
+  Timer? _debounce;
   bool _paginationRequestScheduled = false;
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController()..addListener(_onScroll);
+    _search = TextEditingController(text: widget.state.allBusinessesSearch);
   }
 
   @override
   void dispose() {
+    _debounce?.cancel();
+    _search.dispose();
     _scrollController
       ..removeListener(_onScroll)
       ..dispose();
     super.dispose();
+  }
+
+  void _onSearchChanged(String value) {
+    _debounce?.cancel();
+    _debounce = Timer(_typingPause, () {
+      if (!mounted) return;
+      context.read<HomeBloc>().add(HomeAllBusinessesSearchChanged(value));
+    });
   }
 
   void _onScroll() {
@@ -1998,9 +2060,11 @@ class _BusinessesTabState extends State<_BusinessesTab> {
 
   @override
   Widget build(BuildContext context) {
-    final businesses = widget.state.allBusinesses
-        .where((business) => business.matches(widget.state.searchQuery))
-        .toList();
+    // Not filtered here: the server answered this exact query, and anything
+    // this widget dropped would be a shop the customer asked for and cannot
+    // see.
+    final businesses = widget.state.allBusinesses;
+    final searching = widget.state.allBusinessesSearch.isNotEmpty;
     final rows = <Widget>[
       for (var index = 0; index < businesses.length; index += 2) ...[
         _AllBusinessesRow(
@@ -2021,7 +2085,7 @@ class _BusinessesTabState extends State<_BusinessesTab> {
           onProtectedAction: widget.onProtectedAction,
         ),
         const SizedBox(height: 18),
-        _SearchBox(onTap: () => context.push('/search')),
+        _StoresSearchField(controller: _search, onChanged: _onSearchChanged),
         const SizedBox(height: 18),
         if (widget.state.allBusinessesStatus == HomeSectionStatus.loading &&
             businesses.isEmpty)
@@ -2041,7 +2105,9 @@ class _BusinessesTabState extends State<_BusinessesTab> {
         else if (businesses.isEmpty)
           _EmptyFeatureState(
             icon: Icons.search_off_rounded,
-            title: 'search.noResults'.tr(),
+            title: searching
+                ? 'search.noResults'.tr()
+                : 'home.businesses.emptyTitle'.tr(),
             message: 'home.businesses.noResultsMessage'.tr(),
           )
         else ...[

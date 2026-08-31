@@ -31,6 +31,10 @@ final class _BusinessRequest {
   });
 }
 
+/// The page size `المتاجر` asks for, which is how these tests tell its
+/// requests apart from the home sections'.
+const int _storesPageSize = 50;
+
 class _FakeCatalogApi extends ApiService {
   final Future<BusinessListApiResponse> Function(_BusinessRequest request)
   handler;
@@ -108,8 +112,11 @@ void main() {
         discount: '15%',
       );
       final api = _FakeCatalogApi((request) async {
-        if (request.limit == 100) {
-          return businessPage(businesses: [newest, best], limit: 100);
+        if (request.limit == _storesPageSize) {
+          return businessPage(
+            businesses: [newest, best],
+            limit: _storesPageSize,
+          );
         }
         if (request.discounted == true) {
           return businessPage(businesses: [offer]);
@@ -178,12 +185,12 @@ void main() {
         name: 'Third',
       );
       final api = _FakeCatalogApi((request) async {
-        if (request.limit != 100) return businessPage();
+        if (request.limit != _storesPageSize) return businessPage();
         if (request.page == 1) {
           return businessPage(
             businesses: [first, duplicate],
             page: 1,
-            limit: 100,
+            limit: _storesPageSize,
             hasMore: true,
             total: 3,
           );
@@ -191,7 +198,7 @@ void main() {
         return businessPage(
           businesses: [duplicate, third],
           page: 2,
-          limit: 100,
+          limit: _storesPageSize,
           hasMore: false,
           total: 3,
         );
@@ -217,12 +224,133 @@ void main() {
       expect(secondPage.hasMoreAllBusinesses, isFalse);
       expect(
         api.requests
-            .where((request) => request.limit == 100)
+            .where((request) => request.limit == _storesPageSize)
             .map((request) => request.page),
         [1, 2],
       );
     },
   );
+
+  // `المتاجر` searches the server, not the page it is holding. The tab is
+  // paged, so a filter applied in the widget could only ever find shops that
+  // had already been fetched - a shop on page three would not exist.
+
+  test('a stores search reaches the server and replaces the list', () async {
+    final all = catalogBusiness(name: 'Everything');
+    final match = catalogBusiness(
+      id: '64b000000000000000000009',
+      name: 'Yasmeen',
+    );
+
+    final api = _FakeCatalogApi((request) async {
+      if (request.limit != _storesPageSize) return businessPage();
+
+      return (request.search ?? '').isEmpty
+          ? businessPage(businesses: [all], limit: _storesPageSize)
+          : businessPage(businesses: [match], limit: _storesPageSize);
+    });
+
+    final bloc = _homeBloc(api: api, permissionGranted: false);
+    addTearDown(bloc.close);
+
+    final loaded = await _startHome(bloc);
+    expect(loaded.allBusinesses.single.name, 'Everything');
+
+    final searched = bloc.stream.firstWhere(
+      (HomeState state) =>
+          state.allBusinessesSearch == 'Yasmeen' &&
+          state.allBusinessesStatus == HomeSectionStatus.ready,
+    );
+    bloc.add(const HomeAllBusinessesSearchChanged('  Yasmeen  '));
+
+    final state = await searched;
+
+    // Trimmed, sent, and the previous page dropped rather than merged.
+    expect(state.allBusinessesSearch, 'Yasmeen');
+    expect(state.allBusinesses.map((item) => item.name), ['Yasmeen']);
+    expect(
+      api.requests
+          .where((request) => request.limit == _storesPageSize)
+          .map((request) => request.search),
+      ['', 'Yasmeen'],
+    );
+  });
+
+  test('the second page of a search stays inside that search', () async {
+    final first = catalogBusiness(name: 'Match one');
+    final second = catalogBusiness(
+      id: '64b000000000000000000008',
+      name: 'Match two',
+    );
+
+    final api = _FakeCatalogApi((request) async {
+      if (request.limit != _storesPageSize) return businessPage();
+
+      return businessPage(
+        businesses: <SearchBusinessApiModel>[
+          request.page == 1 ? first : second,
+        ],
+        page: request.page,
+        limit: _storesPageSize,
+        hasMore: request.page == 1,
+        total: 2,
+      );
+    });
+
+    final bloc = _homeBloc(api: api, permissionGranted: false);
+    addTearDown(bloc.close);
+
+    await _startHome(bloc);
+
+    final searched = bloc.stream.firstWhere(
+      (HomeState state) =>
+          state.allBusinessesSearch == 'Match' &&
+          state.allBusinessesStatus == HomeSectionStatus.ready,
+    );
+    bloc.add(const HomeAllBusinessesSearchChanged('Match'));
+    await searched;
+
+    final paged = bloc.stream.firstWhere(
+      (HomeState state) => state.allBusinessesPage == 2,
+    );
+    bloc.add(const HomeAllBusinessesNextPageRequested());
+    await paged;
+
+    // Without the term, page two would arrive unfiltered and be merged into a
+    // filtered list.
+    expect(
+      api.requests
+          .where(
+            (request) => request.limit == _storesPageSize && request.page == 2,
+          )
+          .map((request) => request.search),
+      ['Match'],
+    );
+    expect(bloc.state.allBusinesses, hasLength(2));
+  });
+
+  test('re-typing the same query does not ask again', () async {
+    final api = _FakeCatalogApi(
+      (request) async => businessPage(limit: request.limit),
+    );
+
+    final bloc = _homeBloc(api: api, permissionGranted: false);
+    addTearDown(bloc.close);
+
+    await _startHome(bloc);
+
+    final searched = bloc.stream.firstWhere(
+      (HomeState state) => state.allBusinessesSearch == 'Yasmeen',
+    );
+    bloc.add(const HomeAllBusinessesSearchChanged('Yasmeen'));
+    await searched;
+
+    final int before = api.requests.length;
+    bloc.add(const HomeAllBusinessesSearchChanged('Yasmeen'));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(api.requests.length, before);
+  });
 
   test(
     'Nearby uses granted device coordinates and backend distance data',

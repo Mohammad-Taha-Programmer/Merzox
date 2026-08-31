@@ -30,6 +30,10 @@ final class HomeState {
   final String nearbyBusinessesError;
   final String allBusinessesError;
   final int allBusinessesPage;
+
+  /// What `المتاجر` is currently searching for. Empty means the whole
+  /// catalogue.
+  final String allBusinessesSearch;
   final bool isLoadingAllBusinesses;
   final bool hasMoreAllBusinesses;
   final Set<String> followedBusinessIds;
@@ -62,6 +66,7 @@ final class HomeState {
     this.nearbyBusinessesError = '',
     this.allBusinessesError = '',
     this.allBusinessesPage = 0,
+    this.allBusinessesSearch = '',
     this.isLoadingAllBusinesses = false,
     this.hasMoreAllBusinesses = false,
     this.followedBusinessIds = const {},
@@ -95,6 +100,7 @@ final class HomeState {
     String? nearbyBusinessesError,
     String? allBusinessesError,
     int? allBusinessesPage,
+    String? allBusinessesSearch,
     bool? isLoadingAllBusinesses,
     bool? hasMoreAllBusinesses,
     Set<String>? followedBusinessIds,
@@ -142,6 +148,7 @@ final class HomeState {
           nearbyBusinessesError ?? this.nearbyBusinessesError,
       allBusinessesError: allBusinessesError ?? this.allBusinessesError,
       allBusinessesPage: allBusinessesPage ?? this.allBusinessesPage,
+      allBusinessesSearch: allBusinessesSearch ?? this.allBusinessesSearch,
       isLoadingAllBusinesses:
           isLoadingAllBusinesses ?? this.isLoadingAllBusinesses,
       hasMoreAllBusinesses: hasMoreAllBusinesses ?? this.hasMoreAllBusinesses,
