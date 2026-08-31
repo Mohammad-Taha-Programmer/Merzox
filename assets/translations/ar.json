@@ -338,7 +338,7 @@
     "invalidPriceAfterDiscount": "السعر بعد التخفيض يجب أن يكون أقل من السعر"
   },
   "merchantImages": {
-    "title": "إضافة صور أو فيديو",
+    "title": "إضافة صور",
     "primary": "الصورة الأساسية",
     "addHint": "أضف صورة عبر رابط",
     "addTitle": "إضافة صورة",

@@ -32,6 +32,14 @@ class MerchantProductImagesPage extends StatefulWidget {
       _MerchantProductImagesPageState();
 }
 
+/// `الرئيسية – 14` draws a drag-and-drop area titled «إضافة صور أو فيديو».
+///
+/// Neither half of that is available here. The product has no file upload of
+/// any kind - no picker, no multipart route, no storage - and no video
+/// anywhere: not a field, not a player, not another board. An image is added
+/// by its link, which is what the hint says and what the title now says too.
+/// Promising a video the product cannot take would be the same defect as a
+/// discard button that discards nothing.
 class _MerchantProductImagesPageState extends State<MerchantProductImagesPage> {
   static const double _dropTargetHeight = 155;
   static const double _previewHeight = 235;

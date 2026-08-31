@@ -338,7 +338,7 @@
     "invalidPriceAfterDiscount": "The discounted price must be below the price"
   },
   "merchantImages": {
-    "title": "Add photos or video",
+    "title": "Add photos",
     "primary": "Primary image",
     "addHint": "Add an image by link",
     "addTitle": "Add an image",
