@@ -1006,6 +1006,26 @@ class MappingContractTests(unittest.TestCase):
                     808,
                     "extend_final_row_to_812",
                 ),
+                (
+                    "profile_form_empty",
+                    "test/goldens/seed/profile_form_empty_ar_375x812.png",
+                    "\u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062e\u0635\u064a",
+                    "b11305d5-b6e1-4338-aca9-0e9320669635",
+                    "artwork/artboard-4a8d14ad-960d-4745-ad16-43775643978b",
+                    375,
+                    807,
+                    "extend_final_row_to_812",
+                ),
+                (
+                    "checkout_cancelling",
+                    "test/goldens/seed/checkout_cancelling_ar_375x812.png",
+                    "\u062a\u0641\u0627\u0635\u064a\u0644 \u0627\u0644\u0645\u062a\u062c\u0631 \u2013 24",
+                    "2f14e240-c8db-4781-862d-3391ecd8efc1",
+                    "artwork/artboard-af467938-91c0-4054-8d18-fe752b10ab60",
+                    375,
+                    808,
+                    "extend_final_row_to_812",
+                ),
             ],
         )
 

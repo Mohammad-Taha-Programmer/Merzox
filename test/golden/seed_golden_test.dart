@@ -371,6 +371,8 @@ final class _SeedProductApi extends ApiService {
 }
 
 // ---------------------------------------------------------------------------
+// Nearby map fixture
+// ---------------------------------------------------------------------------
 // Conversation fixture
 // ---------------------------------------------------------------------------
 
@@ -1033,23 +1035,32 @@ final class _SeedPreferenceGateway implements NotificationPreferenceGateway {
 
 /// The signed-in customer the profile form loads.
 final class _SeedProfileApi extends ApiService {
+  /// Whether the account has been filled in yet.
+  ///
+  /// `الملف الشخصي` draws the form with every placeholder still showing and
+  /// `تعديل الملف الشخصي` draws the same form with an account behind it, so
+  /// the two boards are one screen before and after it has been used.
+  final bool filled;
+
+  _SeedProfileApi({this.filled = true});
+
   @override
   Future<AuthApiUser> me({required String token}) async {
-    return AuthApiUser.fromJson(const <String, dynamic>{
+    return AuthApiUser.fromJson(<String, dynamic>{
       'id': '64a000000000000000000001',
-      'name': 'ياسمين خالد',
-      'email': 'yasmeen@example.test',
-      'emailVerified': true,
-      'emails': <Map<String, dynamic>>[],
-      'phone': '0592029316',
-      'phones': <Map<String, dynamic>>[],
-      'address': 'أريحا',
-      'addresses': <Map<String, dynamic>>[],
+      'name': filled ? 'ياسمين خالد' : '',
+      'email': filled ? 'yasmeen@example.test' : '',
+      'emailVerified': filled,
+      'emails': const <Map<String, dynamic>>[],
+      'phone': filled ? '0592029316' : '',
+      'phones': const <Map<String, dynamic>>[],
+      'address': filled ? 'أريحا' : '',
+      'addresses': const <Map<String, dynamic>>[],
       'userType': 'normal',
-      'gender': 'female',
-      'birthDate': '1995-04-12',
-      'permissions': <String, dynamic>{},
-      'permissionConsents': <String, dynamic>{},
+      'gender': filled ? 'female' : 'unspecified',
+      'birthDate': filled ? '1995-04-12' : null,
+      'permissions': const <String, dynamic>{},
+      'permissionConsents': const <String, dynamic>{},
       'canChangeName': true,
       'canChangeGender': true,
     });
@@ -2057,8 +2068,49 @@ void main() {
         expect(find.text('الدفع'), findsWidgets);
         expect(find.text('الدفع عند الاستلام'), findsOneWidget);
         expect(find.text('تأكيد الطلب'), findsOneWidget);
+        // `تفاصيل المتجر – 26` has no cancellation rule on it: that belongs to
+        // the button, and only once it has been reached for.
+        expect(
+          find.text('يمكن إلغاء الطلب خلال 24 ساعة من تأكيده'),
+          findsNothing,
+        );
 
         await expectMerzoxSeedGolden('checkout_payment_ar_375x812.png');
+      });
+
+      testWidgets('the checkout cancelling state renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final CartBloc cart = await loadedCart();
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<CartBloc>.value(
+            value: cart,
+            child: withMerzoxGoldenDeviceInsets(
+              CheckoutPage(apiService: _SeedDeliveryApi()),
+            ),
+          ),
+        );
+
+        await tester.tap(find.text('متابعة'));
+        await settleMerzoxGoldenFrames(tester);
+
+        // Reached for cancel, then said no: the button keeps the emphasis and
+        // the window stays on screen, which is the state between `– 26` and
+        // `– 30`.
+        await tester.tap(find.text('إلغاء الطلب'));
+        await settleMerzoxGoldenFrames(tester);
+        await tester.tap(find.text('لا'));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('هل أنت متأكد من عملية إلغاء الطلب؟'), findsNothing);
+        expect(
+          find.text('يمكن إلغاء الطلب خلال 24 ساعة من تأكيده'),
+          findsOneWidget,
+        );
+
+        await expectMerzoxSeedGolden('checkout_cancelling_ar_375x812.png');
       });
 
       testWidgets('the checkout cancel question renders its Arabic baseline', (
@@ -2322,6 +2374,43 @@ void main() {
         );
 
         await expectMerzoxSeedGolden('profile_form_ar_375x812.png');
+      });
+
+      testWidgets('the empty profile form renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        final ProfileEditBloc bloc = ProfileEditBloc(
+          apiService: _SeedProfileApi(filled: false),
+        );
+        _closeOnTearDown(bloc);
+
+        final Future<ProfileEditState> ready = bloc.stream.firstWhere(
+          (ProfileEditState state) =>
+              state.status != ProfileEditStatus.initial &&
+              state.status != ProfileEditStatus.loading,
+        );
+        bloc.add(const ProfileEditStarted());
+        final ProfileEditState settled = await ready;
+        expect(
+          settled.status,
+          ProfileEditStatus.ready,
+          reason: 'profile fixture rejected: ${settled.errorMessage}',
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<ProfileEditBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(const ProfileEditPage()),
+          ),
+        );
+
+        // Nothing typed yet: every field is showing what it wants.
+        expect(find.text('ياسمين خالد'), findsNothing);
+
+        await expectMerzoxSeedGolden('profile_form_empty_ar_375x812.png');
       });
 
       // -- 31/47/48/49. Store settings, one section at a time --------------

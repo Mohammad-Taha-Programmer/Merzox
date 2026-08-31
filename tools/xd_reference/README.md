@@ -1266,6 +1266,8 @@ and that the report follows this file's order exactly.
 | `chat_empty` | `test/goldens/seed/chat_empty_ar_375x812.png` | `تفاصيل المتجر – 18` | `b81ea3ec-9c49-4b2f-b386-d3a04cab8d62` | 375 x 805 | `extend_final_row_to_812` |
 | `chat_storefront` | `test/goldens/seed/chat_storefront_ar_375x812.png` | `تفاصيل المتجر – 20` | `f279de6a-80b5-4f99-b5f1-db80a20ea94a` | 375 x 805 | `extend_final_row_to_812` |
 | `checkout_cancel` | `test/goldens/seed/checkout_cancel_ar_375x812.png` | `تفاصيل المتجر – 30` | `b4af8a63-e4d2-44fa-9f9b-09f8e7482422` | 375 x 808 | `extend_final_row_to_812` |
+| `profile_form_empty` | `test/goldens/seed/profile_form_empty_ar_375x812.png` | `الملف الشخصي` | `b11305d5-b6e1-4338-aca9-0e9320669635` | 375 x 807 | `extend_final_row_to_812` |
+| `checkout_cancelling` | `test/goldens/seed/checkout_cancelling_ar_375x812.png` | `تفاصيل المتجر – 24` | `2f14e240-c8db-4781-862d-3391ecd8efc1` | 375 x 808 | `extend_final_row_to_812` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1344,6 +1346,8 @@ a *different* uuid from the manifest id):
 | `chat_empty` | `artwork/artboard-ea9279d7-1a37-4839-b5e9-c43c335c1c83` |
 | `chat_storefront` | `artwork/artboard-912a5591-8704-4951-902f-7fd9c17fb286` |
 | `checkout_cancel` | `artwork/artboard-c3cebb35-cca9-4bca-99f3-1e65ec0eee0d` |
+| `profile_form_empty` | `artwork/artboard-4a8d14ad-960d-4745-ad16-43775643978b` |
+| `checkout_cancelling` | `artwork/artboard-af467938-91c0-4054-8d18-fe752b10ab60` |
 
 Why each one, in one line:
 

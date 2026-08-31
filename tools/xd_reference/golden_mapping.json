@@ -940,6 +940,32 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "What `الغاء الطلب` asks before it throws the basket away — it used to ask nothing. The board asks twice: first whether to cancel, then for a reason under a second button. The reason half belongs to cancelling a PLACED order, and `طلباتي` already asks for one there; nothing has been placed at this point in the wizard, so there is nothing to record a reason against. Most of what is left after matching the scrim is that difference in size: a panel that asks one question is a good deal smaller than one that asks two and carries a text area between them."
+    },
+    {
+      "seed": "profile_form_empty",
+      "flutter_golden": "test/goldens/seed/profile_form_empty_ar_375x812.png",
+      "xd": {
+        "name": "الملف الشخصي",
+        "manifest_id": "b11305d5-b6e1-4338-aca9-0e9320669635",
+        "artboard_path": "artwork/artboard-4a8d14ad-960d-4745-ad16-43775643978b",
+        "width": 375,
+        "height": 807
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The profile form with every placeholder still showing. `تعديل الملف الشخصي`, already seeded, is the same screen with an account behind it — the two boards are one form before and after it has been used, not two forms. The board puts a `+972` prefix on the phone field, which needs a country list and a storage format the server does not have today."
+    },
+    {
+      "seed": "checkout_cancelling",
+      "flutter_golden": "test/goldens/seed/checkout_cancelling_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 24",
+        "manifest_id": "2f14e240-c8db-4781-862d-3391ecd8efc1",
+        "artboard_path": "artwork/artboard-af467938-91c0-4054-8d18-fe752b10ab60",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "Step two after the customer has reached for cancel and said no: the button keeps the emphasis and the twenty-four hour window stays beside it. Three boards, three states — `– 26` at rest with no rule on it, this one, and `– 30` for the question. The window used to be printed under the buttons at all times, which put a rule about undoing an order on a screen where nothing had been ordered."
     }
   ]
 }
