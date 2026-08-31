@@ -1240,6 +1240,7 @@ and that the report follows this file's order exactly.
 | `checkout_address_form` | `test/goldens/seed/checkout_address_form_ar_375x812.png` | `تفاصيل المتجر – 29` | `eba6e283-2353-474e-96bf-f25f28d094ed` | 375 x 808 | `extend_final_row_to_812` |
 | `checkout_governorate` | `test/goldens/seed/checkout_governorate_ar_375x812.png` | `تفاصيل المتجر – 28` | `b02e7d19-5da7-4163-839f-d035e9a8f1d9` | 375 x 808 | `extend_final_row_to_812` |
 | `checkout_city` | `test/goldens/seed/checkout_city_ar_375x812.png` | `تفاصيل المتجر – 27` | `143b4f12-eea3-4cad-abe6-474a7f5bc2e5` | 375 x 808 | `extend_final_row_to_812` |
+| `stores` | `test/goldens/seed/stores_ar_375x812.png` | `المتاجر` | `3b375ebd-f5ed-4d9a-ae28-f15de08c4e9f` | 375 x 1492 | `crop_top_to_812` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1292,6 +1293,7 @@ a *different* uuid from the manifest id):
 | `checkout_address_form` | `artwork/artboard-0eb623e2-3c12-4811-998f-22dfdd2389e2` |
 | `checkout_governorate` | `artwork/artboard-754206ac-0ccc-4dd4-b275-6285e97917cf` |
 | `checkout_city` | `artwork/artboard-2d0f2946-4360-4413-9f1b-b1bffd353f64` |
+| `stores` | `artwork/artboard-56d49dd7-a2b0-462c-b8de-60a328405091` |
 
 Why each one, in one line:
 

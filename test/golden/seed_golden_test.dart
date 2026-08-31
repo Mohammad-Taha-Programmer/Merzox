@@ -814,15 +814,21 @@ final class _SeedHomeApi extends ApiService {
     double? longitude,
     int? radiusMeters,
   }) async {
+    // `المتاجر` asks for a page of fifty and the home's own strips ask for
+    // ten, which is how this fixture tells them apart. The board draws eight
+    // cards above its fold.
+    final bool storesTab = limit >= 50;
+    final int count = storesTab ? 8 : 3;
+
     return BusinessListApiResponse.fromJson(<String, dynamic>{
       'businesses': <Map<String, dynamic>>[
-        for (int index = 0; index < 3; index++)
+        for (int index = 0; index < count; index++)
           _seedHomeBusiness(index, discount: discounted == true ? '50%' : null),
       ],
-      'pagination': const <String, dynamic>{
+      'pagination': <String, dynamic>{
         'page': 1,
-        'limit': 20,
-        'total': 3,
+        'limit': limit,
+        'total': count,
         'hasMore': false,
       },
     });
@@ -2351,6 +2357,44 @@ void main() {
 
         return bloc;
       }
+
+      testWidgets('the stores tab renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        // `المتاجر` is not a tall screen: it is a grid of every registered
+        // shop, and the 1492 the board is drawn at is what scrolling reveals.
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          AuthBloc.sessionKey: true,
+          AuthBloc.tokenKey: 'seed-golden-token',
+          AuthBloc.userTypeKey: 'customer',
+          AuthBloc.nameKey: 'ياسمين خالد',
+        });
+
+        final HomeBloc bloc = await customerHome(isGuest: false);
+
+        // The stores grid is tab two, which is the raised button in the bar.
+        bloc.add(const HomeTabChanged(2));
+        await bloc.stream.firstWhere(
+          (HomeState state) => state.selectedTab == 2,
+        );
+
+        expect(bloc.state.allBusinesses, hasLength(8));
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<HomeBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              const HomeScreen(isGuest: false),
+            ),
+          ),
+        );
+
+        expect(find.text('ابحث عن أي متجر تريده'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('stores_ar_375x812.png');
+      });
 
       testWidgets('customer home renders its Arabic guest baseline', (
         WidgetTester tester,

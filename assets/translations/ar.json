@@ -626,7 +626,9 @@
     },
     "businesses": {
       "noResultsMessage": "جرّب البحث باسم متجر أو منتج آخر.",
-      "swipeForMore": "مرر لعرض المزيد من المتاجر"
+      "swipeForMore": "مرر لعرض المزيد من المتاجر",
+      "searchHint": "ابحث عن أي متجر تريده",
+      "emptyTitle": "لا توجد متاجر بعد"
     },
     "profileGuestMessage": "لعرض حسابك وتعديل بياناتك، يرجى تسجيل الدخول أولا",
     "profileGreeting": "{} ، أهلا",

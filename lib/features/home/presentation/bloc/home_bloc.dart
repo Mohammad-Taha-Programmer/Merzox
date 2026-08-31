@@ -48,6 +48,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<HomeLocationPermissionAnswered>(_onLocationPermissionAnswered);
     on<HomeBusinessFollowToggled>(_onBusinessFollowToggled);
     on<HomeAllBusinessesNextPageRequested>(_onAllBusinessesNextPageRequested);
+    on<HomeAllBusinessesSearchChanged>(_onAllBusinessesSearchChanged);
     on<HomeCatalogSectionRetryRequested>(_onCatalogSectionRetryRequested);
   }
 
@@ -121,6 +122,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         () => _apiService.businesses(
           page: 1,
           limit: _allBusinessesPageSize,
+          search: state.allBusinessesSearch,
           sort: 'newest',
         ),
       ),
@@ -305,6 +307,9 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       final response = await _apiService.businesses(
         page: nextPage,
         limit: _allBusinessesPageSize,
+        // Without this, page two of a search would arrive unfiltered and be
+        // merged into a filtered list.
+        search: state.allBusinessesSearch,
         sort: 'newest',
       );
       final byId = <String, HomeBusiness>{
@@ -333,6 +338,27 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
         ),
       );
     }
+  }
+
+  Future<void> _onAllBusinessesSearchChanged(
+    HomeAllBusinessesSearchChanged event,
+    Emitter<HomeState> emit,
+  ) async {
+    final String query = event.query.trim();
+    if (query == state.allBusinessesSearch) return;
+
+    emit(
+      state.copyWith(
+        allBusinessesSearch: query,
+        allBusinesses: const [],
+        allBusinessesPage: 0,
+        hasMoreAllBusinesses: false,
+        allBusinessesStatus: HomeSectionStatus.loading,
+        allBusinessesError: '',
+      ),
+    );
+
+    await _reloadAllBusinesses(emit);
   }
 
   Future<void> _onCatalogSectionRetryRequested(
@@ -444,6 +470,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       () => _apiService.businesses(
         page: 1,
         limit: _allBusinessesPageSize,
+        search: state.allBusinessesSearch,
         sort: 'newest',
       ),
     );
@@ -632,5 +659,10 @@ final class _BusinessLoadResult {
 }
 
 const int _homeSectionLimit = 10;
-const int _allBusinessesPageSize = 100;
+
+/// Fifty shops a page.
+///
+/// Large enough that scrolling rarely waits and small enough that the first
+/// screen is not paid for with ninety-odd cards nobody asked for.
+const int _allBusinessesPageSize = 50;
 const int _nearbyRadiusMeters = 25000;

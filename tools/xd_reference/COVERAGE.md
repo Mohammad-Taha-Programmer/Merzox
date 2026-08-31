@@ -8,8 +8,8 @@ two boards carrying the same words are two **states of one surface**, not two
 surfaces. Single-link at Jaccard ≥ 0.72 over the text sets, which collapses
 112 boards into **68 distinct surfaces**.
 
-    112 artboards → 68 surfaces → 39 seeded, 29 not
-    80 of the 112 boards sit inside a seeded surface
+    112 artboards → 68 surfaces → 40 seeded, 28 not
+    82 of the 112 boards sit inside a seeded surface
 
 Seeds outnumber seeded surfaces: `تفاصيل المتجر – 21` is one
 surface carrying three seeds (the three tabs of طلباتي), and
@@ -58,6 +58,7 @@ preview of a storefront says the same things the customer's view of it does.
 | `checkout_address_form` | تفاصيل المتجر – 25 | 3 |
 | `checkout_governorate` | تفاصيل المتجر – 28 | 2 |
 | `checkout_city` | تفاصيل المتجر – 27 | 2 |
+| `stores` | المتاجر | 2 |
 
 ## What is not covered
 
@@ -65,11 +66,7 @@ Ranked by how much of the corpus each accounts for and whether the app has the
 screen at all. "Built" means the widget exists and was aligned in a previous
 pass but carries no golden seed.
 
-### 1. المتاجر — all stores · 2 boards
-
-375x1492, the tallest boards in the corpus. A businesses tab exists.
-
-### 2. اعدادات المتجر, the other three sections · 3 boards
+### 1. اعدادات المتجر, the other three sections · 3 boards
 
 `شعار المتجر`,
 `وصف المتجر`,
@@ -77,7 +74,7 @@ pass but carries no golden seed.
 different accordion open. Each clusters on its own because opening a section
 changes the words on the screen. **Built**, and reachable; only unseeded.
 
-### 3. Smaller items
+### 2. Smaller items
 
 | Boards | Surface | Note |
 | --- | --- | --- |

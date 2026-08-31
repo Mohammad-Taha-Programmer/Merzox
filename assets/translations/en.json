@@ -626,7 +626,9 @@
     },
     "businesses": {
       "noResultsMessage": "Try searching for another business or product name.",
-      "swipeForMore": "Scroll to view more businesses"
+      "swipeForMore": "Scroll to view more businesses",
+      "searchHint": "Search for any store you want",
+      "emptyTitle": "No stores yet"
     },
     "profileGuestMessage": "To view your account and edit your details, please log in first",
     "profileGreeting": "Hello, {}",
