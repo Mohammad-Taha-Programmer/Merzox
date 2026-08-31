@@ -74,11 +74,33 @@ preview of a storefront says the same things the customer's view of it does.
 
 ## What is not covered
 
-One surface, for a reason that was measured rather than argued.
+One surface. What is known about it is written below, and no more than that.
 
-| Board | Surface | Why not |
+| Board | Surface | What was found |
 | --- | --- | --- |
-| `الخريطة` | the map | Seeding it was tried twice and hung the suite for ten minutes each time, once with an unbounded image wait and once with a bounded one. The screen's tile layer issues network work that a deterministic capture cannot wait out, and a golden that never finishes is worse than a board that is not measured. The bounded wait the attempt introduced is kept: it is right for every other seed. |
+| `الخريطة` | the map | Every attempt to capture it hangs. |
+
+`NearbyMapPage` renders correctly and is reachable at `/map`; only the golden
+hangs, and it does so before any assertion runs.
+
+What was measured, by bisection:
+
+- A bare `FlutterMap` — at any size, inside `runAsync`, with a network-free
+  tile provider — captures fine.
+- `NearbyMapPage` at **800x600** captures fine, on the fake clock and inside
+  `runAsync`.
+- `NearbyMapPage` at **375x812** — the device viewport every seed uses — never
+  finishes. It still never finishes with the marker layer removed, with the
+  results chips removed, and with the attribution widget removed.
+
+So it is the page at the golden viewport, and it is **not** the tiles, the
+markers, the shop chips or the attribution. An earlier version of this file
+said the tile layer was waiting for a network it could not have; that was a
+guess, it was tested, and it was wrong — a tile provider that answers instantly
+and without a network changes nothing.
+
+The cause is still unidentified. Until it is, the board is not measured, and
+the reason recorded here is what was observed rather than what was assumed.
 
 ## Reproducing this
 
