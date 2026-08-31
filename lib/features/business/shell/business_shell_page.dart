@@ -49,6 +49,7 @@ class BusinessShellPage extends StatelessWidget {
     CourierLocationHandoff handoff,
   ) async {
     var handedOff = false;
+    final BusinessBloc bloc = context.read<BusinessBloc>();
 
     final expiresAt = handoff.expiresAt.toLocal().toIso8601String();
 
@@ -83,6 +84,10 @@ class BusinessShellPage extends StatelessWidget {
                   setDialogState(() {
                     handedOff = true;
                   });
+                  // `تجاهل الرمز` said the credential was discarded while
+                  // leaving it live until the order moved on. It is minted and
+                  // shown once, so discarding has to reach the server.
+                  bloc.add(BusinessCourierLocationRevoked(handoff.orderId));
                   Navigator.of(dialogContext).pop();
                 },
                 child: Text('courierLocation.discardAccess'.tr()),

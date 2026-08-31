@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:merzox/core/localization/api_error_codes.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 
 final String ipAddress = "192.168.1.11";
@@ -1065,6 +1066,31 @@ class ApiService {
     );
   }
 
+  /// Revokes the courier's location credential for one order.
+  ///
+  /// The merchant mints this credential when assigning a courier, and the
+  /// handoff dialog shows it exactly once. Choosing to discard it there used to
+  /// close the dialog and nothing else, which left a minted credential live
+  /// until the order moved on. The server's kill switch is idempotent, so a
+  /// second call on an already-revoked order is still a success.
+  Future<OwnerOrder> revokeOrderCourierLocation({
+    required String token,
+    required String orderId,
+  }) async {
+    final response = await _dio.delete<Map<String, dynamic>>(
+      '/businesses/me/orders/$orderId/courier-location-capability',
+      options: _authOptions(token),
+    );
+
+    return OwnerOrder.fromJson(
+      requiredEntity(
+        response.data,
+        'order',
+        endpoint: 'revokeOwnerOrderCourierLocation',
+      ),
+    );
+  }
+
   Future<DateTime> updateCourierLocationByCapability({
     required String orderId,
     required String capabilityToken,
@@ -1177,9 +1203,7 @@ class ApiService {
 
   /// Operational server codes whose English message would otherwise reach an
   /// Arabic screen verbatim. The code, not the prose, is the stable contract.
-  static const localizedApiErrorCodes = {
-    'INVALID_BIRTH_DATE': 'apiErrors.invalidBirthDate',
-  };
+  static const Map<String, String> localizedApiErrorCodes = apiErrorMessageKeys;
 
   static String messageFromError(Object error) {
     if (error is ApiContractException) {

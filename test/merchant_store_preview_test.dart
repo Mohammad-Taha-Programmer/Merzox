@@ -1251,9 +1251,6 @@ void main() {
     // every preview key the code asks for exists in BOTH catalogues.
     const usedKeys = [
       'merchantPreview.title',
-      'merchantPreview.open',
-      'merchantPreview.banner',
-      'merchantPreview.close',
       'merchantPreview.loadError',
       'merchantPreview.retry',
     ];
