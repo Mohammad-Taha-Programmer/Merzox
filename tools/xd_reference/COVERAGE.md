@@ -8,35 +8,49 @@ two boards carrying the same words are two **states of one surface**, not two
 surfaces. Single-link at Jaccard ≥ 0.72 over the text sets, which collapses
 112 boards into **68 distinct surfaces**.
 
-    112 artboards → 68 surfaces → 19 seeded, 49 not
+    112 artboards → 68 surfaces → 32 seeded, 36 not
+    62 of the 112 boards sit inside a seeded surface
 
-The seed count differs from the mapping's 20 entries because `store_details`
-and `store_preview` are seeded from two boards that cluster together — the
-merchant's own preview of a storefront says the same things the customer's
-view of it does.
+Seeds outnumber seeded surfaces: `تفاصيل المتجر – 21` is one
+surface carrying three seeds (the three tabs of طلباتي), and
+`تفاصيل المتجر – 1` carries two, because the merchant's
+preview of a storefront says the same things the customer's view of it does.
 
 ## What is covered
 
-| Seed | Surface |
-| --- | --- |
-| `splash` | سبلاش |
-| `onboarding` | شاشة ترحيبية |
-| `login` | تسجيل الدخول |
-| `signup` | إنشاء حساب |
-| `about_us` | من نحن |
-| `cart` | السلة |
-| `favorites` | المفضلة (products tab) |
-| `order_tracking` | تتبع الطلب (delivered) |
-| `store_preview`, `store_details` | تفاصيل المتجر – 1 / معاينة المتجر |
-| `storefront_products` | تفاصيل المتجر – 2 (+8 sibling boards) |
-| `storefront_reviews` | تفاصيل المتجر – 7 (+2) |
-| `product_details` | تفاصيل المتجر – 8 (+3) |
-| `checkout_buyer` | تفاصيل المتجر – 16 (+1) |
-| `checkout_payment` | تفاصيل المتجر – 24 |
-| `home_guest`, `home_customer` | الرئيسية, الرئيسية – 1 |
-| `merchant_dashboard` | الرئيسية – 2 |
-| `merchant_orders` | الرئيسية – 9 (+2) |
-| `merchant_products` | الرئيسية – 10 |
+| Seed | Surface | Boards |
+| --- | --- | --- |
+| `splash` | سبلاش – 1 | 1 |
+| `onboarding` | شاشة ترحيبية | 1 |
+| `login` | تسجيل الدخول | 2 |
+| `signup` | إنشاء حساب | 1 |
+| `about_us` | من نحن | 1 |
+| `home_guest`, `home_customer` | الرئيسية, الرئيسية – 1 | 2 |
+| `search_history` | البحث | 2 |
+| `search_products` | بحث منتجات | 2 |
+| `search_stores` | بحث متاجر | 2 |
+| `store_preview`, `store_details` | تفاصيل المتجر – 1 | 3 |
+| `storefront_products` | تفاصيل المتجر – 6 | 9 |
+| `storefront_reviews` | تفاصيل المتجر – 7 | 3 |
+| `product_details` | تفاصيل المتجر – 8 | 4 |
+| `cart` | السلة | 1 |
+| `checkout_buyer` | تفاصيل المتجر – 16 | 2 |
+| `checkout_payment` | تفاصيل المتجر – 24 | 1 |
+| `checkout_done` | تفاصيل المتجر – 17 | 2 |
+| `orders_current`, `orders_completed`, `orders_cancelled` | تفاصيل المتجر – 21 | 6 |
+| `orders_empty` | السلة – 4 | 1 |
+| `order_tracking` | تتبع الطلب | 1 |
+| `favorites` | المفضلة | 1 |
+| `messages_inbox` | الرسائل – 3 | 2 |
+| `messages_empty` | الرسائل | 1 |
+| `notifications` | الرسائل – 5 | 1 |
+| `profile_guest` | البروفايل – 1 | 2 |
+| `profile_merchant` | البروفايل | 1 |
+| `profile_form` | تعديل الملف الشخصي | 1 |
+| `store_settings` | اعدادات المتجر | 1 |
+| `merchant_dashboard` | الرئيسية – 2 | 1 |
+| `merchant_orders` | الرئيسية – 9 | 3 |
+| `merchant_products` | الرئيسية – 10 | 1 |
 
 ## What is not covered
 
@@ -44,81 +58,66 @@ Ranked by how much of the corpus each accounts for and whether the app has the
 screen at all. "Built" means the widget exists and was aligned in a previous
 pass but carries no golden seed.
 
-### 1. الرسائل — messaging and notifications · 9 boards, 6 surfaces
+### 1. إضافة منتجات — add a product · 3 boards
 
-The largest untouched family. The app has messaging (`merchant_messages_page`,
-`messaging_bloc`) and notifications, and none of it has ever been measured.
+375x1334 and 375x1251: the longest unmeasured form in the corpus. A product
+editor exists in the merchant shell; the artboards' field order and their image
+step have never been read against it.
 
-| Board | Surface |
-| --- | --- |
-| `الرسائل` 812 | conversation list |
-| `الرسائل – 3` ×2 | list with الكل / غير مقروءة tabs |
-| `الرسائل – 1` | signed-out gate |
-| `الرسائل` 810 | empty state |
-| `الرسائل – 2`, `الرسائل` ×2 | conversation thread |
-| `الرسائل – 5` | **الاشعارات** — the notifications list |
+### 2. تفاصيل الطلب — merchant order detail · 4 boards, 2 surfaces
 
-### 2. The checkout wizard · 6 surfaces across تفاصيل المتجر
+`تفاصيل الطلب` ×3 and `– 3`.
+`merchant_order_detail_page` exists and is reachable from the orders tab.
+
+### 3. تفاصيل المتجر – 34 · 3 boards
+
+375x1141, the product page with its description and review tabs open. The
+seeded `product_details` is board 8, a different and shorter surface.
+
+### 4. The rest of the checkout wizard · 5 surfaces, 10 boards
 
 A real divergence rather than a gap: the design is a **three-step wizard** with
-a stepper across the top, and the shipped flow has two steps and no stepper.
+a stepper across the top, and the shipped flow reaches the same end by a
+different road.
 
 | Board | Surface |
 | --- | --- |
-| `تفاصيل المتجر – 25` ×3 | step 1 «تفاصيل» — full name, phone, governorate |
-| `تفاصيل المتجر – 26` ×2 | step 2 «الدفع» — cash on delivery, fee, ETA |
-| `تفاصيل المتجر – 17` ×2 | step 3 «إتمام الطلب» — courier illustration |
+| `تفاصيل المتجر – 25` ×3 | step 1 «تفاصيل» |
+| `تفاصيل المتجر – 26` ×2 | step 2 «الدفع» |
 | `تفاصيل المتجر – 27` ×2 | governorate picker |
 | `تفاصيل المتجر – 28` ×2 | city picker |
 | `تفاصيل المتجر – 30` | purchase confirmation dialog |
 
-The seeded `checkout_buyer` and `checkout_payment` are boards 16 and 24, which
-are a *different* pair from 25 and 26 — worth resolving before either is
-treated as final.
+The pickers and the confirmation both exist in the app; boards 25 and 26 are a
+*different* pair from the seeded 16 and 24, and which pair is authoritative is
+still unresolved.
 
-### 3. البحث — search · 6 boards, 3 surfaces
+### 5. المتاجر — all stores · 2 boards
 
-| Board | Surface |
-| --- | --- |
-| `البحث` ×2 | recent searches |
-| `بحث متاجر` ×2 | results, stores tab |
-| `بحث منتجات` ×2 | results, products tab |
+375x1492, the tallest boards in the corpus. A businesses tab exists.
 
-### 4. Profile · 5 boards, 4 surfaces
+### 6. اعدادات المتجر, the other three sections · 3 boards
 
-`البروفايل` (merchant menu), `البروفايل – 1` ×2 (customer menu),
-`الملف الشخصي` (form), `تعديل الملف الشخصي` (gender and birth date).
+`شعار المتجر`,
+`وصف المتجر`,
+`وسائل التواصل` — the seeded screen with a
+different accordion open. Each clusters on its own because opening a section
+changes the words on the screen. **Built**, and reachable; only unseeded.
 
-### 5. اعدادات المتجر — store settings · 5 boards, 5 surfaces
-
-The settings menu plus four editors: store details, logo, description, social
-links. `store_settings_page` exists.
-
-### 6. طلباتي — customer order history · 7 boards, 2 surfaces
-
-`تفاصيل المتجر – 21` ×6 with الحالية / المكتملة tabs, and `السلة – 4` as its
-empty state.
-
-### 7. تفاصيل الطلب — order detail · 4 boards, 2 surfaces
-
-Merchant order detail. `merchant_order_detail_page` exists.
-
-### 8. Smaller items
+### 7. Smaller items
 
 | Boards | Surface | Note |
 | --- | --- | --- |
-| `المتاجر` ×2 (1492) | all-stores list | businesses tab exists |
-| `إضافة منتجات` ×3 (1334) | add-product form | product editor exists |
-| `الرئيسية – 12..17` (5) | merchant browse overlays | **built**, not seeded |
-| `الرئيسية – 14` | product images screen | **built**, not seeded |
+| `الرئيسية – 12`, `– 13` ×2, `– 16` | merchant browse overlays | **built**, not seeded |
+| `الرئيسية – 14` (1009) | product images screen | **built**; no upload endpoint exists |
 | `السلة – 1`, `السلة – 2` | cart with invoice, empty cart | |
 | `المفضلة – 1` | favorites, stores tab | |
 | `تتبع الطلب – 1`, `– 2` | tracking: preparing, on the way | |
-| `شاشة ترحيبية 1` ×2 | two more onboarding slides | payment methods, map |
+| `شاشة ترحيبية 1`, `1 – 1` | two more onboarding slides | payment methods, map |
 | `إنشاء حساب – 1`, `– 2` | signup as customer / as merchant | |
-| `تسجيل الدخول – 1` | login, second state | |
-| `تفاصيل المتجر – 34` ×3 | product page, description/review tabs | |
 | `تفاصيل المتجر – 18`, `– 20` | storefront support and chat states | |
+| `الرسائل` ×2 (810), `– 1`, `– 2` | thread, signed-out gate | |
+| `الملف الشخصي` | profile form, first state | `profile_form` is `تعديل ...` |
 | `الخريطة` | map | |
 | `تقييم` | rate a delivered order | |
 

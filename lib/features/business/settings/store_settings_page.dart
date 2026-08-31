@@ -32,6 +32,16 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
   late final TextEditingController _category = TextEditingController(
     text: widget.business.category,
   );
+  // Not on any artboard, and here because merchant enrollment collects both
+  // and the server accepts edits to both. The old profile dialog was their
+  // only editor; routing its menu row to this page would otherwise have
+  // stranded two stored fields with no way to correct them.
+  late final TextEditingController _englishName = TextEditingController(
+    text: widget.business.englishName,
+  );
+  late final TextEditingController _attachmentUrl = TextEditingController(
+    text: widget.business.attachmentUrl,
+  );
   late final TextEditingController _instagram = TextEditingController(
     text: widget.business.socialLinks.instagram,
   );
@@ -53,6 +63,8 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
       _description,
       _address,
       _category,
+      _englishName,
+      _attachmentUrl,
       _instagram,
       _whatsapp,
       _mobile,
@@ -71,6 +83,8 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
         'description': _description.text.trim(),
         'address': _address.text.trim(),
         'category': _category.text.trim(),
+        'englishName': _englishName.text.trim(),
+        'attachmentUrl': _attachmentUrl.text.trim(),
         'socialLinks': {
           'instagram': _instagram.text.trim(),
           'whatsapp': _whatsapp.text.trim(),
@@ -86,7 +100,6 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
     Navigator.of(context).pop();
   }
 
-  @override
   /// Which section is open. The artboards show exactly one at a time, and a
   /// second open section would push the save button off the screen.
   _SettingsSection? _open = _SettingsSection.store;
@@ -223,6 +236,15 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                           controller: _category,
                           label: 'storeSettings.categoryLabel'.tr(),
                         ),
+                        _Field(
+                          controller: _englishName,
+                          label: 'business.englishName'.tr(),
+                        ),
+                        _Field(
+                          controller: _attachmentUrl,
+                          label: 'business.attachmentUrl'.tr(),
+                          keyboardType: TextInputType.url,
+                        ),
                       ],
                     ),
                     _Accordion(
@@ -337,24 +359,6 @@ class _Accordion extends StatelessWidget {
           ),
           if (open) ...<Widget>[const SizedBox(height: 14), ...children],
         ],
-      ),
-    );
-  }
-}
-
-class _Section extends StatelessWidget {
-  final String title;
-
-  const _Section(this.title);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      title,
-      style: const TextStyle(
-        fontSize: 13,
-        fontWeight: FontWeight.w800,
-        color: MerzoxColors.kColor2B2B2B,
       ),
     );
   }

@@ -62,6 +62,10 @@ import 'package:merzox/features/product_details/bloc/product_details_event.dart'
 import 'package:merzox/features/product_details/bloc/product_details_state.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
+import 'package:merzox/features/orders/bloc/orders_bloc.dart';
+import 'package:merzox/features/orders/bloc/orders_event.dart';
+import 'package:merzox/features/orders/bloc/orders_state.dart';
+import 'package:merzox/features/orders/pages/orders_page.dart';
 import 'package:merzox/features/orders/bloc/order_tracking_bloc.dart';
 import 'package:merzox/features/orders/bloc/order_tracking_event.dart';
 import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
@@ -331,6 +335,144 @@ final class _SeedProductApi extends ApiService {
     required String businessId,
     required String productId,
   }) async => const <BusinessReviewApiModel>[];
+}
+
+// ---------------------------------------------------------------------------
+// Customer order history fixture
+// ---------------------------------------------------------------------------
+
+/// One card of `تفاصيل المتجر – 21`, with the artboard's own numbers.
+///
+/// 35 + 10 = 45, ordered on 30/1/2022, one unit of `أساس فت مي`. `imageUrl` is
+/// empty because the repository ships no product photography - the card falls
+/// back to its placeholder rather than reaching the network mid-capture.
+Map<String, dynamic> _seedCustomerOrder({
+  required int index,
+  required String statusGroup,
+  required String status,
+  String cancellationReason = '',
+}) {
+  return <String, dynamic>{
+    'id': '64d00000000000000000010$index',
+    'publicId': '222321',
+    'business': <String, dynamic>{
+      'id': '64b000000000000000000009',
+      'name': 'متجر الياسمين',
+    },
+    'items': <Map<String, dynamic>>[
+      <String, dynamic>{
+        'productId': '64c00000000000000000010$index',
+        'variantId': 'v$index',
+        'name': 'أساس فت مي',
+        'imageUrl': '',
+        'unitPrice': 35,
+        'quantity': 1,
+        'variant': '',
+      },
+    ],
+    'subtotal': 35,
+    'deliveryFee': 10,
+    'total': 45,
+    'currency': 'ILS',
+    'deliveryAddress': 'رام الله ، المصيون',
+    'paymentMethod': 'cash',
+    'status': status,
+    'statusGroup': statusGroup,
+    'statusHistory': const <Map<String, dynamic>>[],
+    'cancellationReason': cancellationReason,
+    'createdAt': '2022-01-30T10:00:00.000',
+    'courier': const <String, dynamic>{},
+    'tracking': <String, dynamic>{
+      'isCancelled': statusGroup == 'cancelled',
+      'currentStep': 'placed',
+      'currentIndex': 0,
+      'steps': const <Map<String, dynamic>>[],
+      'courier': const <String, dynamic>{},
+      'courierLocation': null,
+      'canCancel': statusGroup == 'current',
+      'canChangeAddress': statusGroup == 'current',
+      'canReview': statusGroup == 'completed',
+    },
+  };
+}
+
+/// Answers `/orders` for whichever tab the bloc asks about.
+///
+/// `counts.total` is the figure the tab strip is gated on, so it is the sum
+/// across the three groups and not the length of the answer.
+final class _SeedCustomerOrdersApi extends ApiService {
+  @override
+  Future<OrderListApiResponse> orders({
+    required String token,
+    required String status,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final List<Map<String, dynamic>> orders;
+    switch (status) {
+      case 'completed':
+        orders = <Map<String, dynamic>>[
+          for (int index = 0; index < 3; index++)
+            _seedCustomerOrder(
+              index: index,
+              statusGroup: 'completed',
+              status: 'delivered',
+            ),
+        ];
+      case 'cancelled':
+        orders = <Map<String, dynamic>>[
+          for (int index = 0; index < 2; index++)
+            _seedCustomerOrder(
+              index: index,
+              statusGroup: 'cancelled',
+              status: 'cancelled',
+              cancellationReason: 'قمت بشراء شي شبيه',
+            ),
+        ];
+      default:
+        orders = <Map<String, dynamic>>[
+          for (int index = 0; index < 3; index++)
+            _seedCustomerOrder(
+              index: index,
+              statusGroup: 'current',
+              status: 'preparing',
+            ),
+        ];
+    }
+
+    return OrderListApiResponse.fromJson(<String, dynamic>{
+      'orders': orders,
+      'pagination': <String, dynamic>{
+        'page': 1,
+        'limit': limit,
+        'total': orders.length,
+        'hasMore': false,
+      },
+      'counts': const <String, dynamic>{'total': 8},
+    });
+  }
+}
+
+/// The same endpoint for a customer who has never ordered.
+final class _SeedNoCustomerOrdersApi extends ApiService {
+  @override
+  Future<OrderListApiResponse> orders({
+    required String token,
+    required String status,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return OrderListApiResponse.fromJson(const <String, dynamic>{
+      'orders': <Map<String, dynamic>>[],
+      'pagination': <String, dynamic>{
+        'page': 1,
+        'limit': 20,
+        'total': 0,
+        'hasMore': false,
+      },
+      'counts': <String, dynamic>{'total': 0},
+    });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2257,6 +2399,124 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
 
         await expectMerzoxSeedGolden('notifications_ar_375x812.png');
+      });
+
+      // -- 32/33/34/35. طلباتي, the customer's own order history ------------
+      //
+      // Six boards of `تفاصيل المتجر – 21` are one screen with one of three
+      // tabs selected, and `السلة – 4` is that screen with nothing in it. The
+      // pairs within each tab differ only in whether the label reads
+      // `رقم الطلب` or `رقم الطلبية`, so three loaded seeds cover all six.
+      Future<OrdersBloc> customerOrders(
+        ApiService api,
+        OrdersGroup group,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        final OrdersBloc bloc = OrdersBloc(apiService: api);
+        _closeOnTearDown(bloc);
+
+        final Future<OrdersState> ready = bloc.stream.firstWhere(
+          (OrdersState state) => state.status == OrdersStatus.ready,
+        );
+        bloc.add(const OrdersStarted());
+        await ready;
+
+        if (group != OrdersGroup.current) {
+          bloc.add(OrdersGroupChanged(group));
+          await bloc.stream.firstWhere(
+            (OrdersState state) =>
+                state.status == OrdersStatus.ready &&
+                state.selectedGroup == group,
+          );
+        }
+
+        return bloc;
+      }
+
+      Future<void> pumpCustomerOrders(
+        WidgetTester tester,
+        OrdersBloc bloc,
+      ) async {
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<OrdersBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(const OrdersPage()),
+          ),
+        );
+      }
+
+      testWidgets('current orders render their Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final OrdersBloc bloc = await customerOrders(
+          _SeedCustomerOrdersApi(),
+          OrdersGroup.current,
+        );
+        expect(bloc.state.orders, hasLength(3));
+
+        await pumpCustomerOrders(tester, bloc);
+
+        expect(find.text('الحالية'), findsOneWidget);
+        expect(find.text('تتبع الطلب'), findsNWidgets(3));
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('orders_current_ar_375x812.png');
+      });
+
+      testWidgets('completed orders render their Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final OrdersBloc bloc = await customerOrders(
+          _SeedCustomerOrdersApi(),
+          OrdersGroup.completed,
+        );
+        expect(bloc.state.orders, hasLength(3));
+
+        await pumpCustomerOrders(tester, bloc);
+
+        // The completed card carries the total and nothing to track.
+        expect(find.text('تتبع الطلب'), findsNothing);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('orders_completed_ar_375x812.png');
+      });
+
+      testWidgets('cancelled orders render their Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final OrdersBloc bloc = await customerOrders(
+          _SeedCustomerOrdersApi(),
+          OrdersGroup.cancelled,
+        );
+        expect(bloc.state.orders, hasLength(2));
+
+        await pumpCustomerOrders(tester, bloc);
+
+        expect(find.textContaining('قمت بشراء شي شبيه'), findsNWidgets(2));
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('orders_cancelled_ar_375x812.png');
+      });
+
+      testWidgets('empty order history renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final OrdersBloc bloc = await customerOrders(
+          _SeedNoCustomerOrdersApi(),
+          OrdersGroup.current,
+        );
+        expect(bloc.state.orders, isEmpty);
+
+        await pumpCustomerOrders(tester, bloc);
+
+        // `السلة – 4` has no tab strip: a customer with no orders has no
+        // groups to move between.
+        expect(find.text('الحالية'), findsNothing);
+        expect(find.text('عذراً، لا يوجد لديك طلبات'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('orders_empty_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

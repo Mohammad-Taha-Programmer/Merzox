@@ -407,6 +407,58 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "Store settings, in the state the screen opens in. The family is five boards of one screen with a different collapsible section open; the others are that same surface. The page existed and was referenced by nothing at all — the merchant profile's settings row opened a dialog editor instead — so the artboards' four-section screen was unreachable until this pass."
+    },
+    {
+      "seed": "orders_current",
+      "flutter_golden": "test/goldens/seed/orders_current_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 22",
+        "manifest_id": "00fc6554-9bab-48fc-b8e5-489dfe7a8bd7",
+        "artboard_path": "artwork/artboard-c023e977-cbd8-46cd-96e2-cbfc73686812",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The customer’s order history on its first tab. `تفاصيل المتجر – 22` and `– 37` are the same tab; 22 is the one that keeps `تتبع الطلب` on the card, which is the only route a customer has to the tracking screen. Both boards draw the first card slid aside over an orange `الغاء الطلب` running off the far edge — a swipe caught mid-gesture, which the seed captures at rest."
+    },
+    {
+      "seed": "orders_completed",
+      "flutter_golden": "test/goldens/seed/orders_completed_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 19",
+        "manifest_id": "ef447a75-53a1-4d3c-9005-7357605d2e8b",
+        "artboard_path": "artwork/artboard-516a509b-3b66-48cf-b19f-56264eacce6e",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The same screen on `المكتملة`, where the card keeps its total and drops the tracking chip. `– 36` is this board with `رقم الطلبية` for `رقم الطلب` and is otherwise identical."
+    },
+    {
+      "seed": "orders_cancelled",
+      "flutter_golden": "test/goldens/seed/orders_cancelled_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 23",
+        "manifest_id": "34f26b42-ea88-4537-8295-afd91400184d",
+        "artboard_path": "artwork/artboard-6f540fc1-797c-49d6-ac59-525f45c91472",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The same screen on `الملغية`, whose card carries one extra line: why the order was cancelled. `– 21` is this board with the other spelling of the order-number label."
+    },
+    {
+      "seed": "orders_empty",
+      "flutter_golden": "test/goldens/seed/orders_empty_ar_375x812.png",
+      "xd": {
+        "name": "السلة – 4",
+        "manifest_id": "735d3a5c-dcc8-4b1e-811f-85995ae388ea",
+        "artboard_path": "artwork/artboard-5c73099e-976f-4302-aaac-7b3d6054ac04",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "Order history with nothing in it. Drawn in the cart family but titled `طلباتي`, and it is the one board of the seven with no tab strip: a customer with no orders has no groups to move between. It is also the only one that draws the bottom bar, which the loaded boards omit."
     }
   ]
 }

@@ -44,7 +44,6 @@
     "completed": "Completed",
     "cancelled": "Cancelled",
     "empty": "You do not have any orders yet",
-    "emptyHint": "Your orders will appear here after your first purchase",
     "orderNumber": "Order number",
     "orderDate": "Order date",
     "price": "Price",
