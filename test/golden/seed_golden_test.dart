@@ -62,6 +62,8 @@ import 'package:merzox/features/product_details/bloc/product_details_event.dart'
 import 'package:merzox/features/product_details/bloc/product_details_state.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
+import 'package:merzox/features/business/orders/merchant_order_detail_page.dart';
+import 'package:merzox/features/business/orders/merchant_order_invoice_page.dart';
 import 'package:merzox/features/business/products/merchant_product_editor_page.dart';
 import 'package:merzox/features/business/products/merchant_product_options_dialog.dart';
 import 'package:merzox/features/orders/bloc/orders_bloc.dart';
@@ -475,6 +477,44 @@ final class _SeedNoCustomerOrdersApi extends ApiService {
       'counts': <String, dynamic>{'total': 0},
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Merchant order detail fixture
+// ---------------------------------------------------------------------------
+
+/// The order `تفاصيل الطلب` draws: 35 + 10 = 45, placed 15.2.2022 by
+/// `ياسمين خالد`, one unit of `أساس فت مي`.
+OwnerOrder _seedDetailOrder({String status = 'pending'}) {
+  return OwnerOrder.fromJson(<String, dynamic>{
+    'id': '64d000000000000000000201',
+    'publicId': '222321',
+    'customerName': 'ياسمين خالد',
+    'customerPhone': '0592029316',
+    'items': <Map<String, dynamic>>[
+      <String, dynamic>{
+        'productId': '64c000000000000000000201',
+        'variantId': null,
+        'name': 'أساس فت مي',
+        'imageUrl': '',
+        'unitPrice': 35,
+        'quantity': 1,
+        'variant': '',
+      },
+    ],
+    'subtotal': 35,
+    'deliveryFee': 10,
+    'total': 45,
+    'currency': 'ILS',
+    'deliveryAddress': 'أريحا ، النبي موسى',
+    'paymentMethod': 'cash',
+    'status': status,
+    'statusGroup': status == 'pending' ? 'current' : 'current',
+    'statusHistory': const <Map<String, dynamic>>[],
+    'cancellationReason': '',
+    'createdAt': '2022-02-15T10:00:00.000',
+    'courier': const <String, dynamic>{},
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -2619,6 +2659,104 @@ void main() {
         expect(find.text('الخيار2'), findsOneWidget);
 
         await expectMerzoxSeedGolden('add_product_options_ar_375x812.png');
+      });
+
+      // -- 39/40/41/42. تفاصيل الطلب, one order in the merchant's hands -----
+      //
+      // The screen, its status menu open, the confirmation it raises once the
+      // customer has been told, and the invoice `عرض الفاتورة` opens. All four
+      // boards are 375x808 and none of them carries a page title.
+      Widget orderDetail({String status = 'pending', VoidCallback? onNotify}) {
+        return withMerzoxGoldenDeviceInsets(
+          MerchantOrderDetailPage(
+            order: _seedDetailOrder(status: status),
+            businessName: 'متجر الياسمين',
+            businessAddress: 'رام الله',
+            onStatusSelected: (_) {},
+            onNotifyCustomer: onNotify ?? () {},
+          ),
+        );
+      }
+
+      testWidgets('the merchant order screen renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(tester, orderDetail());
+
+        expect(find.text('حالة الطلب'), findsOneWidget);
+        expect(find.text('جديد'), findsOneWidget);
+        expect(find.text('المنتجات (1)'), findsOneWidget);
+        expect(find.text('إرسال إشعار'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('merchant_order_detail_ar_375x812.png');
+      });
+
+      testWidgets('the merchant order status menu renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(tester, orderDetail());
+
+        await tester.tap(find.text('جديد'));
+        await settleMerzoxGoldenFrames(tester);
+
+        // The board lists four - قيد التجهيز, في الطريق, تم التسليم, ملغي -
+        // which is every status except the one a new order can actually move
+        // to next. The server enforces the lifecycle and would answer three of
+        // those four with a 409, so the menu offers what is permitted rather
+        // than what is drawn.
+        for (final String label in <String>['تم الاستلام', 'ملغي']) {
+          expect(find.text(label), findsOneWidget);
+        }
+        expect(find.text('تم التسليم'), findsNothing);
+
+        await expectMerzoxSeedGolden(
+          'merchant_order_status_menu_ar_375x812.png',
+        );
+      });
+
+      testWidgets('the notified merchant order renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(tester, orderDetail(status: 'preparing'));
+
+        // The bar is the screen's own confirmation, so the seed raises the one
+        // the page builds rather than a copy of it.
+        tester
+            .state<ScaffoldMessengerState>(find.byType(ScaffoldMessenger))
+            .showSnackBar(
+              merchantOrderNoticeSnackBar(
+                'merchantOrder.notificationSent'.tr(),
+              ),
+            );
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('قيد التجهيز'), findsOneWidget);
+        expect(find.text('تم إرسال إشعار بحالة الطلب'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('merchant_order_notified_ar_375x812.png');
+      });
+
+      testWidgets('the merchant invoice renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(
+          tester,
+          withMerzoxGoldenDeviceInsets(
+            MerchantOrderInvoicePage(
+              order: _seedDetailOrder(status: 'preparing'),
+              businessName: 'متجر الياسمين',
+              businessAddress: 'رام الله',
+            ),
+          ),
+        );
+
+        expect(find.text('تفاصيل الأسعار'), findsOneWidget);
+        expect(
+          find.text('شكراً لشرائك من المتجر، نتمنى لك يوماً رائعاً'),
+          findsOneWidget,
+        );
+
+        await expectMerzoxSeedGolden('merchant_order_invoice_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

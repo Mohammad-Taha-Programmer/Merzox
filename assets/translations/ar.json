@@ -266,7 +266,11 @@
       "bankTransfer": "تحويل بنكي",
       "assisted": "شراء لشخص آخر"
     },
-    "customerNameUnavailable": "اسم العميل غير متوفر"
+    "customerNameUnavailable": "اسم العميل غير متوفر",
+    "sendNotification": "إرسال إشعار",
+    "notificationSent": "تم إرسال إشعار بحالة الطلب",
+    "notifyCooldown": "تم إرسال إشعار قبل قليل، انتظر دقيقة",
+    "productsPlain": "المنتجات"
   },
   "storeSettings": {
     "title": "إعدادات المتجر",

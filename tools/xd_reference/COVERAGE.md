@@ -8,8 +8,8 @@ two boards carrying the same words are two **states of one surface**, not two
 surfaces. Single-link at Jaccard ≥ 0.72 over the text sets, which collapses
 112 boards into **68 distinct surfaces**.
 
-    112 artboards → 68 surfaces → 32 seeded, 36 not
-    62 of the 112 boards sit inside a seeded surface
+    112 artboards → 68 surfaces → 35 seeded, 33 not
+    69 of the 112 boards sit inside a seeded surface
 
 Seeds outnumber seeded surfaces: `تفاصيل المتجر – 21` is one
 surface carrying three seeds (the three tabs of طلباتي), and
@@ -51,6 +51,9 @@ preview of a storefront says the same things the customer's view of it does.
 | `merchant_dashboard` | الرئيسية – 2 | 1 |
 | `merchant_orders` | الرئيسية – 9 | 3 |
 | `merchant_products` | الرئيسية – 10 | 1 |
+| `add_product`, `add_product_ticked`, `add_product_options` | إضافة منتجات | 3 |
+| `merchant_order_detail`, `merchant_order_status_menu`, `merchant_order_notified` | تفاصيل الطلب | 3 |
+| `merchant_order_invoice` | تفاصيل الطلب – 3 | 1 |
 
 ## What is not covered
 
@@ -58,23 +61,12 @@ Ranked by how much of the corpus each accounts for and whether the app has the
 screen at all. "Built" means the widget exists and was aligned in a previous
 pass but carries no golden seed.
 
-### 1. إضافة منتجات — add a product · 3 boards
-
-375x1334 and 375x1251: the longest unmeasured form in the corpus. A product
-editor exists in the merchant shell; the artboards' field order and their image
-step have never been read against it.
-
-### 2. تفاصيل الطلب — merchant order detail · 4 boards, 2 surfaces
-
-`تفاصيل الطلب` ×3 and `– 3`.
-`merchant_order_detail_page` exists and is reachable from the orders tab.
-
-### 3. تفاصيل المتجر – 34 · 3 boards
+### 1. تفاصيل المتجر – 34 · 3 boards
 
 375x1141, the product page with its description and review tabs open. The
 seeded `product_details` is board 8, a different and shorter surface.
 
-### 4. The rest of the checkout wizard · 5 surfaces, 10 boards
+### 2. The rest of the checkout wizard · 5 surfaces, 10 boards
 
 A real divergence rather than a gap: the design is a **three-step wizard** with
 a stepper across the top, and the shipped flow reaches the same end by a
@@ -92,11 +84,11 @@ The pickers and the confirmation both exist in the app; boards 25 and 26 are a
 *different* pair from the seeded 16 and 24, and which pair is authoritative is
 still unresolved.
 
-### 5. المتاجر — all stores · 2 boards
+### 3. المتاجر — all stores · 2 boards
 
 375x1492, the tallest boards in the corpus. A businesses tab exists.
 
-### 6. اعدادات المتجر, the other three sections · 3 boards
+### 4. اعدادات المتجر, the other three sections · 3 boards
 
 `شعار المتجر`,
 `وصف المتجر`,
@@ -104,7 +96,7 @@ still unresolved.
 different accordion open. Each clusters on its own because opening a section
 changes the words on the screen. **Built**, and reachable; only unseeded.
 
-### 7. Smaller items
+### 5. Smaller items
 
 | Boards | Surface | Note |
 | --- | --- | --- |

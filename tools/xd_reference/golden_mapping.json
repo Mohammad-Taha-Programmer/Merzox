@@ -498,6 +498,58 @@
       },
       "normalization": "crop_top_to_812",
       "semantic_reason": "The options dialog over the form: name an option, press the plus, and it becomes a chip. The board sets the panel 298 down a 1251-tall artboard, its foot against the bar rather than its middle against the screen’s, so a centred dialog sits about a hundred pixels higher than the reference and that is most of this seed’s difference."
+    },
+    {
+      "seed": "merchant_order_detail",
+      "flutter_golden": "test/goldens/seed/merchant_order_detail_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل الطلب",
+        "manifest_id": "a32801f2-9040-44e7-9b96-c70292b895a1",
+        "artboard_path": "artwork/artboard-7516e705-d2df-40d0-b0d4-9123b034baae",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "One order in the merchant’s hands, newly arrived. The board carries no page title — the screen is reached by tapping one row of a list that is already titled, and the order number is the first thing on it."
+    },
+    {
+      "seed": "merchant_order_status_menu",
+      "flutter_golden": "test/goldens/seed/merchant_order_status_menu_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل الطلب – 1",
+        "manifest_id": "97eec35d-b20f-4b41-941b-b7618cc70707",
+        "artboard_path": "artwork/artboard-255ea64d-f256-445e-95cb-cde1a183583b",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The status control open. The board lists four — قيد التجهيز, في الطريق, تم التسليم, ملغي — which is every status except the one a new order can actually move to next. The server enforces the lifecycle and would answer three of those four with a 409, so the menu offers what is permitted rather than what is drawn, and this seed shows two items where the reference shows four."
+    },
+    {
+      "seed": "merchant_order_notified",
+      "flutter_golden": "test/goldens/seed/merchant_order_notified_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل الطلب – 2",
+        "manifest_id": "7951c97c-80fc-4d15-b687-30c6c19b24f2",
+        "artboard_path": "artwork/artboard-a26e2eb5-3be8-47f8-b48c-8ca0332cd8f4",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The order moved on and the customer told about it. `إرسال إشعار` is what the board puts beside the status control and what this pass added an endpoint for: it re-sends the status the server already believes, once a minute at most. The board floats its confirmation across the middle of the screen; a snackbar sits at the foot of it, which is most of this seed’s difference."
+    },
+    {
+      "seed": "merchant_order_invoice",
+      "flutter_golden": "test/goldens/seed/merchant_order_invoice_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل الطلب – 3",
+        "manifest_id": "cb71b94e-cef4-4fb6-b10c-00d497cd6314",
+        "artboard_path": "artwork/artboard-aeed8791-0e43-4abe-a9e9-8d39dde8b469",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "What `عرض الفاتورة` opens. A page with a printer at the head of it rather than the bottom sheet it used to be: this is a document, not a summary raised over the screen it came from."
     }
   ]
 }

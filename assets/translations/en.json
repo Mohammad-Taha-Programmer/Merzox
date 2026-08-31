@@ -266,7 +266,11 @@
       "bankTransfer": "Bank transfer",
       "assisted": "Purchase for someone else"
     },
-    "customerNameUnavailable": "Customer name unavailable"
+    "customerNameUnavailable": "Customer name unavailable",
+    "sendNotification": "Send a notification",
+    "notificationSent": "The customer was notified of the order status",
+    "notifyCooldown": "A notification was just sent; wait a minute",
+    "productsPlain": "Products"
   },
   "storeSettings": {
     "title": "Store settings",

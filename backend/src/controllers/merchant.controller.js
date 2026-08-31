@@ -636,6 +636,94 @@ export const updateMyBusinessOrderStatus = asyncHandler(async (req, res) => {
 });
 
 /**
+ * How long a merchant must wait before re-sending the same order's status.
+ *
+ * `إرسال إشعار` is a button a merchant can lean on, and every press lands in a
+ * customer's notifications. One a minute is enough to chase a customer who
+ * missed the first one and too slow to be a channel to shout down.
+ */
+export const MANUAL_ORDER_NOTIFY_COOLDOWN_MS = 60_000;
+
+export function manualNotifyRetryAfterMs(lastNotifiedAt, now = new Date()) {
+  if (!lastNotifiedAt) return 0;
+
+  const elapsed = now.getTime() - new Date(lastNotifiedAt).getTime();
+  if (!Number.isFinite(elapsed) || elapsed >= MANUAL_ORDER_NOTIFY_COOLDOWN_MS) {
+    return 0;
+  }
+
+  // A clock that moved backwards must not hand out a longer wait than the
+  // cooldown itself.
+  return Math.min(
+    MANUAL_ORDER_NOTIFY_COOLDOWN_MS,
+    MANUAL_ORDER_NOTIFY_COOLDOWN_MS - elapsed
+  );
+}
+
+/**
+ * Re-sends the order's CURRENT status to the customer.
+ *
+ * `تفاصيل الطلب` puts this beside the status control, for the case the status
+ * has not changed but the customer has not noticed it. It carries no payload
+ * on purpose: the notification says what the server already believes, so a
+ * merchant cannot announce a state the order is not in.
+ */
+export const notifyMyBusinessOrderCustomer = asyncHandler(async (req, res) => {
+  const business = await findOwnedBusiness(req);
+  if (!mongoose.isValidObjectId(req.params.orderId)) {
+    throw new AppError('Order id is invalid', 400, 'INVALID_ORDER_ID');
+  }
+
+  const order = await Order.findOne({
+    _id: req.params.orderId,
+    business: business._id
+  });
+  if (!order) {
+    throw new AppError('Order was not found', 404, 'ORDER_NOT_FOUND');
+  }
+
+  const retryAfterMs = manualNotifyRetryAfterMs(order.lastManualNotifyAt);
+  if (retryAfterMs > 0) {
+    throw new AppError(
+      'This order was notified moments ago',
+      429,
+      'ORDER_NOTIFY_COOLDOWN'
+    );
+  }
+
+  const notifiedAt = new Date();
+  const updated = await Order.findOneAndUpdate(
+    {
+      _id: order._id,
+      business: business._id,
+      // Same guard the status route uses: two presses that raced must not both
+      // send.
+      $or: [
+        { lastManualNotifyAt: null },
+        { lastManualNotifyAt: order.lastManualNotifyAt ?? null }
+      ]
+    },
+    { $set: { lastManualNotifyAt: notifiedAt } },
+    { new: true, runValidators: true }
+  );
+  if (!updated) {
+    throw new AppError(
+      'This order was notified moments ago',
+      429,
+      'ORDER_NOTIFY_COOLDOWN'
+    );
+  }
+
+  await notifyOrderStatus({
+    userId: updated.user,
+    order: updated,
+    status: updated.status
+  });
+
+  res.json({ success: true, data: { order: updated.toMerchantJSON() } });
+});
+
+/**
  * Courier assignment rotates a narrow, order-scoped location capability.
  *
  * Only the SHA-256 token hash is persisted. The raw credential is returned
