@@ -11,7 +11,9 @@
     "delete": "حذف",
     "logout": "تسجيل الخروج",
     "remove": "إزالة",
-    "done": "تم"
+    "done": "تم",
+    "yes": "نعم",
+    "no": "لا"
   },
   "authGate": {
     "title": "تسجيل الدخول مطلوب",
@@ -711,7 +713,8 @@
     "orderNumber": "رقم الطلب: #{}",
     "goToOrders": "الذهاب لطلباتي",
     "backHome": "العودة للرئيسية",
-    "doneTitle": "إتمام الطلب"
+    "doneTitle": "إتمام الطلب",
+    "cancelConfirm": "هل أنت متأكد من عملية إلغاء الطلب؟"
   },
   "address": {
     "addTitle": "إضافة عنوان",

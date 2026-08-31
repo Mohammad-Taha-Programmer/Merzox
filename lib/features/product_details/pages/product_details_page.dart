@@ -678,7 +678,14 @@ class _ReviewsTab extends StatefulWidget {
 
 class _ReviewsTabState extends State<_ReviewsTab> {
   final _commentController = TextEditingController();
-  int _rating = 5;
+
+  /// No stars until the customer picks one.
+  ///
+  /// The storefront composer already worked this way; this one opened at five,
+  /// which meant a distracted tap on `نشر` published a rating nobody chose.
+  /// `BusinessReview.rating` is `min: 1`, so zero is also not a submission the
+  /// server would take.
+  int _rating = 0;
 
   @override
   void dispose() {
@@ -689,6 +696,7 @@ class _ReviewsTabState extends State<_ReviewsTab> {
   @override
   Widget build(BuildContext context) {
     final saving = widget.state.status == ProductDetailsStatus.savingReview;
+    final rated = _rating > 0;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
@@ -729,7 +737,7 @@ class _ReviewsTabState extends State<_ReviewsTab> {
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: FilledButton(
-                onPressed: saving
+                onPressed: saving || !rated
                     ? null
                     : () async {
                         final submitted = await AuthGate.run(
@@ -748,7 +756,12 @@ class _ReviewsTabState extends State<_ReviewsTab> {
                       },
                 style: FilledButton.styleFrom(
                   backgroundColor: MerzoxColors.kColorEE6C4D,
-                  fixedSize: const Size(58, 32),
+                  // 63x31, and `padding` must go with it: a FilledButton keeps
+                  // its default ~24px horizontal padding inside the fixed box,
+                  // which left the Arabic label ~15px and broke `نشر` across
+                  // two lines. The storefront composer already carried this.
+                  fixedSize: const Size(63, 31),
+                  padding: EdgeInsets.zero,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(4),
                   ),

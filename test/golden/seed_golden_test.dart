@@ -62,6 +62,7 @@ import 'package:merzox/features/product_details/bloc/product_details_event.dart'
 import 'package:merzox/features/product_details/bloc/product_details_state.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
+import 'package:merzox/features/checkout/pages/address_form_page.dart';
 import 'package:merzox/features/business/orders/merchant_order_detail_page.dart';
 import 'package:merzox/features/business/orders/merchant_order_invoice_page.dart';
 import 'package:merzox/features/business/products/merchant_product_editor_page.dart';
@@ -328,6 +329,11 @@ Map<String, dynamic> _seedDetailedProduct() {
 }
 
 final class _SeedProductApi extends ApiService {
+  /// Whether `تفاصيل المتجر – 34` has anything to list.
+  final bool withReviews;
+
+  _SeedProductApi({this.withReviews = false});
+
   @override
   Future<BusinessProductApiModel> businessProduct({
     required String businessId,
@@ -338,7 +344,23 @@ final class _SeedProductApi extends ApiService {
   Future<List<BusinessReviewApiModel>> productReviews({
     required String businessId,
     required String productId,
-  }) async => const <BusinessReviewApiModel>[];
+  }) async {
+    if (!withReviews) return const <BusinessReviewApiModel>[];
+
+    // The board draws three, all five stars and all the same sentence.
+    return <BusinessReviewApiModel>[
+      for (int index = 0; index < 3; index++)
+        BusinessReviewApiModel.fromJson(<String, dynamic>{
+          'id': '64f00000000000000000000$index',
+          'userName': 'ياسمين خالد',
+          'rating': 5,
+          'comment':
+              'قمت بشراء الاساس ، للأمانة جدًا رفيع وأنا مبسوطة بالتعامل '
+              'معهم، حيث أني اعتمدت المتجر ومنتجاته',
+          'createdAt': '2022-02-15T14:40:00.000',
+        }),
+    ];
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -973,14 +995,58 @@ final class _SeedDeliveryApi extends _SeedProductApi {
     }),
   ];
 
+  /// The regions the server actually serves, copied from
+  /// `backend/src/policies/address.policy.js` so the pickers are seeded on the
+  /// contract rather than on a shorter invention. The three closed ones are
+  /// listed on purpose: the board marks them `مغلق` rather than hiding them.
   @override
   Future<List<DeliveryRegionApiModel>> deliveryRegions() async =>
       <DeliveryRegionApiModel>[
         DeliveryRegionApiModel.fromJson(const <String, dynamic>{
+          'governorate': 'رام الله والبيرة',
+          'open': true,
+          'cities': <String>[
+            'رام الله',
+            'البيرة',
+            'بيرزيت',
+            'الجلزون',
+            'أم الشرايط',
+            'بيت سيرا',
+            'تل الماصيون',
+            'جمالا',
+            'بدرس',
+            'النبي موسى',
+          ],
+        }),
+        DeliveryRegionApiModel.fromJson(const <String, dynamic>{
           'governorate': 'أريحا',
           'open': true,
-          'cities': <String>['أريحا'],
+          'cities': <String>['أريحا', 'الطيبة'],
         }),
+        DeliveryRegionApiModel.fromJson(const <String, dynamic>{
+          'governorate': 'سلفيت',
+          'open': true,
+          'cities': <String>['سلفيت', 'بديا'],
+        }),
+        for (final String only in <String>[
+          'طولكرم',
+          'الخليل',
+          'بيت لحم',
+          'طوباس',
+          'جنين',
+          'قلقيلية',
+        ])
+          DeliveryRegionApiModel.fromJson(<String, dynamic>{
+            'governorate': only,
+            'open': true,
+            'cities': <String>[only],
+          }),
+        for (final String closed in <String>['الناصرة', 'عكا', 'الجولان'])
+          DeliveryRegionApiModel.fromJson(<String, dynamic>{
+            'governorate': closed,
+            'open': false,
+            'cities': <String>[closed],
+          }),
       ];
 
   @override
@@ -2757,6 +2823,137 @@ void main() {
         );
 
         await expectMerzoxSeedGolden('merchant_order_invoice_ar_375x812.png');
+      });
+
+      // -- 43. تفاصيل المتجر – 34, the product page on its reviews tab -----
+      //
+      // Three boards of one surface: `– 34`, `– 35` and `– 38`, which differ
+      // only in what the header carries. All three are 1141 tall, so the
+      // comparator crops to the 812 a device shows.
+      testWidgets('product reviews render their Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        // The board draws the composer, which only a signed-in eligible
+        // customer sees.
+        _useAuthenticatedCustomerSession();
+
+        final ProductDetailsBloc bloc = ProductDetailsBloc(
+          apiService: _SeedProductApi(withReviews: true),
+          reviewEligibilityGateway: const _SeedEligibleReviewer(),
+        );
+
+        final BusinessProductApiModel seedProduct =
+            BusinessProductApiModel.fromJson(_seedDetailedProduct());
+
+        final Future<ProductDetailsState> ready = bloc.stream.firstWhere(
+          (ProductDetailsState state) =>
+              state.detailsStatus == ProductDetailsSectionStatus.ready &&
+              state.reviews.length == 3,
+        );
+        bloc.add(
+          ProductDetailsStarted(
+            businessId: _previewBusinessId,
+            initialProduct: seedProduct,
+          ),
+        );
+        await ready;
+
+        bloc.add(const ProductDetailsTabChanged(1));
+        await bloc.stream.firstWhere(
+          (ProductDetailsState state) => state.selectedTabIndex == 1,
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          withMerzoxGoldenDeviceInsets(
+            ProductDetailsPage(
+              business: const HomeBusiness(
+                id: _previewBusinessId,
+                name: 'متجر الياسمين',
+                category: '',
+                address: 'رام الله، دوار المنارة',
+                products: <String>[],
+                rating: 0,
+                colorValue: 0xffdeeef8,
+              ),
+              product: seedProduct,
+              bloc: bloc,
+            ),
+          ),
+        );
+
+        expect(find.text('كل التقييمات'), findsOneWidget);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('product_reviews_ar_375x812.png');
+      });
+
+      // -- 44/45/46. The rest of step one ----------------------------------
+      //
+      // `تفاصيل المتجر – 16` is step one with a saved address to pick, and
+      // `– 25`/`– 29`/`– 40` are the same step on the branch where there is
+      // none: the form. `– 27` and `– 28` are its two pickers, drawn as sheets
+      // over the step they belong to.
+      Widget addressForm() {
+        return withMerzoxGoldenDeviceInsets(
+          AddressFormPage(
+            token: 'seed-golden-token',
+            apiService: _SeedDeliveryApi(),
+          ),
+        );
+      }
+
+      testWidgets('the address form renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        await pumpMerzoxGoldenPage(tester, addressForm());
+
+        expect(find.text('تفاصيل المشتري'), findsOneWidget);
+        expect(find.text('من فضلك قم باختيار محافظتك'), findsOneWidget);
+        expect(find.text('تعيين كعنوان افتراضي'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('checkout_address_form_ar_375x812.png');
+      });
+
+      testWidgets('the governorate picker renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        await pumpMerzoxGoldenPage(tester, addressForm());
+
+        await tester.tap(find.text('من فضلك قم باختيار محافظتك'));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('أريحا'), findsOneWidget);
+        expect(find.text('رام الله والبيرة'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('checkout_governorate_ar_375x812.png');
+      });
+
+      testWidgets('the city picker renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        await pumpMerzoxGoldenPage(tester, addressForm());
+
+        // The city list only ever holds cities of the governorate above it, so
+        // the governorate is chosen first - which is also the only way a
+        // customer reaches this sheet.
+        await tester.tap(find.text('من فضلك قم باختيار محافظتك'));
+        await settleMerzoxGoldenFrames(tester);
+        await tester.tap(find.text('رام الله والبيرة').last);
+        await settleMerzoxGoldenFrames(tester);
+
+        await tester.tap(find.text('من فضلك قم باختيار مدينتك / قريتك'));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('بيرزيت'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('checkout_city_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

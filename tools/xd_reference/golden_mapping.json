@@ -191,14 +191,14 @@
       "seed": "checkout_payment",
       "flutter_golden": "test/goldens/seed/checkout_payment_ar_375x812.png",
       "xd": {
-        "name": "تفاصيل المتجر – 24",
-        "manifest_id": "2f14e240-c8db-4781-862d-3391ecd8efc1",
-        "artboard_path": "artwork/artboard-af467938-91c0-4054-8d18-fe752b10ab60",
+        "name": "تفاصيل المتجر – 26",
+        "manifest_id": "3eb04ace-b8df-4450-b3a7-dc3d64580ad8",
+        "artboard_path": "artwork/artboard-7e490ee6-c7bb-4ee5-9bb7-0b5c6620cd50",
         "width": 375,
         "height": 808
       },
       "normalization": "extend_final_row_to_812",
-      "semantic_reason": "Step two. Cash on delivery is the whole payment list in the artboard and in the backend alike - every other method is refused with PAYMENT_METHOD_UNAVAILABLE. The artboard also prints a delivery fee and a grand total; the client cannot know either, because deliveryFeeFor is a server rule, so the invoice states the subtotal it knows and the total as that plus a fee computed on confirmation."
+      "semantic_reason": "Step two at rest. Re-pointed from `تفاصيل المتجر – 24`, which is the same screen with the cancel button filled and a line explaining the twenty-four hour window — the state after the customer has reached for cancel, not the one the step opens in. Board 26 fills `تأكيد الطلب` and outlines `الغاء الطلب`; this screen had it the other way round, which put the weight of the page on the button that throws the order away."
     },
     {
       "seed": "merchant_dashboard",
@@ -550,6 +550,58 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "What `عرض الفاتورة` opens. A page with a printer at the head of it rather than the bottom sheet it used to be: this is a document, not a summary raised over the screen it came from."
+    },
+    {
+      "seed": "product_reviews",
+      "flutter_golden": "test/goldens/seed/product_reviews_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 34",
+        "manifest_id": "5bd79c1d-2b07-44d1-9129-7f607e1ccb19",
+        "artboard_path": "artwork/artboard-bf5395a7-0329-4b1c-99c8-ce5846814955",
+        "width": 375,
+        "height": 1141
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The product page on its reviews tab, with the composer a signed-in eligible customer sees. `– 35` and `– 38` are the same surface and differ only in what the header carries — `– 38` a close button and a `جديد` ribbon over the photograph. The board puts the reviewer’s own avatar and name above the stars; nothing on this screen knows who is signed in, and the storefront composer this one now matches does not draw it either. Most of this seed’s difference is the photograph: the board carries a real product shot across the top 300 pixels and the repository ships none, so the capture falls back to its placeholder. Below the fold the two agree closely."
+    },
+    {
+      "seed": "checkout_address_form",
+      "flutter_golden": "test/goldens/seed/checkout_address_form_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 29",
+        "manifest_id": "eba6e283-2353-474e-96bf-f25f28d094ed",
+        "artboard_path": "artwork/artboard-0eb623e2-3c12-4811-998f-22dfdd2389e2",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "Step one on the branch where there is no saved address to pick. `– 16`, already seeded, is the other branch; these are two states of one step, not two versions of it, which is why the form now carries the wizard’s header and its three chips. `– 25` and `– 40` are this board with the `تمت إضافة العنوان بنجاح` bar over it. Two departures: the board puts a `+972` country prefix on the phone field, which needs a country list and a storage format the server does not have today; and `تفاصيل العنوان` is not on the board and is kept, because a governorate with a city is not an address a driver can find."
+    },
+    {
+      "seed": "checkout_governorate",
+      "flutter_golden": "test/goldens/seed/checkout_governorate_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 28",
+        "manifest_id": "b02e7d19-5da7-4163-839f-d035e9a8f1d9",
+        "artboard_path": "artwork/artboard-754206ac-0ccc-4dd4-b275-6285e97917cf",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The governorate picker, raised over the step it belongs to. The list is the server’s own — `backend/src/policies/address.policy.js` — so the three the board tags `مغلق` are listed and disabled here too: a customer can see the place exists and is not served rather than wonder why it is missing."
+    },
+    {
+      "seed": "checkout_city",
+      "flutter_golden": "test/goldens/seed/checkout_city_ar_375x812.png",
+      "xd": {
+        "name": "تفاصيل المتجر – 27",
+        "manifest_id": "143b4f12-eea3-4cad-abe6-474a7f5bc2e5",
+        "artboard_path": "artwork/artboard-2d0f2946-4360-4413-9f1b-b1bffd353f64",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The city picker, which only ever holds cities of the governorate above it — the board lists the towns of رام الله والبيرة, and so does this seed, because that is the governorate it was reached through."
     }
   ]
 }
