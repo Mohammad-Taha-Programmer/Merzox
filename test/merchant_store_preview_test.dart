@@ -10,6 +10,7 @@ import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/preview/store_preview_page.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
+import 'package:merzox/features/business/settings/store_settings_page.dart';
 import 'package:merzox/features/business/shell/business_shell_page.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
@@ -1419,18 +1420,18 @@ void main() {
         bloc.add(const BusinessTabChanged(4));
         await settleFrames(tester);
 
-        final editButton = find.byIcon(Icons.settings_outlined);
-        expect(editButton, findsOneWidget);
+        final settingsRow = find.byIcon(Icons.settings_outlined);
+        expect(settingsRow, findsOneWidget);
 
-        await tester.tap(editButton);
+        await tester.tap(settingsRow);
         await settleFrames(tester);
 
-        final dialog = find.byType(AlertDialog);
-        expect(dialog, findsOneWidget);
+        final settings = find.byType(StoreSettingsPage);
+        expect(settings, findsOneWidget);
 
-        expect(Directionality.of(tester.element(dialog)), direction);
+        expect(Directionality.of(tester.element(settings)), direction);
 
-        Navigator.of(tester.element(dialog)).pop();
+        Navigator.of(tester.element(settings)).pop();
         await settleFrames(tester);
       });
     });

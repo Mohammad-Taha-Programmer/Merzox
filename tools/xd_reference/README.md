@@ -1224,6 +1224,7 @@ and that the report follows this file's order exactly.
 | `profile_guest` | `test/goldens/seed/profile_guest_ar_375x812.png` | `البروفايل – 1` | `6158e2a9-6c0a-4339-a56d-48c8ba2ba108` | 375 x 1075 | `crop_top_to_812` |
 | `profile_merchant` | `test/goldens/seed/profile_merchant_ar_375x812.png` | `البروفايل` | `e5d63064-d49b-4cc9-a5a1-2053cb24300c` | 375 x 914 | `crop_top_to_812` |
 | `profile_form` | `test/goldens/seed/profile_form_ar_375x812.png` | `تعديل الملف الشخصي` | `d8998c46-d85a-4d14-ac6e-97c05d25666f` | 375 x 810 | `extend_final_row_to_812` |
+| `store_settings` | `test/goldens/seed/store_settings_ar_375x812.png` | `اعدادات المتجر` | `4c608328-df08-4187-ae3a-9d849332167a` | 375 x 807 | `extend_final_row_to_812` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1260,6 +1261,7 @@ a *different* uuid from the manifest id):
 | `profile_guest` | `artwork/artboard-b5c6bd68-f048-4631-bae6-44610335a099` |
 | `profile_merchant` | `artwork/artboard-6cc95e16-8971-4d50-ae3f-542d59d0201e` |
 | `profile_form` | `artwork/artboard-6636840c-df3a-4c10-8a2f-d4f4a74452d3` |
+| `store_settings` | `artwork/artboard-0c361447-1919-45e7-a177-a5baa10f9401` |
 
 Why each one, in one line:
 

@@ -278,7 +278,14 @@
     "whatsapp": "WhatsApp number with country code",
     "mobile": "Mobile number",
     "facebook": "Facebook page for the store",
-    "saved": "Store settings saved"
+    "saved": "Store settings saved",
+    "storeDetails": "Store settings",
+    "storeNameLabel": "Store name in Arabic or English",
+    "logoAttach": "Attach your store logo",
+    "logoSpec": "Width 99 PX   Height 99 PX   Size 0.5 MB",
+    "aboutStore": "About the store",
+    "addressLabel": "Add the store address",
+    "categoryLabel": "What kind of products do you sell"
   },
   "merchantProduct": {
     "addTitle": "Add a new product",

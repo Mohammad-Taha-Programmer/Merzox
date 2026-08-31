@@ -394,6 +394,19 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "The profile form. `الملف الشخصي` draws the same surface with name, phone and email; this board adds gender and a birth date, which is the one the app implements."
+    },
+    {
+      "seed": "store_settings",
+      "flutter_golden": "test/goldens/seed/store_settings_ar_375x812.png",
+      "xd": {
+        "name": "اعدادات المتجر",
+        "manifest_id": "4c608328-df08-4187-ae3a-9d849332167a",
+        "artboard_path": "artwork/artboard-0c361447-1919-45e7-a177-a5baa10f9401",
+        "width": 375,
+        "height": 807
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "Store settings, in the state the screen opens in. The family is five boards of one screen with a different collapsible section open; the others are that same surface. The page existed and was referenced by nothing at all — the merchant profile's settings row opened a dialog editor instead — so the artboards' four-section screen was unreachable until this pass."
     }
   ]
 }

@@ -1199,7 +1199,14 @@ class _Profile extends StatelessWidget {
         _ProfileMenuRow(
           icon: Icons.settings_outlined,
           label: 'storeSettings.title'.tr(),
-          onTap: () => _showProfileEditor(context, business),
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => BlocProvider<BusinessBloc>.value(
+                value: context.read<BusinessBloc>(),
+                child: StoreSettingsPage(business: business),
+              ),
+            ),
+          ),
         ),
         _ProfileMenuRow(
           icon: Icons.chat_bubble_outline_rounded,

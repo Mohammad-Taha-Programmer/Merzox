@@ -87,8 +87,16 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
   }
 
   @override
+  /// Which section is open. The artboards show exactly one at a time, and a
+  /// second open section would push the save button off the screen.
+  _SettingsSection? _open = _SettingsSection.store;
+
+  void _toggle(_SettingsSection section) =>
+      setState(() => _open = _open == section ? null : section);
+
+  @override
   Widget build(BuildContext context) {
-    final logoUrl = _logoUrl.text.trim();
+    final String logoUrl = _logoUrl.text.trim();
 
     return Directionality(
       textDirection: Directionality.of(context),
@@ -96,13 +104,13 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
         backgroundColor: Colors.white,
         body: SafeArea(
           child: Column(
-            children: [
+            children: <Widget>[
               SizedBox(
                 width: double.infinity,
                 height: 66,
                 child: Stack(
                   alignment: Alignment.center,
-                  children: [
+                  children: <Widget>[
                     Text(
                       'storeSettings.title'.tr(),
                       style: const TextStyle(
@@ -120,88 +128,131 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
               ),
               Expanded(
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-                  children: [
-                    _Section('storeSettings.logo'.tr()),
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Container(
-                        width: 96,
-                        height: 96,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          color: MerzoxColors.kColorF3F7FA,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: MerzoxColors.kColorDEEEF8,
-                            width: 2,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+                  children: <Widget>[
+                    _Accordion(
+                      title: 'storeSettings.storeDetails'.tr(),
+                      open: _open == _SettingsSection.store,
+                      onTap: () => _toggle(_SettingsSection.store),
+                      children: <Widget>[
+                        _Field(
+                          controller: _name,
+                          label: 'storeSettings.storeNameLabel'.tr(),
+                        ),
+                      ],
+                    ),
+                    _Accordion(
+                      title: 'storeSettings.logo'.tr(),
+                      open: _open == _SettingsSection.logo,
+                      onTap: () => _toggle(_SettingsSection.logo),
+                      children: <Widget>[
+                        Text(
+                          'storeSettings.logoAttach'.tr(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: MerzoxColors.kColor3B3B3B,
                           ),
                         ),
-                        child: logoUrl.isEmpty
-                            ? const Icon(
-                                Icons.storefront_rounded,
-                                size: 36,
-                                color: MerzoxColors.kColor3D5A80,
-                              )
-                            : Image.network(
-                                logoUrl,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.broken_image_outlined,
-                                  size: 30,
-                                  color: MerzoxColors.kColorBEBEBE,
-                                ),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: Container(
+                            width: 96,
+                            height: 96,
+                            clipBehavior: Clip.antiAlias,
+                            decoration: BoxDecoration(
+                              color: MerzoxColors.kColorF3F7FA,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: MerzoxColors.kColorDEEEF8,
+                                width: 2,
                               ),
-                      ),
+                            ),
+                            child: logoUrl.isEmpty
+                                ? const Icon(
+                                    Icons.file_upload_outlined,
+                                    size: 32,
+                                    color: MerzoxColors.kColor98C1D9,
+                                  )
+                                : Image.network(
+                                    logoUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => const Icon(
+                                      Icons.broken_image_outlined,
+                                      size: 30,
+                                      color: MerzoxColors.kColorBEBEBE,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        // The artboard states the size it wants rather than
+                        // letting a merchant discover it by rejection.
+                        Text(
+                          'storeSettings.logoSpec'.tr(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: MerzoxColors.kColorEE6C4D,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _Field(
+                          controller: _logoUrl,
+                          label: 'storeSettings.logoHint'.tr(),
+                          keyboardType: TextInputType.url,
+                          onChanged: (_) => setState(() {}),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 14),
-                    _Field(
-                      controller: _logoUrl,
-                      label: 'storeSettings.logoHint'.tr(),
-                      keyboardType: TextInputType.url,
-                      onChanged: (_) => setState(() {}),
+                    _Accordion(
+                      title: 'storeSettings.description'.tr(),
+                      open: _open == _SettingsSection.description,
+                      onTap: () => _toggle(_SettingsSection.description),
+                      children: <Widget>[
+                        _Field(
+                          controller: _description,
+                          label: 'storeSettings.aboutStore'.tr(),
+                          maxLines: 4,
+                        ),
+                        _Field(
+                          controller: _address,
+                          label: 'storeSettings.addressLabel'.tr(),
+                        ),
+                        _Field(
+                          controller: _category,
+                          label: 'storeSettings.categoryLabel'.tr(),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 22),
-                    _Section('storeSettings.description'.tr()),
-                    const SizedBox(height: 12),
-                    _Field(controller: _name, label: 'business.storeName'.tr()),
-                    _Field(
-                      controller: _description,
-                      label: 'storeSettings.description'.tr(),
-                      maxLines: 4,
-                    ),
-                    _Field(
-                      controller: _address,
-                      label: 'business.address'.tr(),
-                    ),
-                    _Field(
-                      controller: _category,
-                      label: 'business.category'.tr(),
-                    ),
-                    const SizedBox(height: 22),
-                    _Section('storeSettings.socialLinks'.tr()),
-                    const SizedBox(height: 12),
-                    _Field(
-                      controller: _instagram,
-                      label: 'storeSettings.instagram'.tr(),
-                      icon: Icons.camera_alt_outlined,
-                    ),
-                    _Field(
-                      controller: _whatsapp,
-                      label: 'storeSettings.whatsapp'.tr(),
-                      icon: Icons.chat_outlined,
-                      keyboardType: TextInputType.phone,
-                    ),
-                    _Field(
-                      controller: _mobile,
-                      label: 'storeSettings.mobile'.tr(),
-                      icon: Icons.phone_outlined,
-                      keyboardType: TextInputType.phone,
-                    ),
-                    _Field(
-                      controller: _facebook,
-                      label: 'storeSettings.facebook'.tr(),
-                      icon: Icons.facebook_outlined,
+                    _Accordion(
+                      title: 'storeSettings.socialLinks'.tr(),
+                      open: _open == _SettingsSection.social,
+                      onTap: () => _toggle(_SettingsSection.social),
+                      children: <Widget>[
+                        _Field(
+                          controller: _instagram,
+                          label: 'storeSettings.instagram'.tr(),
+                          icon: Icons.camera_alt_outlined,
+                        ),
+                        _Field(
+                          controller: _whatsapp,
+                          label: 'storeSettings.whatsapp'.tr(),
+                          icon: Icons.chat_outlined,
+                          keyboardType: TextInputType.phone,
+                        ),
+                        _Field(
+                          controller: _mobile,
+                          label: 'storeSettings.mobile'.tr(),
+                          icon: Icons.phone_outlined,
+                          keyboardType: TextInputType.phone,
+                        ),
+                        _Field(
+                          controller: _facebook,
+                          label: 'storeSettings.facebook'.tr(),
+                          icon: Icons.facebook_outlined,
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 24),
                     FilledButton(
@@ -209,6 +260,9 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                       style: FilledButton.styleFrom(
                         minimumSize: const Size.fromHeight(48),
                         backgroundColor: MerzoxColors.kColorEE6C4D,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(6),
+                        ),
                       ),
                       child: Text('common.save'.tr()),
                     ),
@@ -218,6 +272,71 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// The four sections `اعدادات المتجر` collapses into.
+enum _SettingsSection { store, logo, description, social }
+
+/// One collapsible section: a 48-tall row that opens onto its fields.
+class _Accordion extends StatelessWidget {
+  final String title;
+  final bool open;
+  final VoidCallback onTap;
+  final List<Widget> children;
+
+  const _Accordion({
+    required this.title,
+    required this.open,
+    required this.onTap,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Material(
+            color: MerzoxColors.kColorF7F8FA,
+            borderRadius: BorderRadius.circular(6),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                height: 48,
+                child: Row(
+                  children: <Widget>[
+                    const SizedBox(width: 14),
+                    Icon(
+                      open
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 20,
+                      color: MerzoxColors.kColor8D99AE,
+                    ),
+                    Expanded(
+                      child: Text(
+                        title,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: MerzoxColors.kColor3B3B3B,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 34),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          if (open) ...<Widget>[const SizedBox(height: 14), ...children],
+        ],
       ),
     );
   }
