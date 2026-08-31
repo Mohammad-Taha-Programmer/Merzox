@@ -27,6 +27,8 @@ const Map<String, String> apiErrorMessageKeys = <String, String>{
   'INVALID_VERIFICATION_TOKEN': 'apiErrors.invalidVerificationToken',
   'INVALID_PASSWORD_RESET_TOKEN': 'apiErrors.invalidResetToken',
   'PASSWORD_RECOVERY_RATE_LIMITED': 'apiErrors.passwordRateLimited',
+  'LOGIN_RATE_LIMITED': 'apiErrors.loginRateLimited',
+  'SIGNUP_RATE_LIMITED': 'apiErrors.signupRateLimited',
   'PASSWORD_RESET_RATE_LIMITED': 'apiErrors.passwordRateLimited',
   'INVALID_CURRENT_PASSWORD': 'apiErrors.invalidCurrentPassword',
   'INVALID_PASSWORD': 'apiErrors.invalidPassword',

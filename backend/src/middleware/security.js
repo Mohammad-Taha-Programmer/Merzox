@@ -12,6 +12,26 @@ export const PASSWORD_RECOVERY_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 export const FORGOT_PASSWORD_RATE_LIMIT_MAX = 5;
 export const RESET_PASSWORD_RATE_LIMIT_MAX = 20;
 
+/**
+ * The credential endpoints get their own budgets.
+ *
+ * Password recovery has been limited since it was written; the front door was
+ * not, and stood behind the global allowance alone - hundreds of attempts per
+ * window, shared with browsing. Guessing a password is the cheapest attack
+ * this API offers, so it is the one that most needs its own ceiling.
+ */
+export const CREDENTIAL_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Counted per address, and only when the attempt fails - a household behind
+ * one address can sign in all day, while twenty wrong guesses in a quarter of
+ * an hour stops.
+ */
+export const LOGIN_RATE_LIMIT_MAX = 20;
+
+/** Creating accounts is the abuse, so every attempt counts here. */
+export const SIGNUP_RATE_LIMIT_MAX = 10;
+
 function isOriginAllowed(origin) {
   if (!origin) {
     return true;
@@ -43,6 +63,34 @@ function passwordRecoveryLimiter({ max, code }) {
     }
   });
 }
+
+function credentialLimiter({ max, code, message, skipSuccessfulRequests = false }) {
+  return rateLimit({
+    windowMs: CREDENTIAL_RATE_LIMIT_WINDOW_MS,
+    max,
+    skipSuccessfulRequests,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler(_req, _res, next) {
+      next(new AppError(message, 429, code));
+    }
+  });
+}
+
+export const loginLimiter = credentialLimiter({
+  max: LOGIN_RATE_LIMIT_MAX,
+  code: 'LOGIN_RATE_LIMITED',
+  message: 'Too many sign-in attempts. Try again later.',
+  // A successful sign-in must not spend the budget, or a shared address would
+  // lock out the people using it correctly.
+  skipSuccessfulRequests: true
+});
+
+export const signupLimiter = credentialLimiter({
+  max: SIGNUP_RATE_LIMIT_MAX,
+  code: 'SIGNUP_RATE_LIMITED',
+  message: 'Too many sign-up attempts. Try again later.'
+});
 
 export const forgotPasswordLimiter = passwordRecoveryLimiter({
   max: FORGOT_PASSWORD_RATE_LIMIT_MAX,
