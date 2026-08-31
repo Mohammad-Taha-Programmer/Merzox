@@ -389,10 +389,26 @@ if (!environment.enabled) {
 
         if (userIds.length > 0) {
           const db = mongoose.connection.db;
-          await db.collection('notifications').deleteMany({ user: { $in: userIds } });
-          await db.collection('messages').deleteMany({ user: { $in: userIds } });
-          await db.collection('conversations').deleteMany({ user: { $in: userIds } });
-          await db.collection('orders').deleteMany({ user: { $in: userIds } });
+
+          // Every collection that carries a `user`. The first run of this
+          // suite left a `checkoutintents` row behind because that one was
+          // missing from the list; a filter that matches nothing costs a
+          // round trip, while a collection that is missing from it
+          // accumulates a row on every run.
+          for (const collection of [
+            'notifications',
+            'messages',
+            'conversations',
+            'orders',
+            'checkoutintents',
+            'favorites',
+            'businessreviews',
+            'productreviews',
+            'pushregistrations'
+          ]) {
+            await db.collection(collection).deleteMany({ user: { $in: userIds } });
+          }
+
           if (businessIds.length > 0) {
             await db.collection('businesses').deleteMany({ _id: { $in: businessIds } });
           }

@@ -26,11 +26,15 @@ export const CREDENTIAL_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
  * Counted per address, and only when the attempt fails - a household behind
  * one address can sign in all day, while twenty wrong guesses in a quarter of
  * an hour stops.
+ *
+ * Configurable through `LOGIN_RATE_LIMIT_MAX` the way the global allowance
+ * already is, because the integration harness drives the real HTTP API and
+ * would otherwise throttle itself.
  */
-export const LOGIN_RATE_LIMIT_MAX = 20;
+export const LOGIN_RATE_LIMIT_MAX = env.loginRateLimitMax;
 
 /** Creating accounts is the abuse, so every attempt counts here. */
-export const SIGNUP_RATE_LIMIT_MAX = 10;
+export const SIGNUP_RATE_LIMIT_MAX = env.signupRateLimitMax;
 
 function isOriginAllowed(origin) {
   if (!origin) {

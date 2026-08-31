@@ -12,16 +12,24 @@ import { resolveIntegrationDatabase } from './test-environment.js';
  *
  * SAFETY. This suite starts its own Express app on an ephemeral LOOPBACK port
  * and connects it to an explicitly declared disposable database. It refuses to
- * run unless `resolveIntegrationDatabase` agrees the target is opt-in, loopback
- * and disposable. It never reads MONGODB_URI as a fallback; in fact it shadows
- * that variable inside this process with the test URI before the application is
- * imported, so even an accidental `connectDatabase()` could not reach the
- * configured application database. `backend/.env` is never written or read for
- * a connection target here.
+ * run unless `resolveIntegrationDatabase` agrees the target is opt-in and
+ * disposable, and loopback unless the run says otherwise in as many words. It
+ * never reads MONGODB_URI as a fallback; in fact it shadows that variable
+ * inside this process with the test URI before the application is imported, so
+ * even an accidental `connectDatabase()` could not reach the configured
+ * application database. `backend/.env` is never written or read for a
+ * connection target here.
  *
  * Required environment:
  *   MERZOX_INTEGRATION_TESTS=true
  *   MERZOX_TEST_MONGODB_URI=mongodb://127.0.0.1:27017/merzox_integration
+ *
+ * For a disposable database that is not local, additionally:
+ *   MERZOX_ALLOW_REMOTE_INTEGRATION_DB=true
+ *
+ * The suite seeds dozens of accounts through the real HTTP API, which the
+ * credential rate limits would otherwise stop. Raise them for the run:
+ *   SIGNUP_RATE_LIMIT_MAX / LOGIN_RATE_LIMIT_MAX
  *
  * Cleanup removes exactly the documents this run created, by id. There is no
  * dropDatabase, no deleteMany({}), and no collection-wide operation anywhere.
