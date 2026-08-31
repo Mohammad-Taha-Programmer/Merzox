@@ -8,8 +8,8 @@ two boards carrying the same words are two **states of one surface**, not two
 surfaces. Single-link at Jaccard ≥ 0.72 over the text sets, which collapses
 112 boards into **68 distinct surfaces**.
 
-    112 artboards → 68 surfaces → 65 seeded, 3 not
-    109 of the 112 boards sit inside a seeded surface
+    112 artboards → 68 surfaces → 67 seeded, 1 not
+    111 of the 112 boards sit inside a seeded surface
 
 Seeds outnumber seeded surfaces: `تفاصيل المتجر – 21` is one
 surface carrying three seeds (the three tabs of طلباتي), and
@@ -69,17 +69,16 @@ preview of a storefront says the same things the customer's view of it does.
 | `messages_gate`, `messages_unread` | الرسائل – 1, الرسائل | 3 |
 | `chat_customer`, `chat_merchant`, `chat_empty`, `chat_storefront` | الرسائل – 2, تفاصيل المتجر – 18, – 20 | 4 |
 | `merchant_order_filter`, `merchant_product_menu`, `merchant_product_filter`, `merchant_product_images` | الرئيسية – 12, – 13, – 16, – 14 | 5 |
-| `checkout_cancel` | تفاصيل المتجر – 30 | 1 |
+| `checkout_cancel`, `checkout_cancelling` | تفاصيل المتجر – 30, – 24 | 2 |
+| `profile_form_empty` | الملف الشخصي | 1 |
 
 ## What is not covered
 
-Three surfaces, each for a stated reason rather than for want of time.
+One surface, for a reason that was measured rather than argued.
 
 | Board | Surface | Why not |
 | --- | --- | --- |
-| `تفاصيل المتجر – 24` | step two, cancel emphasised | the state between rest and the dialog. This screen goes straight from one to the other, so there is no such state to capture |
-| `الخريطة` | the map | a live tile screen: a golden of it measures the absence of tiles rather than the screen |
-| `الملف الشخصي` | profile form, first state | the same screen `profile_form` measures, drawn with only its first three fields |
+| `الخريطة` | the map | Seeding it was tried twice and hung the suite for ten minutes each time, once with an unbounded image wait and once with a bounded one. The screen's tile layer issues network work that a deterministic capture cannot wait out, and a golden that never finishes is worse than a board that is not measured. The bounded wait the attempt introduced is kept: it is right for every other seed. |
 
 ## Reproducing this
 

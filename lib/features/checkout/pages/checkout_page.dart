@@ -873,7 +873,7 @@ class _DeliveryChoice extends StatelessWidget {
   }
 }
 
-class _CheckoutActions extends StatelessWidget {
+class _CheckoutActions extends StatefulWidget {
   final bool busy;
   final String deliveryOption;
   final String deliveryAddress;
@@ -884,8 +884,22 @@ class _CheckoutActions extends StatelessWidget {
     required this.deliveryAddress,
   });
 
+  @override
+  State<_CheckoutActions> createState() => _CheckoutActionsState();
+}
+
+class _CheckoutActionsState extends State<_CheckoutActions> {
+  /// Whether the customer has reached for cancel at least once.
+  ///
+  /// `تفاصيل المتجر – 24` is that state: the cancel button fills and the
+  /// twenty-four hour window appears beside it. It stays after the question is
+  /// answered with no, so the reason not to is still on screen.
+  bool _askedToCancel = false;
+
   /// `تفاصيل المتجر – 30` asks before abandoning, which the button did not.
   Future<void> _confirmAbandon(BuildContext context) async {
+    setState(() => _askedToCancel = true);
+
     final bool? leave = await showDialog<bool>(
       context: context,
       // The board dims the wizard to #9B9B9B over white, which is black at
@@ -939,22 +953,30 @@ class _CheckoutActions extends StatelessWidget {
           children: <Widget>[
             Expanded(
               child: FilledButton(
-                onPressed: busy
+                onPressed: widget.busy
                     ? null
                     : () => context.read<CartBloc>().add(
                         CartCheckoutRequested(
-                          deliveryOption: deliveryOption,
-                          deliveryAddress: deliveryAddress,
+                          deliveryOption: widget.deliveryOption,
+                          deliveryAddress: widget.deliveryAddress,
                         ),
                       ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: MerzoxColors.kColorEE6C4D,
+                  backgroundColor: _askedToCancel
+                      ? Colors.white
+                      : MerzoxColors.kColorEE6C4D,
+                  foregroundColor: _askedToCancel
+                      ? MerzoxColors.kColor2B2B2B
+                      : Colors.white,
+                  side: _askedToCancel
+                      ? const BorderSide(color: MerzoxColors.kColorEE6C4D)
+                      : BorderSide.none,
                   minimumSize: const Size.fromHeight(47),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
                   ),
                 ),
-                child: busy
+                child: widget.busy
                     ? const SizedBox(
                         width: 18,
                         height: 18,
@@ -975,9 +997,14 @@ class _CheckoutActions extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: OutlinedButton(
-                onPressed: busy ? null : () => _confirmAbandon(context),
+                onPressed: widget.busy ? null : () => _confirmAbandon(context),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: MerzoxColors.kColor2B2B2B,
+                  backgroundColor: _askedToCancel
+                      ? MerzoxColors.kColorEE6C4D
+                      : Colors.white,
+                  foregroundColor: _askedToCancel
+                      ? Colors.white
+                      : MerzoxColors.kColor2B2B2B,
                   side: const BorderSide(color: MerzoxColors.kColorEE6C4D),
                   minimumSize: const Size.fromHeight(47),
                   shape: RoundedRectangleBorder(
@@ -995,27 +1022,31 @@ class _CheckoutActions extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 14),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Icon(
-              Icons.error_outline_rounded,
-              size: 16,
-              color: MerzoxColors.kColor767676,
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Text(
-                'checkout.cancellationWindow'.tr(),
-                style: TextStyle(
-                  fontSize: 11,
-                  color: MerzoxColors.kColor767676,
+        // Only once cancel has been reached for: a rule about undoing an
+        // order does not belong on a screen where nothing has been ordered.
+        if (_askedToCancel) ...<Widget>[
+          const SizedBox(height: 14),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Icon(
+                Icons.error_outline_rounded,
+                size: 16,
+                color: MerzoxColors.kColor767676,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  'checkout.cancellationWindow'.tr(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: MerzoxColors.kColor767676,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ],
     );
   }

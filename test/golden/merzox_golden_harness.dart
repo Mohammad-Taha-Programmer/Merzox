@@ -242,18 +242,34 @@ Future<void> pumpMerzoxGoldenPage(WidgetTester tester, Widget page) async {
 /// Deterministic by construction: it waits on the image futures themselves
 /// rather than on a duration. Must be called inside `runAsync`.
 Future<void> precacheMerzoxGoldenImages(WidgetTester tester) async {
-  for (final Element element in find.byType(Image).evaluate()) {
-    final Image image = element.widget as Image;
+  await Future.wait(<Future<void>>[
+    for (final Element element in find.byType(Image).evaluate())
+      _precacheOne(element),
+  ]);
+}
 
-    // An image that cannot load is not a race to wait out: the widget's own
-    // `errorBuilder` draws the placeholder, and that placeholder is what the
-    // capture is meant to show. Letting the failure through would fail the
-    // seed instead, on a screen whose subject is the row around the image.
-    try {
-      await precacheImage(image.image, element);
-    } catch (_) {
-      // Deliberately swallowed; see above.
-    }
+/// How long one image gets before the capture stops waiting for it.
+///
+/// The wait exists so a capture is not racing a decode. A fetch that never
+/// returns is not a race: a map's tile layer asks for images the golden
+/// environment has no network to answer, and waiting on those hangs the seed
+/// rather than making it deterministic. Bounding it is what keeps "wait for
+/// every image" a promise that can be kept.
+const Duration merzoxGoldenImageWait = Duration(seconds: 1);
+
+Future<void> _precacheOne(Element element) async {
+  final Image image = element.widget as Image;
+
+  // An image that cannot load is not a race either: the widget's own
+  // `errorBuilder` draws the placeholder, and that placeholder is what the
+  // capture is meant to show.
+  try {
+    await precacheImage(
+      image.image,
+      element,
+    ).timeout(merzoxGoldenImageWait, onTimeout: () {});
+  } catch (_) {
+    // Deliberately swallowed; see above.
   }
 }
 
