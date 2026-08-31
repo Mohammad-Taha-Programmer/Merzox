@@ -11,6 +11,7 @@
 import 'dart:io' show Platform;
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:flutter/foundation.dart' show FlutterExceptionHandler;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show FontLoader, rootBundle;
 import 'package:flutter_test/flutter_test.dart';
@@ -195,6 +196,18 @@ Widget merzoxGoldenSurface({required Widget page}) {
 /// never completes on the faked clock. Nothing here waits on wall-clock time:
 /// images are awaited through `precacheImage`, not slept on.
 Future<void> pumpMerzoxGoldenPage(WidgetTester tester, Widget page) async {
+  // A golden environment has no network, on purpose: the capture must be the
+  // same bytes on any machine. An `Image.network` therefore always fails here,
+  // and the widget's own `errorBuilder` draws the placeholder the capture is
+  // meant to show - so the failure is expected, and the only thing left to do
+  // with it is not fail the test over it. Nothing else is swallowed.
+  final FlutterExceptionHandler? previousOnError = FlutterError.onError;
+  FlutterError.onError = (FlutterErrorDetails details) {
+    if (details.exception is NetworkImageLoadException) return;
+    previousOnError?.call(details);
+  };
+  addTearDown(() => FlutterError.onError = previousOnError);
+
   tester.view.physicalSize = merzoxGoldenSurfaceSize;
   tester.view.devicePixelRatio = 1.0;
   tester.platformDispatcher.textScaleFactorTestValue = 1.0;
@@ -231,7 +244,16 @@ Future<void> pumpMerzoxGoldenPage(WidgetTester tester, Widget page) async {
 Future<void> precacheMerzoxGoldenImages(WidgetTester tester) async {
   for (final Element element in find.byType(Image).evaluate()) {
     final Image image = element.widget as Image;
-    await precacheImage(image.image, element);
+
+    // An image that cannot load is not a race to wait out: the widget's own
+    // `errorBuilder` draws the placeholder, and that placeholder is what the
+    // capture is meant to show. Letting the failure through would fail the
+    // seed instead, on a screen whose subject is the row around the image.
+    try {
+      await precacheImage(image.image, element);
+    } catch (_) {
+      // Deliberately swallowed; see above.
+    }
   }
 }
 

@@ -1224,7 +1224,7 @@ and that the report follows this file's order exactly.
 | `profile_guest` | `test/goldens/seed/profile_guest_ar_375x812.png` | `البروفايل – 1` | `6158e2a9-6c0a-4339-a56d-48c8ba2ba108` | 375 x 1075 | `crop_top_to_812` |
 | `profile_merchant` | `test/goldens/seed/profile_merchant_ar_375x812.png` | `البروفايل` | `e5d63064-d49b-4cc9-a5a1-2053cb24300c` | 375 x 914 | `crop_top_to_812` |
 | `profile_form` | `test/goldens/seed/profile_form_ar_375x812.png` | `تعديل الملف الشخصي` | `d8998c46-d85a-4d14-ac6e-97c05d25666f` | 375 x 810 | `extend_final_row_to_812` |
-| `store_settings` | `test/goldens/seed/store_settings_ar_375x812.png` | `اعدادات المتجر` | `4c608328-df08-4187-ae3a-9d849332167a` | 375 x 807 | `extend_final_row_to_812` |
+| `store_settings` | `test/goldens/seed/store_settings_ar_375x812.png` | `اعدادات المتجر` | `3de9948d-4451-4604-8df7-3e0ad9131c33` | 375 x 807 | `extend_final_row_to_812` |
 | `orders_current` | `test/goldens/seed/orders_current_ar_375x812.png` | `تفاصيل المتجر – 22` | `00fc6554-9bab-48fc-b8e5-489dfe7a8bd7` | 375 x 808 | `extend_final_row_to_812` |
 | `orders_completed` | `test/goldens/seed/orders_completed_ar_375x812.png` | `تفاصيل المتجر – 19` | `ef447a75-53a1-4d3c-9005-7357605d2e8b` | 375 x 808 | `extend_final_row_to_812` |
 | `orders_cancelled` | `test/goldens/seed/orders_cancelled_ar_375x812.png` | `تفاصيل المتجر – 23` | `34f26b42-ea88-4537-8295-afd91400184d` | 375 x 808 | `extend_final_row_to_812` |
@@ -1254,6 +1254,18 @@ and that the report follows this file's order exactly.
 | `order_tracking_review` | `test/goldens/seed/order_tracking_review_ar_375x812.png` | `تقييم` | `5edaa160-6cd5-4ae6-9d2c-efa4cfdf3b9c` | 375 x 812 | `exact` |
 | `enrollment_account` | `test/goldens/seed/enrollment_account_ar_375x812.png` | `إنشاء حساب – 1` | `0cd698d9-9369-4093-8b35-f27498ba4560` | 375 x 812 | `exact` |
 | `enrollment_store` | `test/goldens/seed/enrollment_store_ar_375x812.png` | `إنشاء حساب – 2` | `b00426f9-36c9-4174-8fe0-36e61ec33e59` | 375 x 986 | `crop_top_to_812` |
+| `messages_gate` | `test/goldens/seed/messages_gate_ar_375x812.png` | `الرسائل – 1` | `564e1f27-bbb1-435c-8979-9dad96f50719` | 375 x 812 | `exact` |
+| `messages_unread` | `test/goldens/seed/messages_unread_ar_375x812.png` | `الرسائل` | `2181a84f-83ec-461a-984e-d95b5e9a1fe5` | 375 x 810 | `extend_final_row_to_812` |
+| `chat_customer` | `test/goldens/seed/chat_customer_ar_375x812.png` | `الرسائل – 2` | `be534a86-cd28-466c-ab2b-69f6945494d1` | 375 x 810 | `extend_final_row_to_812` |
+| `chat_merchant` | `test/goldens/seed/chat_merchant_ar_375x812.png` | `الرسائل` | `9db2c0ee-7a4f-4f68-befd-33e26951a58d` | 375 x 810 | `extend_final_row_to_812` |
+| `merchant_order_filter` | `test/goldens/seed/merchant_order_filter_ar_375x812.png` | `الرئيسية – 12` | `47a7e81f-cd9a-41a8-8d19-f2f92a263e0f` | 375 x 808 | `extend_final_row_to_812` |
+| `merchant_product_menu` | `test/goldens/seed/merchant_product_menu_ar_375x812.png` | `الرئيسية – 13` | `88b38d89-3dec-433d-9d76-c2a52d727ca7` | 375 x 808 | `extend_final_row_to_812` |
+| `merchant_product_filter` | `test/goldens/seed/merchant_product_filter_ar_375x812.png` | `الرئيسية – 16` | `94b228cf-ae93-42f6-9264-6c61e0337d20` | 375 x 808 | `extend_final_row_to_812` |
+| `merchant_product_images` | `test/goldens/seed/merchant_product_images_ar_375x812.png` | `الرئيسية – 14` | `99b9e7b0-ec6e-49bf-9282-ec29f2793cc3` | 375 x 1009 | `crop_top_to_812` |
+| `store_settings_closed` | `test/goldens/seed/store_settings_closed_ar_375x812.png` | `اعدادات المتجر` | `4c608328-df08-4187-ae3a-9d849332167a` | 375 x 807 | `extend_final_row_to_812` |
+| `chat_empty` | `test/goldens/seed/chat_empty_ar_375x812.png` | `تفاصيل المتجر – 18` | `b81ea3ec-9c49-4b2f-b386-d3a04cab8d62` | 375 x 805 | `extend_final_row_to_812` |
+| `chat_storefront` | `test/goldens/seed/chat_storefront_ar_375x812.png` | `تفاصيل المتجر – 20` | `f279de6a-80b5-4f99-b5f1-db80a20ea94a` | 375 x 805 | `extend_final_row_to_812` |
+| `checkout_cancel` | `test/goldens/seed/checkout_cancel_ar_375x812.png` | `تفاصيل المتجر – 30` | `b4af8a63-e4d2-44fa-9f9b-09f8e7482422` | 375 x 808 | `extend_final_row_to_812` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1290,7 +1302,7 @@ a *different* uuid from the manifest id):
 | `profile_guest` | `artwork/artboard-b5c6bd68-f048-4631-bae6-44610335a099` |
 | `profile_merchant` | `artwork/artboard-6cc95e16-8971-4d50-ae3f-542d59d0201e` |
 | `profile_form` | `artwork/artboard-6636840c-df3a-4c10-8a2f-d4f4a74452d3` |
-| `store_settings` | `artwork/artboard-0c361447-1919-45e7-a177-a5baa10f9401` |
+| `store_settings` | `artwork/artboard-5b3bc09f-9c9c-4d4f-b7d5-339b777d0163` |
 | `orders_current` | `artwork/artboard-c023e977-cbd8-46cd-96e2-cbfc73686812` |
 | `orders_completed` | `artwork/artboard-516a509b-3b66-48cf-b19f-56264eacce6e` |
 | `orders_cancelled` | `artwork/artboard-6f540fc1-797c-49d6-ac59-525f45c91472` |
@@ -1320,6 +1332,18 @@ a *different* uuid from the manifest id):
 | `order_tracking_review` | `artwork/artboard-9a5befdd-fefd-4154-ac08-dc41812c5bb0` |
 | `enrollment_account` | `artwork/artboard-b91e8299-9746-4e9a-8d81-7c708846c814` |
 | `enrollment_store` | `artwork/artboard-e479bb29-1971-4be0-8b89-629ad96e51ae` |
+| `messages_gate` | `artwork/artboard-3611cfde-6a3e-4585-914c-2f3352ecd66e` |
+| `messages_unread` | `artwork/artboard-428a0849-f6b7-4dec-bf98-884042e3d229` |
+| `chat_customer` | `artwork/artboard-be72caa1-2792-4c91-b0e8-32630f9c10da` |
+| `chat_merchant` | `artwork/artboard-a7385d90-932c-4978-bdc4-ce522ab3c1c5` |
+| `merchant_order_filter` | `artwork/artboard-beec9796-17f3-48ec-bb5c-9b74a1365522` |
+| `merchant_product_menu` | `artwork/artboard-f72f1e4b-bae1-4439-9ea5-ad83fbd4b20a` |
+| `merchant_product_filter` | `artwork/artboard-26470fcb-ac25-47b7-9087-401627a1b8bb` |
+| `merchant_product_images` | `artwork/artboard-434bb904-38e9-48de-bbbb-d02b8da24f02` |
+| `store_settings_closed` | `artwork/artboard-0c361447-1919-45e7-a177-a5baa10f9401` |
+| `chat_empty` | `artwork/artboard-ea9279d7-1a37-4839-b5e9-c43c335c1c83` |
+| `chat_storefront` | `artwork/artboard-912a5591-8704-4951-902f-7fd9c17fb286` |
+| `checkout_cancel` | `artwork/artboard-c3cebb35-cca9-4bca-99f3-1e65ec0eee0d` |
 
 Why each one, in one line:
 

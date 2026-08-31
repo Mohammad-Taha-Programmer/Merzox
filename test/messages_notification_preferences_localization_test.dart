@@ -171,9 +171,12 @@ void _expectLogicalTail({
   required bool mine,
   required TextDirection direction,
 }) {
+  // `الرسائل – 2` puts what you wrote at the logical START and what you were
+  // told at the end, and the tail is the corner pointing back at whoever
+  // spoke: a mine bubble's small corner is at its own end.
   final smallOnLeft = mine
-      ? direction == TextDirection.rtl
-      : direction == TextDirection.ltr;
+      ? direction == TextDirection.ltr
+      : direction == TextDirection.rtl;
 
   expect(radius.bottomLeft.x, closeTo(smallOnLeft ? 2 : 14, 0.001));
 

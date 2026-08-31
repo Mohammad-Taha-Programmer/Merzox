@@ -888,6 +888,9 @@ class _CheckoutActions extends StatelessWidget {
   Future<void> _confirmAbandon(BuildContext context) async {
     final bool? leave = await showDialog<bool>(
       context: context,
+      // The board dims the wizard to #9B9B9B over white, which is black at
+      // 100/255 - lighter than Material's own barrier.
+      barrierColor: const Color(0x64000000),
       builder: (BuildContext dialogContext) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
