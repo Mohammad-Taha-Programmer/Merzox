@@ -8,8 +8,8 @@ two boards carrying the same words are two **states of one surface**, not two
 surfaces. Single-link at Jaccard ≥ 0.72 over the text sets, which collapses
 112 boards into **68 distinct surfaces**.
 
-    112 artboards → 68 surfaces → 35 seeded, 33 not
-    69 of the 112 boards sit inside a seeded surface
+    112 artboards → 68 surfaces → 39 seeded, 29 not
+    80 of the 112 boards sit inside a seeded surface
 
 Seeds outnumber seeded surfaces: `تفاصيل المتجر – 21` is one
 surface carrying three seeds (the three tabs of طلباتي), and
@@ -35,7 +35,7 @@ preview of a storefront says the same things the customer's view of it does.
 | `product_details` | تفاصيل المتجر – 8 | 4 |
 | `cart` | السلة | 1 |
 | `checkout_buyer` | تفاصيل المتجر – 16 | 2 |
-| `checkout_payment` | تفاصيل المتجر – 24 | 1 |
+| `checkout_payment` | تفاصيل المتجر – 26 | 2 |
 | `checkout_done` | تفاصيل المتجر – 17 | 2 |
 | `orders_current`, `orders_completed`, `orders_cancelled` | تفاصيل المتجر – 21 | 6 |
 | `orders_empty` | السلة – 4 | 1 |
@@ -54,6 +54,10 @@ preview of a storefront says the same things the customer's view of it does.
 | `add_product`, `add_product_ticked`, `add_product_options` | إضافة منتجات | 3 |
 | `merchant_order_detail`, `merchant_order_status_menu`, `merchant_order_notified` | تفاصيل الطلب | 3 |
 | `merchant_order_invoice` | تفاصيل الطلب – 3 | 1 |
+| `product_reviews` | تفاصيل المتجر – 34 | 3 |
+| `checkout_address_form` | تفاصيل المتجر – 25 | 3 |
+| `checkout_governorate` | تفاصيل المتجر – 28 | 2 |
+| `checkout_city` | تفاصيل المتجر – 27 | 2 |
 
 ## What is not covered
 
@@ -61,34 +65,11 @@ Ranked by how much of the corpus each accounts for and whether the app has the
 screen at all. "Built" means the widget exists and was aligned in a previous
 pass but carries no golden seed.
 
-### 1. تفاصيل المتجر – 34 · 3 boards
-
-375x1141, the product page with its description and review tabs open. The
-seeded `product_details` is board 8, a different and shorter surface.
-
-### 2. The rest of the checkout wizard · 5 surfaces, 10 boards
-
-A real divergence rather than a gap: the design is a **three-step wizard** with
-a stepper across the top, and the shipped flow reaches the same end by a
-different road.
-
-| Board | Surface |
-| --- | --- |
-| `تفاصيل المتجر – 25` ×3 | step 1 «تفاصيل» |
-| `تفاصيل المتجر – 26` ×2 | step 2 «الدفع» |
-| `تفاصيل المتجر – 27` ×2 | governorate picker |
-| `تفاصيل المتجر – 28` ×2 | city picker |
-| `تفاصيل المتجر – 30` | purchase confirmation dialog |
-
-The pickers and the confirmation both exist in the app; boards 25 and 26 are a
-*different* pair from the seeded 16 and 24, and which pair is authoritative is
-still unresolved.
-
-### 3. المتاجر — all stores · 2 boards
+### 1. المتاجر — all stores · 2 boards
 
 375x1492, the tallest boards in the corpus. A businesses tab exists.
 
-### 4. اعدادات المتجر, the other three sections · 3 boards
+### 2. اعدادات المتجر, the other three sections · 3 boards
 
 `شعار المتجر`,
 `وصف المتجر`,
@@ -96,7 +77,7 @@ still unresolved.
 different accordion open. Each clusters on its own because opening a section
 changes the words on the screen. **Built**, and reachable; only unseeded.
 
-### 5. Smaller items
+### 3. Smaller items
 
 | Boards | Surface | Note |
 | --- | --- | --- |
@@ -108,6 +89,8 @@ changes the words on the screen. **Built**, and reachable; only unseeded.
 | `شاشة ترحيبية 1`, `1 – 1` | two more onboarding slides | payment methods, map |
 | `إنشاء حساب – 1`, `– 2` | signup as customer / as merchant | |
 | `تفاصيل المتجر – 18`, `– 20` | storefront support and chat states | |
+| `تفاصيل المتجر – 24` | step 2 with cancel emphasised | the state before the dialog |
+| `تفاصيل المتجر – 30` | cancel-an-order dialog | its reason half belongs to a *placed* order, which `طلباتي` already asks for |
 | `الرسائل` ×2 (810), `– 1`, `– 2` | thread, signed-out gate | |
 | `الملف الشخصي` | profile form, first state | `profile_form` is `تعديل ...` |
 | `الخريطة` | map | |

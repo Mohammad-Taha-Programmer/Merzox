@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/features/checkout/widgets/checkout_step_indicator.dart';
 import 'package:merzox/services/api_service.dart';
 
 /// The address form of `تفاصيل المتجر – 25`, with the pickers of `– 27` and
@@ -48,7 +49,11 @@ class _AddressFormPageState extends State<AddressFormPage> {
 
   late String? _governorate = widget.existing?.governorate;
   late String? _city = widget.existing?.city;
-  late bool _isDefault = widget.existing?.isDefault ?? false;
+
+  /// Ticked, the way the board draws it: a first address is the default
+  /// whatever this says, and a second one is usually being added because it is
+  /// now the one to use.
+  late bool _isDefault = widget.existing?.isDefault ?? true;
 
   List<DeliveryRegionApiModel> _regions = const <DeliveryRegionApiModel>[];
   bool _saving = false;
@@ -132,133 +137,172 @@ class _AddressFormPageState extends State<AddressFormPage> {
 
   @override
   Widget build(BuildContext context) {
+    // The board draws this form inside the wizard, under the same header and
+    // the same three chips as the step it belongs to - because that is what it
+    // is: step one, on the branch where there is no saved address to pick.
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        title: Text(
-          (widget.existing == null ? 'address.addTitle' : 'address.editTitle')
-              .tr(),
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: MerzoxColors.kColor2B2B2B,
-          ),
-        ),
-      ),
-      body: Form(
-        key: _form,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      body: SafeArea(
+        child: Column(
           children: <Widget>[
-            _Field(
-              label: 'address.fullName'.tr(),
-              child: TextFormField(
-                controller: _fullName,
-                decoration: _decoration('address.fullNameHint'.tr()),
-                validator: (String? value) => (value ?? '').trim().length < 2
-                    ? 'address.fullNameInvalid'.tr()
-                    : null,
-              ),
-            ),
-            _Field(
-              label: 'address.phone'.tr(),
-              child: TextFormField(
-                controller: _phone,
-                keyboardType: TextInputType.phone,
-                decoration: _decoration('address.phoneHint'.tr()),
-                validator: _phoneValidator,
-              ),
-            ),
-            _Field(
-              label: 'address.governorate'.tr(),
-              child: _RegionPicker(
-                hint: 'address.governorateHint'.tr(),
-                value: _governorate,
-                entries: <_PickerEntry>[
-                  for (final DeliveryRegionApiModel region in _regions)
-                    _PickerEntry(
-                      value: region.governorate,
-                      // Closed governorates are shown and disabled, so the
-                      // customer sees the place exists and is not served.
-                      enabled: region.open,
-                    ),
-                ],
-                onChanged: (String value) => setState(() {
-                  _governorate = value;
-                  _city = null;
-                }),
-              ),
-            ),
-            _Field(
-              label: 'address.city'.tr(),
-              child: _RegionPicker(
-                hint: 'address.cityHint'.tr(),
-                value: _city,
-                entries: <_PickerEntry>[
-                  for (final String city in _selectedRegion?.cities ?? const [])
-                    _PickerEntry(value: city, enabled: true),
-                ],
-                onChanged: (String value) => setState(() => _city = value),
-              ),
-            ),
-            _Field(
-              label: 'address.details'.tr(),
-              child: TextFormField(
-                controller: _details,
-                maxLength: 250,
-                decoration: _decoration('address.detailsHint'.tr()),
-              ),
-            ),
-            _Field(
-              label: 'address.altPhone'.tr(),
-              child: TextFormField(
-                controller: _altPhone,
-                keyboardType: TextInputType.phone,
-                decoration: _decoration('address.altPhoneHint'.tr()),
-                validator: (String? value) => (value ?? '').trim().isEmpty
-                    ? null
-                    : _phoneValidator(value),
-              ),
-            ),
-            CheckboxListTile(
-              value: _isDefault,
-              onChanged: (bool? value) =>
-                  setState(() => _isDefault = value ?? false),
-              controlAffinity: ListTileControlAffinity.trailing,
-              contentPadding: EdgeInsets.zero,
-              activeColor: MerzoxColors.kColor3D5A80,
-              title: Text(
-                'address.makeDefault'.tr(),
-                style: const TextStyle(fontSize: 12),
-              ),
-            ),
-            if (_error.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 8),
-              Text(
-                _error,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: MerzoxColors.kColorB72D2D,
-                ),
-              ),
-            ],
-            const SizedBox(height: 20),
             SizedBox(
-              height: 48,
-              child: FilledButton(
-                onPressed: _saving ? null : _submit,
-                style: FilledButton.styleFrom(
-                  backgroundColor: MerzoxColors.kColorEE6C4D,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
+              width: double.infinity,
+              height: 53,
+              child: Stack(
+                alignment: Alignment.center,
+                children: <Widget>[
+                  Text(
+                    widget.existing == null
+                        ? 'checkout.buyerTitle'.tr()
+                        : 'address.editTitle'.tr(),
+                    style: const TextStyle(
+                      color: MerzoxColors.kColor2B2B2B,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
-                ),
-                child: Text(
-                  'common.save'.tr(),
-                  style: const TextStyle(fontSize: 14, color: Colors.white),
+                  PositionedDirectional(
+                    start: 8,
+                    child: IconButton(
+                      tooltip: 'common.back'.tr(),
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: MerzoxColors.kColor5E5E5E,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const CheckoutStepIndicator(current: CheckoutStep.buyerDetails),
+            const SizedBox(height: 26),
+            Expanded(
+              child: Form(
+                key: _form,
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                  children: <Widget>[
+                    _Field(
+                      label: 'address.fullName'.tr(),
+                      child: TextFormField(
+                        controller: _fullName,
+                        decoration: _decoration('address.fullNameHint'.tr()),
+                        validator: (String? value) =>
+                            (value ?? '').trim().length < 2
+                            ? 'address.fullNameInvalid'.tr()
+                            : null,
+                      ),
+                    ),
+                    _Field(
+                      label: 'address.phone'.tr(),
+                      child: TextFormField(
+                        controller: _phone,
+                        keyboardType: TextInputType.phone,
+                        decoration: _decoration('address.phoneHint'.tr()),
+                        validator: _phoneValidator,
+                      ),
+                    ),
+                    _Field(
+                      label: 'address.governorate'.tr(),
+                      child: _RegionPicker(
+                        hint: 'address.governorateHint'.tr(),
+                        value: _governorate,
+                        entries: <_PickerEntry>[
+                          for (final DeliveryRegionApiModel region in _regions)
+                            _PickerEntry(
+                              value: region.governorate,
+                              // Closed governorates are shown and disabled, so the
+                              // customer sees the place exists and is not served.
+                              enabled: region.open,
+                            ),
+                        ],
+                        onChanged: (String value) => setState(() {
+                          _governorate = value;
+                          _city = null;
+                        }),
+                      ),
+                    ),
+                    _Field(
+                      label: 'address.city'.tr(),
+                      child: _RegionPicker(
+                        hint: 'address.cityHint'.tr(),
+                        value: _city,
+                        entries: <_PickerEntry>[
+                          for (final String city
+                              in _selectedRegion?.cities ?? const [])
+                            _PickerEntry(value: city, enabled: true),
+                        ],
+                        onChanged: (String value) =>
+                            setState(() => _city = value),
+                      ),
+                    ),
+                    _Field(
+                      label: 'address.altPhone'.tr(),
+                      child: TextFormField(
+                        controller: _altPhone,
+                        keyboardType: TextInputType.phone,
+                        decoration: _decoration('address.altPhoneHint'.tr()),
+                        validator: (String? value) =>
+                            (value ?? '').trim().isEmpty
+                            ? null
+                            : _phoneValidator(value),
+                      ),
+                    ),
+                    // Not on the board, and kept: the server stores it and a
+                    // governorate with a city is not an address a driver can find.
+                    _Field(
+                      label: 'address.details'.tr(),
+                      child: TextFormField(
+                        controller: _details,
+                        maxLength: 250,
+                        decoration: _decoration('address.detailsHint'.tr()),
+                      ),
+                    ),
+                    CheckboxListTile(
+                      value: _isDefault,
+                      onChanged: (bool? value) =>
+                          setState(() => _isDefault = value ?? false),
+                      controlAffinity: ListTileControlAffinity.trailing,
+                      contentPadding: EdgeInsets.zero,
+                      activeColor: MerzoxColors.kColor3D5A80,
+                      title: Text(
+                        'address.makeDefault'.tr(),
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                    if (_error.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 8),
+                      Text(
+                        _error,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: MerzoxColors.kColorB72D2D,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: 48,
+                      child: FilledButton(
+                        onPressed: _saving ? null : _submit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: MerzoxColors.kColorEE6C4D,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                        ),
+                        child: Text(
+                          'common.save'.tr(),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -321,12 +365,80 @@ class _Field extends StatelessWidget {
   );
 }
 
+/// One line of the picker: the name at the start, its button at the end, and
+/// the rule the board draws between them.
+class _PickerRow extends StatelessWidget {
+  final _PickerEntry entry;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PickerRow({
+    required this.entry,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color ink = entry.enabled
+        ? MerzoxColors.kColor2B2B2B
+        : MerzoxColors.kColorBEBEBE;
+
+    return InkWell(
+      onTap: entry.enabled ? onTap : null,
+      child: SizedBox(
+        height: 50,
+        child: Row(
+          children: <Widget>[
+            const SizedBox(width: 30),
+            Text(entry.value, style: TextStyle(fontSize: 13, color: ink)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                height: 1,
+                margin: const EdgeInsets.only(top: 12),
+                color: MerzoxColors.kColorEFEFEF,
+              ),
+            ),
+            // The artboard tags an unserved governorate «مغلق» rather than
+            // dropping it from the list.
+            if (!entry.enabled) ...<Widget>[
+              const SizedBox(width: 10),
+              Text(
+                'address.closed'.tr(),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: MerzoxColors.kColorBEBEBE,
+                ),
+              ),
+            ],
+            const SizedBox(width: 12),
+            Icon(
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
+              size: 20,
+              color: entry.enabled
+                  ? MerzoxColors.kColor3D5A80
+                  : MerzoxColors.kColorBEBEBE,
+            ),
+            const SizedBox(width: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 final class _PickerEntry {
   final String value;
   final bool enabled;
 
   const _PickerEntry({required this.value, required this.enabled});
 }
+
+/// How much of the screen the header and the three step chips occupy.
+const double _wizardChrome = 186;
 
 /// The radio list of `تفاصيل المتجر – 27` and `– 28`, raised as a sheet.
 class _RegionPicker extends StatelessWidget {
@@ -357,45 +469,20 @@ class _RegionPicker extends StatelessWidget {
         top: false,
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.7,
+            // The board stops the sheet just under the wizard's chips rather
+            // than at some fraction of the screen: whichever step raised the
+            // picker stays readable behind it.
+            maxHeight: MediaQuery.sizeOf(sheetContext).height - _wizardChrome,
           ),
           child: ListView(
             shrinkWrap: true,
             padding: const EdgeInsets.symmetric(vertical: 12),
             children: <Widget>[
               for (final _PickerEntry entry in entries)
-                ListTile(
-                  enabled: entry.enabled,
+                _PickerRow(
+                  entry: entry,
+                  selected: entry.value == value,
                   onTap: () => Navigator.of(sheetContext).pop(entry.value),
-                  leading: Icon(
-                    entry.value == value
-                        ? Icons.radio_button_checked
-                        : Icons.radio_button_unchecked,
-                    size: 20,
-                    color: entry.enabled
-                        ? MerzoxColors.kColor3D5A80
-                        : MerzoxColors.kColorBEBEBE,
-                  ),
-                  title: Text(
-                    entry.value,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: entry.enabled
-                          ? MerzoxColors.kColor2B2B2B
-                          : MerzoxColors.kColorBEBEBE,
-                    ),
-                  ),
-                  // The artboard tags an unserved governorate «مغلق» rather
-                  // than dropping it from the list.
-                  trailing: entry.enabled
-                      ? null
-                      : Text(
-                          'address.closed'.tr(),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: MerzoxColors.kColorBEBEBE,
-                          ),
-                        ),
                 ),
             ],
           ),

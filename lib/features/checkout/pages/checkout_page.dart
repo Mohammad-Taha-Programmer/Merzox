@@ -884,14 +884,58 @@ class _CheckoutActions extends StatelessWidget {
     required this.deliveryAddress,
   });
 
+  /// `تفاصيل المتجر – 30` asks before abandoning, which the button did not.
+  Future<void> _confirmAbandon(BuildContext context) async {
+    final bool? leave = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        content: Text(
+          'checkout.cancelConfirm'.tr(),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: MerzoxColors.kColor2B2B2B,
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: <Widget>[
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: MerzoxColors.kColorEE6C4D,
+              fixedSize: const Size(84, 40),
+            ),
+            child: Text('common.yes'.tr()),
+          ),
+          OutlinedButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: MerzoxColors.kColor2B2B2B,
+              fixedSize: const Size(84, 40),
+            ),
+            child: Text('common.no'.tr()),
+          ),
+        ],
+      ),
+    );
+
+    if ((leave ?? false) && context.mounted) context.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
+        // `تفاصيل المتجر – 26` fills the confirm and outlines the cancel. It
+        // was the other way round here, which put the whole weight of the
+        // screen on the button that throws the order away.
         Row(
           children: <Widget>[
             Expanded(
-              child: OutlinedButton(
+              child: FilledButton(
                 onPressed: busy
                     ? null
                     : () => context.read<CartBloc>().add(
@@ -900,9 +944,8 @@ class _CheckoutActions extends StatelessWidget {
                           deliveryAddress: deliveryAddress,
                         ),
                       ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: MerzoxColors.kColor2B2B2B,
-                  side: BorderSide(color: MerzoxColors.kColorEE6C4D),
+                style: FilledButton.styleFrom(
+                  backgroundColor: MerzoxColors.kColorEE6C4D,
                   minimumSize: const Size.fromHeight(47),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
@@ -912,7 +955,10 @@ class _CheckoutActions extends StatelessWidget {
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : Text(
                         'checkout.confirm'.tr(),
@@ -925,10 +971,11 @@ class _CheckoutActions extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: FilledButton(
-                onPressed: busy ? null : () => context.pop(),
-                style: FilledButton.styleFrom(
-                  backgroundColor: MerzoxColors.kColorEE6C4D,
+              child: OutlinedButton(
+                onPressed: busy ? null : () => _confirmAbandon(context),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: MerzoxColors.kColor2B2B2B,
+                  side: const BorderSide(color: MerzoxColors.kColorEE6C4D),
                   minimumSize: const Size.fromHeight(47),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(6),
