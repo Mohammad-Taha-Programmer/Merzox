@@ -13,6 +13,12 @@ import 'cart_event.dart';
 import 'cart_state.dart';
 
 class CartBloc extends Bloc<CartEvent, CartState> {
+  /// The most of one thing a basket line may hold.
+  ///
+  /// Not a stock rule — the server owns that — but a bound on what a stepper
+  /// can produce by being held down.
+  static const int maxLineQuantity = 99;
+
   final ApiService _apiService;
   final AuthSessionService _authSessionService;
 
@@ -24,6 +30,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
        super(const CartState()) {
     on<CartStarted>(_onStarted);
     on<CartItemRemoved>(_onItemRemoved);
+    on<CartItemQuantityChanged>(_onItemQuantityChanged);
     on<CartCheckoutRequested>(_onCheckoutRequested);
   }
 
@@ -40,6 +47,40 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     final storedItems = prefs.getStringList(CartStorageKeys.items) ?? [];
     final nextRawItems = [...storedItems]..remove(event.raw);
     await prefs.setStringList(CartStorageKeys.items, nextRawItems);
+    await prefs.remove(CartStorageKeys.checkoutId);
+
+    emit(state.copyWith(status: CartStatus.ready, items: await _loadItems()));
+  }
+
+  Future<void> _onItemQuantityChanged(
+    CartItemQuantityChanged event,
+    Emitter<CartState> emit,
+  ) async {
+    if (event.quantity < 1 || event.quantity > maxLineQuantity) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    final storedItems = prefs.getStringList(CartStorageKeys.items) ?? [];
+    final index = storedItems.indexOf(event.raw);
+    if (index < 0) return;
+
+    final Map<String, dynamic> decoded;
+    try {
+      decoded = jsonDecode(storedItems[index]) as Map<String, dynamic>;
+    } catch (_) {
+      // An unparseable line is dropped by the loader anyway; it is not
+      // something to rewrite.
+      return;
+    }
+
+    if (decoded['quantity'] == event.quantity) return;
+    decoded['quantity'] = event.quantity;
+
+    final nextRawItems = [...storedItems];
+    nextRawItems[index] = jsonEncode(decoded);
+
+    await prefs.setStringList(CartStorageKeys.items, nextRawItems);
+    // A claimed checkout describes the basket as it was, and this is no longer
+    // that basket.
     await prefs.remove(CartStorageKeys.checkoutId);
 
     emit(state.copyWith(status: CartStatus.ready, items: await _loadItems()));

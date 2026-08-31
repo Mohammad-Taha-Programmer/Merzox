@@ -17,8 +17,54 @@ import '../bloc/order_tracking_bloc.dart';
 import '../bloc/order_tracking_event.dart';
 import '../bloc/order_tracking_state.dart';
 
-class OrderTrackingPage extends StatelessWidget {
+class OrderTrackingPage extends StatefulWidget {
   const OrderTrackingPage({super.key});
+
+  @override
+  State<OrderTrackingPage> createState() => _OrderTrackingPageState();
+}
+
+class _OrderTrackingPageState extends State<OrderTrackingPage> {
+  /// Raised once per visit, never again after it has been dismissed.
+  bool _reviewAsked = false;
+
+  /// `تقييم` is the delivered screen with the review over it.
+  ///
+  /// Raised rather than pushed to the foot of the page: below a four-step
+  /// timeline and a driver's card, an invitation nobody scrolls to is not an
+  /// invitation. Dismissing it leaves the same composer at the bottom, so it
+  /// is an offer and not a toll.
+  void _maybeAskForReview(BuildContext context, OrderTrackingState state) {
+    if (_reviewAsked) return;
+    if (state.status != OrderTrackingStatus.ready) return;
+
+    final OrderApiModel? order = state.order;
+    if (order == null) return;
+    if (!order.tracking.canReview || state.reviewSubmitted) return;
+
+    _reviewAsked = true;
+
+    final OrderTrackingBloc bloc = context.read<OrderTrackingBloc>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.white,
+        // The board dims the screen to #9D9D9D over white, which is black at
+        // 98/255 - lighter than Material's own barrier.
+        barrierColor: const Color(0x62000000),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (_) => BlocProvider<OrderTrackingBloc>.value(
+          value: bloc,
+          child: const _ReviewSheet(),
+        ),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +88,11 @@ class OrderTrackingPage extends StatelessWidget {
               ..showSnackBar(SnackBar(content: Text(message)));
           },
           builder: (context, state) {
+            // Asked from the builder rather than the listener: a screen opened
+            // on an already-delivered order never transitions, so a listener
+            // would never hear about it.
+            _maybeAskForReview(context, state);
+
             return Column(
               children: [
                 const _TrackingHeader(),
@@ -785,10 +836,65 @@ class _TrackingActions extends StatelessWidget {
 }
 
 /// Shown once the order is delivered, matching the "قيم تجربتك للمتجر" block.
+/// The review, raised over the delivered order.
+class _ReviewSheet extends StatelessWidget {
+  const _ReviewSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<OrderTrackingBloc, OrderTrackingState>(
+      builder: (BuildContext context, OrderTrackingState state) {
+        if (state.reviewSubmitted) {
+          // Saved: the sheet has nothing left to ask.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (Navigator.of(context).canPop()) Navigator.of(context).pop();
+          });
+        }
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            10,
+            16,
+            MediaQuery.viewInsetsOf(context).bottom + 50,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Container(
+                  width: 60,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: MerzoxColors.kColorEFEFEF,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const Icon(
+                  Icons.delivery_dining_rounded,
+                  size: 90,
+                  color: MerzoxColors.kColorEE6C4D,
+                ),
+                const SizedBox(height: 20),
+                _ReviewPrompt(busy: state.isBusy, framed: false),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _ReviewPrompt extends StatefulWidget {
   final bool busy;
 
-  const _ReviewPrompt({required this.busy});
+  /// Whether to draw its own card. False inside the sheet, which is already
+  /// one.
+  final bool framed;
+
+  const _ReviewPrompt({required this.busy, this.framed = true});
 
   @override
   State<_ReviewPrompt> createState() => _ReviewPromptState();
@@ -806,6 +912,100 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
 
   @override
   Widget build(BuildContext context) {
+    final Widget body = Column(
+      crossAxisAlignment: widget.framed
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.center,
+      children: [
+        Text(
+          'tracking.rateTitle'.tr(),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: MerzoxColors.kColor2B2B2B,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'tracking.rateHint'.tr(),
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            fontSize: 12,
+            height: 1.5,
+            color: MerzoxColors.kColor767676,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          mainAxisAlignment: widget.framed
+              ? MainAxisAlignment.start
+              : MainAxisAlignment.center,
+          children: [
+            for (var star = 1; star <= 5; star++)
+              IconButton(
+                onPressed: () => setState(() => _rating = star),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                icon: Icon(
+                  star <= _rating
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
+                  color: MerzoxColors.kColorFBB300,
+                  size: 28,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _controller,
+          maxLines: 3,
+          maxLength: 500,
+          decoration: InputDecoration(
+            counterText: '',
+            filled: true,
+            fillColor: Colors.white,
+            hintText: 'tracking.reviewHint'.tr(),
+            hintStyle: const TextStyle(
+              color: MerzoxColors.kColor9F9F9F,
+              fontSize: 12,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: MerzoxColors.kColorEFEFEF),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: const BorderSide(color: MerzoxColors.kColorEFEFEF),
+            ),
+          ),
+          style: const TextStyle(fontSize: 12),
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: widget.busy || _rating == 0
+                ? null
+                : () => context.read<OrderTrackingBloc>().add(
+                    OrderTrackingReviewSubmitted(
+                      rating: _rating,
+                      comment: _controller.text,
+                    ),
+                  ),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              backgroundColor: MerzoxColors.kColorEE6C4D,
+            ),
+            child: Text('common.save'.tr()),
+          ),
+        ),
+      ],
+    );
+
+    if (!widget.framed) return body;
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -813,93 +1013,7 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: MerzoxColors.kColorEFEFEF),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'tracking.rateTitle'.tr(),
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: MerzoxColors.kColor2B2B2B,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'tracking.rateHint'.tr(),
-            style: const TextStyle(
-              fontSize: 12,
-              height: 1.5,
-              color: MerzoxColors.kColor767676,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              for (var star = 1; star <= 5; star++)
-                IconButton(
-                  onPressed: () => setState(() => _rating = star),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(
-                    minWidth: 38,
-                    minHeight: 38,
-                  ),
-                  icon: Icon(
-                    star <= _rating
-                        ? Icons.star_rounded
-                        : Icons.star_border_rounded,
-                    color: MerzoxColors.kColorFBB300,
-                    size: 28,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _controller,
-            maxLines: 3,
-            maxLength: 500,
-            decoration: InputDecoration(
-              counterText: '',
-              filled: true,
-              fillColor: Colors.white,
-              hintText: 'tracking.reviewHint'.tr(),
-              hintStyle: const TextStyle(
-                color: MerzoxColors.kColor9F9F9F,
-                fontSize: 12,
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: MerzoxColors.kColorEFEFEF),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8),
-                borderSide: const BorderSide(color: MerzoxColors.kColorEFEFEF),
-              ),
-            ),
-            style: const TextStyle(fontSize: 12),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: widget.busy || _rating == 0
-                  ? null
-                  : () => context.read<OrderTrackingBloc>().add(
-                      OrderTrackingReviewSubmitted(
-                        rating: _rating,
-                        comment: _controller.text,
-                      ),
-                    ),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size.fromHeight(46),
-                backgroundColor: MerzoxColors.kColorEE6C4D,
-              ),
-              child: Text('common.save'.tr()),
-            ),
-          ),
-        ],
-      ),
+      child: body,
     );
   }
 }

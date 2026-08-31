@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:merzox/services/api_service.dart';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -88,6 +90,13 @@ class HomeScreen extends StatelessWidget {
   final RecommendationPreferenceSessionReader?
   recommendationPreferenceSessionReader;
 
+  /// What the cart tab builds its own bloc on.
+  ///
+  /// The tab creates that bloc itself, which is right for the app and left the
+  /// basket unreachable from a test: nothing could put a line in it. Injecting
+  /// the service the bloc talks to is the smallest thing that fixes both.
+  final ApiService? apiService;
+
   const HomeScreen({
     super.key,
     required this.isGuest,
@@ -95,6 +104,7 @@ class HomeScreen extends StatelessWidget {
     this.notificationPreferenceSessionReader,
     this.recommendationPreferenceGateway,
     this.recommendationPreferenceSessionReader,
+    this.apiService,
   });
 
   Future<void> _logout(BuildContext context) async {
@@ -211,6 +221,7 @@ class HomeScreen extends StatelessWidget {
               ),
               1 => _CartTab(
                 isGuest: isGuest,
+                apiService: apiService,
                 onSignupPressed: () => context.go('/signup'),
                 onLoginPressed: () => context.go('/login'),
                 onExplorePressed: () {
@@ -1607,6 +1618,7 @@ class _GuestAvatarMark extends StatelessWidget {
 
 class _CartTab extends StatelessWidget {
   final bool isGuest;
+  final ApiService? apiService;
   final VoidCallback onSignupPressed;
   final VoidCallback onLoginPressed;
   final VoidCallback onExplorePressed;
@@ -1616,6 +1628,7 @@ class _CartTab extends StatelessWidget {
     required this.onSignupPressed,
     required this.onLoginPressed,
     required this.onExplorePressed,
+    this.apiService,
   });
 
   @override
@@ -1630,7 +1643,7 @@ class _CartTab extends StatelessWidget {
     }
 
     return BlocProvider(
-      create: (_) => CartBloc()..add(const CartStarted()),
+      create: (_) => CartBloc(apiService: apiService)..add(const CartStarted()),
       child: _CartItemsView(onExplorePressed: onExplorePressed),
     );
   }
@@ -1849,9 +1862,44 @@ class _CartItemTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        _card(context),
+        // `السلة – 1` drops a line from a small ✕ at the corner of its card,
+        // which is what the stepper freed the row of: a minus that empties a
+        // line by accident is not a remove button.
+        PositionedDirectional(
+          top: 2,
+          end: 2,
+          child: InkWell(
+            onTap: onRemove,
+            customBorder: const CircleBorder(),
+            child: Tooltip(
+              message: 'common.remove'.tr(),
+              child: Container(
+                width: 22,
+                height: 22,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: MerzoxColors.kColor98C1D9,
+                ),
+                child: const Icon(
+                  Icons.close_rounded,
+                  size: 14,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _card(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
@@ -1947,12 +1995,10 @@ class _CartItemTile extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    IconButton(
-                      tooltip: 'common.remove'.tr(),
-                      onPressed: onRemove,
-                      icon: Icon(
-                        Icons.delete_outline_rounded,
-                        color: MerzoxColors.kColorEE6C4D,
+                    _QuantityStepper(
+                      quantity: item.quantity,
+                      onChanged: (int next) => context.read<CartBloc>().add(
+                        CartItemQuantityChanged(raw: item.raw, quantity: next),
                       ),
                     ),
                   ],
@@ -1961,6 +2007,84 @@ class _CartItemTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The `− 1 +` control every basket line carries on `السلة – 1`.
+class _QuantityStepper extends StatelessWidget {
+  final int quantity;
+  final ValueChanged<int> onChanged;
+
+  const _QuantityStepper({required this.quantity, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 28,
+      decoration: BoxDecoration(
+        color: MerzoxColors.kColor3D5A80,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        textDirection: TextDirection.ltr,
+        children: <Widget>[
+          _StepperButton(
+            icon: Icons.remove_rounded,
+            // One is the floor: dropping a line is the ✕'s job, not a
+            // decrement that empties it by accident.
+            onPressed: quantity > 1 ? () => onChanged(quantity - 1) : null,
+          ),
+          Container(
+            width: 30,
+            height: 22,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '$quantity',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: MerzoxColors.kColor2B2B2B,
+              ),
+            ),
+          ),
+          _StepperButton(
+            icon: Icons.add_rounded,
+            onPressed: quantity < CartBloc.maxLineQuantity
+                ? () => onChanged(quantity + 1)
+                : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StepperButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onPressed;
+
+  const _StepperButton({required this.icon, required this.onPressed});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 28,
+        height: 28,
+        child: Icon(
+          icon,
+          size: 16,
+          color: onPressed == null ? MerzoxColors.kColor8D99AE : Colors.white,
+        ),
       ),
     );
   }
