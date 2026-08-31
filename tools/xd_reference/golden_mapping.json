@@ -615,6 +615,175 @@
       },
       "normalization": "crop_top_to_812",
       "semantic_reason": "Every registered shop, two to a row, under a search field of its own. Not a tall screen: 1492 is what scrolling reveals, and `المتاجر – 1` is this board with the bottom bar drawn across the fold, which is where it sits on a device. The board reserves a `مساحة إعلانية` banner after every four cards; nothing in this app or its server has ad inventory, and a slot with nothing in it is worse than no slot, so it is not built. The two round faces on each card are emoji, which the golden environment has no font for and a device does. Above the first card the two agree closely; the cards themselves differ mostly because the board carries each shop’s real wordmark and the capture falls back to a placeholder."
+    },
+    {
+      "seed": "store_settings_logo",
+      "flutter_golden": "test/goldens/seed/store_settings_logo_ar_375x812.png",
+      "xd": {
+        "name": "اعدادات المتجر - شعار المتجر",
+        "manifest_id": "d646b5a6-99f2-4644-9c77-f6e42e765b1e",
+        "artboard_path": "artwork/artboard-87cd75ab-7e7e-4ffb-9569-c10a6146fbe4",
+        "width": 375,
+        "height": 807
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The same screen with the logo section open. Only one section is ever open, so the store name goes away as the logo arrives — which is what makes these four boards four surfaces rather than one."
+    },
+    {
+      "seed": "store_settings_description",
+      "flutter_golden": "test/goldens/seed/store_settings_description_ar_375x812.png",
+      "xd": {
+        "name": "اعدادات المتجر - وصف المتجر",
+        "manifest_id": "81568c5b-ec51-4df3-8428-a68136285e3d",
+        "artboard_path": "artwork/artboard-905116f1-8b5c-48cd-a6a9-2faf8263f422",
+        "width": 375,
+        "height": 807
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The description section: the blurb, the address and what the shop sells. Two fields under it are not on the board — the English name and the registration attachment — and are kept, because enrollment collects both and this screen is now their only editor."
+    },
+    {
+      "seed": "store_settings_social",
+      "flutter_golden": "test/goldens/seed/store_settings_social_ar_375x812.png",
+      "xd": {
+        "name": "اعدادات المتجر - وسائل التواصل",
+        "manifest_id": "2b28f335-37af-4fa6-95bf-82f516000c2a",
+        "artboard_path": "artwork/artboard-4b6abcf8-435c-4345-ba4e-58ff90b54aa2",
+        "width": 375,
+        "height": 807
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The four ways a customer can reach the shop outside the app."
+    },
+    {
+      "seed": "onboarding_map",
+      "flutter_golden": "test/goldens/seed/onboarding_map_ar_375x812.png",
+      "xd": {
+        "name": "شاشة ترحيبية 1",
+        "manifest_id": "d8deb8c1-c164-464b-b92c-bc31b3d75eac",
+        "artboard_path": "artwork/artboard-e262a484-4490-4c6d-bff9-9c2bfae8bb25",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "Slide two: the map. As with the first slide, the Flutter wording and the XD wording are not text-identical — this is a semantic state match, not text parity."
+    },
+    {
+      "seed": "onboarding_payment",
+      "flutter_golden": "test/goldens/seed/onboarding_payment_ar_375x812.png",
+      "xd": {
+        "name": "شاشة ترحيبية 1 – 1",
+        "manifest_id": "601edd36-30cf-4789-80ff-8b67edf0efc7",
+        "artboard_path": "artwork/artboard-81eeef77-7f0e-4a18-8d18-d360845a00c5",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "Slide three: paying. The last slide drops the skip, because there is nothing left to skip."
+    },
+    {
+      "seed": "cart_loaded",
+      "flutter_golden": "test/goldens/seed/cart_loaded_ar_375x812.png",
+      "xd": {
+        "name": "السلة – 1",
+        "manifest_id": "93493ac9-a4be-4ea7-92c6-45b228672803",
+        "artboard_path": "artwork/artboard-d0374c1a-d767-4c91-acee-1bfffcc6c094",
+        "width": 375,
+        "height": 808
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "A basket with something in it. The seeded `cart_guest` is `السلة`, which is the signed-out gate; these are three states of one tab. Reaching it needed the cart tab to stop building its own bloc on a real `ApiService` — nothing could put a line in the basket from a test."
+    },
+    {
+      "seed": "cart_empty",
+      "flutter_golden": "test/goldens/seed/cart_empty_ar_375x812.png",
+      "xd": {
+        "name": "السلة – 2",
+        "manifest_id": "72c484ac-8b51-4123-ac08-f1a17b79c35c",
+        "artboard_path": "artwork/artboard-723c33b3-b5d4-4f11-b035-c3995e9c7ea1",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The same tab, signed in, with nothing in it yet."
+    },
+    {
+      "seed": "favorites_stores",
+      "flutter_golden": "test/goldens/seed/favorites_stores_ar_375x812.png",
+      "xd": {
+        "name": "المفضلة – 1",
+        "manifest_id": "68fa2ab9-9f72-4475-90a9-63dc8bd00193",
+        "artboard_path": "artwork/artboard-688ee249-8507-4499-9def-adb6c148fb67",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "Favourites on the stores tab, which is the tab the bloc opens on; the seeded `favorites` is the products one."
+    },
+    {
+      "seed": "order_tracking_preparing",
+      "flutter_golden": "test/goldens/seed/order_tracking_preparing_ar_375x812.png",
+      "xd": {
+        "name": "تتبع الطلب – 1",
+        "manifest_id": "9aec45e7-c76a-49c8-b30a-30ca27cf7ef0",
+        "artboard_path": "artwork/artboard-b3a89251-8e39-4383-81ef-a65308d69363",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The order being prepared: two steps reached, and the address still changeable."
+    },
+    {
+      "seed": "order_tracking_on_the_way",
+      "flutter_golden": "test/goldens/seed/order_tracking_on_the_way_ar_375x812.png",
+      "xd": {
+        "name": "تتبع الطلب – 2",
+        "manifest_id": "b7428d33-5579-48af-9c54-23de5eb84632",
+        "artboard_path": "artwork/artboard-bf1fbfb6-8407-4e87-9863-89f1bc628d2a",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The order on its way, with the driver named. The driver’s card appears only once there is one."
+    },
+    {
+      "seed": "order_tracking_review",
+      "flutter_golden": "test/goldens/seed/order_tracking_review_ar_375x812.png",
+      "xd": {
+        "name": "تقييم",
+        "manifest_id": "5edaa160-6cd5-4ae6-9d2c-efa4cfdf3b9c",
+        "artboard_path": "artwork/artboard-9a5befdd-fefd-4154-ac08-dc41812c5bb0",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "The delivered order with the review over it. It was at the foot of the page instead — below a four-step timeline and a driver’s card, which on an 812 screen is below the fold, where an invitation nobody sees is not an invitation. Dismissing the sheet leaves the same composer at the bottom, so it is an offer and not a toll."
+    },
+    {
+      "seed": "enrollment_account",
+      "flutter_golden": "test/goldens/seed/enrollment_account_ar_375x812.png",
+      "xd": {
+        "name": "إنشاء حساب – 1",
+        "manifest_id": "0cd698d9-9369-4093-8b35-f27498ba4560",
+        "artboard_path": "artwork/artboard-b91e8299-9746-4e9a-8d81-7c708846c814",
+        "width": 375,
+        "height": 812
+      },
+      "normalization": "exact",
+      "semantic_reason": "Not the customer signup `إنشاء حساب` draws: both this board and `– 2` say `ابدأ في إنشاء حسابك بخطوتين` and the second asks for a shop, so they are the merchant enrolment wizard. Step one is who is signing up. The board puts a `+972` prefix on the phone field, which needs a country list and a storage format the server does not have today."
+    },
+    {
+      "seed": "enrollment_store",
+      "flutter_golden": "test/goldens/seed/enrollment_store_ar_375x812.png",
+      "xd": {
+        "name": "إنشاء حساب – 2",
+        "manifest_id": "b00426f9-36c9-4174-8fe0-36e61ec33e59",
+        "artboard_path": "artwork/artboard-e479bb29-1971-4be0-8b89-629ad96e51ae",
+        "width": 375,
+        "height": 986
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "Step two: what they are opening. Reached the way a merchant reaches it, because the first step will not hand over an unfilled form."
     }
   ]
 }

@@ -8,8 +8,8 @@ two boards carrying the same words are two **states of one surface**, not two
 surfaces. Single-link at Jaccard ≥ 0.72 over the text sets, which collapses
 112 boards into **68 distinct surfaces**.
 
-    112 artboards → 68 surfaces → 40 seeded, 28 not
-    82 of the 112 boards sit inside a seeded surface
+    112 artboards → 68 surfaces → 53 seeded, 15 not
+    95 of the 112 boards sit inside a seeded surface
 
 Seeds outnumber seeded surfaces: `تفاصيل المتجر – 21` is one
 surface carrying three seeds (the three tabs of طلباتي), and
@@ -59,6 +59,12 @@ preview of a storefront says the same things the customer's view of it does.
 | `checkout_governorate` | تفاصيل المتجر – 28 | 2 |
 | `checkout_city` | تفاصيل المتجر – 27 | 2 |
 | `stores` | المتاجر | 2 |
+| `store_settings_logo`, `_description`, `_social` | اعدادات المتجر - … | 3 |
+| `onboarding_map`, `onboarding_payment` | شاشة ترحيبية 1, 1 – 1 | 2 |
+| `cart_loaded`, `cart_empty` | السلة – 1, – 2 | 2 |
+| `favorites_stores` | المفضلة – 1 | 1 |
+| `order_tracking_preparing`, `_on_the_way`, `_review` | تتبع الطلب – 1, – 2, تقييم | 3 |
+| `enrollment_account`, `enrollment_store` | إنشاء حساب – 1, – 2 | 2 |
 
 ## What is not covered
 
@@ -66,32 +72,29 @@ Ranked by how much of the corpus each accounts for and whether the app has the
 screen at all. "Built" means the widget exists and was aligned in a previous
 pass but carries no golden seed.
 
-### 1. اعدادات المتجر, the other three sections · 3 boards
+### 1. الرسائل — the thread and its gates · 5 boards, 4 surfaces
 
-`شعار المتجر`,
-`وصف المتجر`,
-`وسائل التواصل` — the seeded screen with a
-different accordion open. Each clusters on its own because opening a section
-changes the words on the screen. **Built**, and reachable; only unseeded.
+The conversation itself (`الرسائل` ×2 at 810 and `– 2`) and the signed-out gate
+(`– 1`). The inbox, its empty state and the notifications list are seeded; what
+is left is what opens when a conversation is tapped.
 
-### 2. Smaller items
+### 2. الرئيسية – 12, – 13 ×2, – 14, – 16 · 5 boards
+
+The merchant browse overlays and the product-images screen. **Built** in an
+earlier pass and still unseeded.
+
+### 3. Smaller items
 
 | Boards | Surface | Note |
 | --- | --- | --- |
-| `الرئيسية – 12`, `– 13` ×2, `– 16` | merchant browse overlays | **built**, not seeded |
-| `الرئيسية – 14` (1009) | product images screen | **built**; no upload endpoint exists |
-| `السلة – 1`, `السلة – 2` | cart with invoice, empty cart | |
-| `المفضلة – 1` | favorites, stores tab | |
-| `تتبع الطلب – 1`, `– 2` | tracking: preparing, on the way | |
 | `شاشة ترحيبية 1`, `1 – 1` | two more onboarding slides | payment methods, map |
-| `إنشاء حساب – 1`, `– 2` | signup as customer / as merchant | |
 | `تفاصيل المتجر – 18`, `– 20` | storefront support and chat states | |
 | `تفاصيل المتجر – 24` | step 2 with cancel emphasised | the state before the dialog |
 | `تفاصيل المتجر – 30` | cancel-an-order dialog | its reason half belongs to a *placed* order, which `طلباتي` already asks for |
 | `الرسائل` ×2 (810), `– 1`, `– 2` | thread, signed-out gate | |
+| `الخريطة` | map | **deliberately unseeded**: the screen is a live tile map, and a golden of it measures the absence of tiles rather than the screen |
 | `الملف الشخصي` | profile form, first state | `profile_form` is `تعديل ...` |
-| `الخريطة` | map | |
-| `تقييم` | rate a delivered order | |
+| `اعدادات المتجر` (3de9948d) | a fifth settings board | four of the five are seeded |
 
 ## Reproducing this
 

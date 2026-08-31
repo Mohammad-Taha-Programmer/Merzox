@@ -63,6 +63,8 @@ import 'package:merzox/features/product_details/bloc/product_details_state.dart'
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
 import 'package:merzox/features/checkout/pages/address_form_page.dart';
+import 'package:merzox/features/business/enrollment/business_enrollment_bloc.dart';
+import 'package:merzox/features/business/enrollment/business_enrollment_page.dart';
 import 'package:merzox/features/business/orders/merchant_order_detail_page.dart';
 import 'package:merzox/features/business/orders/merchant_order_invoice_page.dart';
 import 'package:merzox/features/business/products/merchant_product_editor_page.dart';
@@ -552,6 +554,22 @@ const String _trackedOrderId = '64d000000000000000000001';
 /// synthesized here. No courier is assigned and no courier location exists, so
 /// the live map and its network tiles are not part of this capture.
 final class _SeedOrderTrackingApi extends ApiService {
+  /// Which step the order has reached. `تتبع الطلب – 1` draws `preparing`,
+  /// `– 2` draws `outForDelivery` with a driver, and `تقييم` draws it
+  /// delivered with the review the customer is invited to leave.
+  final String step;
+
+  _SeedOrderTrackingApi({this.step = 'placed'});
+
+  static const List<String> _steps = <String>[
+    'placed',
+    'preparing',
+    'outForDelivery',
+    'delivered',
+  ];
+
+  int get _index => _steps.indexOf(step);
+
   @override
   Future<OrderApiModel> order({
     required String token,
@@ -571,47 +589,52 @@ final class _SeedOrderTrackingApi extends ApiService {
       'currency': 'ILS',
       'deliveryAddress': 'عنوان التوصيل للاختبار',
       'paymentMethod': 'cash',
-      'status': 'pending',
-      'statusGroup': 'current',
+      'status': step == 'placed' ? 'pending' : step,
+      'statusGroup': step == 'delivered' ? 'completed' : 'current',
       'statusHistory': <Map<String, dynamic>>[],
       'cancellationReason': '',
       // The artboard's own stamp: Saturday 15.2.2022, 02:40 PM.
       'createdAt': '2022-02-15T14:40:00.000',
-      'courier': <String, dynamic>{},
+      'courier': _courier,
       'tracking': <String, dynamic>{
         'isCancelled': false,
-        'currentStep': 'placed',
-        'currentIndex': 0,
+        'currentStep': step,
+        'currentIndex': _index,
         'steps': <Map<String, dynamic>>[
-          <String, dynamic>{
-            'step': 'placed',
-            'reachedAt': '2022-02-15T14:40:00.000',
-            'isReached': true,
-          },
-          <String, dynamic>{
-            'step': 'preparing',
-            'reachedAt': null,
-            'isReached': false,
-          },
-          <String, dynamic>{
-            'step': 'outForDelivery',
-            'reachedAt': null,
-            'isReached': false,
-          },
-          <String, dynamic>{
-            'step': 'delivered',
-            'reachedAt': null,
-            'isReached': false,
-          },
+          for (int at = 0; at < _steps.length; at++)
+            <String, dynamic>{
+              'step': _steps[at],
+              'reachedAt': at <= _index ? _reachedAt[at] : null,
+              'isReached': at <= _index,
+            },
         ],
-        'courier': <String, dynamic>{},
+        'courier': _courier,
         'courierLocation': null,
-        'canCancel': true,
-        'canChangeAddress': true,
-        'canReview': false,
+        // A driver may be recalled and an order may be cancelled right up to
+        // the point it is handed over; after that neither is true and a review
+        // becomes possible instead.
+        'canCancel': step != 'delivered',
+        'canChangeAddress': step == 'placed' || step == 'preparing',
+        'canReview': step == 'delivered',
       },
     });
   }
+
+  /// The driver `تتبع الطلب – 2` names, and only once one is out.
+  Map<String, dynamic> get _courier => _index >= 2
+      ? const <String, dynamic>{
+          'name': 'Hamode Hussen',
+          'phone': '0592029316',
+          'assignedAt': '2022-02-17T15:30:00.000',
+        }
+      : const <String, dynamic>{};
+
+  static const List<String> _reachedAt = <String>[
+    '2022-02-15T14:40:00.000',
+    '2022-02-17T15:30:00.000',
+    '2022-02-18T14:40:00.000',
+    '2022-02-18T15:30:00.000',
+  ];
 }
 
 /// Installs the authenticated customer session the tracking bloc reads.
@@ -2179,14 +2202,12 @@ void main() {
         await expectMerzoxSeedGolden('profile_form_ar_375x812.png');
       });
 
-      // -- 31. Store settings ---------------------------------------------
+      // -- 31/47/48/49. Store settings, one section at a time --------------
       //
-      // One screen with four collapsible sections. The family's five boards
-      // are that screen with a different section open; this seeds the first,
-      // which is the state the screen opens in.
-      testWidgets('store settings renders its Arabic baseline', (
-        WidgetTester tester,
-      ) async {
+      // One screen with four collapsible sections, and four boards that are
+      // that screen with a different one open. Opening a section is what makes
+      // them four surfaces rather than one, so each seed opens its own.
+      Future<void> pumpStoreSettings(WidgetTester tester) async {
         _useAuthenticatedMerchantSession();
 
         final BusinessBloc bloc = BusinessBloc(apiService: _SeedMerchantApi());
@@ -2207,11 +2228,65 @@ void main() {
             ),
           ),
         );
+      }
+
+      testWidgets('store settings renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpStoreSettings(tester);
 
         expect(find.text('شعار المتجر'), findsOneWidget);
         expect(find.text('وصف المتجر'), findsOneWidget);
 
         await expectMerzoxSeedGolden('store_settings_ar_375x812.png');
+      });
+
+      testWidgets('store settings logo section renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpStoreSettings(tester);
+
+        await tester.tap(find.text('شعار المتجر'));
+        await settleMerzoxGoldenFrames(tester);
+
+        // Only one section is ever open: the store name goes away as the logo
+        // arrives.
+        expect(find.text('قم بإرفاق شعار المتجر'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('store_settings_logo_ar_375x812.png');
+      });
+
+      testWidgets('store settings description renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpStoreSettings(tester);
+
+        await tester.tap(find.text('وصف المتجر'));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(find.text('أضف عنوان المتجر'), findsOneWidget);
+        expect(find.text('ما نوع المنتجات التي تبيعها'), findsOneWidget);
+
+        await expectMerzoxSeedGolden(
+          'store_settings_description_ar_375x812.png',
+        );
+      });
+
+      testWidgets('store settings social renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpStoreSettings(tester);
+
+        await tester.tap(find.text('وسائل التواصل الاجتماعي'));
+        await settleMerzoxGoldenFrames(tester);
+
+        expect(
+          find.text('قم بإدخال يوزر الانستغرام او الرابط'),
+          findsOneWidget,
+        );
+        expect(find.text('قم بإدخال رقم الواتس مع المقدمة'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('store_settings_social_ar_375x812.png');
       });
 
       // -- 16. Merchant dashboard -----------------------------------------
@@ -2998,6 +3073,309 @@ void main() {
         expect(find.text('بيرزيت'), findsOneWidget);
 
         await expectMerzoxSeedGolden('checkout_city_ar_375x812.png');
+      });
+
+      // -- 50/51. The other two onboarding slides ---------------------------
+      //
+      // `شاشة ترحيبية 1` and `1 – 1` are slides two and three. As with the
+      // first, the Flutter wording and the XD wording are not text-identical:
+      // these are semantic state matches, not text parity.
+      Future<void> pumpOnboardingSlide(WidgetTester tester, int slide) async {
+        SharedPreferences.setMockInitialValues(<String, Object>{});
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<OnboardingBloc>(
+            create: (_) => OnboardingBloc(),
+            child: withMerzoxGoldenDeviceInsets(
+              OnboardingScreen(onFinished: () {}),
+            ),
+          ),
+        );
+
+        // Advanced the way a customer advances it, so the page view and the
+        // bloc move together; a drag moved one without the other.
+        for (int step = 0; step < slide; step++) {
+          await tester.tap(find.byType(FilledButton));
+          await settleMerzoxGoldenFrames(tester);
+        }
+
+        // Each slide brings its own illustration, and only the first was
+        // precached by the pump.
+        await tester.runAsync(() => precacheMerzoxGoldenImages(tester));
+        await settleMerzoxGoldenFrames(tester);
+      }
+
+      testWidgets('the map onboarding slide renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpOnboardingSlide(tester, 1);
+
+        expect(find.text('متاجر على الخريطة'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('onboarding_map_ar_375x812.png');
+      });
+
+      testWidgets('the payment onboarding slide renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpOnboardingSlide(tester, 2);
+
+        expect(find.text('دفع وطلبات بمرونة'), findsOneWidget);
+        // The last slide drops the skip, because there is nothing left to
+        // skip.
+        expect(find.text('تخطي'), findsNothing);
+
+        await expectMerzoxSeedGolden('onboarding_payment_ar_375x812.png');
+      });
+
+      // -- 52/53. The two cart states the guest gate hides ------------------
+      //
+      // The seeded `cart_guest` is `السلة` — the signed-out gate. `السلة – 1`
+      // is a basket with something in it and `– 2` is one with nothing.
+      testWidgets('the loaded cart renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        // `loadedCart` writes the stored line and the session the cart tab's
+        // own bloc reads back, so the tab builds the basket the board draws
+        // rather than being handed one.
+        final CartBloc cart = await loadedCart();
+        expect(cart.state.items, hasLength(1));
+
+        final HomeBloc homeBloc = await customerHome(isGuest: false);
+
+        final Future<HomeState> cartSelected = homeBloc.stream.firstWhere(
+          (HomeState state) => state.selectedTab == 1,
+        );
+        homeBloc.add(const HomeTabChanged(1));
+        await cartSelected;
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<HomeBloc>.value(
+            value: homeBloc,
+            child: withMerzoxGoldenDeviceInsets(
+              HomeScreen(isGuest: false, apiService: _SeedDeliveryApi()),
+            ),
+          ),
+        );
+
+        expect(find.text('أساس فت مي'), findsWidgets);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('cart_loaded_ar_375x812.png');
+      });
+
+      testWidgets('the empty cart renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        // Signed in, nothing stored: the basket a customer sees before they
+        // have put anything in it, which is a different screen from the
+        // signed-out gate `السلة` draws.
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          AuthBloc.sessionKey: true,
+          AuthBloc.tokenKey: 'seed-golden-token',
+          AuthBloc.userTypeKey: 'customer',
+          AuthBloc.nameKey: 'ياسمين خالد',
+        });
+
+        final HomeBloc homeBloc = await customerHome(isGuest: false);
+
+        final Future<HomeState> cartSelected = homeBloc.stream.firstWhere(
+          (HomeState state) => state.selectedTab == 1,
+        );
+        homeBloc.add(const HomeTabChanged(1));
+        await cartSelected;
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<HomeBloc>.value(
+            value: homeBloc,
+            child: withMerzoxGoldenDeviceInsets(
+              HomeScreen(isGuest: false, apiService: _SeedDeliveryApi()),
+            ),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('cart_empty_ar_375x812.png');
+      });
+
+      // -- 54. المفضلة, the stores tab --------------------------------------
+      testWidgets('favorites renders its Arabic stores-tab baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedCustomerSession();
+
+        final FavoritesBloc favoritesBloc = FavoritesBloc(
+          apiService: _SeedFavoritesApi(),
+        );
+        _closeOnTearDown(favoritesBloc);
+
+        // The bloc opens on businesses, which is the tab this board draws.
+        final Future<FavoritesState> ready = favoritesBloc.stream.firstWhere(
+          (FavoritesState state) =>
+              state.status == FavoritesStatus.ready &&
+              state.selectedTab == FavoritesTab.businesses,
+        );
+        favoritesBloc.add(const FavoritesStarted());
+        await ready;
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<FavoritesBloc>.value(
+            value: favoritesBloc,
+            child: withMerzoxGoldenDeviceInsets(const FavoritesPage()),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('المتاجر'), findsWidgets);
+
+        await expectMerzoxSeedGolden('favorites_stores_ar_375x812.png');
+      });
+
+      // -- 58/59. إنشاء حساب – 1 and – 2 -----------------------------------
+      //
+      // Both boards say `ابدأ في إنشاء حسابك بخطوتين` and ask for a shop, so
+      // they are the merchant enrolment wizard rather than the customer signup
+      // `إنشاء حساب` draws: the first step is who is signing up, the second is
+      // what they are opening.
+      Future<void> pumpEnrollment(WidgetTester tester, int step) async {
+        SharedPreferences.setMockInitialValues(const <String, Object>{});
+
+        final BusinessEnrollmentBloc bloc = BusinessEnrollmentBloc();
+        _closeOnTearDown(bloc);
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessEnrollmentBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              BusinessEnrollmentPage(onCompleted: () {}),
+            ),
+          ),
+        );
+
+        if (step == 0) return;
+
+        // Reached the way a merchant reaches it, which is also the only way:
+        // the first step will not hand over an unfilled form.
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'رقم الجوال'),
+          '592029316',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'البريد الإلكتروني'),
+          'yasmeen@example.com',
+        );
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'كلمة المرور الحالية'),
+          'Merzox-2026',
+        );
+        await settleMerzoxGoldenFrames(tester);
+
+        await tester.tap(find.text('التالي'));
+        await settleMerzoxGoldenFrames(tester);
+      }
+
+      testWidgets('merchant enrolment renders its Arabic first-step baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpEnrollment(tester, 0);
+
+        expect(find.text('التالي'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('enrollment_account_ar_375x812.png');
+      });
+
+      testWidgets(
+        'merchant enrolment renders its Arabic second-step baseline',
+        (WidgetTester tester) async {
+          await pumpEnrollment(tester, 1);
+
+          expect(find.text('التالي'), findsNothing);
+
+          await expectMerzoxSeedGolden('enrollment_store_ar_375x812.png');
+        },
+      );
+
+      // -- 55/56/57. The rest of تتبع الطلب --------------------------------
+      //
+      // The seeded `order_tracking` is the order just placed. `– 1` is it being
+      // prepared, `– 2` is it on the way with a driver named, and `تقييم` is
+      // it delivered, with the review the customer is invited to leave.
+      Future<OrderTrackingBloc> trackedOrder(String step) async {
+        _useAuthenticatedCustomerSession();
+
+        final OrderTrackingBloc bloc = OrderTrackingBloc(
+          orderId: _trackedOrderId,
+          apiService: _SeedOrderTrackingApi(step: step),
+        );
+        _closeOnTearDown(bloc);
+
+        final Future<OrderTrackingState> ready = bloc.stream.firstWhere(
+          (OrderTrackingState state) =>
+              state.status == OrderTrackingStatus.ready,
+        );
+        bloc.add(const OrderTrackingStarted());
+        await ready;
+
+        return bloc;
+      }
+
+      Future<void> pumpTracking(
+        WidgetTester tester,
+        OrderTrackingBloc bloc,
+      ) async {
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<OrderTrackingBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(const OrderTrackingPage()),
+          ),
+        );
+      }
+
+      testWidgets('order tracking renders its Arabic preparing baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpTracking(tester, await trackedOrder('preparing'));
+
+        expect(find.text('يتم تحضير طلبك'), findsWidgets);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+
+        await expectMerzoxSeedGolden('order_tracking_preparing_ar_375x812.png');
+      });
+
+      testWidgets('order tracking renders its Arabic on-the-way baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpTracking(tester, await trackedOrder('outForDelivery'));
+
+        // The driver appears only once there is one.
+        expect(find.text('Hamode Hussen'), findsOneWidget);
+
+        await expectMerzoxSeedGolden(
+          'order_tracking_on_the_way_ar_375x812.png',
+        );
+      });
+
+      testWidgets('order tracking renders its Arabic delivered baseline', (
+        WidgetTester tester,
+      ) async {
+        final OrderTrackingBloc bloc = await trackedOrder('delivered');
+        expect(bloc.state.order!.tracking.canReview, isTrue);
+
+        await pumpTracking(tester, bloc);
+
+        // The composer is below the fold, which the board also shows: this
+        // seed captures the 812 a device shows, and the reference is the same
+        // screen scrolled to the same place.
+        expect(find.text('تم وصول طلبك بنجاح'), findsWidgets);
+
+        await expectMerzoxSeedGolden('order_tracking_review_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,
