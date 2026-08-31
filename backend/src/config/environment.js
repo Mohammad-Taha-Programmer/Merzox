@@ -159,6 +159,29 @@ function resolveNodeEnv(
   return nodeEnv;
 }
 
+/**
+ * Whether a string is an origin a browser could actually open.
+ *
+ * `new URL` alone is not enough: it accepts `http://${CURRENT_IP_ADDRESS}:x`
+ * as a host of literal `${current_ip_address}`, which resolves nowhere.
+ */
+export function isUsableBaseUrl(value) {
+  let parsed;
+
+  try {
+    parsed = new URL(value);
+  } catch {
+    return false;
+  }
+
+  return (
+    ['http:', 'https:'].includes(parsed.protocol) &&
+    parsed.hostname.length > 0 &&
+    !/[${}\s]/.test(parsed.hostname) &&
+    !/[${}\s]/.test(parsed.port)
+  );
+}
+
 function resolvePublicBaseUrl({
   source,
   nodeEnv,
@@ -170,13 +193,32 @@ function resolvePublicBaseUrl({
       'PUBLIC_BASE_URL'
     ).trim();
 
+  const fallback = `http://127.0.0.1:${port}`;
+
   if (
     nodeEnv !== 'production'
   ) {
-    return (
-      configured ||
-      `http://127.0.0.1:${port}`
-    );
+    if (configured === '') {
+      return fallback;
+    }
+
+    // Outside production this value used to be taken verbatim, so a template
+    // that was never filled in - `http://${CURRENT_IP_ADDRESS}:${PORT}` - went
+    // straight into the address a verification email asks someone to open.
+    // The link is unopenable and nothing said so. Refusing to boot over it
+    // would be harsh for a development machine; falling back to the loopback
+    // default keeps the link working, and the warning names what was ignored.
+    if (!isUsableBaseUrl(configured)) {
+      process.emitWarning(
+        `PUBLIC_BASE_URL is not a usable http(s) origin (${configured}); ` +
+          `using ${fallback} instead`,
+        'MerzoxConfigurationWarning'
+      );
+
+      return fallback;
+    }
+
+    return configured;
   }
 
   if (configured === '') {

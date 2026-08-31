@@ -97,29 +97,31 @@ One surface. What is known about it is written below, and no more than that.
 
 | Board | Surface | What was found |
 | --- | --- | --- |
-| `الخريطة` | the map | Every attempt to capture it hangs. |
+| `الخريطة` | the map | Its ready state cannot be set up yet; the page itself renders. |
 
-`NearbyMapPage` renders correctly and is reachable at `/map`; only the golden
-hangs, and it does so before any assertion runs.
+`NearbyMapPage` renders correctly and is reachable at `/map`. What has never
+been captured is the map in its ready state, with the tile layer live.
 
-What was measured, by bisection:
+An earlier version of this file said the page "never finishes" a frame at
+375x812, and listed a bisection to prove it. That was measured wrongly, and the
+correction is worth recording because the wrong reading stood for a while:
 
-- A bare `FlutterMap` — at any size, inside `runAsync`, with a network-free
-  tile provider — captures fine.
-- `NearbyMapPage` at **800x600** captures fine, on the fake clock and inside
-  `runAsync`.
-- `NearbyMapPage` at **375x812** — the device viewport every seed uses — never
-  finishes. It still never finishes with the marker layer removed, with the
-  results chips removed, and with the attribution widget removed.
+- The page **does** render at 375x812. `test/nearby_map_surface_test.dart`
+  pumps it there through the golden harness and reads its permission-request
+  state back.
+- What never finished was `bloc.close()` in teardown, after a pump inside
+  `runAsync`. Every earlier bisection - removing the marker layer, the results
+  chips, the attribution - changed the tree and left teardown untouched, so
+  every one of them still hung, which read as "the page hangs at this size".
+- The golden seeds had already been working around the same thing for other
+  boards by closing their blocs with `unawaited`, without anyone writing down
+  why.
 
-So it is the page at the golden viewport, and it is **not** the tiles, the
-markers, the shop chips or the attribution. An earlier version of this file
-said the tile layer was waiting for a network it could not have; that was a
-guess, it was tested, and it was wrong — a tile provider that answers instantly
-and without a network changes nothing.
-
-The cause is still unidentified. Until it is, the board is not measured, and
-the reason recorded here is what was observed rather than what was assumed.
+What is still open is narrower than it looked: the ready state needs the bloc
+to report shops near the seeded position, and a stub returning one shop still
+arrives with `businesses` empty, so the seed cannot yet be set up. The tile
+layer itself has not been ruled in or out, because nothing has got past that
+point.
 
 ## Reproducing this
 

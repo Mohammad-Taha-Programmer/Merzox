@@ -243,16 +243,9 @@ void expectSpeaks(WidgetTester tester, String surface) {
   );
 }
 
-/// Two surfaces are absent here, and neither is absent because it is broken.
-///
-/// The storefront of a shop with no products draws `catalog.noProducts`, and
-/// the map with nothing nearby draws `map.noBusinesses` - both are wired, and
-/// the storefront has a passing golden for its populated state. Neither would
-/// render in this file's harness: the storefront needs the app's own font and
-/// theme to lay its filter row out at 375, and the map is the one board that
-/// does not finish a frame at the device viewport at all, which is why it has
-/// no seed. Rather than assert against a tree that is not the shipped one,
-/// they are named here as unverified.
+/// The storefront of a shop with no products is covered next door, in
+/// `empty_storefront_test.dart`: it needs the app's own font and theme to lay
+/// its filter row out at 375, which only the golden harness provides.
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

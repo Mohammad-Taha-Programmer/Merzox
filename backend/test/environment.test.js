@@ -298,7 +298,7 @@ test(
 );
 
 test(
-  'non-production preserves a configured legacy base URL without production enforcement',
+  'non-production accepts a configured origin without production enforcement',
   () => {
     assert.equal(
       resolveEnvironment(
@@ -306,11 +306,93 @@ test(
           NODE_ENV:
             'test',
           PUBLIC_BASE_URL:
-            'localhost:4000'
+            'http://localhost:4000'
         })
       ).publicBaseUrl,
-      'localhost:4000'
+      'http://localhost:4000'
     );
+  }
+);
+
+// This value has exactly one job: it is the origin of the link a verification
+// email asks somebody to open. Outside production it used to be taken
+// verbatim, so a value that is not an openable origin became a link nobody
+// could follow, silently. It now falls back and says what it ignored.
+test(
+  'non-production refuses a base URL nobody could open',
+  () => {
+    const unusable = [
+      // A template that was never filled in. This one was real: it sat in a
+      // working `.env` and produced a dead verification link.
+      'http://${CURRENT_IP_ADDRESS}:${PORT}',
+      // No scheme, so an email client has no link to make of it.
+      'localhost:4000',
+      'not a url',
+      'ftp://example.test'
+    ];
+
+    for (const value of unusable) {
+      assert.equal(
+        resolveEnvironment(
+          baseEnvironment({
+            NODE_ENV: 'test',
+            PORT: '4000',
+            PUBLIC_BASE_URL: value
+          })
+        ).publicBaseUrl,
+        'http://127.0.0.1:4000',
+        `${value} must not be used as a link origin`
+      );
+    }
+  }
+);
+
+test(
+  'the fallback is announced rather than taken quietly',
+  () => {
+    const warnings = [];
+    const original = process.emitWarning;
+    process.emitWarning = (message, name) => warnings.push({ message, name });
+
+    try {
+      resolveEnvironment(
+        baseEnvironment({
+          NODE_ENV: 'test',
+          PORT: '4000',
+          PUBLIC_BASE_URL: 'http://${CURRENT_IP_ADDRESS}:${PORT}'
+        })
+      );
+    } finally {
+      process.emitWarning = original;
+    }
+
+    assert.equal(warnings.length, 1);
+    assert.equal(warnings[0].name, 'MerzoxConfigurationWarning');
+    assert.match(warnings[0].message, /PUBLIC_BASE_URL/);
+    assert.match(warnings[0].message, /127\.0\.0\.1:4000/);
+  }
+);
+
+test(
+  'an unset base URL still falls back without a warning',
+  () => {
+    const warnings = [];
+    const original = process.emitWarning;
+    process.emitWarning = (message) => warnings.push(message);
+
+    try {
+      assert.equal(
+        resolveEnvironment(
+          baseEnvironment({ NODE_ENV: 'test', PORT: '4000' })
+        ).publicBaseUrl,
+        'http://127.0.0.1:4000'
+      );
+    } finally {
+      process.emitWarning = original;
+    }
+
+    // Nothing was configured, so nothing was ignored.
+    assert.deepEqual(warnings, []);
   }
 );
 
