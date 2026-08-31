@@ -1447,6 +1447,13 @@ void _useAuthenticatedMerchantSession() {
 /// `merchant_store_preview_test.dart` records why: awaiting `close()` from
 /// inside `testWidgets` waits on a stream-controller completion the faked clock
 /// never delivers. Dropping the future still tears the bloc down.
+/// Closes a bloc without waiting for it.
+///
+/// The `unawaited` is load-bearing and was never written down: after a page is
+/// pumped inside `runAsync`, `close()` does not complete, and awaiting it hangs
+/// the whole file in teardown with no failure to read. That silence is what
+/// made `الخريطة` look like a page that could not render at the device
+/// viewport - it renders; only its teardown hung.
 void _closeOnTearDown<S>(BlocBase<S> bloc) {
   addTearDown(() => unawaited(bloc.close()));
 }
