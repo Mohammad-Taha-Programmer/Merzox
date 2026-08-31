@@ -15,7 +15,6 @@ import '../../../injection/injector.dart';
 import '../../../services/push_service.dart';
 import '../../../services/realtime_service.dart';
 import '../models/business_models.dart';
-import '../../orders/order_status_policy.dart';
 import '../orders/merchant_order_detail_page.dart';
 import '../settings/store_settings_page.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_bloc.dart';
@@ -800,113 +799,6 @@ void _openOrderDetail(
   );
 }
 
-class _OrderTile extends StatelessWidget {
-  final OwnerOrder order;
-  final VoidCallback? onOpen;
-  const _OrderTile({required this.order, this.onOpen});
-
-  @override
-  Widget build(BuildContext context) {
-    final currentStatus = OrderStatusPolicy.isStatus(order.status)
-        ? order.status
-        : 'pending';
-    final options = <String>[
-      currentStatus,
-      ...OrderStatusPolicy.merchantTransitionsFrom(currentStatus),
-    ];
-
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 5, 16, 7),
-      color: Colors.white,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onOpen,
-        child: Padding(
-          padding: const EdgeInsets.all(13),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: MerzoxColors.kColorDEEEF8,
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Icon(Icons.receipt_long_outlined),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // AC-28: an absent customer name is stated as unavailable
-                    // rather than filled with an invented identity - a merchant
-                    // must never read a placeholder as the customer's name.
-                    Text(
-                      order.customerName.isEmpty
-                          ? 'merchantOrder.customerNameUnavailable'.tr()
-                          : order.customerName,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontStyle: order.customerName.isEmpty
-                            ? FontStyle.italic
-                            : FontStyle.normal,
-                        color: order.customerName.isEmpty
-                            ? MerzoxColors.kColor8D99AE
-                            : null,
-                      ),
-                    ),
-                    Text(
-                      '#${order.publicId}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    Text(
-                      'businessShell.orderSummary'.tr(
-                        args: [
-                          order.items.length.toString(),
-                          merzoxAmount(order.total),
-                        ],
-                      ),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: MerzoxColors.kColor767676,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // Always the editable control now: the dashboard's read-only
-              // summary moved to `_RecentOrdersTable`, so this tile is only
-              // ever the orders tab, where a merchant changes the status.
-              DropdownButton<String>(
-                value: currentStatus,
-                underline: const SizedBox.shrink(),
-                items: options
-                    .map(
-                      (status) => DropdownMenuItem(
-                        value: status,
-                        child: Text(_statusLabel(status)),
-                      ),
-                    )
-                    .toList(),
-                onChanged: options.length == 1
-                    ? null
-                    : (status) {
-                        if (status != null && status != order.status) {
-                          context.read<BusinessBloc>().add(
-                            BusinessOrderStatusChanged(order.id, status),
-                          );
-                        }
-                      },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 String _statusLabel(String status) => switch (status) {
   'pending' => 'merchantOrder.statuses.pending'.tr(),
   'confirmed' => 'businessShell.statuses.confirmed'.tr(),
@@ -1144,30 +1036,6 @@ Future<void> _confirmProductDeletion(
   }
 }
 
-class _ProductImage extends StatelessWidget {
-  final String url;
-  const _ProductImage(this.url);
-  @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(7),
-    child: SizedBox(
-      width: 52,
-      height: 52,
-      child: url.isEmpty
-          ? Container(
-              color: MerzoxColors.kColorDEEEF8,
-              child: const Icon(Icons.inventory_2_outlined),
-            )
-          : Image.network(
-              url,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  const Icon(Icons.broken_image_outlined),
-            ),
-    ),
-  );
-}
-
 class _Profile extends StatelessWidget {
   final BusinessState state;
   final VoidCallback onLogout;
@@ -1375,17 +1243,6 @@ class _OrderNotificationsRow extends StatelessWidget {
       ),
     );
   }
-}
-
-class _ProfileLine extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _ProfileLine(this.icon, this.text);
-  @override
-  Widget build(BuildContext context) => ListTile(
-    leading: Icon(icon, color: MerzoxColors.kColor3D5A80),
-    title: Text(text.isEmpty ? 'businessShell.unspecified'.tr() : text),
-  );
 }
 
 class _BusinessNavigation extends StatelessWidget {
@@ -2251,116 +2108,4 @@ class _DerivedPricePreview extends StatelessWidget {
       ),
     );
   }
-}
-
-Future<void> _showProfileEditor(
-  BuildContext context,
-  OwnerBusiness business,
-) async {
-  final bloc = context.read<BusinessBloc>();
-  await showDialog<void>(
-    context: context,
-    builder: (_) =>
-        BlocProvider.value(value: bloc, child: _ProfileEditor(business)),
-  );
-}
-
-class _ProfileEditor extends StatefulWidget {
-  final OwnerBusiness business;
-  const _ProfileEditor(this.business);
-  @override
-  State<_ProfileEditor> createState() => _ProfileEditorState();
-}
-
-class _ProfileEditorState extends State<_ProfileEditor> {
-  late final TextEditingController _name = TextEditingController(
-    text: widget.business.name,
-  );
-  late final TextEditingController _english = TextEditingController(
-    text: widget.business.englishName,
-  );
-  late final TextEditingController _description = TextEditingController(
-    text: widget.business.description,
-  );
-  late final TextEditingController _category = TextEditingController(
-    text: widget.business.category,
-  );
-  late final TextEditingController _address = TextEditingController(
-    text: widget.business.address,
-  );
-  late final TextEditingController _attachment = TextEditingController(
-    text: widget.business.attachmentUrl,
-  );
-
-  @override
-  void dispose() {
-    _name.dispose();
-    _english.dispose();
-    _description.dispose();
-    _category.dispose();
-    _address.dispose();
-    _attachment.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Directionality(
-    textDirection: Directionality.of(context),
-    child: AlertDialog(
-      title: Text('businessShell.editProfile'.tr()),
-      content: SizedBox(
-        width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              _field(_name, 'business.storeName'.tr()),
-              _field(_english, 'business.englishName'.tr()),
-              _field(_description, 'business.description'.tr(), maxLines: 3),
-              _field(_category, 'business.category'.tr()),
-              _field(_address, 'business.address'.tr()),
-              _field(_attachment, 'business.attachmentUrl'.tr()),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text('common.cancel'.tr()),
-        ),
-        FilledButton(
-          onPressed: () {
-            context.read<BusinessBloc>().add(
-              BusinessProfileSaved({
-                'name': _name.text.trim(),
-                'englishName': _english.text.trim(),
-                'description': _description.text.trim(),
-                'category': _category.text.trim(),
-                'address': _address.text.trim(),
-                'attachmentUrl': _attachment.text.trim(),
-              }),
-            );
-            Navigator.pop(context);
-          },
-          child: Text('common.save'.tr()),
-        ),
-      ],
-    ),
-  );
-
-  Widget _field(
-    TextEditingController controller,
-    String label, {
-    int maxLines = 1,
-  }) => Padding(
-    padding: const EdgeInsets.only(bottom: 10),
-    child: TextField(
-      controller: controller,
-      maxLines: maxLines,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
-    ),
-  );
 }

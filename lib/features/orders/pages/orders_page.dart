@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,6 +10,10 @@ import 'package:merzox/features/orders/bloc/orders_event.dart';
 import 'package:merzox/features/orders/bloc/orders_state.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 import 'package:merzox/core/constants/money.dart';
+
+/// The band between the status bar and the tab strip, which every artboard in
+/// the family draws the same.
+const double _ordersHeaderHeight = 69;
 
 class OrdersPage extends StatefulWidget {
   const OrdersPage({super.key});
@@ -150,10 +153,28 @@ class _OrdersPageState extends State<OrdersPage> {
         onRefresh: () async {
           context.read<OrdersBloc>().add(const OrdersRefreshRequested());
         },
-        child: ListView(
-          controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: const [SizedBox(height: 92), _EmptyOrdersState()],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return ListView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                // `السلة – 4` starts the block 110px under the header rather
+                // than centring it in what is left of the screen: where the
+                // bottom bar ends is not what the artboard measures from.
+                ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: const Padding(
+                    padding: EdgeInsets.only(top: 110),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: _EmptyOrdersState(),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       );
     }
@@ -164,11 +185,11 @@ class _OrdersPageState extends State<OrdersPage> {
       },
       child: ListView.separated(
         controller: _scrollController,
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 28),
+        padding: const EdgeInsets.fromLTRB(16, 25, 16, 28),
         itemCount:
             state.orders.length +
             (state.status == OrdersStatus.loadingMore ? 1 : 0),
-        separatorBuilder: (_, __) => const SizedBox(height: 14),
+        separatorBuilder: (_, __) => const SizedBox(height: 16),
         itemBuilder: (context, index) {
           if (index == state.orders.length) {
             return const Padding(
@@ -183,6 +204,7 @@ class _OrdersPageState extends State<OrdersPage> {
 
           final order = state.orders[index];
           return _OrderListItem(
+            key: ValueKey<String>(order.id),
             order: order,
             group: state.selectedGroup,
             cancelling: state.cancellingOrderId == order.id,
@@ -199,23 +221,32 @@ class _OrdersHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The artboards put the title's baseline 31px below the status bar and the
+    // tab strip 69px below it, so the title is not centred in the band it
+    // occupies and a `Stack.center` would sit it 8px too low.
     return SizedBox(
       width: double.infinity,
-      height: 82,
+      height: _ordersHeaderHeight,
       child: Stack(
-        alignment: Alignment.center,
         children: [
-          Text(
-            'orders.title'.tr(),
-            style: const TextStyle(
-              color: MerzoxColors.kColor2B2B2B,
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
+          const PositionedDirectional(
+            start: 5,
+            top: 1,
+            child: BackButton(color: MerzoxColors.kColor5E5E5E),
           ),
-          PositionedDirectional(
-            start: 8,
-            child: const BackButton(color: MerzoxColors.kColor5E5E5E),
+          Positioned(
+            top: 14,
+            left: 0,
+            right: 0,
+            child: Text(
+              'orders.title'.tr(),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: MerzoxColors.kColor2B2B2B,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
           ),
         ],
       ),
@@ -231,11 +262,11 @@ class _OrdersTabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 46,
+      height: 48,
       margin: const EdgeInsets.symmetric(horizontal: 16),
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        border: Border.all(color: MerzoxColors.kColor98C1D9),
+        border: Border.all(color: MerzoxColors.kColor3D5A80),
         borderRadius: BorderRadius.circular(5),
       ),
       child: Row(
@@ -286,9 +317,9 @@ class _OrderTab extends StatelessWidget {
             child: Text(
               label,
               style: TextStyle(
-                color: selected ? Colors.white : MerzoxColors.kColor3B3B3B,
-                fontSize: 13,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: selected ? Colors.white : MerzoxColors.kColor2B2B2B,
+                fontSize: 14,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w400,
               ),
             ),
           ),
@@ -303,17 +334,25 @@ class _TabDivider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(width: 1, color: MerzoxColors.kColor98C1D9);
+    return Container(width: 1, color: MerzoxColors.kColor3D5A80);
   }
 }
 
-class _OrderListItem extends StatelessWidget {
+/// A current order's card over the cancel action the artboards hide behind it.
+///
+/// `تفاصيل المتجر – 22` and `– 37` both draw the first card slid aside with an
+/// orange `الغاء الطلب` running off the far edge, which is a swipe being shown
+/// mid-gesture — not a button that permanently narrows every card. The old
+/// layout reserved 92px beside the card for it and cost the card a quarter of
+/// its width on the one tab that has the most to say.
+class _OrderListItem extends StatefulWidget {
   final OrderApiModel order;
   final OrdersGroup group;
   final bool cancelling;
   final VoidCallback onCancel;
 
   const _OrderListItem({
+    super.key,
     required this.order,
     required this.group,
     required this.cancelling,
@@ -321,45 +360,64 @@ class _OrderListItem extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final card = _OrderCard(order: order, group: group);
-    if (group != OrdersGroup.current) return card;
+  State<_OrderListItem> createState() => _OrderListItemState();
+}
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 330) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              card,
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 42,
+class _OrderListItemState extends State<_OrderListItem> {
+  /// How far the card slides, which is how wide the action underneath is.
+  static const double _revealWidth = 120;
+
+  double _offset = 0;
+
+  bool get _open => _offset > _revealWidth / 2;
+
+  void _drag(DragUpdateDetails details, TextDirection direction) {
+    // The action lives at the logical end, so the card travels towards the
+    // logical start: rightwards in Arabic, leftwards in English.
+    final double delta = direction == TextDirection.rtl
+        ? details.delta.dx
+        : -details.delta.dx;
+    setState(() => _offset = (_offset + delta).clamp(0.0, _revealWidth));
+  }
+
+  void _settle() => setState(() => _offset = _open ? _revealWidth : 0);
+
+  @override
+  Widget build(BuildContext context) {
+    final card = _OrderCard(order: widget.order, group: widget.group);
+    if (widget.group != OrdersGroup.current) return card;
+
+    final TextDirection direction = Directionality.of(context);
+    final double signed = direction == TextDirection.rtl ? _offset : -_offset;
+
+    return GestureDetector(
+      onHorizontalDragUpdate: (details) => _drag(details, direction),
+      onHorizontalDragEnd: (_) => _settle(),
+      onHorizontalDragCancel: _settle,
+      child: Stack(
+        children: [
+          PositionedDirectional(
+            top: 0,
+            bottom: 0,
+            end: 0,
+            width: _revealWidth,
+            child: Center(
+              child: SizedBox(
+                width: _revealWidth - 12,
+                height: 48,
                 child: _CancelOrderButton(
-                  cancelling: cancelling,
-                  onPressed: onCancel,
+                  cancelling: widget.cancelling,
+                  onPressed: () {
+                    setState(() => _offset = 0);
+                    widget.onCancel();
+                  },
                 ),
               ),
-            ],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: card),
-            const SizedBox(width: 10),
-            SizedBox(
-              width: 92,
-              height: 50,
-              child: _CancelOrderButton(
-                cancelling: cancelling,
-                onPressed: onCancel,
-              ),
             ),
-          ],
-        );
-      },
+          ),
+          Transform.translate(offset: Offset(signed, 0), child: card),
+        ],
+      ),
     );
   }
 }
@@ -374,12 +432,12 @@ class _OrderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final firstItem = order.items.isEmpty ? null : order.items.first;
     final date = _formatDate(order.createdAt);
+    final bool current = group == OrdersGroup.current;
 
     return Container(
-      constraints: const BoxConstraints(minHeight: 142),
-      padding: const EdgeInsets.all(11),
+      padding: const EdgeInsets.fromLTRB(13, 13, 13, 15),
       decoration: BoxDecoration(
-        color: MerzoxColors.kColorF5F9FC,
+        color: MerzoxColors.kColorF3F7FA,
         borderRadius: BorderRadius.circular(5),
       ),
       child: Column(
@@ -393,24 +451,27 @@ class _OrderCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 10,
-                    color: Color(0xFF3B3B3B),
+                    fontSize: 11,
+                    color: MerzoxColors.kColor3B3B3B,
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               Text(
                 '${'orders.orderDate'.tr()}: $date',
-                style: const TextStyle(fontSize: 10, color: Color(0xFF3B3B3B)),
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: MerzoxColors.kColor3B3B3B,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 11),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _OrderProductImage(imageUrl: firstItem?.imageUrl ?? ''),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -421,8 +482,8 @@ class _OrderCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: MerzoxColors.kColor2B2B2B,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                     if ((firstItem?.variant ?? '').trim().isNotEmpty) ...[
@@ -450,87 +511,72 @@ class _OrderCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 3),
+                    // Price, quantity, delivery - in that reading order, and
+                    // with the number beside its label rather than under it.
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         _OrderMetric(
                           label: 'orders.price'.tr(),
-                          value: _money(order.subtotal),
-                        ),
-                        _OrderMetric(
-                          label: 'orders.delivery'.tr(),
-                          value: _money(order.deliveryFee),
+                          value: merzoxAmount(order.subtotal),
                         ),
                         _OrderMetric(
                           label: 'orders.quantity'.tr(),
                           value:
                               '${order.items.fold<int>(0, (sum, item) => sum + item.quantity)}',
                         ),
+                        _OrderMetric(
+                          label: 'orders.delivery'.tr(),
+                          value: merzoxAmount(order.deliveryFee),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 10),
-                    Align(
-                      alignment: AlignmentDirectional.centerStart,
-                      child: Container(
-                        height: 28,
-                        constraints: const BoxConstraints(minWidth: 84),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: MerzoxColors.kColorEE6C4D,
-                          borderRadius: BorderRadius.circular(5),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _OrderChip(
+                          // The artboard labels this chip `السعر` even though
+                          // it carries the total, one line under a `السعر`
+                          // that carries the subtotal. Two different numbers
+                          // cannot share a name, so the total says so.
+                          label: 'orders.total'.tr(),
+                          value: _money(order.total),
+                          color: current
+                              ? MerzoxColors.kColor3D5A80
+                              : MerzoxColors.kColorEE6C4D,
                         ),
-                        child: Text(
-                          '${'orders.total'.tr()} ${_money(order.total)}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
+                        if (current) ...[
+                          const SizedBox(width: 10),
+                          _OrderChip(
+                            label: 'tracking.trackOrder'.tr(),
+                            color: MerzoxColors.kColorEE6C4D,
+                            onTap: () =>
+                                context.push('/orders/${order.id}/tracking'),
                           ),
-                        ),
-                      ),
+                        ],
+                      ],
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          SizedBox(
-            width: double.infinity,
-            height: 34,
-            child: OutlinedButton.icon(
-              onPressed: () => context.push('/orders/${order.id}/tracking'),
-              style: OutlinedButton.styleFrom(
-                padding: EdgeInsets.zero,
-                side: const BorderSide(color: MerzoxColors.kColor3D5A80),
-                foregroundColor: MerzoxColors.kColor3D5A80,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(5),
-                ),
-              ),
-              icon: const Icon(Icons.local_shipping_outlined, size: 15),
-              label: Text(
-                'tracking.trackOrder'.tr(),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ),
           if (group == OrdersGroup.cancelled &&
               order.cancellationReason.isNotEmpty) ...[
-            const SizedBox(height: 9),
+            const SizedBox(height: 8),
+            // The artboard sets this at 14, on a seventeen-character sample.
+            // A cancellation reason is free text up to 250 characters, and at
+            // 14 a realistic one wraps the card past the height drawn.
             Text(
               '${'orders.cancelledReason'.tr()}: ${order.cancellationReason}',
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 10,
+                fontSize: 12,
                 height: 1.35,
-                color: MerzoxColors.kColor5E5E5E,
+                color: MerzoxColors.kColor3B3B3B,
               ),
             ),
           ],
@@ -540,6 +586,7 @@ class _OrderCard extends StatelessWidget {
   }
 }
 
+/// A label and its number on one line, the way the artboards set them.
 class _OrderMetric extends StatelessWidget {
   final String label;
   final String value;
@@ -548,24 +595,93 @@ class _OrderMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
         Text(
           label,
-          style: const TextStyle(fontSize: 9, color: MerzoxColors.kColor707070),
+          style: const TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            color: MerzoxColors.kColor3B3B3B,
+          ),
         ),
-        const SizedBox(height: 2),
+        const SizedBox(width: 6),
         Text(
           value,
           textDirection: TextDirection.ltr,
           style: const TextStyle(
-            fontSize: 11,
+            fontSize: 14,
             fontWeight: FontWeight.w700,
-            color: MerzoxColors.kColor2B2B2B,
+            color: MerzoxColors.kColor3B3B3B,
           ),
         ),
       ],
+    );
+  }
+}
+
+/// One of the card's two pills: 99x30, white on a solid fill.
+class _OrderChip extends StatelessWidget {
+  final String label;
+  final String? value;
+  final Color color;
+  final VoidCallback? onTap;
+
+  const _OrderChip({
+    required this.label,
+    required this.color,
+    this.value,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 99x30 is the size the artboards draw, and it fits `المجموع 45 ₪` in
+    // Tajawal. A fallback face is wider, so the label scales rather than
+    // striping the chip with an overflow.
+    final Widget content = Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: value == null ? 12 : 10,
+                fontWeight: value == null ? FontWeight.w700 : FontWeight.w500,
+                color: Colors.white,
+              ),
+            ),
+            if (value != null) ...[
+              const SizedBox(width: 6),
+              Text(
+                value!,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    return SizedBox(
+      width: 99,
+      height: 30,
+      child: Material(
+        color: color,
+        borderRadius: BorderRadius.circular(5),
+        clipBehavior: Clip.antiAlias,
+        child: onTap == null ? content : InkWell(onTap: onTap, child: content),
+      ),
     );
   }
 }
@@ -604,7 +720,7 @@ class _OrderProductImage extends StatelessWidget {
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
-      child: SizedBox(width: 66, height: 76, child: image),
+      child: SizedBox(width: 84, height: 84, child: image),
     );
   }
 }
@@ -638,7 +754,7 @@ class _CancelOrderButton extends StatelessWidget {
           : Text(
               'orders.cancelOrder'.tr(),
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
             ),
     );
   }
@@ -650,31 +766,21 @@ class _EmptyOrdersState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         CustomPaint(
-          size: const Size(132, 170),
+          size: const Size(150, 200),
           painter: _OrdersChecklistPainter(),
         ),
-        const SizedBox(height: 56),
-        Text(
-          'orders.empty'.tr(),
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: MerzoxColors.kColor2B2B2B,
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 81),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 34),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Text(
-            'orders.emptyHint'.tr(),
+            'orders.empty'.tr(),
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: MerzoxColors.kColor707070,
-              fontSize: 12,
-              height: 1.5,
+              color: MerzoxColors.kColor2B2B2B,
+              fontSize: 16,
             ),
           ),
         ),
@@ -719,34 +825,41 @@ class _OrdersFailureState extends StatelessWidget {
   }
 }
 
+/// The checklist `السلة – 4` draws: a 150x200 page, three ticked rows and a
+/// fourth rule with no tick, all in one 11px stroke.
 class _OrdersChecklistPainter extends CustomPainter {
+  static const double _stroke = 11;
+  static const double _rowPitch = 36;
+
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = MerzoxColors.kColor3D5A80
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 7
+      ..strokeWidth = _stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
+    final half = _stroke / 2;
     final page = RRect.fromRectAndRadius(
-      Rect.fromLTWH(5, 4, size.width - 10, size.height - 8),
-      const Radius.circular(2),
+      Rect.fromLTWH(half, half, size.width - _stroke, size.height - _stroke),
+      const Radius.circular(3),
     );
     canvas.drawRRect(page, paint);
 
-    for (var index = 0; index < 3; index++) {
-      final y = 45.0 + index * 43;
-      final check = Path()
-        ..moveTo(25, y)
-        ..lineTo(37, y + 12)
-        ..lineTo(56, y - 9);
-      canvas.drawPath(check, paint);
-      canvas.drawLine(Offset(75, y + 2), Offset(size.width - 22, y + 2), paint);
+    final ruleEnd = size.width - 28;
+    for (var index = 0; index < 4; index++) {
+      final y = 50.0 + index * _rowPitch;
+      // The fourth row is a rule with no tick against it.
+      if (index < 3) {
+        final tick = Path()
+          ..moveTo(32, y)
+          ..lineTo(40, y + 10)
+          ..lineTo(60, y - 12);
+        canvas.drawPath(tick, paint);
+      }
+      canvas.drawLine(Offset(75, y), Offset(ruleEnd, y), paint);
     }
-
-    final shortY = math.min(size.height - 31, 151.0);
-    canvas.drawLine(Offset(75, shortY), Offset(size.width - 22, shortY), paint);
   }
 
   @override

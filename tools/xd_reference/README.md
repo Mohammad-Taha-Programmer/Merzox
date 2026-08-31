@@ -1225,6 +1225,10 @@ and that the report follows this file's order exactly.
 | `profile_merchant` | `test/goldens/seed/profile_merchant_ar_375x812.png` | `البروفايل` | `e5d63064-d49b-4cc9-a5a1-2053cb24300c` | 375 x 914 | `crop_top_to_812` |
 | `profile_form` | `test/goldens/seed/profile_form_ar_375x812.png` | `تعديل الملف الشخصي` | `d8998c46-d85a-4d14-ac6e-97c05d25666f` | 375 x 810 | `extend_final_row_to_812` |
 | `store_settings` | `test/goldens/seed/store_settings_ar_375x812.png` | `اعدادات المتجر` | `4c608328-df08-4187-ae3a-9d849332167a` | 375 x 807 | `extend_final_row_to_812` |
+| `orders_current` | `test/goldens/seed/orders_current_ar_375x812.png` | `تفاصيل المتجر – 22` | `00fc6554-9bab-48fc-b8e5-489dfe7a8bd7` | 375 x 808 | `extend_final_row_to_812` |
+| `orders_completed` | `test/goldens/seed/orders_completed_ar_375x812.png` | `تفاصيل المتجر – 19` | `ef447a75-53a1-4d3c-9005-7357605d2e8b` | 375 x 808 | `extend_final_row_to_812` |
+| `orders_cancelled` | `test/goldens/seed/orders_cancelled_ar_375x812.png` | `تفاصيل المتجر – 23` | `34f26b42-ea88-4537-8295-afd91400184d` | 375 x 808 | `extend_final_row_to_812` |
+| `orders_empty` | `test/goldens/seed/orders_empty_ar_375x812.png` | `السلة – 4` | `735d3a5c-dcc8-4b1e-811f-85995ae388ea` | 375 x 812 | `exact` |
 
 Artwork paths (the canonical `artwork/artboard-<uuid>` directories, which carry
 a *different* uuid from the manifest id):
@@ -1262,6 +1266,10 @@ a *different* uuid from the manifest id):
 | `profile_merchant` | `artwork/artboard-6cc95e16-8971-4d50-ae3f-542d59d0201e` |
 | `profile_form` | `artwork/artboard-6636840c-df3a-4c10-8a2f-d4f4a74452d3` |
 | `store_settings` | `artwork/artboard-0c361447-1919-45e7-a177-a5baa10f9401` |
+| `orders_current` | `artwork/artboard-c023e977-cbd8-46cd-96e2-cbfc73686812` |
+| `orders_completed` | `artwork/artboard-516a509b-3b66-48cf-b19f-56264eacce6e` |
+| `orders_cancelled` | `artwork/artboard-6f540fc1-797c-49d6-ac59-525f45c91472` |
+| `orders_empty` | `artwork/artboard-5c73099e-976f-4302-aaac-7b3d6054ac04` |
 
 Why each one, in one line:
 

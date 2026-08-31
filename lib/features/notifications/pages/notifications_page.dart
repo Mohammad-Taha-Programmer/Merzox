@@ -308,17 +308,6 @@ class _NotificationTile extends StatelessWidget {
   }
 }
 
-IconData _iconFor(String type) {
-  return switch (type) {
-    'orderPlaced' => Icons.receipt_long_rounded,
-    'orderStatus' => Icons.local_shipping_rounded,
-    'orderCancelled' => Icons.cancel_outlined,
-    'newMessage' => Icons.chat_bubble_rounded,
-    'newReview' => Icons.star_rounded,
-    _ => Icons.notifications_rounded,
-  };
-}
-
 String _formatTimestamp(DateTime? value) {
   if (value == null) return '';
 

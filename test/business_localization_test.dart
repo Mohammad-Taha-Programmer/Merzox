@@ -145,6 +145,22 @@ void main() {
         expect(find.text(address), findsOneWidget);
         expect(find.text(category), findsOneWidget);
 
+        // No artboard draws these two, but merchant enrollment collects them
+        // and the server accepts edits, so this screen is now their only
+        // editor. Without them they would be stored and uncorrectable.
+        expect(
+          find.text(isArabic ? 'الاسم بالإنجليزية' : 'English name'),
+          findsOneWidget,
+        );
+        expect(
+          find.text(
+            isArabic
+                ? 'رابط مرفق سجل المتجر'
+                : 'Store registration attachment URL',
+          ),
+          findsOneWidget,
+        );
+
         _expectDirection(tester, find.text(address), direction);
         _expectDirection(tester, find.text(save), direction);
       });
