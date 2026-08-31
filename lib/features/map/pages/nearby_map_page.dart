@@ -226,12 +226,12 @@ class _NearbyMapPageState extends State<NearbyMapPage> {
                     ...state.businesses.map(
                       (business) => Marker(
                         point: LatLng(business.latitude!, business.longitude!),
-                        width: 58,
-                        height: 66,
+                        width: 104,
+                        height: 88,
                         alignment: Alignment.topCenter,
                         child: _BusinessMapMarker(
                           selected: business.id == state.selectedBusinessId,
-                          tooltip: business.name,
+                          name: business.name,
                           onTap: () => _selectBusiness(business),
                         ),
                       ),
@@ -510,12 +510,12 @@ class _UserLocationMarker extends StatelessWidget {
 
 class _BusinessMapMarker extends StatelessWidget {
   final bool selected;
-  final String tooltip;
+  final String name;
   final VoidCallback onTap;
 
   const _BusinessMapMarker({
     required this.selected,
-    required this.tooltip,
+    required this.name,
     required this.onTap,
   });
 
@@ -525,41 +525,71 @@ class _BusinessMapMarker extends StatelessWidget {
         ? MerzoxColors.kColorEE6C4D
         : MerzoxColors.kColor3D5A80;
 
-    return Tooltip(
-      message: tooltip,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: selected ? 43 : 38,
-              height: selected ? 43 : 38,
+    // `الخريطة` writes each shop's name beside its pin. It used to live in a
+    // `Tooltip`, which on a phone means nobody reads it - and which also hung
+    // any attempt to capture this screen, because a tooltip keeps a timer
+    // alive and the capture waits for the timers to drain.
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: selected ? 43 : 38,
+            height: selected ? 43 : 38,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white, width: 3),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.storefront_outlined,
+              color: Colors.white,
+              size: 21,
+            ),
+          ),
+          CustomPaint(
+            size: const Size(12, 8),
+            painter: _MarkerTailPainter(color),
+          ),
+          const SizedBox(height: 4),
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 3),
-                boxShadow: [
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: const <BoxShadow>[
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+                    color: Color(0x1F000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 2),
                   ),
                 ],
               ),
-              child: const Icon(
-                Icons.storefront_outlined,
-                color: Colors.white,
-                size: 21,
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: selected
+                      ? MerzoxColors.kColorEE6C4D
+                      : MerzoxColors.kColor2B2B2B,
+                ),
               ),
             ),
-            CustomPaint(
-              size: const Size(12, 8),
-              painter: _MarkerTailPainter(color),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
