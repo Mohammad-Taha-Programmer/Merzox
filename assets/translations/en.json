@@ -10,7 +10,8 @@
     "edit": "Edit",
     "delete": "Delete",
     "logout": "Log out",
-    "remove": "Remove"
+    "remove": "Remove",
+    "done": "Done"
   },
   "authGate": {
     "title": "Login required",
@@ -287,7 +288,7 @@
     "categoryLabel": "What kind of products do you sell"
   },
   "merchantProduct": {
-    "addTitle": "Add a new product",
+    "addTitle": "Add products",
     "editTitle": "Edit product",
     "name": "Product name",
     "nameHint": "Write the product name",
@@ -300,7 +301,6 @@
     "quantityHint": "Quantity available for this product",
     "unlimited": "Unlimited",
     "hasDiscount": "Has a discount",
-    "discountPercent": "Discount %",
     "priceAfterDiscount": "Price after discount",
     "classification": "Product classification",
     "keywords": "Keywords",
@@ -335,7 +335,18 @@
       "new": "New",
       "bestSelling": "Best selling",
       "offers": "Offers"
-    }
+    },
+    "priceHint": "Price",
+    "classificationHint": "Choose a product classification",
+    "moreOptions": "Add other options",
+    "imagesDrop": "Drag and drop images here",
+    "preview": "Preview",
+    "deleteProduct": "Delete product",
+    "optionsTitle": "Extra product options",
+    "optionsBody": "For products that come in a size, a colour and so on, and to give the product a brand",
+    "optionNameHint": "Option name (colour, size)",
+    "addOptions": "Add options",
+    "invalidPriceAfterDiscount": "The discounted price must be below the price"
   },
   "merchantImages": {
     "title": "Add photos or video",

@@ -11,6 +11,7 @@ class MerzoxColors {
   static const Color kColor666666 = Color(0xFF666666);
   static const Color kColor707070 = Color(0xFF707070);
   static const Color kColor98C1D9 = Color(0xFF98C1D9);
+  static const Color kColorCBE0EC = Color(0xFFCBE0EC);
   static const Color kColor293241 = Color(0xFF293241);
   static const Color kColorEE6C4D = Color(0xFFEE6C4D);
   static const Color kColorFEE3DC = Color(0xFFFEE3DC);

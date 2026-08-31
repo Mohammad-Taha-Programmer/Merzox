@@ -459,6 +459,45 @@
       },
       "normalization": "exact",
       "semantic_reason": "Order history with nothing in it. Drawn in the cart family but titled `طلباتي`, and it is the one board of the seven with no tab strip: a customer with no orders has no groups to move between. It is also the only one that draws the bottom bar, which the loaded boards omit."
+    },
+    {
+      "seed": "add_product",
+      "flutter_golden": "test/goldens/seed/add_product_ar_375x812.png",
+      "xd": {
+        "name": "إضافة منتجات",
+        "manifest_id": "2a394bd3-6aeb-46c2-afda-a1daddd6f168",
+        "artboard_path": "artwork/artboard-6712b392-dfa0-4ed5-bf54-05ff139e5f61",
+        "width": 375,
+        "height": 1334
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The merchant’s product form as it opens: the quantity field showing and neither tick box set. 1334 tall with the shell’s own bar drawn across the fold, which is a full screen the form scrolls inside — the reason the editor stopped being a bottom sheet."
+    },
+    {
+      "seed": "add_product_ticked",
+      "flutter_golden": "test/goldens/seed/add_product_ticked_ar_375x812.png",
+      "xd": {
+        "name": "إضافة منتجات – 1",
+        "manifest_id": "b2c5f0c2-0331-45e9-946e-f569c9613c13",
+        "artboard_path": "artwork/artboard-eb2c1d36-4549-4de8-ba74-b04047a024fd",
+        "width": 375,
+        "height": 1334
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The same form with both boxes ticked. `غير محدودة` takes the quantity field away and `هناك تخفيض` puts the price the customer pays in its place, and the two cancel out: everything from `تصنيف المنتجات` down sits at the same height on both boards."
+    },
+    {
+      "seed": "add_product_options",
+      "flutter_golden": "test/goldens/seed/add_product_options_ar_375x812.png",
+      "xd": {
+        "name": "إضافة منتجات – 2",
+        "manifest_id": "8f8d98d3-9baf-4022-949b-aabe4a8b3787",
+        "artboard_path": "artwork/artboard-92a3d46f-b20e-4914-801c-3c5d8bc01ead",
+        "width": 375,
+        "height": 1251
+      },
+      "normalization": "crop_top_to_812",
+      "semantic_reason": "The options dialog over the form: name an option, press the plus, and it becomes a chip. The board sets the panel 298 down a 1251-tall artboard, its foot against the bar rather than its middle against the screen’s, so a centred dialog sits about a hundred pixels higher than the reference and that is most of this seed’s difference."
     }
   ]
 }
