@@ -149,20 +149,65 @@ export function buildBusinessFilter(query) {
   return applyDiscountFilter(filter, query);
 }
 
+/** The needle, matched rather than executed. */
+function regexSearchClauses(search) {
+  const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  return [
+    { name: { $regex: escaped, $options: 'i' } },
+    { category: { $regex: escaped, $options: 'i' } },
+    { 'products.name': { $regex: escaped, $options: 'i' } }
+  ];
+}
+
+/**
+ * The same search without `$text`, for when there is no text index to use.
+ *
+ * Mongo answers `IndexNotFound` rather than an empty page when `$text` has no
+ * index behind it, and there are two ordinary ways to be in that state: a
+ * production deployment, which runs with `autoIndex` off and never builds one,
+ * and a cold start anywhere else, where the build is asynchronous and the first
+ * request can beat it. In both, a customer typing a word got a 500.
+ */
+export function buildBusinessSearchFallbackFilter(query) {
+  const filter = { isActive: true };
+  const search = searchParam(query);
+
+  if (search) {
+    filter.$or = regexSearchClauses(search);
+  }
+
+  return applyDiscountFilter(filter, query);
+}
+
 export function buildNearbyBusinessFilter(query) {
   const filter = { isActive: true };
   const search = searchParam(query);
 
   if (search) {
-    const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    filter.$or = [
-      { name: { $regex: escaped, $options: 'i' } },
-      { category: { $regex: escaped, $options: 'i' } },
-      { 'products.name': { $regex: escaped, $options: 'i' } }
-    ];
+    filter.$or = regexSearchClauses(search);
   }
 
   return applyDiscountFilter(filter, query);
+}
+
+/** Mongo's code for "this query wanted an index that does not exist". */
+export const TEXT_INDEX_MISSING = 27;
+
+/**
+ * Runs a business read, and runs it again without `$text` if the index is
+ * absent. Anything else the database says is passed on untouched.
+ */
+export async function withTextIndexFallback(query, run) {
+  try {
+    return await run(buildBusinessFilter(query));
+  } catch (error) {
+    if (error?.code !== TEXT_INDEX_MISSING || !searchParam(query)) {
+      throw error;
+    }
+
+    return run(buildBusinessSearchFallbackFilter(query));
+  }
 }
 
 export function nearbyParams(query = {}) {
@@ -251,11 +296,11 @@ export const listBusinesses = asyncHandler(async (req, res) => {
   const { page, limit, skip } = paginationParams(req.query);
   const nearby = nearbyParams(req.query);
   const sort = businessSort(req.query);
-  const filter = nearby
-    ? buildNearbyBusinessFilter(req.query)
-    : buildBusinessFilter(req.query);
-
+  // The nearby path builds its filter once; the list path builds it inside
+  // `withTextIndexFallback`, which may need a second, index-free shape.
   if (nearby) {
+    const filter = buildNearbyBusinessFilter(req.query);
+
     const [result] = await Business.aggregate([
       {
         $geoNear: {
@@ -295,14 +340,12 @@ export const listBusinesses = asyncHandler(async (req, res) => {
     });
   }
 
-  const [items, total] = await Promise.all([
-    Business.find(filter)
-      .sort(sort)
-      .skip(skip)
-      .limit(limit)
-      .lean(false),
-    Business.countDocuments(filter)
-  ]);
+  const [items, total] = await withTextIndexFallback(req.query, (active) =>
+    Promise.all([
+      Business.find(active).sort(sort).skip(skip).limit(limit).lean(false),
+      Business.countDocuments(active)
+    ])
+  );
 
   res.json({
     success: true,

@@ -504,3 +504,96 @@ test('HTTP boundary rejects supported repeated business query parameters after H
     );
   }
 });
+
+
+// ---------------------------------------------------------------------------
+// Searching a catalogue that has no text index
+// ---------------------------------------------------------------------------
+
+test('a search falls back when there is no text index to use', async () => {
+  const {
+    buildBusinessFilter,
+    buildBusinessSearchFallbackFilter,
+    withTextIndexFallback,
+    TEXT_INDEX_MISSING
+  } = await import('../src/controllers/business.controller.js');
+
+  const attempts = [];
+  const result = await withTextIndexFallback({ search: 'الياسمين' }, (filter) => {
+    attempts.push(filter);
+
+    if (attempts.length === 1) {
+      const error = new Error('text index required for $text query');
+      error.code = TEXT_INDEX_MISSING;
+      throw error;
+    }
+
+    return 'answered';
+  });
+
+  assert.equal(result, 'answered');
+  assert.equal(attempts.length, 2);
+  // The first attempt is the fast path.
+  assert.deepEqual(attempts[0], buildBusinessFilter({ search: 'الياسمين' }));
+  // The second asks the same question without needing an index.
+  assert.deepEqual(
+    attempts[1],
+    buildBusinessSearchFallbackFilter({ search: 'الياسمين' })
+  );
+  assert.equal(attempts[1].$text, undefined);
+  assert.equal(attempts[1].$or.length, 3);
+});
+
+test('the fallback needle is escaped, not executed', async () => {
+  const { buildBusinessSearchFallbackFilter } = await import(
+    '../src/controllers/business.controller.js'
+  );
+
+  const filter = buildBusinessSearchFallbackFilter({ search: 'a.*b' });
+  const [byName] = filter.$or;
+
+  assert.equal(byName.name.$regex, String.raw`a\.\*b`);
+  assert.equal(new RegExp(byName.name.$regex).test('a.*b'), true);
+  assert.equal(new RegExp(byName.name.$regex).test('axxb'), false);
+});
+
+test('a search with no needle never reaches the fallback', async () => {
+  const { withTextIndexFallback, TEXT_INDEX_MISSING } = await import(
+    '../src/controllers/business.controller.js'
+  );
+
+  let attempts = 0;
+
+  await assert.rejects(
+    withTextIndexFallback({}, () => {
+      attempts += 1;
+      const error = new Error('some other missing index');
+      error.code = TEXT_INDEX_MISSING;
+      throw error;
+    }),
+    /some other missing index/
+  );
+
+  // Retrying an unrelated missing index would hide a real fault.
+  assert.equal(attempts, 1);
+});
+
+test('any other database failure is passed on untouched', async () => {
+  const { withTextIndexFallback } = await import(
+    '../src/controllers/business.controller.js'
+  );
+
+  let attempts = 0;
+
+  await assert.rejects(
+    withTextIndexFallback({ search: 'x' }, () => {
+      attempts += 1;
+      const error = new Error('connection lost');
+      error.code = 89;
+      throw error;
+    }),
+    /connection lost/
+  );
+
+  assert.equal(attempts, 1);
+});
