@@ -282,13 +282,29 @@ function canonicalHostsFromUri(uri) {
 }
 
 /**
+ * A second opt-in, on top of MERZOX_INTEGRATION_TESTS, for a database that is
+ * disposable but not local.
+ *
+ * The loopback rule below exists because a suite that boots its own server has
+ * no operator watching where it points. Naming this variable is that operator:
+ * it has to be set deliberately, per run, by someone who knows which cluster
+ * they are aiming at. Everything else still applies - the name must be marked
+ * disposable and it must not resolve to the application's own database.
+ */
+export const REMOTE_OPT_IN = 'MERZOX_ALLOW_REMOTE_INTEGRATION_DB';
+
+function allowsRemoteDatabase(env) {
+  return String(env[REMOTE_OPT_IN] ?? '').trim() === 'true';
+}
+
+/**
  * The DB-only gate, for a suite that starts its own loopback API in-process
  * rather than talking to one somebody launched by hand.
  *
  * It keeps every safety rule of the full gate - explicit opt-in, a disposable
  * database name, no MONGODB_URI fallback - and adds one the API-based gate got
- * for free: the database host itself must be loopback. A suite that boots its
- * own server has no operator to notice it was pointed somewhere remote.
+ * for free: the database host must be loopback, unless the run says in as many
+ * words that it means to use a remote one.
  */
 export function resolveIntegrationDatabase(env = process.env) {
   if (String(env.MERZOX_INTEGRATION_TESTS ?? '').trim() !== 'true') {
@@ -337,10 +353,12 @@ export function resolveIntegrationDatabase(env = process.env) {
   }
 
   const remote = hosts.filter((host) => !host.startsWith('localhost:'));
-  if (remote.length > 0) {
+  if (remote.length > 0 && !allowsRemoteDatabase(env)) {
     return {
       enabled: false,
-      reason: `MERZOX_TEST_MONGODB_URI must point at loopback only (${remote.length} non-loopback host)`
+      reason:
+        `MERZOX_TEST_MONGODB_URI must point at loopback only (${remote.length} non-loopback host); ` +
+        `set ${REMOTE_OPT_IN} to true to allow a remote disposable database`
     };
   }
 

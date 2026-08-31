@@ -664,6 +664,28 @@ export function resolveEnvironment(
           300
       }),
 
+    // The credential endpoints have their own budgets, configurable for the
+    // same reason the global one is: an integration run seeds dozens of
+    // accounts through the real HTTP API and would otherwise throttle itself.
+    // The fallbacks are the production values.
+    loginRateLimitMax:
+      positiveInteger({
+        source,
+        key:
+          'LOGIN_RATE_LIMIT_MAX',
+        fallback:
+          20
+      }),
+
+    signupRateLimitMax:
+      positiveInteger({
+        source,
+        key:
+          'SIGNUP_RATE_LIMIT_MAX',
+        fallback:
+          10
+      }),
+
     firebasePushEnabled:
       booleanValue({
         source,
