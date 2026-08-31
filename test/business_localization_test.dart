@@ -119,21 +119,33 @@ void main() {
         final isArabic = language == 'ar';
         final direction = isArabic ? TextDirection.rtl : TextDirection.ltr;
 
+        // The artboard gives the page and its first section the same words,
+        // so this title is on screen twice by design.
         final title = isArabic ? 'إعدادات المتجر' : 'Store settings';
-        final storeName = isArabic ? 'اسم المتجر' : 'Store name';
-        final address = isArabic ? 'العنوان' : 'Address';
-        final category = isArabic ? 'التصنيف' : 'Category';
+        final descriptionSection = isArabic
+            ? 'وصف المتجر'
+            : 'Store description';
+        final address = isArabic ? 'أضف عنوان المتجر' : 'Add the store address';
+        final category = isArabic
+            ? 'ما نوع المنتجات التي تبيعها'
+            : 'What kind of products do you sell';
         final save = isArabic ? 'حفظ' : 'Save';
 
         await _pumpSettings(tester, direction: direction);
 
-        expect(find.text(title), findsOneWidget);
-        expect(find.text(storeName), findsOneWidget);
-        expect(find.text(address), findsOneWidget);
-        expect(find.text(category), findsOneWidget);
+        expect(find.text(title), findsNWidgets(2));
         expect(find.text(save), findsOneWidget);
 
-        _expectDirection(tester, find.text(title), direction);
+        // Address and category live under the description section, which is
+        // collapsed until it is opened.
+        expect(find.text(address), findsNothing);
+        await tester.tap(find.text(descriptionSection));
+        await settleFrames(tester);
+
+        expect(find.text(address), findsOneWidget);
+        expect(find.text(category), findsOneWidget);
+
+        _expectDirection(tester, find.text(address), direction);
         _expectDirection(tester, find.text(save), direction);
       });
     });

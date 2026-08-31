@@ -68,6 +68,7 @@ import 'package:merzox/features/orders/bloc/order_tracking_state.dart';
 import 'package:merzox/features/orders/pages/order_tracking_page.dart';
 import 'package:merzox/features/splash/presentation/splash_screen.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/features/business/settings/store_settings_page.dart';
 import 'package:merzox/services/notification_preference_service.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_bloc.dart';
@@ -1920,6 +1921,41 @@ void main() {
         );
 
         await expectMerzoxSeedGolden('profile_form_ar_375x812.png');
+      });
+
+      // -- 31. Store settings ---------------------------------------------
+      //
+      // One screen with four collapsible sections. The family's five boards
+      // are that screen with a different section open; this seeds the first,
+      // which is the state the screen opens in.
+      testWidgets('store settings renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        _useAuthenticatedMerchantSession();
+
+        final BusinessBloc bloc = BusinessBloc(apiService: _SeedMerchantApi());
+        _closeOnTearDown(bloc);
+
+        final Future<BusinessState> ready = bloc.stream.firstWhere(
+          (BusinessState state) => state.status == BusinessStatus.ready,
+        );
+        bloc.add(const BusinessStarted());
+        await ready;
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              StoreSettingsPage(business: bloc.state.business!),
+            ),
+          ),
+        );
+
+        expect(find.text('شعار المتجر'), findsOneWidget);
+        expect(find.text('وصف المتجر'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('store_settings_ar_375x812.png');
       });
 
       // -- 16. Merchant dashboard -----------------------------------------
