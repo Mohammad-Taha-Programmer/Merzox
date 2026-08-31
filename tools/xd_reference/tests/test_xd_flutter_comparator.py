@@ -1026,6 +1026,16 @@ class MappingContractTests(unittest.TestCase):
                     808,
                     "extend_final_row_to_812",
                 ),
+                (
+                    "map",
+                    "test/goldens/seed/map_ar_375x812.png",
+                    "\u0627\u0644\u062e\u0631\u064a\u0637\u0629",
+                    "c7c0fa98-31f7-46f8-9793-4202c32c9d2b",
+                    "artwork/artboard-319ef7c4-0b83-45c4-8ccb-3eb6351fb132",
+                    375,
+                    810,
+                    "extend_final_row_to_812",
+                ),
             ],
         )
 

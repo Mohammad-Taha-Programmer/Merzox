@@ -22,9 +22,11 @@
 //                                        on `StorePreviewPage`.
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/features/about_us/bloc/about_us_bloc.dart';
@@ -64,6 +66,10 @@ import 'package:merzox/features/product_details/pages/product_details_page.dart'
 import 'package:merzox/features/onboarding/view/onboarding_screen.dart';
 import 'package:merzox/features/checkout/pages/address_form_page.dart';
 import 'package:merzox/features/business/shell/merchant_product_images_page.dart';
+import 'package:merzox/features/map/bloc/nearby_map_bloc.dart';
+import 'package:merzox/features/map/bloc/nearby_map_event.dart';
+import 'package:merzox/features/map/bloc/nearby_map_state.dart';
+import 'package:merzox/features/map/pages/nearby_map_page.dart';
 import 'package:merzox/features/messages/bloc/chat_bloc.dart';
 import 'package:merzox/features/messages/bloc/chat_event.dart';
 import 'package:merzox/features/messages/bloc/chat_state.dart';
@@ -372,6 +378,79 @@ final class _SeedProductApi extends ApiService {
 
 // ---------------------------------------------------------------------------
 // Nearby map fixture
+
+// ---------------------------------------------------------------------------
+// Nearby map fixture
+// ---------------------------------------------------------------------------
+
+/// The three shops `الخريطة` pins.
+///
+/// Coordinates travel as GeoJSON - `location.coordinates` is `[lng, lat]` -
+/// and the bloc drops any business without both. An earlier attempt at this
+/// seed supplied flat `latitude`/`longitude` fields, which the contract does
+/// not read, so every shop was dropped and the map arrived empty. That, and a
+/// bloc closed with `await`, is the whole of why this board went unseeded.
+final class _SeedNearbyApi extends ApiService {
+  @override
+  Future<BusinessListApiResponse> businesses({
+    int page = 1,
+    int limit = 100,
+    String? search,
+    String? sort,
+    bool? discounted,
+    double? latitude,
+    double? longitude,
+    int? radiusMeters,
+  }) async {
+    const List<(String, String, double, double)> pins =
+        <(String, String, double, double)>[
+          ('64b000000000000000000021', 'متجر الياسمين', 35.2034, 31.9038),
+          ('64b000000000000000000022', 'متاجر الشرق', 35.1968, 31.9101),
+          ('64b000000000000000000023', 'متجر الأميرة', 35.2110, 31.8974),
+        ];
+
+    return BusinessListApiResponse.fromJson(<String, dynamic>{
+      'businesses': <Map<String, dynamic>>[
+        for (final (String id, String name, double lng, double lat) in pins)
+          <String, dynamic>{
+            'id': id,
+            'publicId': '002010${id.substring(id.length - 1)}',
+            'name': name,
+            'category': 'مستحضرات تجميل',
+            'address': 'رام الله',
+            'logoUrl': '',
+            'rating': 4,
+            'location': <String, dynamic>{
+              'type': 'Point',
+              'coordinates': <double>[lng, lat],
+            },
+            'products': const <String>[],
+          },
+      ],
+      'pagination': const <String, dynamic>{
+        'page': 1,
+        'limit': 100,
+        'total': 3,
+        'hasMore': false,
+      },
+    });
+  }
+}
+
+/// A device that knows where it is, and is allowed to say so.
+final class _SeedRamallahLocation extends DeviceLocationService {
+  @override
+  Future<bool> isServiceEnabled() async => true;
+
+  @override
+  Future<DeviceLocation> currentLocation() async =>
+      const DeviceLocation(latitude: 31.9038, longitude: 35.2034);
+}
+
+final class _SeedGrantedLocation extends LocationPermissionService {
+  @override
+  Future<bool> isLocationGranted() async => true;
+}
 
 // ---------------------------------------------------------------------------
 // Conversation fixture
@@ -1466,6 +1545,14 @@ void main() {
     () {
       setUpAll(() async {
         SharedPreferences.setMockInitialValues(<String, Object>{});
+        // `flutter_map` asks path_provider for a tile cache directory. Nothing
+        // answers that channel in a test, and the refusal arrives after the
+        // test has finished, where it cannot be caught.
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(
+              const MethodChannel('plugins.flutter.io/path_provider'),
+              (MethodCall call) async => Directory.systemTemp.path,
+            );
         await EasyLocalization.ensureInitialized();
         await loadMerzoxGoldenDateSymbols();
         await loadMerzoxGoldenFonts();
@@ -3887,6 +3974,45 @@ void main() {
         expect(find.text('الصورة الأساسية'), findsNWidgets(2));
 
         await expectMerzoxSeedGolden('merchant_product_images_ar_375x812.png');
+      });
+
+      // -- 75. الخريطة ------------------------------------------------------
+      //
+      // The last board of the corpus. What this measures is everything the app
+      // draws over the map - the search field, the shop labels, the pins and
+      // the attribution. The ground beneath them is absent: a golden has no
+      // network on purpose, so the tile layer draws its own background. That
+      // difference is recorded in the mapping rather than hidden.
+      testWidgets('the map renders its Arabic baseline', (
+        WidgetTester tester,
+      ) async {
+        final NearbyMapBloc bloc = NearbyMapBloc(
+          apiService: _SeedNearbyApi(),
+          deviceLocationService: _SeedRamallahLocation(),
+          permissionService: _SeedGrantedLocation(),
+        );
+        _closeOnTearDown(bloc);
+
+        final Future<NearbyMapState> ready = bloc.stream.firstWhere(
+          (NearbyMapState state) =>
+              state.status == NearbyMapStatus.ready &&
+              state.businesses.length == 3,
+        );
+        bloc.add(const NearbyMapStarted());
+        await ready;
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<NearbyMapBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(const NearbyMapPage()),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('متجر الياسمين'), findsWidgets);
+
+        await expectMerzoxSeedGolden('map_ar_375x812.png');
       });
     },
     skip: merzoxGoldenPlatformSkip,

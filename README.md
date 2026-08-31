@@ -280,11 +280,208 @@ review, production secret management, monitoring, backups, or dependency audits.
 
 ## Roadmap
 
+Every remaining item is blocked on something outside the repository. They are
+enumerated, with their current state and what each needs, under *What cannot be
+finished from inside this repository* below.
+
 - Finalize the permanent mobile application identity, Firebase platform
   registrations/APNs setup, and production activation of the already implemented
   realtime and background push transport.
 - Activate real processing for card, bank-transfer, and assisted payment flows beyond the current cash-only operational baseline.
+- Accept uploaded images and video rather than image links.
 - Production deployment, observability, and store publication.
+
+## What cannot be finished from inside this repository
+
+Everything below is implemented as far as code alone can take it, and is
+blocked on something that does not live in a repository: an account, a
+credential, a piece of hardware, a commercial relationship, or a decision only
+the product owner can make. Each entry says what already exists, what is
+missing, and what changes once the missing thing arrives — so an assistant
+reading this file can walk the owner through it without first re-deriving the
+state of the code.
+
+Nothing here is a defect. The defects found by review are fixed; these are the
+edges of what a repository can reach by itself.
+
+### 1. The application identity is still `com.example.merzox`
+
+**State.** `android/app/build.gradle.kts` sets both `namespace` and
+`applicationId` to `com.example.merzox`. `ios/Runner.xcodeproj/project.pbxproj`
+sets `PRODUCT_BUNDLE_IDENTIFIER` to the same. This is the Flutter template
+default and it was never replaced.
+
+**Why it blocks other work.** Four items below wait on it. A bundle identifier
+is claimed once and is effectively permanent: Firebase applications, store
+listings, deep links and the OpenStreetMap user agent are all keyed to it, and
+registering any of them against a placeholder would have to be undone by hand.
+
+**Needed from the owner.** A decision on the final reverse-DNS identifier (for
+example `ps.merzox.app`), and confirmation that the matching domain is
+controlled if deep links are wanted later.
+
+**What changes.** The two platform identifiers, then — in the same change — the
+`userAgentPackageName` passed to `flutter_map` in
+`lib/features/map/pages/nearby_map_page.dart` and
+`lib/features/orders/pages/order_tracking_page.dart`, which currently announces
+the placeholder to a public tile server.
+
+### 2. Push notifications are built and switched off
+
+**State.** Registration lifecycle, delivery plumbing, notification-tap routing
+and realtime invalidation are implemented and tested. `FIREBASE_PUSH_ENABLED`
+defaults to `false`, and initialization additionally requires a matching
+`MERZOX_FIREBASE_PRODUCTION_ID`. The full fail-closed contract is in
+*Production Firebase activation guard* below.
+
+**Needed from the owner.** A Firebase project; Android and iOS applications
+registered inside it against the identifier from item 1; the generated
+`google-services.json` and `GoogleService-Info.plist`; an Apple Developer
+account and an APNs authentication key for iOS delivery.
+
+**What changes.** The platform configuration files are added, the readiness
+flag is raised in the same change, and the production dart-defines are supplied
+at build time. Do not register Firebase applications before item 1 is settled.
+
+### 3. Only cash is an operational payment method
+
+**State.** `backend/src/policies/payment.policy.js` keeps the API vocabulary
+`cash`, `card`, `bankTransfer` and `assisted`, and a deliberately narrower
+`operationalPaymentMethods` containing `cash` alone. Anything else is refused
+with `PAYMENT_METHOD_UNAVAILABLE`. No gateway, SDK, webhook, capture or refund
+path exists anywhere in the repository.
+
+**Why it is blocked.** Processing money requires a merchant relationship, and
+the technical work is downstream of choosing the provider: the capture and
+refund lifecycle, the webhook endpoint and its signature verification, and
+whether card data touches this system at all — which sets the PCI scope.
+
+**A copy decision that comes with it.** The third onboarding slide reads
+«اطلب المنتجات والخدمات، وتتبع طلباتك، واختر طريقة الدفع المناسبة لك». It
+offers a choice of payment method the product does not have. Either the
+provider work closes that gap, or the sentence should be softened until it
+does. That is a product decision, not a code one.
+
+**Needed from the owner.** A payment provider and merchant account for the
+target market, its credentials, and a decision on PCI scope.
+
+### 4. There is no file upload anywhere — images are links
+
+**State.** No image picker, no multipart route, no object storage, no CDN. A
+merchant adds a product image by pasting a URL, and the screen says exactly
+that: «أضف صورة عبر رابط». The server validates the URL shape and stores the
+string.
+
+**What the design asks for.** `الرئيسية – 14` draws a dashed drop area with the
+hint «اسحب واسقط الصور هنا», under a title that also offered video. The title
+now reads «إضافة صور», and the divergence is recorded in
+`tools/xd_reference/COVERAGE.md` rather than left to be rediscovered.
+
+**Needed from the owner.** An object storage account (S3, Cloudinary, Firebase
+Storage or equivalent) with credentials, plus decisions on maximum file size,
+accepted types, retention, and who pays for egress. Video additionally needs a
+transcoding and playback decision: nothing in the design specifies a player, so
+its appearance in one title is the only evidence video was ever intended.
+
+**What changes.** A signed-upload route on the backend, a picker on the client,
+and the images screen moves from accepting a link to accepting a file.
+
+### 5. The stores board reserves an advertising space
+
+**State.** `المتاجر` contains a placeholder reading «مساحة إعلانية». It is not
+built, because there is nothing to put in it.
+
+**Needed from the owner.** Either an advertising inventory — a provider, or a
+house-ads mechanism with a way to schedule and target them — or a decision to
+drop the placeholder from the design. Both are business decisions.
+
+### 6. Map tiles are served under a policy this app does not meet
+
+**State.** Both map surfaces request tiles from `tile.openstreetmap.org`. That
+service is donation-funded, its tile usage policy does not permit
+general-purpose application traffic, and the app currently identifies itself
+with the placeholder user agent from item 1.
+
+**Needed from the owner.** A tile provider account (Mapbox, MapTiler,
+Thunderforest, or a self-hosted tile server) with its style URL and API key, or
+an explicit decision to accept the OSM policy's limits for a small pilot.
+
+**What changes.** The `urlTemplate` and `userAgentPackageName` in the two map
+widgets, with the key supplied as a build-time define rather than committed.
+
+### 7. Production database indexes are not created by the application
+
+**State.** `backend/src/config/database.js` sets `autoIndex` to false in
+production, which is correct — an index build on a live collection is not
+something an application should start on boot. No migration script exists, so
+nothing creates them either.
+
+**Why it matters concretely.** The business text index is one of them. Search
+falls back to a scan when it is absent — that fallback was added after a review
+found the missing index returning `500` — but a fallback is not a substitute
+for the index at any real catalogue size.
+
+**Needed from the owner.** A one-time index build against the production
+cluster, run by whoever holds its credentials, and a decision about where that
+step lives afterwards: a release runbook, or a migration script this repository
+does not yet have.
+
+### 8. Production email and deployment configuration
+
+**State.** The environment validator refuses to start in production without
+SMTP credentials, a public HTTPS origin, a strong `JWT_SECRET` and explicit
+CORS origins. Outside production, a base URL that is not an openable origin
+falls back to loopback and warns — this repository's own `.env` held an
+unfilled `http://${CURRENT_IP_ADDRESS}:${PORT}`, which had been silently
+producing dead verification links.
+
+**Needed from the owner.** A mail provider and its credentials, the production
+domain, and the hosting decision behind `PUBLIC_BASE_URL`.
+
+### 9. Store publication
+
+**State.** `RELEASE_READINESS.md` documents the Android and iOS signing
+contracts and the audit that gates them; `tool/release_readiness.dart --audit`
+runs in CI.
+
+**Needed from the owner.** Google Play and Apple Developer accounts, signing
+keys and provisioning profiles, listing copy and screenshots, and the privacy
+declarations. The resulting listing URLs feed `MERZOX_PLAY_STORE_URL` and
+`MERZOX_APP_STORE_URL` (see *Store Sharing Configuration*), which until then
+fall back to a derived Play URL and an App Store search.
+
+### 10. Anything that needs a real device
+
+**State.** The Flutter suite covers behaviour through widget and bloc tests,
+and 75 golden seeds measure the shipped screens against every artboard in the
+design at 375x812. Both are host-only: they run without a phone.
+
+**What they cannot establish.** That a push notification actually arrives and
+routes on tap; that GPS behaves outdoors and that permission dialogs read
+correctly on both platforms; that the system share sheet opens the right
+applications; that map tiles render and pan on a real screen; that the camera
+and gallery pickers behave once item 4 exists; that performance and memory are
+acceptable on a low-end device.
+
+**Needed from the owner.** A pass on real Android and iOS hardware. This is the
+one item on this list that no amount of repository work can substitute for.
+
+### Not on this list, and why
+
+Two things that look like blockers are not.
+
+The **integration suites** — the cross-account authorization matrix and the
+oversell, idempotency and crash-recovery suite — need a real MongoDB, and skip
+without one. They are not blocked: `.github/workflows/ci.yml` runs both against
+a `mongo:8.0` service on every push. What is missing is only a local database
+on a particular developer's machine, and the skip message names exactly which
+variable is unset.
+
+The **map board** was recorded for a long time as impossible to capture. It was
+not; the diagnosis was wrong twice. It is measured now, and
+`tools/xd_reference/COVERAGE.md` records both the correction and the one thing
+still absent from the capture: the streets themselves, because a golden
+environment has no network.
 
 ## Payment capability guard
 
@@ -336,7 +533,9 @@ explicitly supply the production Firebase dart-defines.
 
 Merzox is currently a development-stage product. Store identifiers, payment
 credentials, production SMTP credentials, deployment URLs, privacy documents,
-and final legal content must be supplied before public release.
+and final legal content must be supplied before public release. *What cannot be
+finished from inside this repository* lists each of these with its current
+state, what is missing, and what changes once it arrives.
 
 ### Development CLI safety
 

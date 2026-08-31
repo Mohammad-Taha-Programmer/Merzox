@@ -966,6 +966,19 @@
       },
       "normalization": "extend_final_row_to_812",
       "semantic_reason": "Step two after the customer has reached for cancel and said no: the button keeps the emphasis and the twenty-four hour window stays beside it. Three boards, three states — `– 26` at rest with no rule on it, this one, and `– 30` for the question. The window used to be printed under the buttons at all times, which put a rule about undoing an order on a screen where nothing had been ordered."
+    },
+    {
+      "seed": "map",
+      "flutter_golden": "test/goldens/seed/map_ar_375x812.png",
+      "xd": {
+        "name": "الخريطة",
+        "manifest_id": "c7c0fa98-31f7-46f8-9793-4202c32c9d2b",
+        "artboard_path": "artwork/artboard-319ef7c4-0b83-45c4-8ccb-3eb6351fb132",
+        "width": 375,
+        "height": 810
+      },
+      "normalization": "extend_final_row_to_812",
+      "semantic_reason": "The nearby map. Built with one documented departure: a golden environment has no network, so the tile layer draws its own background instead of the streets the board shows. Everything the app puts over that ground - the search field, the shop chips, the pins with their name labels, the user position, the recentre control and the attribution - is measured."
     }
   ]
 }
