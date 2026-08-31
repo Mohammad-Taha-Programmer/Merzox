@@ -1263,6 +1263,7 @@ and that the report follows this file's order exactly.
 | `merchant_product_filter` | `test/goldens/seed/merchant_product_filter_ar_375x812.png` | `الرئيسية – 16` | `94b228cf-ae93-42f6-9264-6c61e0337d20` | 375 x 808 | `extend_final_row_to_812` |
 | `merchant_product_images` | `test/goldens/seed/merchant_product_images_ar_375x812.png` | `الرئيسية – 14` | `99b9e7b0-ec6e-49bf-9282-ec29f2793cc3` | 375 x 1009 | `crop_top_to_812` |
 | `store_settings_closed` | `test/goldens/seed/store_settings_closed_ar_375x812.png` | `اعدادات المتجر` | `4c608328-df08-4187-ae3a-9d849332167a` | 375 x 807 | `extend_final_row_to_812` |
+| `map` | `test/goldens/seed/map_ar_375x812.png` | `الخريطة` | `c7c0fa98-31f7-46f8-9793-4202c32c9d2b` | 375 x 810 | `extend_final_row_to_812` |
 | `chat_empty` | `test/goldens/seed/chat_empty_ar_375x812.png` | `تفاصيل المتجر – 18` | `b81ea3ec-9c49-4b2f-b386-d3a04cab8d62` | 375 x 805 | `extend_final_row_to_812` |
 | `chat_storefront` | `test/goldens/seed/chat_storefront_ar_375x812.png` | `تفاصيل المتجر – 20` | `f279de6a-80b5-4f99-b5f1-db80a20ea94a` | 375 x 805 | `extend_final_row_to_812` |
 | `checkout_cancel` | `test/goldens/seed/checkout_cancel_ar_375x812.png` | `تفاصيل المتجر – 30` | `b4af8a63-e4d2-44fa-9f9b-09f8e7482422` | 375 x 808 | `extend_final_row_to_812` |
@@ -1342,6 +1343,7 @@ a *different* uuid from the manifest id):
 | `merchant_product_menu` | `artwork/artboard-f72f1e4b-bae1-4439-9ea5-ad83fbd4b20a` |
 | `merchant_product_filter` | `artwork/artboard-26470fcb-ac25-47b7-9087-401627a1b8bb` |
 | `merchant_product_images` | `artwork/artboard-434bb904-38e9-48de-bbbb-d02b8da24f02` |
+| `map` | `artwork/artboard-319ef7c4-0b83-45c4-8ccb-3eb6351fb132` |
 | `store_settings_closed` | `artwork/artboard-0c361447-1919-45e7-a177-a5baa10f9401` |
 | `chat_empty` | `artwork/artboard-ea9279d7-1a37-4839-b5e9-c43c335c1c83` |
 | `chat_storefront` | `artwork/artboard-912a5591-8704-4951-902f-7fd9c17fb286` |
