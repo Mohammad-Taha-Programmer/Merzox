@@ -4,6 +4,8 @@ import 'package:merzox/services/push_service.dart';
 import 'package:merzox/services/realtime_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:merzox/core/auth/secure_token_store.dart';
+
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -17,7 +19,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static const String emailKey = 'auth_user_email';
   static const String phoneKey = 'auth_user_phone';
   static const String genderKey = 'auth_user_gender';
-  static const String tokenKey = 'auth_access_token';
+
+  /// Where the token used to be kept. It is written nowhere now - only
+  /// [SecureTokenStore] holds one - and the name survives so migration and the
+  /// tests that pin it can still name the old place.
+  static const String tokenKey = SecureTokenStore.legacyPreferencesKey;
   static const String userIdKey = 'auth_user_id';
   static const String locationPermissionGrantedKey =
       'auth_location_permission_granted';
@@ -235,7 +241,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await prefs.setBool(sessionKey, false);
     await prefs.remove(rememberSessionKey);
     await prefs.remove(_legacyGuestKey);
-    await prefs.remove(tokenKey);
+    await const SecureTokenStore().clear();
     await prefs.remove(userIdKey);
     await prefs.remove(nameKey);
     await prefs.remove(addressKey);
@@ -258,7 +264,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_legacyGuestKey);
     await prefs.setBool(rememberSessionKey, rememberMe);
-    await prefs.setString(tokenKey, auth.token);
+    await const SecureTokenStore().write(auth.token);
     await prefs.setString(userIdKey, auth.user.id);
     await prefs.setString(nameKey, auth.user.name);
     await prefs.setString(addressKey, auth.user.address);

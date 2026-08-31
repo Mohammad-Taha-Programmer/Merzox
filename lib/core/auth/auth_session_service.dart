@@ -1,5 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'secure_token_store.dart';
+
 import '../../features/authentication/bloc/auth_bloc.dart';
 
 enum AuthSessionType { unauthenticated, customer, business }
@@ -16,7 +18,10 @@ final class AuthSessionSnapshot {
 }
 
 class AuthSessionService {
-  const AuthSessionService();
+  final SecureTokenStore _tokens;
+
+  const AuthSessionService({SecureTokenStore tokens = const SecureTokenStore()})
+    : _tokens = tokens;
 
   /// Reads the session for authenticated work during the current app run.
   ///
@@ -25,7 +30,7 @@ class AuthSessionService {
   /// whether the freshly authenticated user may use protected features now.
   Future<AuthSessionSnapshot> read() async {
     final prefs = await SharedPreferences.getInstance();
-    return _readFromPreferences(prefs);
+    return _readFromPreferences(prefs, await _tokens.read());
   }
 
   /// Resolves only a session that is allowed to survive a cold start.
@@ -43,7 +48,7 @@ class AuthSessionService {
       return const AuthSessionSnapshot(type: AuthSessionType.unauthenticated);
     }
 
-    return _readFromPreferences(prefs);
+    return _readFromPreferences(prefs, await _tokens.read());
   }
 
   /// Reports whether startup is about to purge a still-authenticated
@@ -59,14 +64,17 @@ class AuthSessionService {
       return false;
     }
 
-    return _readFromPreferences(prefs).isAuthenticated;
+    return _readFromPreferences(prefs, await _tokens.read()).isAuthenticated;
   }
 
-  AuthSessionSnapshot _readFromPreferences(SharedPreferences prefs) {
+  /// The session flag stays in preferences; only the token moved.
+  AuthSessionSnapshot _readFromPreferences(
+    SharedPreferences prefs,
+    String? token,
+  ) {
     final sessionActive = prefs.getBool(AuthBloc.sessionKey) ?? false;
-    final token = prefs.getString(AuthBloc.tokenKey)?.trim();
 
-    if (!sessionActive || token == null || token.isEmpty) {
+    if (!sessionActive || token == null || token.trim().isEmpty) {
       return const AuthSessionSnapshot(type: AuthSessionType.unauthenticated);
     }
 
@@ -75,7 +83,7 @@ class AuthSessionService {
       type: userType == 'business'
           ? AuthSessionType.business
           : AuthSessionType.customer,
-      token: token,
+      token: token.trim(),
     );
   }
 }

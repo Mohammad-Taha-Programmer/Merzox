@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/core/startup/startup_destination.dart';
 import 'package:merzox/core/startup/startup_service.dart';
+import 'package:merzox/core/auth/secure_token_store.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/bloc/auth_event.dart';
 import 'package:merzox/features/authentication/bloc/auth_state.dart';
@@ -89,7 +90,7 @@ void main() {
 
       expect(prefs.getBool(AuthBloc.sessionKey), isTrue);
       expect(prefs.getBool(AuthBloc.rememberSessionKey), isFalse);
-      expect(prefs.getString(AuthBloc.tokenKey), 'session-token');
+      expect(await const SecureTokenStore().read(), 'session-token');
       expect(prefs.getString(AuthBloc.userIdKey), 'user-1');
 
       final currentRunSession = await const AuthSessionService().read();
@@ -112,7 +113,7 @@ void main() {
 
       expect(prefs.getBool(AuthBloc.sessionKey), isFalse);
       expect(prefs.getBool(AuthBloc.rememberSessionKey), isNull);
-      expect(prefs.getString(AuthBloc.tokenKey), isNull);
+      expect(await const SecureTokenStore().read(), isNull);
       expect(prefs.getString(AuthBloc.userIdKey), isNull);
       expect(prefs.getString(AuthBloc.nameKey), isNull);
       expect(prefs.getString(AuthBloc.addressKey), isNull);
@@ -133,7 +134,7 @@ void main() {
     final beforeStartup = await SharedPreferences.getInstance();
     expect(beforeStartup.getBool(AuthBloc.sessionKey), isTrue);
     expect(beforeStartup.getBool(AuthBloc.rememberSessionKey), isTrue);
-    expect(beforeStartup.getString(AuthBloc.tokenKey), 'session-token');
+    expect(await const SecureTokenStore().read(), 'session-token');
 
     final destination = await StartupService().initialize();
 
@@ -142,7 +143,7 @@ void main() {
     final afterStartup = await SharedPreferences.getInstance();
     expect(afterStartup.getBool(AuthBloc.sessionKey), isTrue);
     expect(afterStartup.getBool(AuthBloc.rememberSessionKey), isTrue);
-    expect(afterStartup.getString(AuthBloc.tokenKey), 'session-token');
+    expect(await const SecureTokenStore().read(), 'session-token');
   });
 
   test('checked business login survives as business startup', () async {
@@ -173,7 +174,10 @@ void main() {
     expect(destination, StartupDestination.home);
 
     final prefs = await SharedPreferences.getInstance();
-    expect(prefs.getString(AuthBloc.tokenKey), 'legacy-token');
+    // Written by a build that kept the token in preferences. Startup moved it
+    // into secure storage rather than treating the account as signed out.
+    expect(await const SecureTokenStore().read(), 'legacy-token');
+    expect(prefs.getString(SecureTokenStore.legacyPreferencesKey), isNull);
     expect(prefs.getBool(AuthBloc.rememberSessionKey), isNull);
   });
 

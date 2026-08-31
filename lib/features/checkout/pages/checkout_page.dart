@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:merzox/core/auth/secure_token_store.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/constants/money.dart';
 import 'package:merzox/services/api_service.dart';
@@ -232,7 +233,7 @@ class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
 
   Future<void> _load() async {
     final SharedPreferences prefs = await SharedPreferences.getInstance();
-    final String token = prefs.getString(AuthBloc.tokenKey)?.trim() ?? '';
+    final String token = await const SecureTokenStore().read() ?? '';
     final String legacy = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
     final String name = prefs.getString(AuthBloc.nameKey)?.trim() ?? '';
 
