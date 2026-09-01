@@ -1529,6 +1529,9 @@ documents, so it needs neither `design.xd` nor a Flutter toolchain.
 python -m unittest discover -s tools/xd_reference/tests -p 'test_*.py' -v
 ```
 
+The same hermetic suite runs as the `XD tooling` job in GitHub Actions
+for every pull request and every push to `main`.
+
 New in I2-R1:
 
 - `pattern_scale_behavior_counts` — e.g. `{"fill": 1}`, keyed by the raw XD

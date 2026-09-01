@@ -66,7 +66,7 @@ language-aware sharing payloads are generated in Arabic or English at runtime.
 - Responsive Android and iOS UI based on the supplied Adobe XD designs.
 - Local session persistence and configurable API endpoints.
 - GitHub Actions CI verifies pull requests and pushes to `main` with Flutter,
-  backend, and disposable-MongoDB integration test jobs.
+  hermetic XD tooling, backend, and disposable-MongoDB integration test jobs.
 
 ## Technology
 
@@ -213,6 +213,12 @@ flutter analyze
 flutter test
 ```
 
+Run the hermetic XD reference tooling tests:
+
+```powershell
+python -m unittest discover -s tools/xd_reference/tests -p 'test_*.py' -v
+```
+
 Run backend syntax checks and model tests:
 
 ```powershell
@@ -286,8 +292,7 @@ owner decisions, accounts, credentials, commercial relationships, or hardware.
 Both groups are recorded below so neither is mistaken for completed work.
 
 - Finish repository-owned release preparation: add a production database index
-  plan/apply command, run the XD tooling tests in CI, and keep documentation
-  synchronized with tested behavior.
+  plan/apply command and keep documentation synchronized with tested behavior.
 - Finalize the permanent mobile application identity, Firebase platform
   registrations/APNs setup, and production activation of the already implemented
   realtime and background push transport.

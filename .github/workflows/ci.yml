@@ -48,6 +48,33 @@ jobs:
       - name: Run Flutter tests
         run: flutter test --no-pub
 
+  xd-tooling:
+    name: XD tooling
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Show Python toolchain
+        run: python --version
+
+      - name: Run hermetic XD tooling tests
+        run: |
+          python -m unittest discover \
+            -s tools/xd_reference/tests \
+            -p 'test_*.py' \
+            -v
+
   backend:
     name: Backend
     runs-on: ubuntu-latest
