@@ -227,7 +227,12 @@ npm run check
 npm test
 ```
 
-GitHub Actions automatically verifies pull requests and pushes to `main`. The workflow runs Flutter formatting, analysis, and tests; backend syntax checks and standard tests; and the authorization and checkout/inventory integration suites against disposable loopback MongoDB databases. If either integration suite reports `SKIPPED`, the integration job fails.
+GitHub Actions automatically verifies pull requests and pushes to `main`. The
+workflow runs Flutter formatting, analysis, and tests; hermetic XD tooling tests;
+backend syntax checks and standard tests; and the authorization,
+checkout/inventory, and index-management integration suites against disposable
+loopback MongoDB databases. If any integration suite reports `SKIPPED`, the
+integration job fails.
 
 Build an Android debug APK:
 
@@ -286,13 +291,11 @@ review, production secret management, monitoring, backups, or dependency audits.
 
 ## Roadmap
 
-The remaining work falls into two groups: repository-owned preparation that can
-still be implemented and tested here, and production activation that requires
-owner decisions, accounts, credentials, commercial relationships, or hardware.
-Both groups are recorded below so neither is mistaken for completed work.
+The repository-owned XD-CI and MongoDB index-management preparation is now
+implemented and tested. The remaining roadmap is primarily production activation
+that requires owner decisions, accounts, credentials, commercial relationships,
+deployment evidence, or real hardware.
 
-- Finish repository-owned release preparation: add a production database index
-  plan/apply command and keep documentation synchronized with tested behavior.
 - Finalize the permanent mobile application identity, Firebase platform
   registrations/APNs setup, and production activation of the already implemented
   realtime and background push transport.
@@ -419,23 +422,28 @@ widgets, with the key supplied as a build-time define rather than committed.
 
 ### 7. Production database indexes are not created by the application
 
-**State.** `backend/src/config/database.js` sets `autoIndex` to false in
-production, which is correct — an index build on a live collection is not
-something an application should start on boot. No migration script exists, so
-nothing creates them either.
+**State.** `backend/src/config/database.js` keeps `autoIndex` disabled in
+production, so application startup never initiates a live index build. The
+repository now provides deterministic `plan`, read-only `check`, and explicitly
+approved create-only `apply` commands. Unit tests cover the safety policy, and
+CI exercises the real Mongoose lifecycle against disposable MongoDB.
 
 **Why it matters concretely.** The business text index is one of them. Search
 falls back to a scan when it is absent — that fallback was added after a review
 found the missing index returning `500` — but a fallback is not a substitute
 for the index at any real catalogue size.
 
-**Repository work still required.** Add a fail-closed, idempotent index command
-that can print the expected plan without connecting, compare expected and actual
-indexes, and apply only explicitly approved changes. Cover it with unit tests
-and document its release usage before production credentials are supplied.
+**Repository preparation completed.** `npm run indexes:plan` prints the expected
+54-index plan without connecting. `npm run indexes:check` reports drift without
+mutation. `npm run indexes:apply` requires the exact reviewed SHA-256 plan ID and
+an explicit opt-in, refuses every proposed drop, creates only missing indexes,
+and verifies the result. The release sequence is documented in
+`backend/README.md`.
 
-**Needed from the owner after that.** A production MongoDB URI and authorization
-for the operator who will review the plan and run the one-time apply step.
+**Needed from the owner.** A production MongoDB URI and authorization for the
+operator who will review the generated plan and check output, approve the exact
+plan ID, run the one-time create-only apply step, and retain a clean post-check
+as deployment evidence.
 
 ### 8. Production email and deployment configuration
 
@@ -481,12 +489,12 @@ one item on this list that no amount of repository work can substitute for.
 
 Two things that look like blockers are not.
 
-The **integration suites** — the cross-account authorization matrix and the
-oversell, idempotency and crash-recovery suite — need a real MongoDB, and skip
-without one. They are not blocked: `.github/workflows/ci.yml` runs both against
-a `mongo:8.0` service on every push. What is missing is only a local database
-on a particular developer's machine, and the skip message names exactly which
-variable is unset.
+The **integration suites** — the cross-account authorization matrix, the
+oversell/idempotency/crash-recovery suite, and the real Mongoose index lifecycle
+suite — need a real MongoDB and skip without one. They are not blocked:
+`.github/workflows/ci.yml` runs all three against a `mongo:8.0` service on every
+push. What may be missing is only a local disposable database on a particular
+developer's machine, and each skip message names the exact disabled gate.
 
 The **map board** was recorded for a long time as impossible to capture. It was
 not; the diagnosis was wrong twice. It is measured now, and
@@ -544,8 +552,8 @@ explicitly supply the production Firebase dart-defines.
 
 Merzox is currently a development-stage product. Store identifiers, payment
 credentials, production SMTP credentials, deployment URLs, privacy documents,
-and final legal content must be supplied before public release. *What cannot be
-finished from inside this repository* lists each of these with its current
+and final legal content must be supplied before public release. *What still
+needs owner decisions or production access* lists each boundary with its current
 state, what is missing, and what changes once it arrives.
 
 ### Development CLI safety

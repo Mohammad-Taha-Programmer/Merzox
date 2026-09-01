@@ -241,6 +241,56 @@ Products are soft-deleted so historical orders remain intact. Owner order status
 changes must follow `pending -> confirmed -> preparing -> outForDelivery -> delivered`;
 the owner may cancel before delivery where the API permits it.
 
+## MongoDB index management
+
+Production disables Mongoose automatic index creation. Merzox therefore provides
+an explicit, fail-closed release command with three modes.
+
+`npm run indexes:plan` builds the deterministic schema plan without requiring or
+opening a database connection. Its JSON output includes the model count, index
+count, full expected definitions, and a SHA-256 `planId`.
+
+`npm run indexes:check` connects with `autoIndex=false` and `autoCreate=false`,
+compares the reviewed model definitions with the selected database, and performs
+no index mutation. Exit code `0` means clean; exit code `2` means drift exists.
+The JSON report separates missing definitions in `toCreate` from unexpected
+existing names in `toDrop`.
+
+`npm run indexes:apply` is denied unless both approval variables are exact:
+
+    MERZOX_ALLOW_INDEX_APPLY=true
+    MERZOX_INDEX_PLAN_ID=<the exact reviewed sha256 plan id>
+
+Approval is validated before any connection attempt. Apply refuses the entire
+operation if the comparison proposes even one index drop. It never calls
+`syncIndexes`, `dropIndex`, or `dropIndexes`; it calls `createIndexes` only for
+collections with missing definitions and then performs a second comparison. Any
+remaining drift makes the command fail.
+
+Recommended release sequence:
+
+1. Supply `MONGODB_URI` through the deployment secret mechanism; never commit it.
+2. Run `npm run indexes:plan` and archive the reviewed output outside the
+   repository.
+3. Run `npm run indexes:check`. Review every `toCreate` and `toDrop` entry.
+4. If any `toDrop` entry exists, stop and investigate manually. Apply will refuse.
+5. Set the exact opt-in and exact reviewed `planId`, then run
+   `npm run indexes:apply`.
+6. Run `npm run indexes:check` again and retain its clean result as release
+   evidence.
+
+PowerShell example after securely supplying the production URI:
+
+    npm run indexes:plan
+    npm run indexes:check
+    $env:MERZOX_ALLOW_INDEX_APPLY = "true"
+    $env:MERZOX_INDEX_PLAN_ID = "<reviewed sha256 plan id>"
+    npm run indexes:apply
+    npm run indexes:check
+
+CLI error output is bounded to safe error class/code fields. The URI, raw error
+message, stack trace, and credentials are never printed by the index command.
+
 ## Development CLI safety
 
 The seed and SMTP diagnostic scripts remain human-facing CLI utilities rather
