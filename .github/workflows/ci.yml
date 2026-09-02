@@ -183,6 +183,7 @@ jobs:
           cat > "$RUNNER_TEMP/expected-integration-tests.txt" <<'EOF'
           test/integration/authorization.matrix.test.js
           test/integration/checkout.inventory.test.js
+          test/integration/index-management.test.js
           EOF
 
           find test/integration \
@@ -210,6 +211,7 @@ jobs:
           const checks = [
             ['authorization', resolveIntegrationEnvironment()],
             ['inventory', resolveIntegrationDatabase()],
+            ['indexes', resolveIntegrationDatabase()],
           ];
 
           let failed = false;
@@ -305,6 +307,30 @@ jobs:
           fi
 
           echo "Inventory integration executed without a skip."
+
+      - name: Run index-management integration against disposable MongoDB
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TEST_LOG="$RUNNER_TEMP/merzox-index-management-test.log"
+
+          node \
+            --test \
+            --test-reporter=spec \
+            test/integration/index-management.test.js |
+            tee "$TEST_LOG"
+
+          if grep -Fq 'INTEGRATION_INDEXES=SKIPPED' "$TEST_LOG"; then
+            echo "Index-management integration reported SKIPPED."
+            exit 1
+          fi
+
+          grep -Fq \
+            'INTEGRATION_INDEXES=EXECUTED' \
+            "$TEST_LOG"
+
+          echo "Index-management integration executed without a skip."
 
       - name: Show authorization API log on failure
         if: failure()
