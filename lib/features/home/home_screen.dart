@@ -677,7 +677,7 @@ class _HomeTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       // 48..84 on the artboard, over a 44 status bar.
-      height: 36,
+      height: 44,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -790,8 +790,9 @@ class _MerchantEnrollmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      // 602..752 on the artboard.
-      height: 150,
+      // Extra vertical room prevents the enrollment content from
+      // overflowing on physical 375px devices.
+      height: 154,
       decoration: BoxDecoration(
         color: MerzoxColors.kColor3D5A80,
         borderRadius: BorderRadius.circular(8),
@@ -834,6 +835,9 @@ class _MerchantEnrollmentCard extends StatelessWidget {
                     onPressed: onPressed,
                     style: FilledButton.styleFrom(
                       backgroundColor: MerzoxColors.kColorEE6C4D,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(6),
                       ),
@@ -999,7 +1003,7 @@ class _BusinessSection extends StatelessWidget {
               )
             else
               SizedBox(
-                height: 214,
+                height: 232,
                 child: ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   scrollDirection: Axis.horizontal,
@@ -1130,7 +1134,6 @@ class _BusinessCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    _BusinessIdBadge(id: business.displayId),
                     const SizedBox(height: 8),
                     _RatingStars(rating: business.rating),
                     const Spacer(),
@@ -1139,6 +1142,8 @@ class _BusinessCard extends StatelessWidget {
                         padding: const EdgeInsetsDirectional.only(end: 38),
                         child: Text(
                           _businessDistanceText(distance),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
                             color: MerzoxColors.kColor8D99AE,
@@ -1158,47 +1163,6 @@ class _BusinessCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _BusinessIdBadge extends StatelessWidget {
-  final String id;
-
-  const _BusinessIdBadge({required this.id});
-
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: AlignmentDirectional.centerStart,
-      child: Container(
-        height: 24,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          color: MerzoxColors.kColorF5F9FC,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: MerzoxColors.kColorDEEEF8),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          textDirection: TextDirection.ltr,
-          children: [
-            Text(
-              'ID:',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: MerzoxColors.kColor3D5A80,
-              ),
-            ),
-            const SizedBox(width: 3),
-            Text(
-              id,
-              style: const TextStyle(fontSize: 11, color: Color(0xFF2B2B2B)),
-            ),
-          ],
         ),
       ),
     );
