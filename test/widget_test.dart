@@ -75,6 +75,7 @@ final class _SignupMessageApiService extends ApiService {
 /// realtime/push wiring the authenticated branch performs.
 final class _RecordingLoginApiService extends ApiService {
   String? submittedIdentifier;
+  String? submittedPassword;
 
   @override
   Future<AuthApiResponse> login({
@@ -82,6 +83,7 @@ final class _RecordingLoginApiService extends ApiService {
     required String password,
   }) async {
     submittedIdentifier = identifier;
+    submittedPassword = password;
 
     throw StateError('login is observed, never completed, in this test');
   }
@@ -253,6 +255,96 @@ void main() {
     await tester.pump(const Duration(seconds: 5));
     await tester.pumpAndSettle();
   });
+
+  testWidgets(
+    'login normalizes a Palestinian local phone number before submission',
+    (tester) async {
+      final api = _RecordingLoginApiService();
+
+      await _pumpLocalized(
+        tester,
+        home: BlocProvider(
+          create: (_) => AuthBloc(apiService: api),
+          child: LoginPage(
+            onAuthenticated: () {},
+            onBrowseAsGuest: () {},
+            onSignupRequested: () {},
+            onForgotPasswordRequested: () {},
+          ),
+        ),
+      );
+
+      final countryDropdown = find.byWidgetPredicate(
+        (widget) => widget is DropdownButton,
+      );
+
+      expect(countryDropdown, findsOneWidget);
+
+      await tester.tap(countryDropdown);
+      await tester.pumpAndSettle();
+
+      expect(find.text('+970'), findsWidgets);
+
+      await tester.tap(find.text('+970').last);
+      await tester.pumpAndSettle();
+
+      await tester.enterText(find.byType(TextFormField).first, '0599000001');
+
+      await tester.enterText(find.byType(TextFormField).last, 'MerzoxD5_2026');
+
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'تسجيل الدخول'));
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(api.submittedIdentifier, '+970599000001');
+
+      expect(api.submittedPassword, 'MerzoxD5_2026');
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'login preserves an already international Palestinian phone number',
+    (tester) async {
+      final api = _RecordingLoginApiService();
+
+      await _pumpLocalized(
+        tester,
+        home: BlocProvider(
+          create: (_) => AuthBloc(apiService: api),
+          child: LoginPage(
+            onAuthenticated: () {},
+            onBrowseAsGuest: () {},
+            onSignupRequested: () {},
+            onForgotPasswordRequested: () {},
+          ),
+        ),
+      );
+
+      await tester.enterText(find.byType(TextFormField).first, '+970599000001');
+
+      await tester.enterText(find.byType(TextFormField).last, 'MerzoxD5_2026');
+
+      await tester.pump();
+
+      await tester.tap(find.widgetWithText(FilledButton, 'تسجيل الدخول'));
+
+      await tester.pump();
+      await tester.pump();
+
+      expect(api.submittedIdentifier, '+970599000001');
+
+      expect(api.submittedPassword, 'MerzoxD5_2026');
+
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('login renders localized English auth and guest actions', (
     tester,
