@@ -7,6 +7,7 @@ import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/bloc/auth_event.dart';
 import 'package:merzox/features/authentication/bloc/auth_state.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/realtime_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _SuccessfulLoginApi extends ApiService {
@@ -43,6 +44,19 @@ class _SuccessfulLoginApi extends ApiService {
   }
 }
 
+final class _FailingRealtimeController implements RealtimeSessionController {
+  int syncCalls = 0;
+
+  @override
+  Future<void> syncWithSession() async {
+    syncCalls += 1;
+    throw StateError('realtime temporarily unavailable');
+  }
+
+  @override
+  Future<void> disconnect() async {}
+}
+
 Future<AuthState> _performLogin({
   required bool rememberMe,
   String password = 'secret-123',
@@ -71,6 +85,46 @@ Future<AuthState> _performLogin({
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test(
+    'successful phone login survives realtime synchronization failure',
+    () async {
+      SharedPreferences.setMockInitialValues({'onboarding_completed': true});
+
+      final realtimeController = _FailingRealtimeController();
+
+      final bloc = AuthBloc(
+        apiService: _SuccessfulLoginApi(),
+        realtimeSessionController: realtimeController,
+      );
+
+      bloc.add(
+        const LoginSubmitted(
+          identifier: '+970599000001',
+          password: 'secret-123',
+          rememberMe: true,
+        ),
+      );
+
+      final result = await bloc.stream.firstWhere(
+        (state) =>
+            state.status == AuthStatus.authenticated ||
+            state.status == AuthStatus.failure,
+      );
+
+      expect(result.status, AuthStatus.authenticated);
+
+      expect(realtimeController.syncCalls, 1);
+
+      final prefs = await SharedPreferences.getInstance();
+
+      expect(prefs.getBool(AuthBloc.sessionKey), isTrue);
+
+      expect(await const SecureTokenStore().read(), 'session-token');
+
+      await bloc.close();
+    },
+  );
 
   test(
     'unchecked login is authenticated now but is purged before cold-start routing',

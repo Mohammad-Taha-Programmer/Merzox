@@ -224,8 +224,16 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
 
   Future<void> _syncRealtimeSession() async {
     final controller = _realtimeSessionController;
-    if (controller != null) {
+
+    if (controller == null) {
+      return;
+    }
+
+    try {
       await controller.syncWithSession();
+    } catch (_) {
+      // Realtime is best-effort and must never convert a valid login
+      // into an authentication failure.
     }
   }
 
