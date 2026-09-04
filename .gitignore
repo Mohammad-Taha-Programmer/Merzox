@@ -58,3 +58,7 @@ backend/**/*google-credential*.json
 
 # Flutter golden comparison failure artefacts (diagnostic output, never source)
 test/golden/failures/
+
+# Gradle writes its reports here; only the root /build/ was ignored, so a
+# build left an untracked HTML report in every status.
+android/build/

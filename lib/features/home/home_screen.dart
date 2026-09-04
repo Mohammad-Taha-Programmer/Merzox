@@ -37,6 +37,8 @@ import 'package:merzox/core/constants/money.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../authentication/bloc/auth_bloc.dart';
+import 'widgets/business_id_badge.dart';
+import 'widgets/business_rating_stars.dart';
 import 'widgets/feature_bottom_navigation_bar.dart'
     show MerzoxNavIndicator, kMerzoxNavIndicatorGap;
 import 'widgets/home_promo_carousel.dart';
@@ -1005,7 +1007,16 @@ class _BusinessSection extends StatelessWidget {
               SizedBox(
                 height: 232,
                 child: ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  // The vertical inset is the card's shadow, not decoration.
+                  // A horizontal list clips to its own height, and the card
+                  // filled that height exactly, so the shadow was cut off
+                  // above and below while the sides showed - the card looked
+                  // lit from the sides only. Five pixels of room inside the
+                  // clip is enough for a radius-3 blur to finish.
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 5,
+                  ),
                   scrollDirection: Axis.horizontal,
                   itemBuilder: (context, index) {
                     final business = businesses[index];
@@ -1048,120 +1059,170 @@ class _BusinessCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
+      key: ValueKey<String>('business-card-${business.id}'),
       width: width,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: MerzoxColors.kColorEFEFEF),
-          boxShadow: [
+          // Measured off the card in `المتاجر`: a 164x208 rect whose only edge
+          // treatment is one drop shadow, `#4e4e4e` at 7.8% with no offset.
+          // Centred is the point - the board's shadow rings the whole card,
+          // while this one used to be pushed 4px down, so it read as a shelf
+          // under the card rather than an edge around it.
+          //
+          // The radius is XD's own: the exporter writes SVG sigma as half the
+          // shadow radius, so the sigma of 1.5 in the export is a radius of 3,
+          // and Flutter's `blurRadius` is the same artist-facing measure.
+          //
+          // The opacity is deliberately above the board's 7.8%. At the size the
+          // board is read on a screen that value is all but invisible, and the
+          // shadow is the only thing giving this card an edge, so it was raised
+          // to 16% on request. The goldens cannot judge it either way: the test
+          // renderer does not apply a mask blur, so a shadow reaches them as a
+          // hairline whatever its radius.
+          boxShadow: <BoxShadow>[
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
+              color: const Color(0xFF4E4E4E).withValues(alpha: 0.16),
+              blurRadius: 3,
             ),
           ],
         ),
-        child: InkWell(
+        child: ClipRRect(
           borderRadius: BorderRadius.circular(8),
-          onTap: () => _openBusinessProfile(context, business),
-          child: Stack(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Stack(
-                      children: [
-                        Container(
-                          height: 72,
-                          decoration: BoxDecoration(
-                            color: Color(business.colorValue),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Center(
-                            child: Icon(
-                              Icons.storefront_rounded,
-                              size: 34,
-                              color: MerzoxColors.kColor3D5A80,
-                            ),
+          child: Material(
+            color: Colors.white,
+            child: InkWell(
+              onTap: () => _openBusinessProfile(context, business),
+              child: LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints constraints) {
+                  final double cardHeight = constraints.maxHeight.isFinite
+                      ? constraints.maxHeight
+                      : 224;
+
+                  final double cardWidth = constraints.maxWidth.isFinite
+                      ? constraints.maxWidth
+                      : width ?? 164;
+
+                  // The XD card dedicates a little over half of its height
+                  // to the merchant logo.
+                  final double logoHeight = cardHeight * 0.55;
+
+                  final double badgeWidth = cardWidth < 190 ? 82 : 98;
+                  final double ratingWidth = (cardWidth - badgeWidth - 20)
+                      .clamp(60, 92)
+                      .toDouble();
+
+                  return Stack(
+                    fit: StackFit.expand,
+                    children: <Widget>[
+                      PositionedDirectional(
+                        top: 0,
+                        start: 0,
+                        end: 0,
+                        height: logoHeight,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                          child: _BusinessLogo(
+                            businessId: business.id,
+                            logoUrl: business.logoUrl,
                           ),
                         ),
-                        if (business.discount != null)
-                          PositionedDirectional(
-                            top: 6,
-                            start: 6,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
-                              ),
+                      ),
+                      if (business.discount case final discount?)
+                        PositionedDirectional(
+                          top: 8,
+                          start: 8,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: cardWidth * 0.58,
+                            ),
+                            child: DecoratedBox(
                               decoration: BoxDecoration(
                                 color: MerzoxColors.kColorEE6C4D,
-                                borderRadius: BorderRadius.circular(6),
+                                borderRadius: BorderRadius.circular(5),
                               ),
-                              child: Text(
-                                business.discount!,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 7,
+                                  vertical: 3,
+                                ),
+                                child: Text(
+                                  discount,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 9),
-                    Text(
-                      business.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      business.category,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: MerzoxColors.kColor767676,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    const SizedBox(height: 8),
-                    _RatingStars(rating: business.rating),
-                    const Spacer(),
-                    if (business.distanceMeters case final distance?)
-                      Padding(
-                        padding: const EdgeInsetsDirectional.only(end: 38),
-                        child: Text(
-                          _businessDistanceText(distance),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: MerzoxColors.kColor8D99AE,
+                        ),
+                      PositionedDirectional(
+                        top: logoHeight + 6,
+                        start: 10,
+                        end: 10,
+                        bottom: 76,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.center,
+                          child: Text(
+                            business.name,
+                            maxLines: 1,
+                            softWrap: false,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFF2B2B2B),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
                           ),
                         ),
                       ),
-                  ],
-                ),
+                      PositionedDirectional(
+                        start: 9,
+                        bottom: 50,
+                        width: ratingWidth,
+                        height: 22,
+                        child: Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: BusinessRatingStars(
+                            rating: business.rating,
+                            ratingCount: business.ratingCount,
+                          ),
+                        ),
+                      ),
+                      PositionedDirectional(
+                        end: 0,
+                        bottom: 49,
+                        width: badgeWidth,
+                        height: 26,
+                        child: BusinessIdBadge(
+                          id: business.displayId,
+                          dialogTitle: 'home.businessId.title'.tr(),
+                          copyLabel: 'home.businessId.copy'.tr(),
+                          copiedMessage: 'home.businessId.copied'.tr(),
+                          closeLabel: 'home.businessId.close'.tr(),
+                          tapHint: 'home.businessId.tapHint'.tr(),
+                        ),
+                      ),
+                      PositionedDirectional(
+                        start: 0,
+                        bottom: 0,
+                        child: _BusinessInteractionCorner(
+                          followed: followed,
+                          onPressed: onFollowPressed,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
-              PositionedDirectional(
-                bottom: 8,
-                start: 8,
-                child: _FollowButton(
-                  followed: followed,
-                  onPressed: onFollowPressed,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1169,32 +1230,103 @@ class _BusinessCard extends StatelessWidget {
   }
 }
 
-class _RatingStars extends StatelessWidget {
-  final double rating;
+class _BusinessLogo extends StatelessWidget {
+  final String businessId;
+  final String logoUrl;
 
-  const _RatingStars({required this.rating});
+  const _BusinessLogo({required this.businessId, required this.logoUrl});
 
   @override
   Widget build(BuildContext context) {
-    final roundedRating = rating.round().clamp(0, 5);
+    final String normalizedUrl = logoUrl.trim();
 
-    return Row(
-      children: [
-        ...List.generate(5, (index) {
-          return Icon(
-            index < roundedRating
-                ? Icons.star_rounded
-                : Icons.star_outline_rounded,
-            size: 15,
-            color: MerzoxColors.kColorFBB300,
-          );
-        }),
-        const SizedBox(width: 4),
-        Text(
-          rating.toStringAsFixed(1),
-          style: const TextStyle(fontSize: 11, color: Color(0xFF2B2B2B)),
+    if (normalizedUrl.isEmpty) {
+      return _BusinessLogoPlaceholder(businessId: businessId);
+    }
+
+    return Image.network(
+      normalizedUrl,
+      key: ValueKey<String>('business-logo-$businessId'),
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      loadingBuilder:
+          (
+            BuildContext context,
+            Widget child,
+            ImageChunkEvent? loadingProgress,
+          ) {
+            if (loadingProgress == null) {
+              return child;
+            }
+
+            return const ColoredBox(
+              color: Colors.white,
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 1.6),
+                ),
+              ),
+            );
+          },
+      errorBuilder:
+          (BuildContext context, Object error, StackTrace? stackTrace) {
+            return _BusinessLogoPlaceholder(businessId: businessId);
+          },
+    );
+  }
+}
+
+class _BusinessLogoPlaceholder extends StatelessWidget {
+  final String businessId;
+
+  const _BusinessLogoPlaceholder({required this.businessId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        key: ValueKey<String>('business-logo-placeholder-$businessId'),
+        width: 64,
+        height: 64,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: MerzoxColors.kColorDEEEF8,
+          borderRadius: BorderRadius.circular(12),
         ),
-      ],
+        child: Icon(
+          Icons.storefront_rounded,
+          size: 34,
+          color: MerzoxColors.kColor3D5A80,
+        ),
+      ),
+    );
+  }
+}
+
+class _BusinessInteractionCorner extends StatelessWidget {
+  final bool followed;
+  final VoidCallback onPressed;
+
+  const _BusinessInteractionCorner({
+    required this.followed,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      width: 56,
+      height: 46,
+      decoration: BoxDecoration(
+        color: followed ? MerzoxColors.kColorCBE0EC : MerzoxColors.kColor98C1D9,
+        borderRadius: const BorderRadiusDirectional.only(
+          topEnd: Radius.circular(27),
+        ),
+      ),
+      child: _FollowButton(followed: followed, onPressed: onPressed),
     );
   }
 }
@@ -1207,30 +1339,30 @@ class _FollowButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: followed ? 'home.unfollow'.tr() : 'home.follow'.tr(),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: 34,
-          height: 34,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: followed
-                ? MerzoxColors.kColorFEE3DC
-                : MerzoxColors.kColorF5F9FC,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: followed
-                  ? MerzoxColors.kColorEE6C4D
-                  : MerzoxColors.kColorDEEEF8,
+    final String label = followed ? 'home.unfollow'.tr() : 'home.follow'.tr();
+
+    return Semantics(
+      button: true,
+      toggled: followed,
+      label: label,
+      child: Tooltip(
+        message: label,
+        child: Material(
+          type: MaterialType.transparency,
+          child: InkWell(
+            onTap: onPressed,
+            customBorder: const CircleBorder(),
+            child: Center(
+              // The two states have to be told apart at a glance, and the
+              // pair was reading the same way round: both faces were fond
+              // ones, so the card looked equally pleased whether or not the
+              // shop was followed. Following is the warm face; not following
+              // is the flat one waiting to be won over.
+              child: Text(
+                followed ? '😍' : '😒',
+                style: const TextStyle(fontSize: 19),
+              ),
             ),
-          ),
-          child: Text(
-            followed ? '🥰' : '😔',
-            style: const TextStyle(fontSize: 18),
           ),
         ),
       ),
@@ -1352,18 +1484,6 @@ class _CatalogFailureState extends StatelessWidget {
       ),
     );
   }
-}
-
-String _businessDistanceText(int meters) {
-  if (meters < 1000) {
-    return 'map.distanceMeters'.tr(args: ['$meters']);
-  }
-
-  final kilometers = meters / 1000;
-  final value = kilometers >= 10
-      ? kilometers.toStringAsFixed(0)
-      : kilometers.toStringAsFixed(1);
-  return 'map.distanceKilometers'.tr(args: [value]);
 }
 
 class _PlainTabTitle extends StatelessWidget {

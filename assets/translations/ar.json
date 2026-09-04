@@ -61,6 +61,7 @@
     "loadError": "تعذر تحميل الطلبات. حاول مرة أخرى.",
     "checkoutSuccess": "تم إنشاء طلبك بنجاح",
     "checkoutError": "تعذر إنشاء الطلب. تحقق من العنوان والمنتجات ثم حاول مجدداً.",
+    "checkoutRejectedShape": "تعذّر إرسال الطلب بصيغته الحالية. حدّث التطبيق ثم أعد المحاولة.",
     "moreItems": "+{} منتجات",
     "checkoutOutOfStock": "أحد المنتجات لم يعد متوفراً",
     "checkoutInsufficientStock": "الكمية المطلوبة غير متوفرة",
@@ -549,6 +550,13 @@
     "businessFallback": "متجر"
   },
   "home": {
+    "businessId": {
+      "title": "معرّف المتجر",
+      "copy": "نسخ المعرّف",
+      "copied": "تم نسخ معرّف المتجر",
+      "close": "إغلاق",
+      "tapHint": "اضغط لعرض معرّف المتجر كاملاً"
+    },
     "defaultUser": "مستخدم Merzox",
     "locationPermission": {
       "title": "السماح باستخدام موقعك؟",
@@ -656,6 +664,7 @@
     "businessAccountRequired": "هذه الخطوة تتطلب حساب متجر.",
     "customerAccountRequired": "هذه الخطوة تتطلب حساب زبون.",
     "businessAlreadyExists": "هذا الحساب يملك متجراً بالفعل.",
+    "businessPublicIdUnavailable": "تعذر إنشاء رقم تعريف فريد للمتجر حالياً. حاول مرة أخرى.",
     "addressNotFound": "لم يُعثر على هذا العنوان.",
     "addressLimitReached": "لا يمكن حفظ أكثر من 10 عناوين.",
     "invalidAddressName": "اسم المستلم غير صالح.",

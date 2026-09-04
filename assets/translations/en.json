@@ -61,6 +61,7 @@
     "loadError": "Could not load your orders. Please try again.",
     "checkoutSuccess": "Your order was created successfully",
     "checkoutError": "Could not create the order. Check the address and products, then try again.",
+    "checkoutRejectedShape": "The order could not be sent in its current shape. Update the app and try again.",
     "moreItems": "+{} items",
     "checkoutOutOfStock": "One of the products is no longer in stock",
     "checkoutInsufficientStock": "The requested quantity is not available",
@@ -549,6 +550,13 @@
     "businessFallback": "Business"
   },
   "home": {
+    "businessId": {
+      "title": "Business identifier",
+      "copy": "Copy identifier",
+      "copied": "Business identifier copied",
+      "close": "Close",
+      "tapHint": "Tap to show the complete business identifier"
+    },
     "defaultUser": "Merzox user",
     "locationPermission": {
       "title": "Allow access to your location?",
@@ -656,6 +664,7 @@
     "businessAccountRequired": "This needs a business account.",
     "customerAccountRequired": "This needs a customer account.",
     "businessAlreadyExists": "This account already owns a business.",
+    "businessPublicIdUnavailable": "A unique business ID could not be created right now. Please try again.",
     "addressNotFound": "This address was not found.",
     "addressLimitReached": "You can keep at most 10 addresses.",
     "invalidAddressName": "The recipient name is invalid.",

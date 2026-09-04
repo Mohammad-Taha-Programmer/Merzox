@@ -1,5 +1,3 @@
-import crypto from 'node:crypto';
-
 import mongoose from 'mongoose';
 
 import { Business } from '../models/Business.js';
@@ -25,6 +23,9 @@ import {
   PRODUCT_VARIANT_ERRORS
 } from '../policies/product.policy.js';
 import { paginationParams } from '../policies/query.policy.js';
+import {
+  createBusinessWithUniquePublicId
+} from '../services/business-public-id.service.js';
 import { notifyOrderStatus } from '../services/notification.service.js';
 import {
   publishOrderTrackingChanged
@@ -37,12 +38,6 @@ import { normalizeIdentifier, normalizePhone } from '../utils/normalize.js';
 // shared policy now; these are lookup views over it.
 const orderStatuses = new Set(policyStatuses);
 const orderStatusGroups = new Set(policyStatusGroups);
-
-function createBusinessPublicId() {
-  const timePart = Date.now().toString(36).toUpperCase();
-  const randomPart = crypto.randomBytes(5).toString('hex').toUpperCase();
-  return `MXB-${timePart}-${randomPart}`;
-}
 
 async function findOwnedBusiness(req) {
   const business = await Business.findOne({ owner: req.user._id });
@@ -122,9 +117,8 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
     ];
   }
 
-  const business = new Business({
+  const business = await createBusinessWithUniquePublicId({
     owner: user._id,
-    publicId: createBusinessPublicId(),
     name: String(req.body.name).trim(),
     englishName: String(req.body.englishName ?? '').trim(),
     description: String(req.body.description ?? '').trim(),
@@ -139,8 +133,6 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
       }
     ]
   });
-
-  await business.save();
 
   try {
     user.userType = 'business';

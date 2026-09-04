@@ -40,6 +40,49 @@ function rejectCode(validator, body) {
 
 const VALID_ID = '64b000000000000000000001';
 
+/**
+ * The payload the Flutter client actually sends.
+ *
+ * `ApiService.createOrder` has always included `deliveryOption`, and the
+ * allowlist did not. Every order in the application was refused at the door
+ * with `INVALID_ORDER_FIELDS` - from the basket and from "buy now" alike -
+ * while the handler a few lines later read that very field to price the
+ * delivery. Nothing caught it because no test sent what the client sends.
+ */
+test('the order payload the client sends is accepted whole', () => {
+  accept(validateOrderCreate, {
+    businessId: VALID_ID,
+    items: [{ productId: VALID_ID, quantity: 1 }],
+    deliveryAddress: 'رام الله ، دوار المنارة',
+    paymentMethod: 'cash',
+    deliveryOption: 'standard',
+    clientOrderId: 'buy-1725000000000000-64b000000000000000000001'
+  });
+});
+
+test('both delivery tiers pass the gate', () => {
+  for (const deliveryOption of ['standard', 'express']) {
+    accept(validateOrderCreate, {
+      businessId: VALID_ID,
+      items: [{ productId: VALID_ID, quantity: 1 }],
+      deliveryAddress: 'رام الله ، دوار المنارة',
+      deliveryOption
+    });
+  }
+});
+
+test('a field nobody declared is still refused', () => {
+  assert.equal(
+    rejectCode(validateOrderCreate, {
+      businessId: VALID_ID,
+      items: [{ productId: VALID_ID, quantity: 1 }],
+      deliveryAddress: 'رام الله ، دوار المنارة',
+      surpriseField: 'anything'
+    }),
+    'INVALID_ORDER_FIELDS'
+  );
+});
+
 test('an order item may only carry a product and a quantity', () => {
   accept(validateOrderCreate, {
     businessId: VALID_ID,

@@ -2793,6 +2793,66 @@ void main() {
         await expectMerzoxSeedGolden('stores_ar_375x812.png');
       });
 
+      testWidgets(
+        'business cards stay free of RenderFlex overflow in home and stores',
+        (WidgetTester tester) async {
+          SharedPreferences.setMockInitialValues(<String, Object>{
+            AuthBloc.sessionKey: true,
+            AuthBloc.tokenKey: 'seed-golden-token',
+            AuthBloc.userTypeKey: 'customer',
+            AuthBloc.nameKey: 'ياسمين خالد',
+          });
+
+          final HomeBloc bloc = await customerHome(isGuest: false);
+
+          await pumpMerzoxGoldenPage(
+            tester,
+            BlocProvider<HomeBloc>.value(
+              value: bloc,
+              child: withMerzoxGoldenDeviceInsets(
+                const HomeScreen(isGuest: false),
+              ),
+            ),
+          );
+
+          expect(bloc.state.newBusinesses, isNotEmpty);
+
+          expect(
+            find.byKey(
+              ValueKey<String>(
+                'business-card-${bloc.state.newBusinesses.first.id}',
+              ),
+            ),
+            findsWidgets,
+          );
+
+          expect(tester.takeException(), isNull);
+
+          final Future<HomeState> storesSelected = bloc.stream.firstWhere(
+            (HomeState state) => state.selectedTab == 2,
+          );
+
+          bloc.add(const HomeTabChanged(2));
+          await storesSelected;
+
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 250));
+
+          expect(bloc.state.allBusinesses, isNotEmpty);
+
+          expect(
+            find.byKey(
+              ValueKey<String>(
+                'business-card-${bloc.state.allBusinesses.first.id}',
+              ),
+            ),
+            findsWidgets,
+          );
+
+          expect(tester.takeException(), isNull);
+        },
+      );
+
       testWidgets('customer home renders its Arabic guest baseline', (
         WidgetTester tester,
       ) async {
