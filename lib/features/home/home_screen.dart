@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/core/localization/language_toggle_button.dart';
 import 'package:merzox/services/api_service.dart';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
@@ -39,6 +40,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../authentication/bloc/auth_bloc.dart';
 import 'widgets/business_id_badge.dart';
 import 'widgets/business_rating_stars.dart';
+import 'widgets/discount_ribbon.dart';
 import 'widgets/feature_bottom_navigation_bar.dart'
     show MerzoxNavIndicator, kMerzoxNavIndicatorGap;
 import 'widgets/home_promo_carousel.dart';
@@ -743,41 +745,64 @@ class _HomeTopBar extends StatelessWidget {
               ],
             ),
           ),
+          // Both controls belong to the trailing end of the bar. Sign-out used
+          // to be centred, which put it under the greeting and read as if it
+          // belonged to the name beside it rather than to the bar.
           Align(
             alignment: AlignmentDirectional.centerEnd,
-            child: isGuest
-                ? IconButton(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (isGuest)
+                  IconButton(
                     tooltip: 'home.notificationsTooltip'.tr(),
                     onPressed: onProtectedAction,
                     padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
                     icon: const Icon(
                       Icons.notifications_none_rounded,
                       size: 24,
                     ),
                   )
-                : NotificationBadgeButton(
+                else
+                  NotificationBadgeButton(
                     tooltip: 'home.notificationsTooltip'.tr(),
                     onPressed: () => context.push('/notifications'),
                     iconSize: 24,
                     badgeSize: 8,
                   ),
-          ),
-          if (!isGuest)
-            Align(
-              alignment: AlignmentDirectional.center,
-              child: SizedBox(
-                width: 44,
-                height: 44,
-                child: IconButton(
-                  tooltip: 'common.logout'.tr(),
-                  onPressed: onLogout,
-                  icon: Icon(
-                    Icons.logout_rounded,
-                    color: MerzoxColors.kColor8D99AE,
-                  ),
+                // Offered to guests too: a visitor who cannot read the
+                // interface has no way to sign in and reach the profile screen
+                // where this used to be the only copy.
+                const LanguageToggleButton(
+                  iconSize: 24,
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints(minWidth: 40, minHeight: 40),
                 ),
-              ),
+                if (!isGuest)
+                  // Same box as the icons beside it, so the group reads as one
+                  // and no tap target is the smaller of them.
+                  IconButton(
+                    key: const ValueKey<String>('merzox.home.logout'),
+                    tooltip: 'common.logout'.tr(),
+                    onPressed: onLogout,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 40,
+                    ),
+                    icon: Icon(
+                      Icons.logout_rounded,
+                      size: 24,
+                      color: MerzoxColors.kColor8D99AE,
+                    ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -1132,35 +1157,9 @@ class _BusinessCard extends StatelessWidget {
                       ),
                       if (business.discount case final discount?)
                         PositionedDirectional(
-                          top: 8,
-                          start: 8,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: cardWidth * 0.58,
-                            ),
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                color: MerzoxColors.kColorEE6C4D,
-                                borderRadius: BorderRadius.circular(5),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 3,
-                                ),
-                                child: Text(
-                                  discount,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                          top: 0,
+                          end: 0,
+                          child: DiscountRibbon(label: discount),
                         ),
                       PositionedDirectional(
                         top: logoHeight + 6,

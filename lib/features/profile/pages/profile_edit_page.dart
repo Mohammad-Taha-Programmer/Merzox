@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/localization/language_toggle_button.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_bloc.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_event.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_state.dart';
@@ -306,13 +307,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     setState(() => _phones.add(_PhoneFieldData(label: 'other')));
   }
 
-  Future<void> _toggleLanguage() async {
-    final nextLocale = context.locale.languageCode == 'ar'
-        ? const Locale('en')
-        : const Locale('ar');
-    await context.setLocale(nextLocale);
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<ProfileEditBloc, ProfileEditState>(
@@ -353,10 +347,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(21, 18, 21, 32),
                         children: [
-                          _ProfileEditHeader(
-                            onBack: () => context.pop(),
-                            onToggleLanguage: _toggleLanguage,
-                          ),
+                          _ProfileEditHeader(onBack: () => context.pop()),
                           const SizedBox(height: 34),
                           _ProfileLabel(text: 'auth.fullNameLabel'.tr()),
                           _ProfileTextField(
@@ -514,12 +505,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
 class _ProfileEditHeader extends StatelessWidget {
   final VoidCallback onBack;
-  final VoidCallback onToggleLanguage;
 
-  const _ProfileEditHeader({
-    required this.onBack,
-    required this.onToggleLanguage,
-  });
+  const _ProfileEditHeader({required this.onBack});
 
   @override
   Widget build(BuildContext context) {
@@ -555,16 +542,9 @@ class _ProfileEditHeader extends StatelessWidget {
               ),
             ),
           ),
-          Align(
+          const Align(
             alignment: AlignmentDirectional.centerEnd,
-            child: IconButton(
-              tooltip: 'profileEdit.changeLanguage'.tr(),
-              onPressed: onToggleLanguage,
-              icon: Icon(
-                Icons.language_rounded,
-                color: MerzoxColors.kColor3D5A80,
-              ),
-            ),
+            child: LanguageToggleButton(),
           ),
         ],
       ),
