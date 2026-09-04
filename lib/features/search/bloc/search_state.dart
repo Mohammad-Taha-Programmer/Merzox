@@ -23,6 +23,24 @@ final class SearchState {
 
   bool get hasQuery => query.trim().isNotEmpty;
 
+  bool get hasExactBusinessMatch {
+    final normalizedQuery = query.trim();
+
+    if (normalizedQuery.isEmpty || businesses.length != 1) {
+      return false;
+    }
+
+    final business = businesses.single;
+
+    if (business.publicId != normalizedQuery) {
+      return false;
+    }
+
+    return products.every(
+      (product) => product.business.publicId == business.publicId,
+    );
+  }
+
   SearchState copyWith({
     SearchStatus? status,
     String? query,

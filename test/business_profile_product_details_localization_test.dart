@@ -122,12 +122,17 @@ _readyProductBloc() async {
 Future<ProductDetailsBloc> _pumpProductDetails(
   WidgetTester tester, {
   required TextDirection direction,
+  HomeBusiness? business,
 }) async {
   final (bloc, product) = await _readyProductBloc();
 
   await pumpLocalized(
     tester,
-    ProductDetailsPage(business: _business, product: product, bloc: bloc),
+    ProductDetailsPage(
+      business: business ?? _business,
+      product: product,
+      bloc: bloc,
+    ),
     textDirection: direction,
   );
 
@@ -227,6 +232,145 @@ void main() {
           }
         },
       );
+
+      if (language == 'ar') {
+        testWidgets(
+          'Product Details seller row handles long RTL identity at 375px',
+          (tester) async {
+            await tester.binding.setSurfaceSize(const Size(375, 812));
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+
+            const longBusinessName = 'متجر مرزوكس التجريبي 001';
+            const longBusinessAddress =
+                'رام الله، شارع المتاجر التجريبية، مبنى 1';
+
+            await _pumpProductDetails(
+              tester,
+              direction: TextDirection.rtl,
+              business: const HomeBusiness(
+                id: '64b000000000000000000001',
+                name: longBusinessName,
+                category: 'الإلكترونيات',
+                address: longBusinessAddress,
+                products: <String>[],
+                rating: 0,
+                colorValue: 0xffdeeef8,
+              ),
+            );
+            await settleFrames(tester);
+
+            expect(find.text(longBusinessName), findsOneWidget);
+            expect(find.text(longBusinessAddress), findsOneWidget);
+            expect(
+              find.byIcon(Icons.chat_bubble_outline_rounded),
+              findsOneWidget,
+            );
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+
+      // -- the seller row's mark -----------------------------------------
+      //
+      // The design puts the shop's round logo beside its name, and both are a
+      // way into the shop. The mark only ever drew the first letter, because
+      // the logo URL was parsed away from the detail response and dropped
+      // again on the way into `HomeBusiness`.
+
+      const sellerLogoKey = Key('merzox.productDetails.sellerLogo');
+      const sellerNameKey = Key('merzox.productDetails.sellerName');
+      const sellerLogoUrl = 'https://images.example.test/store-logo.png';
+
+      testWidgets('Product Details shows the seller logo, cropped round', (
+        tester,
+      ) async {
+        await _pumpProductDetails(
+          tester,
+          direction: language == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+          business: HomeBusiness(
+            id: _business.id,
+            name: _business.name,
+            category: _business.category,
+            address: _business.address,
+            logoUrl: sellerLogoUrl,
+            products: const <String>[],
+            rating: 0,
+            colorValue: 0xffdeeef8,
+          ),
+        );
+
+        final sources = tester
+            .widgetList<Image>(find.byType(Image))
+            .map((image) => image.image)
+            .whereType<NetworkImage>()
+            .map((provider) => provider.url);
+
+        expect(sources, contains(sellerLogoUrl));
+        // Cropped rather than letterboxed, so a logo of any shape fills the
+        // round mark the design draws.
+        expect(
+          find.descendant(
+            of: find.byKey(sellerLogoKey),
+            matching: find.byType(ClipOval),
+          ),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('Product Details falls back to a letter without a logo', (
+        tester,
+      ) async {
+        await _pumpProductDetails(
+          tester,
+          direction: language == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+        );
+
+        // A shop without a logo still carries a mark rather than a hole.
+        expect(
+          find.descendant(
+            of: find.byKey(sellerLogoKey),
+            matching: find.byType(Text),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(sellerLogoKey),
+            matching: find.byType(Image),
+          ),
+          findsNothing,
+        );
+      });
+
+      testWidgets('Product Details opens the store from the logo', (
+        tester,
+      ) async {
+        await _pumpProductDetails(
+          tester,
+          direction: language == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+        );
+
+        await tester.tap(find.byKey(sellerLogoKey));
+        await settleFrames(tester);
+
+        expect(find.byType(BusinessProfilePage), findsOneWidget);
+      });
+
+      testWidgets('Product Details opens the store from the seller name', (
+        tester,
+      ) async {
+        await _pumpProductDetails(
+          tester,
+          direction: language == 'ar' ? TextDirection.rtl : TextDirection.ltr,
+        );
+
+        // The name is the other half of the same affordance: a customer taps
+        // whichever they read first.
+        await tester.tap(find.byKey(sellerNameKey));
+        await settleFrames(tester);
+
+        expect(find.byType(BusinessProfilePage), findsOneWidget);
+      });
 
       testWidgets(
         'Product Details renders localized eligible review composer',

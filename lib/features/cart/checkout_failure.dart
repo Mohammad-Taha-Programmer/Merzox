@@ -15,6 +15,11 @@ const Map<String, String> checkoutFailureMessages = {
   'PRODUCT_VARIANT_NOT_AVAILABLE': 'catalog.variantUnavailable',
   'BUSINESS_NOT_FOUND': 'orders.checkoutBusinessUnavailable',
   'DELIVERY_ADDRESS_REQUIRED': 'orders.checkoutAddressRequired',
+  // The server refused the request's shape, not its contents. Falling through
+  // to the generic message told the customer to check their address and their
+  // products, and both were fine - the fault was a field the two sides
+  // disagreed about, which is a mismatch between app and server versions.
+  'INVALID_ORDER_FIELDS': 'orders.checkoutRejectedShape',
 };
 
 /// The generic fallback, used only when the server named no reason we model.

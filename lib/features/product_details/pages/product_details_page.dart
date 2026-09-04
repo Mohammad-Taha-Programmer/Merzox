@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/auth/auth_gate.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/product_details/bloc/product_details_bloc.dart';
 import 'package:merzox/features/product_details/bloc/product_details_event.dart';
@@ -602,6 +603,24 @@ class _SellerDetails extends StatelessWidget {
 
   const _SellerDetails({required this.business});
 
+  /// Opens the seller's public storefront.
+  ///
+  /// The same page a customer reaches from the home list, in customer mode:
+  /// this is the shop as everyone sees it, not a second implementation.
+  void _openStore(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => BusinessProfilePage(
+          business: business,
+          onNavChanged: (index) {
+            Navigator.of(context).pop();
+            context.go('/home?tab=$index');
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -614,35 +633,41 @@ class _SellerDetails extends StatelessWidget {
         const SizedBox(height: 13),
         Row(
           children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: MerzoxColors.kColorEEF6FB,
-              child: Text(
-                business.name.isEmpty ? 'M' : business.name.characters.first,
-                style: TextStyle(
-                  color: MerzoxColors.kColor3D5A80,
-                  fontWeight: FontWeight.w800,
-                ),
+            _SellerLogo(business: business, onTap: () => _openStore(context)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // The name is the other way into the shop. A customer who
+                  // wants the seller taps whichever of the two they read
+                  // first, so both lead to the same place.
+                  InkWell(
+                    key: const Key('merzox.productDetails.sellerName'),
+                    onTap: () => _openStore(context),
+                    child: Text(
+                      business.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    business.address.trim().isEmpty
+                        ? 'catalog.addressUnavailable'.tr()
+                        : business.address,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: MerzoxColors.kColor767676,
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(business.name, style: const TextStyle(fontSize: 13)),
-                const SizedBox(height: 4),
-                Text(
-                  business.address.trim().isEmpty
-                      ? 'catalog.addressUnavailable'.tr()
-                      : business.address,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: MerzoxColors.kColor767676,
-                  ),
-                ),
-              ],
-            ),
-            const Spacer(),
             _IconSquare(
               icon: Icons.chat_bubble_outline_rounded,
               onPressed: () => AuthGate.run(
@@ -663,6 +688,69 @@ class _SellerDetails extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// The seller's mark beside their name.
+///
+/// The design draws a round shop logo here; the code only ever drew the first
+/// letter of the name, because the logo URL never reached this page. It does
+/// now, and the letter is what a shop without one still gets - and what a
+/// broken or slow link falls back to, so the row never shows a hole.
+class _SellerLogo extends StatelessWidget {
+  final HomeBusiness business;
+  final VoidCallback onTap;
+
+  const _SellerLogo({required this.business, required this.onTap});
+
+  static const double _diameter = 56;
+
+  Widget _letter() {
+    return Center(
+      child: Text(
+        business.name.trim().isEmpty
+            ? 'M'
+            : business.name.trim().characters.first,
+        style: TextStyle(
+          color: MerzoxColors.kColor3D5A80,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String url = business.logoUrl.trim();
+
+    return InkWell(
+      key: const Key('merzox.productDetails.sellerLogo'),
+      onTap: onTap,
+      customBorder: const CircleBorder(),
+      child: Container(
+        width: _diameter,
+        height: _diameter,
+        decoration: BoxDecoration(
+          color: MerzoxColors.kColorEEF6FB,
+          shape: BoxShape.circle,
+        ),
+        // Cropped to the circle rather than fitted inside it, so a logo of any
+        // aspect ratio fills the mark the way the design draws it.
+        child: ClipOval(
+          child: url.isEmpty
+              ? _letter()
+              : Image.network(
+                  url,
+                  fit: BoxFit.cover,
+                  width: _diameter,
+                  height: _diameter,
+                  loadingBuilder: (context, child, progress) =>
+                      progress == null ? child : _letter(),
+                  errorBuilder: (context, error, stack) => _letter(),
+                ),
+        ),
+      ),
     );
   }
 }

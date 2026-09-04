@@ -1688,6 +1688,7 @@ class SearchBusinessApiModel {
   final String name;
   final String englishName;
   final String category;
+  final String logoUrl;
   final List<String> products;
   final int productCount;
   final double rating;
@@ -1717,6 +1718,7 @@ class SearchBusinessApiModel {
     required this.discount,
     required this.colorValue,
     required this.address,
+    this.logoUrl = '',
     this.distanceMeters,
     this.latitude,
     this.longitude,
@@ -1734,6 +1736,7 @@ class SearchBusinessApiModel {
       name: json['name'] as String? ?? '',
       englishName: json['englishName'] as String? ?? '',
       category: json['category'] as String? ?? '',
+      logoUrl: json['logoUrl'] as String? ?? '',
       products: productsJson.whereType<String>().toList(),
       productCount: (json['productCount'] as num?)?.toInt() ?? 0,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
@@ -1766,6 +1769,7 @@ class BusinessDetailApiModel {
   final String category;
   final String description;
   final String address;
+  final String logoUrl;
   final List<BusinessProductApiModel> products;
   final int productCount;
   final double rating;
@@ -1786,6 +1790,7 @@ class BusinessDetailApiModel {
     required this.category,
     required this.description,
     required this.address,
+    this.logoUrl = '',
     required this.products,
     required this.productCount,
     required this.rating,
@@ -1816,6 +1821,7 @@ class BusinessDetailApiModel {
       category: json['category'] as String? ?? '',
       description: json['description'] as String? ?? '',
       address: json['address'] as String? ?? '',
+      logoUrl: json['logoUrl'] as String? ?? '',
       products: products,
       productCount: (json['productCount'] as num?)?.toInt() ?? products.length,
       rating: (json['rating'] as num?)?.toDouble() ?? 0,

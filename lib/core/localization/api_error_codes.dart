@@ -46,6 +46,7 @@ const Map<String, String> apiErrorMessageKeys = <String, String>{
   'CUSTOMER_ACCOUNT_REQUIRED': 'apiErrors.customerAccountRequired',
   'BUSINESS_ALREADY_ENROLLED': 'apiErrors.businessAlreadyExists',
   'BUSINESS_ALREADY_EXISTS': 'apiErrors.businessAlreadyExists',
+  'BUSINESS_PUBLIC_ID_UNAVAILABLE': 'apiErrors.businessPublicIdUnavailable',
 
   // -- Addresses -----------------------------------------------------------
   'ADDRESS_NOT_FOUND': 'apiErrors.addressNotFound',

@@ -1,14 +1,30 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/constants/money.dart';
+import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
+import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
+import 'package:merzox/features/home/widgets/business_id_badge.dart';
+import 'package:merzox/features/home/widgets/business_rating_stars.dart';
+import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/search/bloc/search_bloc.dart';
 import 'package:merzox/features/search/bloc/search_event.dart';
 import 'package:merzox/features/search/bloc/search_state.dart';
 import 'package:merzox/services/api_service.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key});
+  /// Optional seams keep tap behavior testable without starting destination
+  /// page network work. Production callers leave both values null.
+  final ValueChanged<SearchBusinessApiModel>? onBusinessResultTap;
+  final ValueChanged<SearchProductApiModel>? onProductResultTap;
+
+  const SearchPage({
+    super.key,
+    this.onBusinessResultTap,
+    this.onProductResultTap,
+  });
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -40,6 +56,51 @@ class _SearchPageState extends State<SearchPage> {
       ..text = query
       ..selection = TextSelection.collapsed(offset: query.length);
     context.read<SearchBloc>().add(SearchQueryChanged(query));
+  }
+
+  void _openBusiness(SearchBusinessApiModel business) {
+    final tapOverride = widget.onBusinessResultTap;
+    if (tapOverride != null) {
+      tapOverride(business);
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (routeContext) => Directionality(
+          textDirection: Directionality.of(context),
+          child: BusinessProfilePage(
+            business: HomeBusiness.fromApi(business),
+            onNavChanged: (index) {
+              Navigator.of(routeContext).pop();
+              if (context.mounted) {
+                context.go('/home?tab=$index');
+              }
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openProduct(SearchProductApiModel item) {
+    final tapOverride = widget.onProductResultTap;
+    if (tapOverride != null) {
+      tapOverride(item);
+      return;
+    }
+
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => Directionality(
+          textDirection: Directionality.of(context),
+          child: ProductDetailsPage(
+            business: HomeBusiness.fromApi(item.business),
+            product: item.product,
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -85,14 +146,29 @@ class _SearchPageState extends State<SearchPage> {
                       },
                     )
                   else ...[
-                    _SearchTabs(selectedIndex: state.selectedTab),
-                    const SizedBox(height: 26),
                     if (state.status == SearchStatus.loading)
                       const Center(child: CircularProgressIndicator())
-                    else if (state.selectedTab == 0)
-                      _ProductResults(products: state.products)
-                    else
-                      _BusinessResults(businesses: state.businesses),
+                    else if (state.hasExactBusinessMatch)
+                      _ExactPublicIdResults(
+                        business: state.businesses.single,
+                        products: state.products,
+                        onBusinessTap: _openBusiness,
+                        onProductTap: _openProduct,
+                      )
+                    else ...[
+                      _SearchTabs(selectedIndex: state.selectedTab),
+                      const SizedBox(height: 26),
+                      if (state.selectedTab == 0)
+                        _ProductResults(
+                          products: state.products,
+                          onProductTap: _openProduct,
+                        )
+                      else
+                        _BusinessResults(
+                          businesses: state.businesses,
+                          onBusinessTap: _openBusiness,
+                        ),
+                    ],
                   ],
                 ],
               );
@@ -355,10 +431,61 @@ class _SearchTabs extends StatelessWidget {
   }
 }
 
+class _ExactPublicIdResults extends StatelessWidget {
+  final SearchBusinessApiModel business;
+  final List<SearchProductApiModel> products;
+  final ValueChanged<SearchBusinessApiModel> onBusinessTap;
+  final ValueChanged<SearchProductApiModel> onProductTap;
+
+  const _ExactPublicIdResults({
+    required this.business,
+    required this.products,
+    required this.onBusinessTap,
+    required this.onProductTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      key: ValueKey<String>('exact-public-id-results-${business.publicId}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text(
+          'nav.stores'.tr(),
+          style: const TextStyle(
+            color: Color(0xFF2B2B2B),
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 12),
+        _BusinessResults(
+          businesses: <SearchBusinessApiModel>[business],
+          onBusinessTap: onBusinessTap,
+        ),
+        if (products.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 24),
+          Text(
+            'favorites.products'.tr(),
+            style: const TextStyle(
+              color: Color(0xFF2B2B2B),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 12),
+          _ProductResults(products: products, onProductTap: onProductTap),
+        ],
+      ],
+    );
+  }
+}
+
 class _ProductResults extends StatelessWidget {
   final List<SearchProductApiModel> products;
+  final ValueChanged<SearchProductApiModel> onProductTap;
 
-  const _ProductResults({required this.products});
+  const _ProductResults({required this.products, required this.onProductTap});
 
   @override
   Widget build(BuildContext context) {
@@ -366,18 +493,35 @@ class _ProductResults extends StatelessWidget {
       return const _NoResults();
     }
 
-    return GridView.builder(
-      itemCount: products.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 2.8,
-        crossAxisSpacing: 22,
-        mainAxisSpacing: 22,
-      ),
-      itemBuilder: (context, index) {
-        return _ProductResultTile(item: products[index]);
+    final tiles = products
+        .map(
+          (item) =>
+              _ProductResultTile(item: item, onTap: () => onProductTap(item)),
+        )
+        .toList(growable: false);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 720) {
+          return Column(
+            children: <Widget>[
+              for (var index = 0; index < tiles.length; index++) ...<Widget>[
+                tiles[index],
+                if (index != tiles.length - 1) const SizedBox(height: 12),
+              ],
+            ],
+          );
+        }
+
+        final tileWidth = (constraints.maxWidth - 12) / 2;
+
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: tiles
+              .map((tile) => SizedBox(width: tileWidth, child: tile))
+              .toList(growable: false),
+        );
       },
     );
   }
@@ -385,42 +529,174 @@ class _ProductResults extends StatelessWidget {
 
 class _ProductResultTile extends StatelessWidget {
   final SearchProductApiModel item;
+  final VoidCallback onTap;
 
-  const _ProductResultTile({required this.item});
+  const _ProductResultTile({required this.item, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final imageUrl = item.product.imageUrl;
+    final product = item.product;
+    final title = product.name.isEmpty
+        ? 'search.productFallback'.tr()
+        : product.name;
+    final businessName = item.business.name.trim();
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
 
-    return Row(
-      textDirection: Directionality.of(context),
-      children: [
-        _ResultImage(
-          imageUrl: imageUrl,
-          fallbackIcon: Icons.shopping_bag_outlined,
-          color: MerzoxColors.kColorF7F8FA,
+    return Semantics(
+      button: true,
+      label: title,
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFE7EBF0)),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            item.product.name.isEmpty
-                ? 'search.productFallback'.tr()
-                : item.product.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.start,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF2B2B2B)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey<String>('search-product-result-${product.id}'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 118),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  _ResultImage(
+                    imageUrl: product.imageUrl,
+                    fallbackIcon: Icons.shopping_bag_outlined,
+                    color: MerzoxColors.kColorF7F8FA,
+                    size: 92,
+                    borderRadius: 9,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.start,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  height: 1.3,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF2B2B2B),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              isRtl
+                                  ? Icons.chevron_left_rounded
+                                  : Icons.chevron_right_rounded,
+                              size: 22,
+                              color: MerzoxColors.kColor8D99AE,
+                            ),
+                          ],
+                        ),
+                        if (businessName.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 7),
+                          Row(
+                            children: <Widget>[
+                              Icon(
+                                Icons.storefront_outlined,
+                                size: 15,
+                                color: MerzoxColors.kColor707070,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  businessName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  textAlign: TextAlign.start,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: MerzoxColors.kColor707070,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 9),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 5,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: <Widget>[
+                            Text(
+                              '₪ ${merzoxAmount(product.displayPrice)}',
+                              key: ValueKey<String>(
+                                'search-product-price-${product.id}',
+                              ),
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w900,
+                                color: MerzoxColors.kColorEE6C4D,
+                              ),
+                            ),
+                            if (!product.hasVariants && product.hasDiscount)
+                              Text(
+                                '₪ ${merzoxAmount(product.price)}',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: MerzoxColors.kColor8D99AE,
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                            if (product.ratingCount > 0 &&
+                                product.rating.isFinite)
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    size: 16,
+                                    color: Color(0xFFFFB703),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${product.rating.toStringAsFixed(1)} '
+                                    '(${product.ratingCount})',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: MerzoxColors.kColor707070,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
 
 class _BusinessResults extends StatelessWidget {
   final List<SearchBusinessApiModel> businesses;
+  final ValueChanged<SearchBusinessApiModel> onBusinessTap;
 
-  const _BusinessResults({required this.businesses});
+  const _BusinessResults({
+    required this.businesses,
+    required this.onBusinessTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -428,52 +704,197 @@ class _BusinessResults extends StatelessWidget {
       return const _NoResults();
     }
 
-    return GridView.builder(
-      itemCount: businesses.length,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        childAspectRatio: 2.8,
-        crossAxisSpacing: 22,
-        mainAxisSpacing: 22,
-      ),
-      itemBuilder: (context, index) {
-        return _BusinessResultTile(business: businesses[index]);
-      },
+    return Column(
+      children: <Widget>[
+        for (var index = 0; index < businesses.length; index++) ...<Widget>[
+          _BusinessResultTile(
+            business: businesses[index],
+            onTap: () => onBusinessTap(businesses[index]),
+          ),
+          if (index != businesses.length - 1) const SizedBox(height: 12),
+        ],
+      ],
     );
   }
 }
 
 class _BusinessResultTile extends StatelessWidget {
   final SearchBusinessApiModel business;
+  final VoidCallback onTap;
 
-  const _BusinessResultTile({required this.business});
+  const _BusinessResultTile({required this.business, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      textDirection: Directionality.of(context),
-      children: [
-        _ResultImage(
-          imageUrl: '',
-          fallbackText: business.name,
-          fallbackIcon: Icons.storefront_outlined,
-          color: Color(business.colorValue),
+    final title = business.name.isEmpty
+        ? 'search.businessFallback'.tr()
+        : business.name;
+    final displayId = business.publicId.trim().isEmpty
+        ? business.id
+        : business.publicId;
+    final details = <String>[
+      business.category.trim(),
+      business.address.trim(),
+    ].where((value) => value.isNotEmpty).toList(growable: false);
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final productsLabel = 'favorites.products'.tr();
+
+    return Semantics(
+      button: true,
+      label: title,
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFE7EBF0)),
         ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            business.name.isEmpty
-                ? 'search.businessFallback'.tr()
-                : business.name,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.start,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF2B2B2B)),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: ValueKey<String>('search-business-result-${business.id}'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 128),
+            child: Padding(
+              padding: const EdgeInsets.all(13),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _ResultImage(
+                    imageUrl: business.logoUrl,
+                    fallbackText: title,
+                    fallbackIcon: Icons.storefront_outlined,
+                    color: Color(business.colorValue),
+                    size: 82,
+                    borderRadius: 10,
+                  ),
+                  const SizedBox(width: 13),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.start,
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  height: 1.25,
+                                  fontWeight: FontWeight.w900,
+                                  color: Color(0xFF2B2B2B),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Icon(
+                              isRtl
+                                  ? Icons.chevron_left_rounded
+                                  : Icons.chevron_right_rounded,
+                              size: 23,
+                              color: MerzoxColors.kColor8D99AE,
+                            ),
+                          ],
+                        ),
+                        if (details.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 6),
+                          Text(
+                            details.join(' • '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.start,
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.35,
+                              color: MerzoxColors.kColor707070,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 9),
+                        Wrap(
+                          spacing: 9,
+                          runSpacing: 7,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: <Widget>[
+                            BusinessIdBadge(
+                              id: displayId,
+                              dialogTitle: 'home.businessId.title'.tr(),
+                              copyLabel: 'home.businessId.copy'.tr(),
+                              copiedMessage: 'home.businessId.copied'.tr(),
+                              closeLabel: 'home.businessId.close'.tr(),
+                              tapHint: 'home.businessId.tapHint'.tr(),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: <Widget>[
+                                BusinessRatingStars(
+                                  rating: business.rating,
+                                  ratingCount: business.ratingCount,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '(${business.ratingCount})',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: MerzoxColors.kColor707070,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: AlignmentDirectional.centerStart,
+                          child: Semantics(
+                            label: '$productsLabel: ${business.productCount}',
+                            child: Container(
+                              key: ValueKey<String>(
+                                'search-business-product-count-${business.id}',
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: MerzoxColors.kColorF7F8FA,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  Icon(
+                                    Icons.shopping_bag_outlined,
+                                    size: 14,
+                                    color: MerzoxColors.kColor3D5A80,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${business.productCount}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: MerzoxColors.kColor3D5A80,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -483,21 +904,25 @@ class _ResultImage extends StatelessWidget {
   final IconData fallbackIcon;
   final Color color;
   final String? fallbackText;
+  final double size;
+  final double borderRadius;
 
   const _ResultImage({
     required this.imageUrl,
     required this.fallbackIcon,
     required this.color,
     this.fallbackText,
+    this.size = 52,
+    this.borderRadius = 4,
   });
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(4),
+      borderRadius: BorderRadius.circular(borderRadius),
       child: SizedBox(
-        width: 52,
-        height: 52,
+        width: size,
+        height: size,
         child: imageUrl.isEmpty
             ? Container(
                 color: color,

@@ -228,11 +228,18 @@ const allowedItemFields = [
 ];
 
 export function validateOrderCreate(req, _res, next) {
+  // `deliveryOption` belongs here: `createOrder` reads it a few lines later to
+  // price the delivery, and every client has always sent it. Leaving it out of
+  // the allowlist refused every order at the door - from the basket and from
+  // "buy now" alike - with `INVALID_ORDER_FIELDS`, before the handler that
+  // needs it ever ran. The tier itself is still checked downstream, where an
+  // unknown name is refused with `INVALID_DELIVERY_OPTION`.
   const allowed = [
     'businessId',
     'items',
     'deliveryAddress',
     'paymentMethod',
+    'deliveryOption',
     'clientOrderId'
   ];
   const invalid = Object.keys(req.body).filter((key) => !allowed.includes(key));

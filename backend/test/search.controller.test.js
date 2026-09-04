@@ -37,12 +37,27 @@ function invoke(handler, req = {}) {
 }
 
 /** `Business.find(...).sort(...).limit(...)` resolved from a fixed list. */
-function stubBusinesses(list) {
+function stubBusinesses(
+  list,
+  { exactBusiness = null } = {}
+) {
   const originalFind = Business.find;
-  const state = { filters: [], limit: null };
+  const originalFindOne = Business.findOne;
+
+  const state = {
+    filters: [],
+    exactFilters: [],
+    limit: null
+  };
+
+  Business.findOne = (filter) => {
+    state.exactFilters.push(filter);
+    return Promise.resolve(exactBusiness);
+  };
 
   Business.find = (filter) => {
     state.filters.push(filter);
+
     const chain = {
       sort: () => chain,
       limit(value) {
@@ -50,19 +65,27 @@ function stubBusinesses(list) {
         return Promise.resolve(list);
       }
     };
+
     return chain;
   };
 
   state.restore = () => {
     Business.find = originalFind;
+    Business.findOne = originalFindOne;
   };
 
   return state;
 }
 
-function business({ name, category = 'مستحضرات تجميل', description = '', products = [] }) {
+function business({
+  name,
+  publicId = `MXB-${name}`,
+  category = 'مستحضرات تجميل',
+  description = '',
+  products = []
+}) {
   return new Business({
-    publicId: `MXB-${name}`,
+    publicId,
     name,
     category,
     description,
@@ -76,11 +99,22 @@ function product(name, overrides = {}) {
   return { name, price: 35, isActive: true, ...overrides };
 }
 
-async function search(list, query) {
-  const stub = stubBusinesses(list);
+async function search(
+  list,
+  query,
+  { exactBusiness = null } = {}
+) {
+  const stub = stubBusinesses(list, {
+    exactBusiness
+  });
 
   try {
-    return { ...(await invoke(searchCatalog, { query })), filters: stub.filters, limit: stub.limit };
+    return {
+      ...(await invoke(searchCatalog, { query })),
+      filters: stub.filters,
+      exactFilters: stub.exactFilters,
+      limit: stub.limit
+    };
   } finally {
     stub.restore();
   }
@@ -95,6 +129,75 @@ test('an empty search asks the database for nothing', async () => {
     // The handler returns before building a pattern or issuing a query.
     assert.deepEqual(result.filters, []);
   }
+});
+
+test('an exact public ID returns only its business and active products', async () => {
+  const exactBusiness = business({
+    name: 'متجر صاحب المعرّف',
+    publicId: '54321',
+    products: [
+      product('المنتج الأول'),
+      product('منتج مخفي', { isActive: false }),
+      product('المنتج الثاني')
+    ]
+  });
+
+  const unrelatedBusiness = business({
+    name: 'متجر آخر',
+    publicId: '65432',
+    products: [product('منتج غير مرتبط')]
+  });
+
+  const result = await search(
+    [unrelatedBusiness],
+    { q: '54321' },
+    { exactBusiness }
+  );
+
+  assert.equal(result.error, null);
+
+  assert.deepEqual(
+    result.exactFilters,
+    [
+      {
+        isActive: true,
+        publicId: '54321'
+      }
+    ]
+  );
+
+  assert.deepEqual(
+    result.filters,
+    []
+  );
+
+  assert.deepEqual(
+    result.body.data.businesses.map(
+      (entry) => entry.publicId
+    ),
+    ['54321']
+  );
+
+  assert.deepEqual(
+    result.body.data.products.map(
+      (entry) => entry.name
+    ),
+    ['المنتج الأول', 'المنتج الثاني']
+  );
+
+  assert.deepEqual(
+    result.body.data.products.map(
+      (entry) => entry.business.publicId
+    ),
+    ['54321', '54321']
+  );
+
+  assert.equal(
+    result.body.data.products.some(
+      (entry) => entry.name === 'منتج مخفي'
+    ),
+    false
+  );
 });
 
 test('the needle is escaped, so it is matched and never executed', async () => {

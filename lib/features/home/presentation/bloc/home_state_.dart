@@ -163,6 +163,7 @@ final class HomeBusiness {
   final String name;
   final String englishName;
   final String category;
+  final String logoUrl;
   final String description;
   final String address;
   final List<String> products;
@@ -195,6 +196,7 @@ final class HomeBusiness {
     this.distanceMeters,
     this.discount,
     required this.colorValue,
+    this.logoUrl = '',
     this.latitude,
     this.longitude,
     this.subscribedAt,
@@ -207,6 +209,7 @@ final class HomeBusiness {
       name: business.name,
       englishName: business.englishName,
       category: business.category,
+      logoUrl: business.logoUrl,
       address: business.address,
       products: business.products,
       productCount: business.productCount,
@@ -232,6 +235,10 @@ final class HomeBusiness {
       category: business.category,
       description: business.description,
       address: business.address,
+      // Carried on with everything else. The storefront and the pages it
+      // opens rebuild from the detail response, so dropping the logo here
+      // meant no shop showed one however carefully its merchant set it.
+      logoUrl: business.logoUrl,
       products: business.products.map((product) => product.name).toList(),
       productCount: business.productCount,
       rating: business.rating,

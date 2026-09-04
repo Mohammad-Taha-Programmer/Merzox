@@ -9,6 +9,21 @@ function normalizeQuery(query) {
   return String(query ?? '').trim().slice(0, 80);
 }
 
+function publicProductSearchResult(business, product) {
+  return {
+    ...business.productToJSON(product),
+    business: {
+      id: business._id.toString(),
+      publicId: business.publicId,
+      name: business.name,
+      category: business.category,
+      colorValue: business.colorValue,
+      rating: business.ratingAverage,
+      address: business.address
+    }
+  };
+}
+
 export const searchCatalog = asyncHandler(async (req, res) => {
   const query = normalizeQuery(req.query.query ?? req.query.q);
   const limit = Math.min(
@@ -20,6 +35,35 @@ export const searchCatalog = asyncHandler(async (req, res) => {
     res.json({
       success: true,
       data: { query: '', products: [], businesses: [] }
+    });
+    return;
+  }
+
+  const exactIdBusiness = await Business.findOne({
+    isActive: true,
+    publicId: query
+  });
+
+  if (exactIdBusiness) {
+    const products = exactIdBusiness.products
+      .filter((product) => product.isActive)
+      .slice(0, limit)
+      .map((product) =>
+        publicProductSearchResult(
+          exactIdBusiness,
+          product
+        )
+      );
+
+    res.json({
+      success: true,
+      data: {
+        query,
+        products,
+        businesses: [
+          exactIdBusiness.toListJSON()
+        ]
+      }
     });
     return;
   }
@@ -58,18 +102,12 @@ export const searchCatalog = asyncHandler(async (req, res) => {
       if (!productMatches) continue;
 
       if (products.length < limit) {
-        products.push({
-          ...business.productToJSON(product),
-          business: {
-            id: business._id.toString(),
-            publicId: business.publicId,
-            name: business.name,
-            category: business.category,
-            colorValue: business.colorValue,
-            rating: business.ratingAverage,
-            address: business.address
-          }
-        });
+        products.push(
+          publicProductSearchResult(
+            business,
+            product
+          )
+        );
       }
 
       matchedBusinessIds.add(business._id.toString());
