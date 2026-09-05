@@ -97,10 +97,32 @@ class _CheckoutPageState extends State<CheckoutPage> {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: BlocConsumer<CartBloc, CartState>(
+          // Both outcomes, not just the happy one. Listening for the success
+          // message alone meant a refused order reached this screen and
+          // stopped: no message, no movement, nothing to tell a customer
+          // apart from a dead button.
           listenWhen: (CartState previous, CartState current) =>
-              previous.messageCode != current.messageCode &&
-              current.messageCode.isNotEmpty,
+              (previous.messageCode != current.messageCode &&
+                  current.messageCode.isNotEmpty) ||
+              (previous.errorMessage != current.errorMessage &&
+                  current.errorMessage.isNotEmpty),
           listener: (BuildContext context, CartState state) {
+            if (state.errorMessage.isNotEmpty) {
+              // `checkoutFailureMessage` has already turned the server's
+              // refusal code into the sentence that names the reason, and
+              // falls back to the generic one only when the server named
+              // something we do not model.
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(
+                    content: Text(state.errorMessage.tr()),
+                    duration: const Duration(seconds: 6),
+                  ),
+                );
+              return;
+            }
+
             // The cart clears itself on success, so a placed order is an
             // empty cart plus its message. Moving to the confirmation both
             // shows the customer their order number and takes the review
