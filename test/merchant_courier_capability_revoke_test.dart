@@ -53,6 +53,8 @@ class _CapabilityApi extends ApiService {
   @override
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async => BusinessDashboardData.fromJson(const <String, dynamic>{});
 
   @override
@@ -99,6 +101,12 @@ class _CapabilityApi extends ApiService {
 
     return OwnerOrder.fromJson(_orderJson());
   }
+
+  // The shell reads the account for the picture in its bar. Unstubbed, this
+  // would be a real request that never answers inside a test.
+  @override
+  Future<AuthApiUser> me({required String token}) async =>
+      AuthApiUser.fromJson(const <String, dynamic>{'id': 'u1', 'name': 'تاجر'});
 }
 
 void main() {

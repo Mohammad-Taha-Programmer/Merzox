@@ -1,8 +1,9 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:merzox/core/localization/api_error_codes.dart';
 import 'package:merzox/features/business/models/business_models.dart';
-
-final String ipAddress = "192.168.1.11";
 
 /// Raised when a 2xx response does not carry the entity its endpoint promises.
 ///
@@ -88,19 +89,35 @@ class ApiService {
     defaultValue: '',
   );
 
-  /// The development host. A shipped build passes `MERZOX_API_BASE_URL` at
-  /// compile time; without it the app talks to the LAN address a developer
-  /// runs the API on.
+  /// The host reached when no `MERZOX_API_BASE_URL` was given at compile time.
   ///
-  /// There used to be an Android arm here returning the same string as the
-  /// fallback below it, which read as a platform difference that did not
-  /// exist.
+  /// This used to be one developer's LAN address, typed into the source. It
+  /// went stale - the workstation moved to another number on the same router -
+  /// and every build made without the define then spent its requests on an
+  /// address nobody answers, which reads to the customer as "the server is
+  /// unreachable" and to the developer as an intermittent fault.
+  ///
+  /// Both fallbacks below are fixed names for "this machine", so neither can
+  /// go stale again: `10.0.2.2` is the alias the Android emulator maps to its
+  /// host's loopback, and `127.0.0.1` is that loopback everywhere else.
+  ///
+  /// A physical device is on neither of those and still needs the define -
+  /// there is no address this side can guess for it.
   static String get defaultBaseUrl {
     if (configuredBaseUrl.isNotEmpty) {
       return configuredBaseUrl;
     }
 
-    return 'http://$ipAddress:4000/api/v1';
+    return 'http://$developmentHost:4000/api/v1';
+  }
+
+  /// Visible so the two cases can be stated in a test rather than trusted.
+  static String get developmentHost {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return '10.0.2.2';
+    }
+
+    return '127.0.0.1';
   }
 
   final Dio _dio;
@@ -127,6 +144,27 @@ class ApiService {
     );
 
     return AuthApiResponse.fromJson(response.data ?? {});
+  }
+
+  /// Replaces the signed-in account's picture.
+  ///
+  /// The bytes go to the server, not to the image host: the host's key is a
+  /// secret and an app cannot keep one. What comes back is the account with
+  /// the URL its picture is now hosted at.
+  Future<AuthApiUser> uploadMyAvatar({
+    required String token,
+    required Uint8List bytes,
+  }) async {
+    final response = await _dio.put<Map<String, dynamic>>(
+      '/users/me/avatar',
+      data: <String, dynamic>{'image': base64Encode(bytes)},
+      options: _authOptions(token),
+    );
+
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+    return AuthApiUser.fromJson(
+      data['user'] as Map<String, dynamic>? ?? const <String, dynamic>{},
+    );
   }
 
   Future<AuthApiUser> me({required String token}) async {
@@ -710,11 +748,22 @@ class ApiService {
     );
   }
 
+  /// The merchant dashboard's figures.
+  ///
+  /// [from] and [to] are calendar days. They narrow the figures to the period
+  /// the dashboard's control names, the same way they narrow [ownerOrders], so
+  /// the numbers above the table describe the rows in it.
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/businesses/me/dashboard',
+      queryParameters: MerchantOrderFilter(
+        from: from,
+        to: to,
+      ).toQueryParameters(),
       options: _authOptions(token),
     );
     final data = response.data?['data'] as Map<String, dynamic>? ?? {};
@@ -2733,6 +2782,11 @@ class AuthApiResponse {
 class AuthApiUser {
   final String id;
   final String name;
+
+  /// Where the account's picture is hosted, or empty for an account that has
+  /// never set one - in which case the app draws its own placeholder rather
+  /// than a broken image.
+  final String avatarUrl;
   final String? email;
   final List<ContactEmail> emails;
   final String? phone;
@@ -2753,6 +2807,7 @@ class AuthApiUser {
   const AuthApiUser({
     required this.id,
     required this.name,
+    this.avatarUrl = '',
     required this.email,
     required this.emails,
     required this.phone,
@@ -2774,6 +2829,7 @@ class AuthApiUser {
     return AuthApiUser(
       id: json['id'] as String? ?? '',
       name: json['name'] as String? ?? '',
+      avatarUrl: json['avatarUrl'] as String? ?? '',
       email: json['email'] as String?,
       emails: emailsJson
           .whereType<Map<String, dynamic>>()

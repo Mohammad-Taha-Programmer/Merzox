@@ -89,6 +89,8 @@ class _StatusApi extends ApiService {
   @override
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async => const BusinessDashboardData(
     sales: 45,
     orderCount: 1,

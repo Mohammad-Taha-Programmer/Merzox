@@ -42,6 +42,8 @@ dependencies:
   easy_localization: ^3.0.8
   flutter_native_splash: ^2.4.6
   permission_handler: ^12.0.3
+  # Picks the profile picture off the camera or the gallery.
+  image_picker: ^1.1.2
   flutter_map: ^8.3.1
   latlong2: ^0.10.1
   geolocator: 14.0.1

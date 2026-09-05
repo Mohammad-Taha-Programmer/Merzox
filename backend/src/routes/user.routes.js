@@ -3,7 +3,8 @@ import { Router } from 'express';
 import {
   getMyNotificationPreferences,
   updateMe,
-  updateMyNotificationPreferences
+  updateMyNotificationPreferences,
+  updateMyAvatar
 } from '../controllers/user.controller.js';
 import {
   createMyAddress,
@@ -51,5 +52,6 @@ router.get(
   getMyRecommendations
 );
 router.patch('/me', requireAuth, validateProfilePatch, updateMe);
+router.put('/me/avatar', requireAuth, updateMyAvatar);
 
 export default router;

@@ -27,6 +27,8 @@ class _ProductApi extends ApiService {
   @override
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async => BusinessDashboardData.fromJson(const {});
 
   @override
@@ -67,6 +69,12 @@ class _ProductApi extends ApiService {
     updated.add(changes);
     return OwnerProduct.fromJson({'id': productId, ...changes});
   }
+
+  // The shell reads the account for the picture in its bar. Unstubbed, this
+  // would be a real request that never answers inside a test.
+  @override
+  Future<AuthApiUser> me({required String token}) async =>
+      AuthApiUser.fromJson(const <String, dynamic>{'id': 'u1', 'name': 'تاجر'});
 }
 
 Map<String, dynamic> _values({

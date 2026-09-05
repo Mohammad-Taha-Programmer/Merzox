@@ -181,6 +181,8 @@ class _EmptyApi extends ApiService {
   @override
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async => BusinessDashboardData.fromJson(const <String, dynamic>{});
 
   @override
@@ -203,6 +205,11 @@ class _EmptyApi extends ApiService {
     int page = 1,
     int limit = 20,
   }) async => conversations(token: token, unreadOnly: unreadOnly);
+  // The shell reads the account for the picture in its bar. Unstubbed, this
+  // would be a real request that never answers inside a test.
+  @override
+  Future<AuthApiUser> me({required String token}) async =>
+      AuthApiUser.fromJson(const <String, dynamic>{'id': 'u1', 'name': 'تاجر'});
 }
 
 /// A device that will not answer, which is what a test device does. Without
@@ -407,7 +414,7 @@ void main() {
     );
 
     expectSpeaks(tester, 'merchant dashboard');
-    expect(find.text('لا توجد طلبات حديثة'), findsOneWidget);
+    expect(find.text('لا توجد طلبات في هذه الفترة'), findsOneWidget);
   });
 
   testWidgets('the stores tab says the catalogue is empty', (

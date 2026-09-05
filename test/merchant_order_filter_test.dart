@@ -18,6 +18,19 @@ import 'auth_session_fixtures.dart';
 class _OrderApi extends ApiService {
   final List<Map<String, dynamic>> requests = <Map<String, dynamic>>[];
 
+  /// The dashboard reads orders too, through the same method, and it always
+  /// asks for a period. The orders tab asks for one only when the merchant
+  /// fills in the sheet's date fields, and no test here does that while also
+  /// caring which request it is looking at - so the presence of `from` tells
+  /// the two callers apart.
+  List<Map<String, dynamic>> get tabRequests => requests
+      .where((Map<String, dynamic> request) => !request.containsKey('from'))
+      .toList();
+
+  List<Map<String, dynamic>> get dashboardRequests => requests
+      .where((Map<String, dynamic> request) => request.containsKey('from'))
+      .toList();
+
   @override
   Future<OwnerBusiness> ownerBusiness({required String token}) async =>
       OwnerBusiness.fromJson(const <String, dynamic>{
@@ -28,6 +41,8 @@ class _OrderApi extends ApiService {
   @override
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async => BusinessDashboardData.fromJson(const <String, dynamic>{});
 
   @override
@@ -49,6 +64,12 @@ class _OrderApi extends ApiService {
 
     return OwnerOrderList.fromJson(const <String, dynamic>{});
   }
+
+  // The shell reads the account for the picture in its bar. Unstubbed, this
+  // would be a real request that never answers inside a test.
+  @override
+  Future<AuthApiUser> me({required String token}) async =>
+      AuthApiUser.fromJson(const <String, dynamic>{'id': 'u1', 'name': 'تاجر'});
 }
 
 void main() {
@@ -84,20 +105,33 @@ void main() {
     );
   }
 
+  /// The tab's own last request, which is what every claim below is about.
+  Map<String, dynamic> lastTabRequest() => api.tabRequests.last;
+
   group('the request the filter builds', () {
     test('the first load asks for every order, unfiltered', () async {
       await started();
 
-      expect(api.requests, hasLength(1));
-      expect(api.requests.single, <String, dynamic>{'statusGroup': ''});
+      expect(api.tabRequests, hasLength(1));
+      expect(api.tabRequests.single, <String, dynamic>{'statusGroup': ''});
+    });
+
+    test('the dashboard asks for its own period on the same load', () async {
+      await started();
+
+      // The dashboard's table reports on a period, so its request is not the
+      // tab's: one load produces both, and they must not be confused.
+      expect(api.dashboardRequests, hasLength(1));
+      expect(api.dashboardRequests.single.containsKey('to'), isTrue);
+      expect(api.dashboardRequests.single['statusGroup'], '');
     });
 
     test('the chip sends its status and never a status group', () async {
       final BusinessBloc bloc = await started();
       await apply(bloc, const MerchantOrderFilter(status: 'delivered'));
 
-      expect(api.requests.last['status'], 'delivered');
-      expect(api.requests.last['statusGroup'], '');
+      expect(lastTabRequest()['status'], 'delivered');
+      expect(lastTabRequest()['statusGroup'], '');
     });
 
     test('clearing the chip drops the status from the request', () async {
@@ -105,7 +139,7 @@ void main() {
       await apply(bloc, const MerchantOrderFilter(status: 'cancelled'));
       await apply(bloc, const MerchantOrderFilter());
 
-      expect(api.requests.last.containsKey('status'), isFalse);
+      expect(lastTabRequest().containsKey('status'), isFalse);
     });
 
     test('the sheet sends its four fields beside the chip', () async {
@@ -146,8 +180,8 @@ void main() {
             api.requests.length > before,
       );
 
-      expect(api.requests.last['status'], 'preparing');
-      expect(api.requests.last['q'], 'ياسمين');
+      expect(lastTabRequest()['status'], 'preparing');
+      expect(lastTabRequest()['q'], 'ياسمين');
     });
   });
 

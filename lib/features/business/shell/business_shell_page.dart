@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
@@ -17,6 +18,11 @@ import '../../../services/realtime_service.dart';
 import 'package:merzox/features/business/products/merchant_product_editor_page.dart';
 import 'package:merzox/features/business/shell/business_navigation_bar.dart';
 import '../models/business_models.dart';
+import '../models/dashboard_period.dart';
+import 'widgets/merchant_avatar_button.dart';
+import 'widgets/merchant_dashboard_controls.dart';
+import 'widgets/merchant_orders_table.dart';
+import 'widgets/order_status_presentation.dart';
 import '../orders/merchant_order_detail_page.dart';
 import '../settings/store_settings_page.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_bloc.dart';
@@ -197,7 +203,7 @@ class BusinessShellPage extends StatelessWidget {
               child: Stack(
                 children: <Widget>[
                   switch (state.selectedTab) {
-                    0 => _Dashboard(state: state),
+                    0 => _Dashboard(state: state, onLogout: _logout),
                     1 => _Orders(state: state),
                     3 => _Products(state: state),
                     4 => _Profile(
@@ -208,7 +214,7 @@ class BusinessShellPage extends StatelessWidget {
                       notificationPreferenceSessionReader:
                           notificationPreferenceSessionReader,
                     ),
-                    _ => _Dashboard(state: state),
+                    _ => _Dashboard(state: state, onLogout: _logout),
                   },
                   const Positioned(
                     left: 0,
@@ -238,44 +244,41 @@ class BusinessShellPage extends StatelessWidget {
 }
 
 class _PageHeader extends StatelessWidget {
+  /// The shop's name, plainly.
+  ///
+  /// It used to be wrapped in a greeting with a line under it summarising what
+  /// the screen was - two sentences telling the merchant things they knew,
+  /// above the figures they had opened the app to read.
   final String title;
-  final String? subtitle;
 
-  const _PageHeader({required this.title, this.subtitle});
+  /// The account's picture. Empty draws the placeholder glyph the bar used to
+  /// draw for everyone.
+  final String avatarUrl;
+
+  /// Signs the merchant out. It lives in the profile tab too; here it is the
+  /// outermost control in the bar, past the bell, so the destructive one is
+  /// the hardest of the three to reach by accident.
+  final VoidCallback? onLogout;
+
+  const _PageHeader({required this.title, this.avatarUrl = '', this.onLogout});
 
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
     child: Row(
       children: [
-        CircleAvatar(
-          backgroundColor: Colors.white,
-          child: Icon(
-            Icons.storefront_rounded,
-            color: MerzoxColors.kColor3D5A80,
-          ),
+        MerchantAvatarButton(
+          avatarUrl: avatarUrl,
+          onPicked: (Uint8List bytes) async =>
+              context.read<BusinessBloc>().add(BusinessAvatarPicked(bytes)),
         ),
         const SizedBox(width: 10),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-              if (subtitle != null)
-                Text(
-                  subtitle!,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: MerzoxColors.kColor8D99AE,
-                  ),
-                ),
-            ],
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
         ),
         IconButton(
@@ -290,6 +293,17 @@ class _PageHeader extends StatelessWidget {
           iconSize: 24,
           badgeSize: 8,
         ),
+        if (onLogout case final VoidCallback signOut)
+          IconButton(
+            key: const ValueKey<String>('merzox.businessShell.logout'),
+            tooltip: 'businessShell.logout'.tr(),
+            onPressed: signOut,
+            icon: const Icon(
+              Icons.logout_rounded,
+              size: 24,
+              color: MerzoxColors.kColor8D99AE,
+            ),
+          ),
       ],
     ),
   );
@@ -297,7 +311,9 @@ class _PageHeader extends StatelessWidget {
 
 class _Dashboard extends StatelessWidget {
   final BusinessState state;
-  const _Dashboard({required this.state});
+  final VoidCallback onLogout;
+
+  const _Dashboard({required this.state, required this.onLogout});
 
   @override
   Widget build(BuildContext context) {
@@ -310,24 +326,23 @@ class _Dashboard extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 24),
         children: [
           _PageHeader(
-            title: 'businessShell.welcome'.tr(args: [state.business!.name]),
-            subtitle: 'businessShell.dashboardSummary'.tr(),
+            title: state.business!.name,
+            avatarUrl: state.account?.avatarUrl ?? '',
+            onLogout: onLogout,
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: TextField(
-              readOnly: true,
-              decoration: InputDecoration(
-                hintText: 'businessShell.orderSearchHint'.tr(),
-                prefixIcon: const Icon(Icons.search_rounded),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+          MerchantOrderSearchField(
+            initialQuery: state.dashboardQuery,
+            onSearch: (String query) => context.read<BusinessBloc>().add(
+              BusinessDashboardSearchChanged(query),
             ),
+          ),
+          const SizedBox(height: 14),
+          MerchantPeriodButton(
+            period: state.dashboardPeriod,
+            today: DateTime.now(),
+            onChanged: (DashboardPeriod period) => context
+                .read<BusinessBloc>()
+                .add(BusinessDashboardPeriodChanged(period)),
           ),
           const SizedBox(height: 14),
           Padding(
@@ -352,6 +367,11 @@ class _Dashboard extends StatelessWidget {
                   child: _Metric(
                     'businessShell.visits'.tr(),
                     '${data?.viewCount ?? 0}',
+                    // Sales and orders answer to the period above; visits are
+                    // a running counter with no dates behind it, so the card
+                    // says which of the two it is rather than letting the
+                    // merchant assume.
+                    footnote: 'businessShell.visitsAllTime'.tr(),
                   ),
                 ),
               ],
@@ -379,10 +399,25 @@ class _Dashboard extends StatelessWidget {
           // Measured: the artboard's table header sits at y=393; without this
           // the section heading crowds straight into it 42px early.
           const SizedBox(height: 42),
-          if (data == null || data.recentOrders.isEmpty)
-            _Empty(message: 'businessShell.noRecentOrders'.tr())
+          if (state.dashboardBusy)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            )
+          else if (state.dashboardOrders.isEmpty)
+            _Empty(message: 'businessShell.noOrdersInPeriod'.tr())
           else
-            _RecentOrdersTable(orders: data.recentOrders),
+            MerchantOrdersTable(orders: state.dashboardOrders),
+          if (!state.dashboardBusy && state.dashboardOrders.isNotEmpty)
+            MerchantOrdersPager(
+              page: state.dashboardPage,
+              pageCount: state.dashboardPageCount,
+              total: state.dashboardOrderTotal,
+              busy: state.dashboardBusy,
+              onPage: (int page) => context.read<BusinessBloc>().add(
+                BusinessDashboardPageChanged(page),
+              ),
+            ),
         ],
       ),
     );
@@ -394,174 +429,18 @@ class _Dashboard extends StatelessWidget {
 /// A table rather than the cards the orders tab uses: a merchant scanning the
 /// day's orders reads five short columns faster than five stacked cards, which
 /// is presumably why the design puts one here and not there.
-class _RecentOrdersTable extends StatelessWidget {
-  final List<OwnerOrder> orders;
-
-  /// Null on the dashboard, where the table is a summary; the orders tab
-  /// passes a callback so a row opens the order it names.
-  final void Function(OwnerOrder order)? onOpen;
-
-  const _RecentOrdersTable({required this.orders, this.onOpen});
-
-  static const double _headerHeight = 48;
-  static const double _rowHeight = 37;
-
-  /// The artboard's first row starts 8 below the header, not flush with it.
-  static const double _bodyInset = 8;
-
-  /// Column weights, in reading order: number, date, customer, price, status.
-  static const List<int> _weights = <int>[4, 4, 4, 2, 4];
-
-  @override
-  Widget build(BuildContext context) {
-    final List<String> headings = <String>[
-      'businessShell.orderNumber'.tr(),
-      'businessShell.orderDate'.tr(),
-      'businessShell.orderCustomer'.tr(),
-      'businessShell.orderPrice'.tr(),
-      'businessShell.orderStatus'.tr(),
-    ];
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: Column(
-          children: <Widget>[
-            Container(
-              height: _headerHeight,
-              color: MerzoxColors.kColor3D5A80,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
-                children: <Widget>[
-                  for (int column = 0; column < headings.length; column++)
-                    Expanded(
-                      flex: _weights[column],
-                      child: Text(
-                        headings[column],
-                        textAlign: TextAlign.center,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            const ColoredBox(
-              color: MerzoxColors.kColorFDFDFD,
-              child: SizedBox(height: _bodyInset, width: double.infinity),
-            ),
-            for (final OwnerOrder order in orders)
-              _OrderRow(order: order, onOpen: onOpen),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 /// One 37-tall table row.
-class _OrderRow extends StatelessWidget {
-  final OwnerOrder order;
-  final void Function(OwnerOrder order)? onOpen;
-
-  const _OrderRow({required this.order, this.onOpen});
-
-  @override
-  Widget build(BuildContext context) {
-    final Widget row = SizedBox(
-      height: _RecentOrdersTable._rowHeight,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10),
-        child: Row(
-          children: <Widget>[
-            _Cell(
-              flex: _RecentOrdersTable._weights[0],
-              text: '#${order.publicId}',
-            ),
-            _Cell(
-              flex: _RecentOrdersTable._weights[1],
-              text: _shortDate(order.createdAt),
-            ),
-            _Cell(
-              flex: _RecentOrdersTable._weights[2],
-              text: order.customerName,
-            ),
-            // The only emphasised value in the row, at 14 bold.
-            _Cell(
-              flex: _RecentOrdersTable._weights[3],
-              text: merzoxAmount(order.total),
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-            ),
-            Expanded(
-              flex: _RecentOrdersTable._weights[4],
-              child: Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: _StatusBadge(order.status),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-
-    return ColoredBox(
-      color: MerzoxColors.kColorFDFDFD,
-      child: onOpen == null
-          ? row
-          : InkWell(onTap: () => onOpen!(order), child: row),
-    );
-  }
-}
-
-class _Cell extends StatelessWidget {
-  final int flex;
-  final String text;
-  final double fontSize;
-  final FontWeight fontWeight;
-
-  const _Cell({
-    required this.flex,
-    required this.text,
-    this.fontSize = 11,
-    this.fontWeight = FontWeight.w400,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      flex: flex,
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontSize: fontSize,
-          fontWeight: fontWeight,
-          color: MerzoxColors.kColor3B3B3B,
-        ),
-      ),
-    );
-  }
-}
-
-String _shortDate(DateTime? value) {
-  if (value == null) return '';
-  final DateTime local = value.toLocal();
-  return '${local.day}/${local.month}/${local.year}';
-}
 
 class _Metric extends StatelessWidget {
   final String label;
   final String value;
-  const _Metric(this.label, this.value);
+
+  /// A quieter line under the figure, for a card whose figure does not mean
+  /// the same thing as its neighbours'.
+  final String? footnote;
+
+  const _Metric(this.label, this.value, {this.footnote});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -582,6 +461,16 @@ class _Metric extends StatelessWidget {
           value,
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
+        if (footnote case final String note) ...<Widget>[
+          const SizedBox(height: 4),
+          Text(
+            note,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 9, color: MerzoxColors.kColor8D99AE),
+          ),
+        ],
       ],
     ),
   );
@@ -597,9 +486,9 @@ class _Orders extends StatelessWidget {
   final BusinessState state;
   const _Orders({required this.state});
 
-  Map<String, String> get _statusLabels => <String, String>{
+  Map<String, String> get merchantOrderStatusLabels => <String, String>{
     for (final String status in _kOrderFilterStatuses)
-      status: _statusLabel(status),
+      status: merchantOrderStatusLabel(status),
   };
 
   @override
@@ -632,7 +521,7 @@ class _Orders extends StatelessWidget {
                 await showMerchantOrderFilterSheet(
                   context,
                   current: filter,
-                  statusLabels: _statusLabels,
+                  statusLabels: merchantOrderStatusLabels,
                 );
             if (next != null) apply(next);
           },
@@ -643,7 +532,7 @@ class _Orders extends StatelessWidget {
           trailing: MerchantStatusFilterChip(
             selected: filter.status,
             options: _kOrderFilterStatuses,
-            labelOf: _statusLabel,
+            labelOf: merchantOrderStatusLabel,
             onSelected: (String? status) => apply(
               filter.copyWith(status: status, clearStatus: status == null),
             ),
@@ -662,7 +551,7 @@ class _Orders extends StatelessWidget {
                 : ListView(
                     padding: const EdgeInsets.only(bottom: 20),
                     children: <Widget>[
-                      _RecentOrdersTable(
+                      MerchantOrdersTable(
                         orders: state.orders,
                         onOpen: (OwnerOrder order) =>
                             _openOrderDetail(context, state, order),
@@ -826,49 +715,10 @@ void _openOrderDetail(
   );
 }
 
-String _statusLabel(String status) => switch (status) {
-  'pending' => 'merchantOrder.statuses.pending'.tr(),
-  'confirmed' => 'businessShell.statuses.confirmed'.tr(),
-  'preparing' => 'merchantOrder.statuses.preparing'.tr(),
-  'outForDelivery' => 'merchantOrder.statuses.outForDelivery'.tr(),
-  'delivered' => 'merchantOrder.statuses.delivered'.tr(),
-  'cancelled' => 'merchantOrder.statuses.cancelled'.tr(),
-  _ => status,
-};
-
 /// Each status carries its own colour, sampled from the artboard's table.
 ///
 /// One colour for every status made the column decorative; five make it
 /// scannable, which is the whole point of showing status in a table.
-const Map<String, Color> _statusColors = <String, Color>{
-  'pending': Color(0xFFB9DDF3),
-  'confirmed': Color(0xFFB9DDF3),
-  'preparing': Color(0xFFF3EBB9),
-  'outForDelivery': Color(0xFFC6B9F3),
-  'delivered': Color(0xFFBFF3B9),
-  'cancelled': Color(0xFFF3B9B9),
-};
-
-class _StatusBadge extends StatelessWidget {
-  final String status;
-  const _StatusBadge(this.status);
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 58,
-    height: 19,
-    alignment: Alignment.center,
-    decoration: BoxDecoration(
-      color: _statusColors[status] ?? MerzoxColors.kColorDEEEF8,
-      borderRadius: BorderRadius.circular(4),
-    ),
-    child: Text(
-      _statusLabel(status),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: const TextStyle(fontSize: 11, color: MerzoxColors.kColor3B3B3B),
-    ),
-  );
-}
 
 /// The merchant product list, as `الرئيسية – 10` draws it.
 ///

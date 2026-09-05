@@ -440,8 +440,6 @@
     "createFailed": "تعذر إنشاء حساب الأعمال"
   },
   "businessShell": {
-    "welcome": "مرحباً، {}",
-    "dashboardSummary": "ملخص نشاط متجرك",
     "orderSearchHint": "رقم الطلب، اسم المستخدم...",
     "sales": "المبيعات",
     "orders": "الطلبات",
@@ -499,7 +497,25 @@
     "personalProfile": "الملف الشخصي",
     "contactUs": "تواصل معنا",
     "previewStore": "معاينة متجري",
-    "orderNotifications": "تنبيهات الطلبات"
+    "orderNotifications": "تنبيهات الطلبات",
+    "periodCurrentMonth": "الشهر الحالي",
+    "periodLastMonth": "آخر شهر",
+    "periodLastWeek": "آخر أسبوع",
+    "periodYear": "سنة كاملة",
+    "periodCustom": "مدى مخصص",
+    "periodPick": "اختر المدى",
+    "periodTitle": "فترة التقرير",
+    "visitsAllTime": "إجمالي منذ البداية",
+    "pageOf": "صفحة {} من {}",
+    "previousPage": "الصفحة السابقة",
+    "nextPage": "الصفحة التالية",
+    "ordersInPeriod": "{} طلباً في هذه الفترة",
+    "noOrdersInPeriod": "لا توجد طلبات في هذه الفترة",
+    "orderNumberCopied": "تم نسخ رقم الطلب",
+    "copyOrderNumber": "نسخ رقم الطلب",
+    "holdToCopy": "اضغط مطولاً لنسخ رقم الطلب",
+    "tapToSeeFull": "اضغط لعرض النص كاملاً",
+    "clearSearch": "مسح البحث"
   },
   "profile": {
     "title": "الملف الشخصي"
@@ -532,7 +548,13 @@
       "other": "آخر",
       "mobile": "جوال",
       "fax": "فاكس"
-    }
+    },
+    "changeAvatar": "تغيير صورة الحساب",
+    "avatarFromCamera": "التقاط صورة",
+    "avatarFromGallery": "اختيار من المعرض",
+    "avatarUpdated": "تم تحديث صورة الحساب",
+    "avatarFailed": "تعذّر رفع الصورة، حاول مرة أخرى",
+    "holdToChangeAvatar": "اضغط بشكل مستمر لتغيير الصورة"
   },
   "search": {
     "noResults": "لا توجد نتائج",
@@ -744,7 +766,13 @@
     "invalidRadius": "نطاق البحث غير صالح.",
     "routeNotFound": "هذا المورد غير موجود.",
     "duplicateValue": "هذه القيمة مستخدمة مسبقاً.",
-    "invalidRequest": "بعض البيانات غير صالحة. راجعها ثم أعد المحاولة."
+    "invalidRequest": "بعض البيانات غير صالحة. راجعها ثم أعد المحاولة.",
+    "avatarImageRequired": "اختر صورة أولاً",
+    "avatarImageInvalid": "تعذّرت قراءة الصورة، جرّب صورة أخرى",
+    "avatarImageTooLarge": "الصورة كبيرة جداً، الحد الأقصى 5 ميغابايت",
+    "avatarContentTypeUnsupported": "صيغة الصورة غير مدعومة، استخدم JPG أو PNG",
+    "imageUploadFailed": "تعذّر رفع الصورة، حاول مرة أخرى",
+    "imageHostNotConfigured": "رفع الصور غير مهيّأ على الخادم"
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",

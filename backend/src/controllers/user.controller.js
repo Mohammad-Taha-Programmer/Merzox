@@ -6,6 +6,9 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { normalizeGender, normalizeIdentifier, normalizePhone } from '../utils/normalize.js';
 import { pick } from '../utils/pick.js';
+import { readAvatarImage } from '../policies/avatar.policy.js';
+import { deleteImage, uploadImage } from '../services/image-host.service.js';
+import { applyPictureToOwnedBusiness } from '../services/account-picture.service.js';
 import {
   notificationPreferenceView,
   parseNotificationPreferencePatch,
@@ -218,6 +221,43 @@ export const updateMe = asyncHandler(async (req, res) => {
   }
 
   await req.user.save();
+
+  res.json({ success: true, data: { user: req.user.toSafeJSON() } });
+});
+
+/**
+ * Replaces the signed-in account's picture.
+ *
+ * The image is uploaded here rather than by the app: the host's key is a
+ * secret, and a key inside a mobile binary is not one. The account keeps the
+ * URL that comes back, so a picture survives a reinstall.
+ */
+export const updateMyAvatar = asyncHandler(async (req, res) => {
+  // The body is read before the upload is attempted: an image that will be
+  // refused for its size or its format should cost nothing to refuse.
+  const { base64 } = readAvatarImage(req.body);
+
+  const { url, publicId } = await uploadImage(base64);
+
+  // Read before it is overwritten: this is the only handle on the picture
+  // being replaced.
+  const superseded = req.user.avatarPublicId;
+
+  req.user.avatarUrl = url;
+  req.user.avatarPublicId = publicId;
+  await req.user.save();
+
+  // A merchant has one picture, not two: the shop they own wears it as its
+  // logo, so the bar they look at and the card a customer sees are the same
+  // image. A customer owns no shop and this does nothing.
+  await applyPictureToOwnedBusiness(req.user._id, url);
+
+  // Only once the new picture is safely stored, and never at the cost of the
+  // request: a tidy-up that failed must not turn a successful change into an
+  // error the merchant has to read.
+  if (superseded && superseded !== publicId) {
+    await deleteImage(superseded);
+  }
 
   res.json({ success: true, data: { user: req.user.toSafeJSON() } });
 });

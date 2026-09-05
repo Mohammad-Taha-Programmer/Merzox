@@ -139,6 +139,8 @@ class _SpyApi extends ApiService {
   @override
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async {
     calls.add('businessDashboard');
     return BusinessDashboardData.fromJson(const {});
@@ -161,6 +163,12 @@ class _SpyApi extends ApiService {
     calls.add('ownerProducts');
     return const [];
   }
+
+  // The shell reads the account for the picture in its bar. Unstubbed, this
+  // would be a real request that never answers inside a test.
+  @override
+  Future<AuthApiUser> me({required String token}) async =>
+      AuthApiUser.fromJson(const <String, dynamic>{'id': 'u1', 'name': 'تاجر'});
 }
 
 void main() {
