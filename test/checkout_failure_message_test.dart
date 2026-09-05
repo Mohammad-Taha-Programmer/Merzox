@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 import 'package:merzox/features/cart/checkout_failure.dart';
 
 /// What a customer reads when an order will not go through.
@@ -95,6 +96,25 @@ void main() {
     );
 
     expect(checkoutFailureCode(flat), 'INSUFFICIENT_STOCK');
+  });
+
+  test('these keys are not the kind `localizeApiErrorOrRaw` can translate', () {
+    // That helper translates only keys under `apiErrors.` and returns
+    // everything else untouched. The cart tab ran failures through it, so a
+    // refused order showed the customer the literal text
+    // `orders.checkoutOutOfStock`. Both screens call `.tr()` now, and this
+    // records why reaching for the helper here would be wrong again.
+    for (final String key in <String>{
+      ...checkoutFailureMessages.values,
+      checkoutFailureFallback,
+    }) {
+      expect(
+        localizeApiErrorOrRaw(key),
+        key,
+        reason: '$key would be shown raw',
+      );
+      expect(key.startsWith(apiErrorLocalizationPrefix), isFalse);
+    }
   });
 
   test('every message this map points at exists in both languages', () async {
