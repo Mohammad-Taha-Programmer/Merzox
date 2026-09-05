@@ -125,6 +125,28 @@ const userSchema = new mongoose.Schema(
       default: ''
     },
     addresses: { type: [addressSchema], default: [] },
+    // Where the account's picture is hosted. A URL, not the image: the bytes
+    // live with the image host, and this document keeps only the pointer.
+    // Empty means the app draws its own placeholder rather than a broken one.
+    avatarUrl: {
+      type: String,
+      trim: true,
+      maxlength: 500,
+      default: ''
+    },
+    // The host's own id for that picture. A URL cannot be turned back into
+    // one reliably, and without it a replaced picture could never be removed
+    // from the host - it would simply accumulate.
+    //
+    // Loaded like any other field: the request that replaces a picture needs
+    // it in hand to remove the one being replaced. It is internal rather than
+    // secret, and `toSafeJSON` simply does not put it on the wire.
+    avatarPublicId: {
+      type: String,
+      trim: true,
+      maxlength: 250,
+      default: ''
+    },
     userType: {
       type: String,
       enum: ['normal', 'business'],
@@ -206,6 +228,7 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
   return {
     id: this._id.toString(),
     name: this.name,
+    avatarUrl: this.avatarUrl ?? '',
     email: this.email ?? null,
     emailVerified: this.emailVerified,
     emails: this.emails,

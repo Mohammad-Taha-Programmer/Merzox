@@ -440,8 +440,6 @@
     "createFailed": "Could not create business account"
   },
   "businessShell": {
-    "welcome": "Welcome, {}",
-    "dashboardSummary": "Store activity summary",
     "orderSearchHint": "Order number, customer name...",
     "sales": "Sales",
     "orders": "Orders",
@@ -499,7 +497,25 @@
     "personalProfile": "Personal profile",
     "contactUs": "Contact us",
     "previewStore": "Preview my store",
-    "orderNotifications": "Order notifications"
+    "orderNotifications": "Order notifications",
+    "periodCurrentMonth": "This month",
+    "periodLastMonth": "Last month",
+    "periodLastWeek": "Last week",
+    "periodYear": "A full year",
+    "periodCustom": "Custom range",
+    "periodPick": "Pick a range",
+    "periodTitle": "Reporting period",
+    "visitsAllTime": "All time",
+    "pageOf": "Page {} of {}",
+    "previousPage": "Previous page",
+    "nextPage": "Next page",
+    "ordersInPeriod": "{} orders in this period",
+    "noOrdersInPeriod": "No orders in this period",
+    "orderNumberCopied": "Order number copied",
+    "copyOrderNumber": "Copy order number",
+    "holdToCopy": "Hold to copy the order number",
+    "tapToSeeFull": "Tap to read it in full",
+    "clearSearch": "Clear search"
   },
   "profile": {
     "title": "Profile"
@@ -532,7 +548,13 @@
       "other": "Other",
       "mobile": "Mobile",
       "fax": "Fax"
-    }
+    },
+    "changeAvatar": "Change account picture",
+    "avatarFromCamera": "Take a photo",
+    "avatarFromGallery": "Choose from gallery",
+    "avatarUpdated": "Account picture updated",
+    "avatarFailed": "The picture could not be uploaded, try again",
+    "holdToChangeAvatar": "Hold to change the picture"
   },
   "search": {
     "noResults": "No results",
@@ -744,7 +766,13 @@
     "invalidRadius": "That search radius is invalid.",
     "routeNotFound": "This resource does not exist.",
     "duplicateValue": "That value is already in use.",
-    "invalidRequest": "Some of the details are invalid. Check them and try again."
+    "invalidRequest": "Some of the details are invalid. Check them and try again.",
+    "avatarImageRequired": "Choose a picture first",
+    "avatarImageInvalid": "That picture could not be read, try another one",
+    "avatarImageTooLarge": "That picture is too large, the limit is 5 MB",
+    "avatarContentTypeUnsupported": "That image format is not supported, use JPG or PNG",
+    "imageUploadFailed": "The picture could not be uploaded, try again",
+    "imageHostNotConfigured": "Image uploads are not configured on the server"
   },
   "courierLocation": {
     "loginEntry": "Share courier location",

@@ -850,6 +850,8 @@ final class _SeedMerchantApi extends ApiService {
   @override
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async => BusinessDashboardData.fromJson(const <String, dynamic>{});
 
   @override
@@ -864,6 +866,11 @@ final class _SeedMerchantApi extends ApiService {
   @override
   Future<List<OwnerProduct>> ownerProducts({required String token}) async =>
       const <OwnerProduct>[];
+  // The shell reads the account for the picture in its bar. Unstubbed, this
+  // would be a real request that never answers inside a test.
+  @override
+  Future<AuthApiUser> me({required String token}) async =>
+      AuthApiUser.fromJson(const <String, dynamic>{'id': 'u1', 'name': 'تاجر'});
 }
 
 /// One recent order row, in the shape the merchant dashboard table draws.
@@ -896,6 +903,8 @@ final class _SeedDashboardApi extends _SeedMerchantApi {
   @override
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async {
     return BusinessDashboardData.fromJson(<String, dynamic>{
       'sales': 98000,
@@ -905,6 +914,31 @@ final class _SeedDashboardApi extends _SeedMerchantApi {
       'recentOrders': <Map<String, dynamic>>[
         for (int index = 0; index < 5; index++) _seedOwnerOrder(index),
       ],
+    });
+  }
+
+  /// The dashboard's table reads the order list now, not the figures payload:
+  /// its rows answer to the period control above them, and a period is
+  /// something only the order endpoint understands.
+  @override
+  Future<OwnerOrderList> ownerOrders({
+    required String token,
+    String statusGroup = '',
+    MerchantOrderFilter filter = const MerchantOrderFilter(),
+    int page = 1,
+    int limit = 20,
+  }) async {
+    return OwnerOrderList.fromJson(<String, dynamic>{
+      'orders': <Map<String, dynamic>>[
+        for (int index = 0; index < 5; index++) _seedOwnerOrder(index),
+      ],
+      'counts': const <String, dynamic>{'total': 5},
+      'pagination': const <String, dynamic>{
+        'page': 1,
+        'limit': 50,
+        'total': 5,
+        'hasMore': false,
+      },
     });
   }
 }

@@ -192,6 +192,8 @@ class _SpyMerchantApi extends ApiService {
   @override
   Future<BusinessDashboardData> businessDashboard({
     required String token,
+    DateTime? from,
+    DateTime? to,
   }) async => BusinessDashboardData.fromJson(const {});
 
   @override
@@ -206,6 +208,11 @@ class _SpyMerchantApi extends ApiService {
   @override
   Future<List<OwnerProduct>> ownerProducts({required String token}) async =>
       const [];
+  // The shell reads the account for the picture in its bar. Unstubbed, this
+  // would be a real request that never answers inside a test.
+  @override
+  Future<AuthApiUser> me({required String token}) async =>
+      AuthApiUser.fromJson(const <String, dynamic>{'id': 'u1', 'name': 'تاجر'});
 }
 
 /// A product exactly as the PUBLIC serializer would deliver it, parsed from a
@@ -1384,17 +1391,15 @@ void main() {
         );
         await settleFrames(tester);
 
-        final welcome = isArabic
-            ? 'مرحباً، $_ownerName'
-            : 'Welcome, $_ownerName';
-
-        final summary = isArabic ? 'ملخص نشاط متجرك' : 'Store activity summary';
-
-        expect(find.text(welcome), findsOneWidget);
-        expect(find.text(summary), findsOneWidget);
+        // The header carries the shop's name and nothing else: the greeting
+        // that used to wrap it, and the line summarising the screen under it,
+        // told the merchant two things they already knew above the figures
+        // they had opened the app to read. The claim here was always about
+        // direction, so it now hangs off the name that remains.
+        expect(find.text(_ownerName), findsOneWidget);
 
         expect(
-          Directionality.of(tester.element(find.text(welcome))),
+          Directionality.of(tester.element(find.text(_ownerName))),
           direction,
         );
 

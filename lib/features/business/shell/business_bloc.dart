@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:merzox/features/business/models/dashboard_period.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../services/api_service.dart';
@@ -30,6 +33,34 @@ final class BusinessOrderFilterChanged extends BusinessEvent {
   final MerchantOrderFilter filter;
 
   const BusinessOrderFilterChanged(this.filter);
+}
+
+/// The merchant chose a new picture for the account.
+final class BusinessAvatarPicked extends BusinessEvent {
+  final Uint8List bytes;
+
+  const BusinessAvatarPicked(this.bytes);
+}
+
+/// The dashboard's period control moved.
+final class BusinessDashboardPeriodChanged extends BusinessEvent {
+  final DashboardPeriod period;
+
+  const BusinessDashboardPeriodChanged(this.period);
+}
+
+/// The dashboard's search field settled on a needle.
+final class BusinessDashboardSearchChanged extends BusinessEvent {
+  final String query;
+
+  const BusinessDashboardSearchChanged(this.query);
+}
+
+/// A page of the dashboard's orders table was asked for.
+final class BusinessDashboardPageChanged extends BusinessEvent {
+  final int page;
+
+  const BusinessDashboardPageChanged(this.page);
 }
 
 final class BusinessOrderStatusChanged extends BusinessEvent {
@@ -126,6 +157,23 @@ final class BusinessState {
   /// filter sheet.
   final MerchantOrderFilter orderFilter;
 
+  /// What the dashboard is reporting on: the period its control names, the
+  /// needle its search field holds, and the page of the table below them.
+  final DashboardPeriod dashboardPeriod;
+  final String dashboardQuery;
+  final int dashboardPage;
+
+  /// The dashboard's own table. Separate from [orders], which belongs to the
+  /// orders tab and answers to a different filter.
+  final List<OwnerOrder> dashboardOrders;
+  final int dashboardOrderTotal;
+  final bool dashboardBusy;
+
+  /// The signed-in account. The shell shows its picture in the bar, which is
+  /// the account's, not the shop's - a shop already has its own logo
+  /// elsewhere.
+  final AuthApiUser? account;
+
   final OwnerBusiness? business;
   final BusinessDashboardData? dashboard;
   final List<OwnerOrder> orders;
@@ -150,6 +198,13 @@ final class BusinessState {
     this.status = BusinessStatus.initial,
     this.selectedTab = 0,
     this.orderFilter = const MerchantOrderFilter(),
+    this.dashboardPeriod = DashboardPeriod.initial,
+    this.dashboardQuery = '',
+    this.dashboardPage = 1,
+    this.dashboardOrders = const [],
+    this.dashboardOrderTotal = 0,
+    this.dashboardBusy = false,
+    this.account,
     this.business,
     this.dashboard,
     this.orders = const [],
@@ -165,6 +220,13 @@ final class BusinessState {
     BusinessStatus? status,
     int? selectedTab,
     MerchantOrderFilter? orderFilter,
+    DashboardPeriod? dashboardPeriod,
+    String? dashboardQuery,
+    int? dashboardPage,
+    List<OwnerOrder>? dashboardOrders,
+    int? dashboardOrderTotal,
+    bool? dashboardBusy,
+    AuthApiUser? account,
     OwnerBusiness? business,
     BusinessDashboardData? dashboard,
     List<OwnerOrder>? orders,
@@ -179,6 +241,13 @@ final class BusinessState {
     status: status ?? this.status,
     selectedTab: selectedTab ?? this.selectedTab,
     orderFilter: orderFilter ?? this.orderFilter,
+    dashboardPeriod: dashboardPeriod ?? this.dashboardPeriod,
+    dashboardQuery: dashboardQuery ?? this.dashboardQuery,
+    dashboardPage: dashboardPage ?? this.dashboardPage,
+    dashboardOrders: dashboardOrders ?? this.dashboardOrders,
+    dashboardOrderTotal: dashboardOrderTotal ?? this.dashboardOrderTotal,
+    dashboardBusy: dashboardBusy ?? this.dashboardBusy,
+    account: account ?? this.account,
     business: business ?? this.business,
     dashboard: dashboard ?? this.dashboard,
     orders: orders ?? this.orders,
@@ -191,17 +260,34 @@ final class BusinessState {
         ? null
         : courierLocationHandoff ?? this.courierLocationHandoff,
   );
+
+  /// How many pages the dashboard's table has, never fewer than one so the
+  /// counter reads `1 / 1` on an empty period rather than `1 / 0`.
+  int get dashboardPageCount {
+    if (dashboardOrderTotal <= 0) return 1;
+    return (dashboardOrderTotal + BusinessBloc.dashboardPageSize - 1) ~/
+        BusinessBloc.dashboardPageSize;
+  }
 }
 
 class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
   final ApiService _apiService;
   final AuthSessionService _authSessionService;
 
+  /// Read rather than called directly so a test can say what day it is, which
+  /// is the only way to state what `this month` resolves to.
+  final DateTime Function() _now;
+
+  /// The server's own ceiling. Asking for more is refused, not truncated.
+  static const int dashboardPageSize = 50;
+
   BusinessBloc({
     ApiService? apiService,
     AuthSessionService authSessionService = const AuthSessionService(),
+    DateTime Function()? now,
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
+       _now = now ?? DateTime.now,
        super(const BusinessState()) {
     on<BusinessStarted>(_onStarted);
     on<BusinessTabChanged>((event, emit) {
@@ -209,6 +295,10 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     });
     on<BusinessRefreshed>(_onRefreshed);
     on<BusinessOrderFilterChanged>(_onOrderFilterChanged);
+    on<BusinessDashboardPeriodChanged>(_onDashboardPeriodChanged);
+    on<BusinessDashboardSearchChanged>(_onDashboardSearchChanged);
+    on<BusinessDashboardPageChanged>(_onDashboardPageChanged);
+    on<BusinessAvatarPicked>(_onAvatarPicked);
     on<BusinessOrderStatusChanged>(_onOrderStatusChanged);
     on<BusinessOrderCustomerNotified>(_onOrderCustomerNotified);
     on<BusinessOrderCourierAssigned>(_onOrderCourierAssigned);
@@ -252,21 +342,49 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     if (showLoading) emit(state.copyWith(status: BusinessStatus.loading));
     try {
       final token = await _token();
+      // The dashboard opens on its own period rather than on everything the
+      // shop has ever sold, so its figures and its table agree from the first
+      // frame instead of jumping when the control is first touched.
+      final MerchantOrderFilter dashboard = _dashboardFilter();
+
       final results = await Future.wait<dynamic>([
         _apiService.ownerBusiness(token: token),
-        _apiService.businessDashboard(token: token),
+        // The account is read for its picture, which is decoration. A shell
+        // that would not open because a portrait could not be fetched would
+        // be a worse screen than one with a placeholder on it, so this arm
+        // cannot sink the load.
+        _apiService
+            .me(token: token)
+            .then<AuthApiUser?>((AuthApiUser user) => user)
+            .onError((_, _) => null),
+        _apiService.businessDashboard(
+          token: token,
+          from: dashboard.from,
+          to: dashboard.to,
+        ),
         _ownerOrders(token),
         _apiService.ownerProducts(token: token),
+        _apiService.ownerOrders(
+          token: token,
+          filter: dashboard,
+          page: 1,
+          limit: dashboardPageSize,
+        ),
       ]);
-      final orderList = results[2] as OwnerOrderList;
+      final orderList = results[3] as OwnerOrderList;
+      final dashboardOrders = results[5] as OwnerOrderList;
       emit(
         state.copyWith(
           status: BusinessStatus.ready,
           business: results[0] as OwnerBusiness,
-          dashboard: results[1] as BusinessDashboardData,
+          account: results[1] as AuthApiUser?,
+          dashboard: results[2] as BusinessDashboardData,
           orders: orderList.orders,
           orderCounts: orderList.counts,
-          products: results[3] as List<OwnerProduct>,
+          products: results[4] as List<OwnerProduct>,
+          dashboardOrders: dashboardOrders.orders,
+          dashboardOrderTotal: dashboardOrders.total,
+          dashboardPage: 1,
         ),
       );
     } catch (error) {
@@ -283,6 +401,130 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
   /// `status` and `statusGroup` pair can never both be sent.
   Future<OwnerOrderList> _ownerOrders(String token) =>
       _apiService.ownerOrders(token: token, filter: state.orderFilter);
+
+  /// What the dashboard is asking the server for: the period its control
+  /// names, plus whatever its search field holds.
+  MerchantOrderFilter _dashboardFilter([
+    DashboardPeriod? period,
+    String? query,
+  ]) {
+    final DayRange days = (period ?? state.dashboardPeriod).boundsOn(_now());
+    return MerchantOrderFilter(
+      query: (query ?? state.dashboardQuery).trim(),
+      from: days.from,
+      to: days.to,
+    );
+  }
+
+  /// Re-reads the dashboard: the three figures and the page of the table.
+  ///
+  /// Both go in one request pair against the same period, so the figures can
+  /// never describe a period the rows below them do not.
+  Future<void> _loadDashboard(
+    Emitter<BusinessState> emit, {
+    DashboardPeriod? period,
+    String? query,
+    int? page,
+  }) async {
+    final DashboardPeriod nextPeriod = period ?? state.dashboardPeriod;
+    final String nextQuery = query ?? state.dashboardQuery;
+    // Narrowing the period or the needle puts the reader back on the first
+    // page: page nine of the old result is not page nine of the new one.
+    final int nextPage = page ?? 1;
+
+    emit(
+      state.copyWith(
+        dashboardPeriod: nextPeriod,
+        dashboardQuery: nextQuery,
+        dashboardPage: nextPage,
+        dashboardBusy: true,
+      ),
+    );
+
+    try {
+      final String token = await _token();
+      final MerchantOrderFilter filter = _dashboardFilter(
+        nextPeriod,
+        nextQuery,
+      );
+
+      final List<dynamic> results =
+          await Future.wait<dynamic>(<Future<dynamic>>[
+            _apiService.ownerOrders(
+              token: token,
+              filter: filter,
+              page: nextPage,
+              limit: dashboardPageSize,
+            ),
+            _apiService.businessDashboard(
+              token: token,
+              from: filter.from,
+              to: filter.to,
+            ),
+          ]);
+      final OwnerOrderList list = results[0] as OwnerOrderList;
+
+      emit(
+        state.copyWith(
+          dashboardBusy: false,
+          dashboardOrders: list.orders,
+          dashboardOrderTotal: list.total,
+          dashboard: results[1] as BusinessDashboardData,
+        ),
+      );
+    } catch (error) {
+      emit(
+        state.copyWith(
+          dashboardBusy: false,
+          errorMessage: ApiService.messageFromError(error),
+        ),
+      );
+    }
+  }
+
+  /// Sends the chosen picture and keeps whatever the server says it is now.
+  ///
+  /// The URL is read back from the response rather than guessed at, because
+  /// the image host - not this app - decides where the picture ends up.
+  Future<void> _onAvatarPicked(
+    BusinessAvatarPicked event,
+    Emitter<BusinessState> emit,
+  ) async {
+    try {
+      final AuthApiUser account = await _apiService.uploadMyAvatar(
+        token: await _token(),
+        bytes: event.bytes,
+      );
+
+      emit(
+        state.copyWith(
+          account: account,
+          noticeCode: 'profileEdit.avatarUpdated',
+        ),
+      );
+    } catch (error) {
+      emit(state.copyWith(errorMessage: ApiService.messageFromError(error)));
+    }
+  }
+
+  Future<void> _onDashboardPeriodChanged(
+    BusinessDashboardPeriodChanged event,
+    Emitter<BusinessState> emit,
+  ) => _loadDashboard(emit, period: event.period);
+
+  Future<void> _onDashboardSearchChanged(
+    BusinessDashboardSearchChanged event,
+    Emitter<BusinessState> emit,
+  ) => _loadDashboard(emit, query: event.query);
+
+  Future<void> _onDashboardPageChanged(
+    BusinessDashboardPageChanged event,
+    Emitter<BusinessState> emit,
+  ) {
+    final int page = event.page.clamp(1, state.dashboardPageCount);
+    if (page == state.dashboardPage) return Future<void>.value();
+    return _loadDashboard(emit, page: page);
+  }
 
   Future<void> _onOrderFilterChanged(
     BusinessOrderFilterChanged event,

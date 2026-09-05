@@ -211,10 +211,17 @@ final class OwnerOrderList {
   final Map<String, int> counts;
   final bool hasMore;
 
+  /// How many orders match, across every page. `hasMore` alone cannot say how
+  /// many pages there are, which is what a page counter has to show.
+  final int total;
+  final int page;
+
   const OwnerOrderList({
     required this.orders,
     required this.counts,
     required this.hasMore,
+    this.total = 0,
+    this.page = 1,
   });
 
   factory OwnerOrderList.fromJson(Map<String, dynamic> json) {
@@ -230,6 +237,8 @@ final class OwnerOrderList {
         (key, value) => MapEntry(key, (value as num?)?.toInt() ?? 0),
       ),
       hasMore: pagination['hasMore'] as bool? ?? false,
+      total: (pagination['total'] as num?)?.toInt() ?? rawOrders.length,
+      page: (pagination['page'] as num?)?.toInt() ?? 1,
     );
   }
 }

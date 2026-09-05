@@ -188,9 +188,18 @@ export const updateMyBusiness = asyncHandler(async (req, res) => {
 
 export const getMyBusinessDashboard = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);
+
+  // The dashboard's period control narrows the figures as well as the table
+  // beneath them. `ownerOrderFilterFields` already parses and bounds the two
+  // calendar days for the orders list, so the same reading is used here rather
+  // than a second one that could drift from it.
+  const range = ownerOrderFilterFields(req.query);
+  const match = { business: business._id };
+  if (range.createdAt) match.createdAt = range.createdAt;
+
   const [summary, recentOrders] = await Promise.all([
     Order.aggregate([
-      { $match: { business: business._id } },
+      { $match: match },
       {
         $group: {
           _id: null,
@@ -208,7 +217,7 @@ export const getMyBusinessDashboard = asyncHandler(async (req, res) => {
         }
       }
     ]),
-    Order.find({ business: business._id }).sort({ createdAt: -1, _id: -1 }).limit(5)
+    Order.find(match).sort({ createdAt: -1, _id: -1 }).limit(5)
   ]);
   const totals = summary[0] ?? { sales: 0, orderCount: 0, activeOrderCount: 0 };
 
@@ -219,6 +228,9 @@ export const getMyBusinessDashboard = asyncHandler(async (req, res) => {
         sales: totals.sales,
         orderCount: totals.orderCount,
         activeOrderCount: totals.activeOrderCount,
+        // Visits are a running counter on the business, not a series of dated
+        // events, so there is nothing to narrow them by. It stays the lifetime
+        // figure whatever period is asked for, and the screen says so.
         viewCount: business.viewCount,
         recentOrders: recentOrders.map((order) => order.toMerchantJSON())
       }

@@ -14,6 +14,14 @@ library;
 
 const Map<String, String> apiErrorMessageKeys = <String, String>{
   // -- Session and account -------------------------------------------------
+  // Setting an account picture. The image host is spoken to by the server, so
+  // its refusals arrive as codes like any other.
+  'AVATAR_IMAGE_REQUIRED': 'apiErrors.avatarImageRequired',
+  'AVATAR_IMAGE_INVALID': 'apiErrors.avatarImageInvalid',
+  'AVATAR_IMAGE_TOO_LARGE': 'apiErrors.avatarImageTooLarge',
+  'AVATAR_CONTENT_TYPE_UNSUPPORTED': 'apiErrors.avatarContentTypeUnsupported',
+  'IMAGE_UPLOAD_FAILED': 'apiErrors.imageUploadFailed',
+  'IMAGE_HOST_NOT_CONFIGURED': 'apiErrors.imageHostNotConfigured',
   'AUTH_REQUIRED': 'apiErrors.authRequired',
   'AUTH_INVALID': 'apiErrors.sessionInvalid',
   'ACCOUNT_DISABLED': 'apiErrors.accountDisabled',

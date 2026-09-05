@@ -23,8 +23,11 @@ const CLIENT_FACING = ['controllers', 'middleware', 'policies', 'routes', 'servi
  * `appCode` and `reason` are both log payload: they name what the server did
  * for whoever reads the journal afterwards. A constant that appears only there
  * is never shown to anyone, so it needs no sentence.
+ *
+ * `method` is an HTTP verb on an outgoing request - `method: 'POST'` reads as
+ * a shouting constant to the scan below, and is not a refusal at all.
  */
-const LOG_FIELDS = new Set(['appCode', 'reason']);
+const LOG_FIELDS = new Set(['appCode', 'reason', 'method']);
 
 function jsFilesUnder(dir) {
   const out = [];
