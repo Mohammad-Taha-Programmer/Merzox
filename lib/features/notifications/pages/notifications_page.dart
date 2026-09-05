@@ -8,6 +8,7 @@ import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../bloc/notifications_bloc.dart';
+import '../notification_destination.dart';
 import '../bloc/notifications_event.dart';
 import '../bloc/notifications_state.dart';
 
@@ -51,28 +52,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
       NotificationMarkedRead(notification.id),
     );
 
-    switch (notification.type) {
-      case 'newMessage':
-        if (notification.conversationId.isNotEmpty) {
-          context.push(
-            Uri(
-              path: '/chat',
-              queryParameters: {
-                'conversationId': notification.conversationId,
-                'title': notification.title,
-              },
-            ).toString(),
-          );
-        }
-      case 'orderPlaced':
-      case 'orderStatus':
-      case 'orderCancelled':
-        if (notification.orderId.isNotEmpty) {
-          context.push('/orders/${notification.orderId}/tracking');
-        }
-      default:
-        break;
-    }
+    final String? destination = notificationDestination(
+      notification,
+      businessAudience: context.read<NotificationsBloc>().businessAudience,
+    );
+
+    if (destination != null) context.push(destination);
   }
 
   @override
