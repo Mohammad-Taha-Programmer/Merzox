@@ -43,30 +43,6 @@ function staleBefore(now, staleAfterMs) {
 }
 
 /**
- * What a FINALIZATION claim may match: an undecided checkout, or a
- * finalization whose owner has gone quiet past the abandonment lease.
- *
- * It can never match `releasing`, `released` or `finalized`. Staleness does not
- * change that - it only decides whether the SAME decision may be resumed.
- */
-export function finalizationClaimFilter({
-  intentId,
-  now = Date.now(),
-  staleAfterMs = CHECKOUT_STALE_LEASE_MS
-}) {
-  return {
-    _id: intentId,
-    $or: [
-      { phase: { $in: CLAIMABLE_PHASES } },
-      {
-        phase: CHECKOUT_CLAIMS.finalizing,
-        updatedAt: { $lte: staleBefore(now, staleAfterMs) }
-      }
-    ]
-  };
-}
-
-/**
  * What a RELEASE claim may match: an undecided checkout, or a release whose
  * owner has gone quiet past the abandonment lease.
  *

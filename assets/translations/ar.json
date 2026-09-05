@@ -446,7 +446,6 @@
     "visits": "الزيارات",
     "latestOrders": "أحدث الطلبات",
     "more": "المزيد",
-    "noRecentOrders": "لا توجد طلبات حديثة",
     "orderGroups": {},
     "noOrders": "لا توجد طلبات في هذه القائمة",
     "noProducts": "لم تضف منتجات بعد",
@@ -512,7 +511,6 @@
     "ordersInPeriod": "{} طلباً في هذه الفترة",
     "noOrdersInPeriod": "لا توجد طلبات في هذه الفترة",
     "orderNumberCopied": "تم نسخ رقم الطلب",
-    "copyOrderNumber": "نسخ رقم الطلب",
     "holdToCopy": "اضغط مطولاً لنسخ رقم الطلب",
     "tapToSeeFull": "اضغط لعرض النص كاملاً",
     "clearSearch": "مسح البحث"
@@ -549,11 +547,9 @@
       "mobile": "جوال",
       "fax": "فاكس"
     },
-    "changeAvatar": "تغيير صورة الحساب",
     "avatarFromCamera": "التقاط صورة",
     "avatarFromGallery": "اختيار من المعرض",
     "avatarUpdated": "تم تحديث صورة الحساب",
-    "avatarFailed": "تعذّر رفع الصورة، حاول مرة أخرى",
     "holdToChangeAvatar": "اضغط بشكل مستمر لتغيير الصورة"
   },
   "search": {

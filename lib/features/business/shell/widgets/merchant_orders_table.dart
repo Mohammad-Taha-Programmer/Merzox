@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../core/constants/colors.dart';
+import '../../../../core/constants/dates.dart';
 import '../../../../core/constants/money.dart';
 import '../../models/business_models.dart';
 import 'full_value_dialog.dart';
@@ -124,7 +125,9 @@ class MerchantOrderRow extends StatelessWidget {
             ),
             MerchantOrderCell(
               flex: MerchantOrdersTable.weights[1],
-              text: merchantShortDate(order.createdAt),
+              // Blank rather than a placeholder: a dense table reads better
+              // with a gap than with `--/--/----` in it.
+              text: merzoxDay(order.createdAt, whenMissing: ''),
               expandable: !rowOwnsTheTap,
             ),
             MerchantOrderCell(
@@ -140,7 +143,7 @@ class MerchantOrderRow extends StatelessWidget {
               flex: MerchantOrdersTable.weights[3],
               // The figure is money and read as a bare number without this;
               // every other total on the merchant's screens carries the sign.
-              text: '${merzoxAmount(order.total)} ₪',
+              text: merzoxPrice(order.total),
               expandable: !rowOwnsTheTap,
               fontSize: 14,
               fontWeight: FontWeight.w700,
@@ -245,10 +248,4 @@ class MerchantOrderCell extends StatelessWidget {
       ),
     );
   }
-}
-
-String merchantShortDate(DateTime? value) {
-  if (value == null) return '';
-  final DateTime local = value.toLocal();
-  return '${local.day}/${local.month}/${local.year}';
 }

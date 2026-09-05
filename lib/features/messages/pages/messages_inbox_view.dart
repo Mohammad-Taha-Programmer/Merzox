@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import 'package:merzox/core/constants/dates.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -475,5 +476,5 @@ String _formatTimestamp(DateTime? value, String localeName) {
     return DateFormat.E(localeName).format(local);
   }
 
-  return '${local.day}.${local.month}.${local.year}';
+  return merzoxDay(local);
 }

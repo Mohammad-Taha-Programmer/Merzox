@@ -130,8 +130,11 @@ class MerchantSearchRow extends StatelessWidget {
                   controller: controller,
                   onChanged: onChanged,
                   textAlignVertical: TextAlignVertical.center,
+                  // Ten was the artboard's figure and it is not readable on a
+                  // phone held at arm's length. Thirteen matches the status
+                  // chip beside it, so the row reads at one size.
                   style: const TextStyle(
-                    fontSize: 10,
+                    fontSize: 13,
                     color: MerzoxColors.kColor2B2B2B,
                   ),
                   decoration: InputDecoration(
@@ -139,7 +142,7 @@ class MerchantSearchRow extends StatelessWidget {
                     border: InputBorder.none,
                     hintText: hint,
                     hintStyle: const TextStyle(
-                      fontSize: 10,
+                      fontSize: 13,
                       color: MerzoxColors.kColorC7C7C7,
                     ),
                     contentPadding: const EdgeInsetsDirectional.fromSTEB(
@@ -236,11 +239,18 @@ class MerchantSectionRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: kMerchantGutter),
       child: SizedBox(
         height: kMerchantSectionRowHeight,
-        child: Stack(
+        // The heading used to be centred with the control pinned past it, so
+        // the two drifted together or apart with the heading's length. They
+        // sit at opposite ends now: the gap is whatever is left between them,
+        // and it is the same row whatever either of them says.
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: <Widget>[
-            Center(
+            Flexible(
               child: Text(
                 heading,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -248,13 +258,7 @@ class MerchantSectionRow extends StatelessWidget {
                 ),
               ),
             ),
-            if (trailing != null)
-              PositionedDirectional(
-                end: 0,
-                top: 0,
-                bottom: 0,
-                child: Center(child: trailing!),
-              ),
+            if (trailing case final Widget control) control,
           ],
         ),
       ),
@@ -299,12 +303,31 @@ class MerchantStatusFilterChip extends StatelessWidget {
               PopupMenuItem<String>(
                 value: status,
                 height: 34,
-                child: Text(
-                  labelOf(status),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: MerzoxColors.kColor2B2B2B,
-                  ),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(
+                        labelOf(status),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: MerzoxColors.kColor2B2B2B,
+                        ),
+                      ),
+                    ),
+                    // Tapping the status that is already on clears it, which
+                    // the menu gave no sign of: it read the same open as
+                    // closed, so the way back to every order was something a
+                    // merchant had to be told rather than see.
+                    if (status == selected)
+                      const Icon(
+                        Icons.check_rounded,
+                        key: ValueKey<String>('merchantStatusFilter.checked'),
+                        size: 18,
+                        color: MerzoxColors.kColor3D5A80,
+                      ),
+                  ],
                 ),
               ),
           ],

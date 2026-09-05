@@ -422,30 +422,6 @@ class ApiService {
     return _addressesFrom(response.data);
   }
 
-  Future<List<SavedAddressApiModel>> setDefaultAddress({
-    required String token,
-    required String addressId,
-  }) async {
-    final response = await _dio.patch<Map<String, dynamic>>(
-      '/users/me/addresses/$addressId/default',
-      options: _authOptions(token),
-    );
-
-    return _addressesFrom(response.data);
-  }
-
-  Future<List<SavedAddressApiModel>> deleteAddress({
-    required String token,
-    required String addressId,
-  }) async {
-    final response = await _dio.delete<Map<String, dynamic>>(
-      '/users/me/addresses/$addressId',
-      options: _authOptions(token),
-    );
-
-    return _addressesFrom(response.data);
-  }
-
   static List<SavedAddressApiModel> _addressesFrom(Map<String, dynamic>? body) {
     final data = body?['data'] as Map<String, dynamic>? ?? const {};
     final List<dynamic> raw = data['addresses'] as List<dynamic>? ?? const [];

@@ -29,3 +29,15 @@ String merzoxAmount(num value) {
       ? withDecimals.substring(0, withDecimals.length - 1)
       : withDecimals;
 }
+
+/// The sign this app writes prices in.
+const String merzoxCurrencySign = '₪';
+
+/// An amount with its currency, which is what a reader needs.
+///
+/// A bare figure under a heading like `السعر` is a number without a unit, and
+/// a merchant reading a column of them has to be told which currency they are
+/// in. Screens were each appending the sign themselves, so the spacing and the
+/// order were one edit away from disagreeing between two screens showing the
+/// same order.
+String merzoxPrice(num value) => '${merzoxAmount(value)} $merzoxCurrencySign';

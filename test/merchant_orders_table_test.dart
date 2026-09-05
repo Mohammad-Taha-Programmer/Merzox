@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/constants/dates.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/shell/widgets/full_value_dialog.dart';
 import 'package:merzox/features/business/shell/widgets/merchant_orders_table.dart';
@@ -152,14 +153,14 @@ void main() {
   testWidgets('the date opens in full as well', (WidgetTester tester) async {
     await _pumpTable(tester, <OwnerOrder>[_order()]);
 
-    await tester.tap(find.text('15/2/2022'));
+    await tester.tap(find.text(merzoxDay(DateTime(2022, 2, 15))));
     await tester.pumpAndSettle();
 
     final Finder full = find.byKey(
       const ValueKey<String>('merchantOrders.fullValue'),
     );
     expect(full, findsOneWidget);
-    expect(tester.widget<Text>(full).data, '15/2/2022');
+    expect(tester.widget<Text>(full).data, merzoxDay(DateTime(2022, 2, 15)));
 
     await tester.pump(merchantFullValueDuration);
     await tester.pumpAndSettle();
