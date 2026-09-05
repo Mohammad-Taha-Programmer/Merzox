@@ -18,6 +18,7 @@ import '../features/authentication/password_recovery/pages/forgot_password_page.
 import '../features/authentication/password_recovery/pages/reset_password_page.dart';
 import '../features/business/enrollment/business_enrollment_bloc.dart';
 import '../features/business/messages/merchant_messages_page.dart';
+import '../features/business/orders/merchant_order_route.dart';
 import '../features/business/enrollment/business_enrollment_page.dart';
 import '../features/business/preview/store_preview_page.dart';
 import '../features/business/shell/business_bloc.dart';
@@ -277,6 +278,14 @@ class AppRouter {
           create: (_) => OrdersBloc()..add(const OrdersStarted()),
           child: const OrdersPage(),
         ),
+      ),
+      // A merchant arriving from a notification. The customer's tracking route
+      // below looks an order up among the reader's OWN orders, so a merchant
+      // sent there is told their own shop's order does not exist.
+      GoRoute(
+        path: '/business/orders/:orderId',
+        builder: (_, state) =>
+            MerchantOrderRoute(orderId: state.pathParameters['orderId'] ?? ''),
       ),
       GoRoute(
         path: '/orders/:orderId/tracking',

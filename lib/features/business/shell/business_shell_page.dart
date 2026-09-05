@@ -23,7 +23,7 @@ import 'widgets/merchant_avatar_button.dart';
 import 'widgets/merchant_dashboard_controls.dart';
 import 'widgets/merchant_orders_table.dart';
 import 'widgets/order_status_presentation.dart';
-import '../orders/merchant_order_detail_page.dart';
+import '../orders/merchant_order_route.dart';
 import '../settings/store_settings_page.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_bloc.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_event.dart';
@@ -653,8 +653,11 @@ const List<String> _kOrderFilterStatuses = <String>[
   'cancelled',
 ];
 
-/// Opens the merchant order screen, wiring its actions back to the shell's
-/// bloc so a status change refreshes the list the user returns to.
+/// Opens the merchant order screen on top of the shell.
+///
+/// The screen itself and its wiring live in [MerchantOrderDetailView], which a
+/// notification arriving from outside the shell opens by id through the same
+/// code rather than a second copy of it.
 void _openOrderDetail(
   BuildContext context,
   BusinessState state,
@@ -666,50 +669,7 @@ void _openOrderDetail(
     MaterialPageRoute<void>(
       builder: (_) => BlocProvider.value(
         value: bloc,
-        child: BlocConsumer<BusinessBloc, BusinessState>(
-          listenWhen: (previous, current) =>
-              previous.noticeCode != current.noticeCode ||
-              previous.errorMessage != current.errorMessage,
-          listener: (innerContext, innerState) {
-            final String message = (innerState.noticeCode ?? '').isNotEmpty
-                ? innerState.noticeCode!.tr()
-                : localizeApiErrorOrRaw(innerState.errorMessage ?? '');
-            if (message.isEmpty) return;
-
-            ScaffoldMessenger.of(innerContext)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                merchantOrderNoticeSnackBar(
-                  message,
-                  isNotice: (innerState.noticeCode ?? '').isNotEmpty,
-                ),
-              );
-          },
-          builder: (innerContext, innerState) {
-            final current = innerState.orders
-                .where((candidate) => candidate.id == order.id)
-                .firstOrNull;
-
-            return MerchantOrderDetailPage(
-              order: current ?? order,
-              businessName: innerState.business?.name ?? '',
-              businessAddress: innerState.business?.address ?? '',
-              businessLogoUrl: innerState.business?.logoUrl ?? '',
-              isSaving: innerState.status == BusinessStatus.saving,
-              onStatusSelected: (status) =>
-                  bloc.add(BusinessOrderStatusChanged(order.id, status)),
-              onNotifyCustomer: () =>
-                  bloc.add(BusinessOrderCustomerNotified(order.id)),
-              onCourierAssigned: (name, phone) async => bloc.add(
-                BusinessOrderCourierAssigned(
-                  orderId: order.id,
-                  name: name,
-                  phone: phone,
-                ),
-              ),
-            );
-          },
-        ),
+        child: MerchantOrderDetailView(order: order),
       ),
     ),
   );

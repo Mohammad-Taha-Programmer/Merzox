@@ -266,7 +266,8 @@
     "customerNameUnavailable": "اسم العميل غير متوفر",
     "sendNotification": "إرسال إشعار",
     "notificationSent": "تم إرسال إشعار بحالة الطلب",
-    "productsPlain": "المنتجات"
+    "productsPlain": "المنتجات",
+    "orderNotFound": "لم يُعثر على هذا الطلب بين طلبات متجرك"
   },
   "storeSettings": {
     "title": "إعدادات المتجر",

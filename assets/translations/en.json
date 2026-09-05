@@ -266,7 +266,8 @@
     "customerNameUnavailable": "Customer name unavailable",
     "sendNotification": "Send a notification",
     "notificationSent": "The customer was notified of the order status",
-    "productsPlain": "Products"
+    "productsPlain": "Products",
+    "orderNotFound": "That order is not among your shop orders"
   },
   "storeSettings": {
     "title": "Store settings",
