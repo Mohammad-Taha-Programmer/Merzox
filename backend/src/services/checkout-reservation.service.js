@@ -257,18 +257,6 @@ export async function withdrawReservationFailure({
   );
 }
 
-export async function holdsLiveReservation({
-  businessId,
-  intentId
-}) {
-  const outcome = await reservationOutcome({
-    businessId,
-    intentId
-  });
-
-  return outcome.state === RESERVATION_OUTCOMES.reserved;
-}
-
 /**
  * Gives a still-prepared CheckoutIntent the newest Business generation.
  *

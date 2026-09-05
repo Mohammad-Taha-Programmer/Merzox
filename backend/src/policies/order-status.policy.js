@@ -66,10 +66,6 @@ export const courierAssignableStatuses = [
   'outForDelivery'
 ];
 
-export function isOrderStatus(status) {
-  return orderStatuses.includes(status);
-}
-
 export function canTransitionOwnerOrder(from, to) {
   return ownerTransitions.get(from)?.has(to) ?? false;
 }

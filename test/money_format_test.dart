@@ -52,4 +52,24 @@ void main() {
       }
     });
   });
+
+  group('an amount with its currency', () {
+    test('it is the amount and the sign, in that order', () {
+      expect(merzoxPrice(45), '45 $merzoxCurrencySign');
+      expect(merzoxPrice(5.5), '5.5 $merzoxCurrencySign');
+      expect(merzoxPrice(0), '0 $merzoxCurrencySign');
+    });
+
+    test('it formats the figure exactly as the bare helper does', () {
+      // One rule for how money reads, not two that can drift apart.
+      for (final num amount in <num>[0, 1, 5.5, 99.99, 1234, 0.01]) {
+        expect(merzoxPrice(amount), startsWith(merzoxAmount(amount)));
+        expect(merzoxPrice(amount), endsWith(merzoxCurrencySign));
+      }
+    });
+
+    test('the sign is the shekel this app prices in', () {
+      expect(merzoxCurrencySign, '₪');
+    });
+  });
 }

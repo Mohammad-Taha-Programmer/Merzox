@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import '../../../core/constants/dates.dart';
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/constants/money.dart';
@@ -259,10 +260,15 @@ class _OrderSummaryBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
+      // Two columns at opposite edges. The summary used to be `Expanded` with
+      // its lines aligned to `end`, which right-to-left means the left - so
+      // they drifted inward against the status control and left a gap along
+      // the edge they were supposed to start from.
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: <Widget>[
-        Expanded(
+        Flexible(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               _SummaryLine(
                 label: 'orders.orderNumber'.tr(),
@@ -271,7 +277,7 @@ class _OrderSummaryBlock extends StatelessWidget {
               const SizedBox(height: 6),
               _SummaryLine(
                 label: 'orders.orderDate'.tr(),
-                value: _formatDate(order.createdAt),
+                value: merzoxDay(order.createdAt),
               ),
               const SizedBox(height: 6),
               _SummaryLine(
@@ -578,7 +584,7 @@ class _ItemRow extends StatelessWidget {
                   children: <Widget>[
                     _Metric(
                       label: 'orders.price'.tr(),
-                      value: merzoxAmount(item.unitPrice),
+                      value: merzoxPrice(item.unitPrice),
                     ),
                     _Metric(
                       label: 'orders.quantity'.tr(),
@@ -586,7 +592,7 @@ class _ItemRow extends StatelessWidget {
                     ),
                     _Metric(
                       label: 'orders.delivery'.tr(),
-                      value: merzoxAmount(order.deliveryFee),
+                      value: merzoxPrice(order.deliveryFee),
                     ),
                   ],
                 ),
@@ -597,7 +603,7 @@ class _ItemRow extends StatelessWidget {
                   alignment: AlignmentDirectional.centerEnd,
                   child: _TotalChip(
                     label: 'merchantOrder.lineTotal'.tr(),
-                    value: merzoxAmount(item.lineTotal + order.deliveryFee),
+                    value: merzoxPrice(item.lineTotal + order.deliveryFee),
                   ),
                 ),
               ],
@@ -830,17 +836,17 @@ class _InvoiceSummary extends StatelessWidget {
       children: <Widget>[
         _InvoiceLine(
           label: 'merchantOrder.itemsValue'.tr(),
-          value: merzoxAmount(order.subtotal),
+          value: merzoxPrice(order.subtotal),
         ),
         const SizedBox(height: 17),
         _InvoiceLine(
           label: 'orders.delivery'.tr(),
-          value: merzoxAmount(order.deliveryFee),
+          value: merzoxPrice(order.deliveryFee),
         ),
         const SizedBox(height: 17),
         _InvoiceLine(
           label: 'merchantOrder.grandTotal'.tr(),
-          value: merzoxAmount(order.total),
+          value: merzoxPrice(order.total),
           bold: true,
         ),
       ],
@@ -950,10 +956,4 @@ class _DetailActionBar extends StatelessWidget {
       ),
     );
   }
-}
-
-String _formatDate(DateTime? value) {
-  if (value == null) return '--.--.----';
-  final DateTime local = value.toLocal();
-  return '${local.day}.${local.month}.${local.year}';
 }

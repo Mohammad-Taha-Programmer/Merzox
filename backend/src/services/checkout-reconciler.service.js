@@ -48,20 +48,6 @@ export const RECONCILE_ACTIONS = {
   skipped: 'skipped'
 };
 
-/**
- * The lease is deliberately NOT the request-path convergence wait.
- *
- * A duplicate HTTP request waits ~3s because a person is on the other end. A
- * checkout is only presumed dead after a much longer silence, so a slow but
- * genuinely progressing request is never stolen from.
- */
-export function isStale(intent, now, staleAfterMs = CHECKOUT_STALE_LEASE_MS) {
-  const touched = intent?.updatedAt ?? intent?.createdAt;
-  if (!touched) return false;
-
-  return now - new Date(touched).getTime() >= staleAfterMs;
-}
-
 async function settleMarker(intent) {
   const settlement = buildReservationSettlement({
     businessId: intent.business,

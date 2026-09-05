@@ -446,7 +446,6 @@
     "visits": "Visits",
     "latestOrders": "Latest orders",
     "more": "More",
-    "noRecentOrders": "No recent orders",
     "orderGroups": {},
     "noOrders": "No orders in this list",
     "noProducts": "You haven't added any products yet",
@@ -512,7 +511,6 @@
     "ordersInPeriod": "{} orders in this period",
     "noOrdersInPeriod": "No orders in this period",
     "orderNumberCopied": "Order number copied",
-    "copyOrderNumber": "Copy order number",
     "holdToCopy": "Hold to copy the order number",
     "tapToSeeFull": "Tap to read it in full",
     "clearSearch": "Clear search"
@@ -549,11 +547,9 @@
       "mobile": "Mobile",
       "fax": "Fax"
     },
-    "changeAvatar": "Change account picture",
     "avatarFromCamera": "Take a photo",
     "avatarFromGallery": "Choose from gallery",
     "avatarUpdated": "Account picture updated",
-    "avatarFailed": "The picture could not be uploaded, try again",
     "holdToChangeAvatar": "Hold to change the picture"
   },
   "search": {

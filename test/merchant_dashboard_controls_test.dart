@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/constants/dates.dart';
 import 'package:merzox/features/business/models/dashboard_period.dart';
 import 'package:merzox/features/business/shell/widgets/merchant_dashboard_controls.dart';
 
@@ -219,8 +220,15 @@ void main() {
         DashboardPeriod.custom(DateTime(2026, 3, 4), DateTime(2026, 5, 6)),
       );
 
-      // Not "custom range": the merchant picked days and wants to see them.
-      expect(find.text('4/3/2026 - 6/5/2026'), findsOneWidget);
+      // Not "custom range": the merchant picked days and wants to see them,
+      // in the one format every screen writes.
+      expect(
+        find.text(
+          '${merzoxDay(DateTime(2026, 3, 4))} - '
+          '${merzoxDay(DateTime(2026, 5, 6))}',
+        ),
+        findsOneWidget,
+      );
     });
   });
 

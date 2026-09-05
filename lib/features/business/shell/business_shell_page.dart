@@ -352,7 +352,7 @@ class _Dashboard extends StatelessWidget {
                 Expanded(
                   child: _Metric(
                     'businessShell.sales'.tr(),
-                    '${data == null ? '0' : merzoxAmount(data.sales)} ₪',
+                    data == null ? merzoxPrice(0) : merzoxPrice(data.sales),
                   ),
                 ),
                 const SizedBox(width: 10),

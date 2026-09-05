@@ -152,11 +152,6 @@ export const LIVE_RESERVATION_MATCH = Object.freeze({
   state: { $ne: RESERVATION_STATES.failed }
 });
 
-/** Businesses with at least one entry holding stock. Legacy-safe. */
-export const HOLDS_LIVE_RESERVATION = Object.freeze({
-  stockReservations: { $elemMatch: LIVE_RESERVATION_MATCH }
-});
-
 /**
  * The terminal reservation failure, as ONE atomic decision.
  *

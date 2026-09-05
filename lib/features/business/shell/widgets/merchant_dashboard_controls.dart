@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/constants/colors.dart';
+import '../../../../core/constants/dates.dart';
 import '../../models/dashboard_period.dart';
 
 /// The dashboard's search field.
@@ -123,11 +124,8 @@ class MerchantPeriodButton extends StatelessWidget {
     if (period.kind != DashboardPeriodKind.custom) return period.labelKey.tr();
 
     final DayRange days = period.boundsOn(today);
-    return '${_day(days.from)} - ${_day(days.to)}';
+    return '${merzoxDay(days.from)} - ${merzoxDay(days.to)}';
   }
-
-  static String _day(DateTime value) =>
-      '${value.day}/${value.month}/${value.year}';
 
   Future<void> _pickCustom(BuildContext context) async {
     final DayRange current = period.boundsOn(today);

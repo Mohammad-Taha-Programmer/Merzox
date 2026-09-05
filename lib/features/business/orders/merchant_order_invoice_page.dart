@@ -1,4 +1,5 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
+import '../../../core/constants/dates.dart';
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/constants/money.dart';
@@ -86,7 +87,7 @@ class MerchantOrderInvoicePage extends StatelessWidget {
                     ),
                     end: _HeadLine(
                       label: 'orders.orderDate'.tr(),
-                      value: _formatDate(order.createdAt),
+                      value: merzoxDay(order.createdAt),
                     ),
                   ),
                   const SizedBox(height: 9),
@@ -374,10 +375,4 @@ class _InvoiceRule extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Divider(height: 1, color: MerzoxColors.kColorDEEEF8);
   }
-}
-
-String _formatDate(DateTime? value) {
-  if (value == null) return '--.--.----';
-  final DateTime local = value.toLocal();
-  return '${local.day}.${local.month}.${local.year}';
 }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:merzox/core/constants/dates.dart';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
@@ -1062,6 +1063,5 @@ String _formatFullDate(DateTime? value, String localeName) {
   final local = value.toLocal();
   final weekday = DateFormat.EEEE(localeName).format(local);
 
-  return '$weekday  •  ${local.day}.${local.month}.${local.year} , '
-      '${_formatTime(local)}';
+  return '$weekday  •  ${merzoxDay(local)} , ${_formatTime(local)}';
 }
