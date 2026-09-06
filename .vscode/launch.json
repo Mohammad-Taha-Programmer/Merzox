@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // The editor builds its own command line, so a flag typed at a terminal
+      // never reaches a build started from the sidebar. Without this the build
+      // carries no MERZOX_API_BASE_URL and falls back to 10.0.2.2, which is
+      // the Android emulator's alias for its host's loopback and nothing at
+      // all on a physical device.
+      //
+      // Generate the file first:  dart run tool/dev_config.dart
+      "name": "merzox (dev API)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=config/merzox.dev.json"]
+    }
+  ]
+}
