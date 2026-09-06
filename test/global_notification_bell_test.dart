@@ -148,9 +148,11 @@ void main() {
       }
     });
 
-    test('it stays off the screen it would only lead back to', () {
-      expect(globalBellWantedAt('/notifications'), isFalse);
-      expect(globalBellWantedAt('/notifications?audience=business'), isFalse);
+    test('it stands over the notifications screen too', () {
+      // It is how that screen is opened and how it is closed again, so it has
+      // to be reachable while the screen is showing.
+      expect(globalBellWantedAt('/notifications'), isTrue);
+      expect(globalBellWantedAt('/notifications?audience=business'), isTrue);
     });
 
     test('and off everything that comes before a session', () {

@@ -9,6 +9,7 @@ import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../bloc/notifications_bloc.dart';
 import '../notification_destination.dart';
+import '../notifications_visibility.dart';
 import '../bloc/notifications_event.dart';
 import '../bloc/notifications_state.dart';
 
@@ -21,6 +22,12 @@ class NotificationsPage extends StatefulWidget {
 
 class _NotificationsPageState extends State<NotificationsPage> {
   final ScrollController _scrollController = ScrollController();
+
+  /// Whether the reader asked past the default fifty.
+  ///
+  /// Held here rather than in the bloc: the bloc knows what the server sent,
+  /// and this is a question about how much of it this screen is showing.
+  bool _showingAll = false;
 
   @override
   void initState() {
@@ -175,27 +182,74 @@ class _NotificationsPageState extends State<NotificationsPage> {
       );
     }
 
+    final DateTime now = DateTime.now();
+    final List<AppNotificationApiModel> shown = visibleNotifications(
+      state.notifications,
+      now: now,
+      showingAll: _showingAll,
+    );
+    final bool heldBack = notificationsAreHeldBack(
+      state.notifications,
+      now: now,
+      showingAll: _showingAll,
+      serverHasMore: state.hasMore,
+    );
+    final bool loadingMore = state.status == NotificationsStatus.loadingMore;
+
     return ListView.builder(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      itemCount:
-          state.notifications.length +
-          (state.status == NotificationsStatus.loadingMore ? 1 : 0),
+      padding: const EdgeInsets.fromLTRB(11, 8, 11, 24),
+      itemCount: shown.length + (heldBack || loadingMore ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index >= state.notifications.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
+        if (index >= shown.length) {
+          if (loadingMore) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Center(
+              child: TextButton(
+                key: const ValueKey<String>('notifications.showMore'),
+                onPressed: _showMore,
+                child: Text(
+                  'notifications.showMore'.tr(),
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: MerzoxColors.kColor3D5A80,
+                  ),
+                ),
+              ),
+            ),
           );
         }
 
-        final notification = state.notifications[index];
-        return _NotificationTile(
+        final notification = shown[index];
+        return NotificationTile(
           notification: notification,
           onTap: () => _open(notification),
         );
       },
+    );
+  }
+
+  /// Opens what the default view was holding back.
+  ///
+  /// The screen's own limit is lifted first; only once everything already
+  /// fetched is on show is the server asked for the next page.
+  void _showMore() {
+    if (!_showingAll) {
+      setState(() => _showingAll = true);
+      return;
+    }
+
+    context.read<NotificationsBloc>().add(
+      const NotificationsLoadMoreRequested(),
     );
   }
 }
@@ -243,47 +297,70 @@ class _NotificationsHeader extends StatelessWidget {
   }
 }
 
-class _NotificationTile extends StatelessWidget {
+/// One notification, as a box.
+///
+/// Public so a test can find it: the screen is otherwise a list of anonymous
+/// containers, and what is under test is how one of these reads.
+class NotificationTile extends StatelessWidget {
   final AppNotificationApiModel notification;
   final VoidCallback onTap;
 
-  const _NotificationTile({required this.notification, required this.onTap});
+  const NotificationTile({
+    required this.notification,
+    required this.onTap,
+    super.key,
+  });
+
+  /// The box's fill, and its border.
+  ///
+  /// The border is the same colour as the fill on purpose: the box is meant to
+  /// read as one soft shape, not as an outlined card.
+  static const Color _fill = MerzoxColors.kColorB9DDF3;
 
   @override
   Widget build(BuildContext context) {
-    final unread = !notification.isRead;
+    final bool unread = !notification.isRead;
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         child: Container(
-          height: 48,
-          margin: const EdgeInsets.only(bottom: 16),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          color: unread ? MerzoxColors.kColorFDF1EC : Colors.white,
+          margin: const EdgeInsets.all(5),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: _fill.withValues(alpha: 0.7),
+            border: Border.all(color: _fill.withValues(alpha: 0.7)),
+            borderRadius: BorderRadius.circular(6),
+          ),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Expanded(
                 child: Text(
                   notification.body.isEmpty
                       ? notification.title
                       : '${notification.title} · ${notification.body}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  // No `maxLines` and no ellipsis: a notification cut off at
+                  // `...` is one a reader has to open to understand, and the
+                  // box has no fixed height to protect any more.
                   style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: unread ? FontWeight.w700 : FontWeight.w500,
+                    fontSize: 15,
+                    height: 1.4,
+                    fontWeight: unread ? FontWeight.w700 : FontWeight.w400,
                     color: MerzoxColors.kColor3B3B3B,
                   ),
                 ),
               ),
               const SizedBox(width: 10),
-              Text(
-                _formatTimestamp(notification.createdAt),
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: MerzoxColors.kColor8D99AE,
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(
+                  _formatTimestamp(notification.createdAt),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: MerzoxColors.kColor5E5E5E,
+                  ),
                 ),
               ),
             ],

@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_session_service.dart';
 import '../../../core/constants/colors.dart';
@@ -21,14 +22,31 @@ const double kGlobalBellInset = 8;
 /// drawn under it. The width is the icon plus its padding on both sides.
 const double kGlobalBellReservedWidth = 40;
 
+/// Where the app is, read safely.
+///
+/// Three readings and only one is right in both moments this needs. The route
+/// information provider carries the initial location but never moves for a
+/// `push`, so a toggle built on it always sees the screen it opened from.
+/// `GoRouter.state` does follow a push - and throws `Bad state: No element`
+/// before the first route is resolved, which the framework paints as a red
+/// screen on launch. So: the state, once there is one.
+String currentAppLocation(GoRouter router) {
+  if (router.routerDelegate.currentConfiguration.isEmpty) {
+    return router.routeInformationProvider.value.uri.toString();
+  }
+
+  return router.state.uri.toString();
+}
+
 /// Routes the bell stays off.
 ///
-/// The notifications screen itself, which it would only lead back to, and
-/// everything before a session exists - there is nothing to count for someone
+/// Everything before a session exists: there is nothing to count for someone
 /// who has not signed in, and a bell over a login form is noise.
+///
+/// The notifications screen is deliberately not among them. The bell is how
+/// that screen is opened and how it is closed again, so it has to be reachable
+/// while it is showing.
 bool globalBellWantedAt(String location) {
-  if (location.startsWith('/notifications')) return false;
-
   const List<String> silent = <String>[
     '/login',
     '/signup',
