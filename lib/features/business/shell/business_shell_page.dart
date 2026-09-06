@@ -1,3 +1,4 @@
+import '../../../core/widgets/remote_circle_avatar.dart';
 import '../../messages/widgets/message_badge.dart';
 import '../../notifications/widgets/global_notification_bell.dart';
 import 'dart:async';
@@ -909,21 +910,17 @@ class _ProfileHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 18),
-        CircleAvatar(
+        RemoteCircleAvatar(
+          url: business.logoUrl,
           radius: 26,
           backgroundColor: Colors.white,
-          backgroundImage: business.logoUrl.isEmpty
-              ? null
-              : NetworkImage(business.logoUrl),
-          child: business.logoUrl.isNotEmpty
-              ? null
-              : Text(
-                  business.name.isEmpty ? 'M' : business.name.characters.first,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    color: MerzoxColors.kColor3D5A80,
-                  ),
-                ),
+          fallback: Text(
+            business.name.isEmpty ? 'M' : business.name.characters.first,
+            style: const TextStyle(
+              fontSize: 20,
+              color: MerzoxColors.kColor3D5A80,
+            ),
+          ),
         ),
         const SizedBox(height: 10),
         Text(
