@@ -9,6 +9,8 @@ import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/product_details/bloc/product_details_bloc.dart';
 import 'package:merzox/features/product_details/bloc/product_details_event.dart';
 import 'package:merzox/features/product_details/bloc/product_details_state.dart';
+import 'package:merzox/features/product_details/new_product_window.dart';
+import 'package:merzox/features/product_details/widgets/new_product_ribbon.dart';
 import 'package:merzox/features/reviews/widgets/review_eligibility_notice.dart';
 import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:merzox/services/api_service.dart';
@@ -81,7 +83,17 @@ class _ProductDetailsView extends StatelessWidget {
                       ListView(
                         padding: const EdgeInsets.only(bottom: 96),
                         children: [
-                          _ImageSlider(product: product, state: state),
+                          ProductImageSlider(
+                            images: productGallery(product),
+                            selectedIndex: state.selectedImageIndex,
+                            isNewlyAdded: productIsNewlyAdded(
+                              product.createdAt,
+                              now: DateTime.now(),
+                            ),
+                            onPageChanged: (int index) => context
+                                .read<ProductDetailsBloc>()
+                                .add(ProductDetailsImageChanged(index)),
+                          ),
                           if (state.detailsStatus ==
                               ProductDetailsSectionStatus.failure)
                             _ProductLoadFailure(
@@ -172,17 +184,38 @@ class _ProductDetailsView extends StatelessWidget {
   }
 }
 
-class _ImageSlider extends StatefulWidget {
-  final BusinessProductApiModel product;
-  final ProductDetailsState state;
+/// The photos at the head of a product, and the flag over them.
+///
+/// Takes what it draws rather than reaching for a bloc: the pictures, which
+/// one is showing, and whether the product is new enough to be marked. That
+/// keeps the one property worth guarding - the flag belongs to the product,
+/// not to the picture showing - checkable without standing up the whole
+/// screen behind it.
+class ProductImageSlider extends StatefulWidget {
+  /// Every picture, in the order the merchant arranged them.
+  final List<String> images;
 
-  const _ImageSlider({required this.product, required this.state});
+  /// Which one is showing, for the dots beneath.
+  final int selectedIndex;
+
+  final ValueChanged<int> onPageChanged;
+
+  /// Whether the product went up within [kNewProductWindow].
+  final bool isNewlyAdded;
+
+  const ProductImageSlider({
+    super.key,
+    required this.images,
+    required this.selectedIndex,
+    required this.onPageChanged,
+    this.isNewlyAdded = false,
+  });
 
   @override
-  State<_ImageSlider> createState() => _ImageSliderState();
+  State<ProductImageSlider> createState() => _ProductImageSliderState();
 }
 
-class _ImageSliderState extends State<_ImageSlider> {
+class _ProductImageSliderState extends State<ProductImageSlider> {
   late final PageController _controller;
 
   @override
@@ -199,44 +232,53 @@ class _ImageSliderState extends State<_ImageSlider> {
 
   @override
   Widget build(BuildContext context) {
-    final images = productGallery(widget.product);
+    final List<String> images = widget.images;
 
     return Column(
       children: [
         SizedBox(
           height: 302,
-          child: PageView.builder(
-            controller: _controller,
-            reverse: Directionality.of(context) == TextDirection.rtl,
-            itemCount: images.length,
-            onPageChanged: (index) {
-              context.read<ProductDetailsBloc>().add(
-                ProductDetailsImageChanged(index),
-              );
-            },
-            itemBuilder: (context, index) {
-              final imageUrl = images[index];
-              return ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  bottom: Radius.circular(6),
+          child: Stack(
+            children: <Widget>[
+              PageView.builder(
+                controller: _controller,
+                reverse: Directionality.of(context) == TextDirection.rtl,
+                itemCount: images.length,
+                onPageChanged: widget.onPageChanged,
+                itemBuilder: (context, index) {
+                  final imageUrl = images[index];
+                  return ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      bottom: Radius.circular(6),
+                    ),
+                    child: imageUrl.isEmpty
+                        ? const _ProductPhotoPlaceholder()
+                        : Image.network(
+                            imageUrl,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                const _ProductPhotoPlaceholder(),
+                          ),
+                  );
+                },
+              ),
+              // Outside the pager on purpose: the flag says something about
+              // the product, not about the photo showing, so paging must not
+              // carry it away or leave it behind.
+              if (widget.isNewlyAdded)
+                const PositionedDirectional(
+                  end: kNewRibbonInset,
+                  bottom: 0,
+                  child: NewProductRibbon(),
                 ),
-                child: imageUrl.isEmpty
-                    ? const _ProductPhotoPlaceholder()
-                    : Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) =>
-                            const _ProductPhotoPlaceholder(),
-                      ),
-              );
-            },
+            ],
           ),
         ),
         const SizedBox(height: 7),
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: List.generate(images.length, (index) {
-            final active = index == widget.state.selectedImageIndex;
+            final active = index == widget.selectedIndex;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 180),
               margin: const EdgeInsets.symmetric(horizontal: 3),

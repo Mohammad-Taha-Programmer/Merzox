@@ -664,7 +664,8 @@
     },
     "sellerDetails": "Seller details",
     "reviewHint": "Write your review of the product you purchased here",
-    "buyNow": "Buy now"
+    "buyNow": "Buy now",
+    "newBadge": "New"
   },
   "apiErrors": {
     "contract": "Could not read the server response. Please try again.",

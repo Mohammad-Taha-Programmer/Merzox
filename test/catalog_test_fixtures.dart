@@ -94,6 +94,7 @@ BusinessProductApiModel catalogProduct({
   double? minFinalPrice,
   double? maxFinalPrice,
   List<String> imageUrls = const <String>[],
+  DateTime? createdAt,
 }) {
   final payable = finalPrice ?? price;
 
@@ -115,6 +116,7 @@ BusinessProductApiModel catalogProduct({
     imageUrl: imageUrls.isEmpty ? '' : imageUrls.first,
     imageUrls: imageUrls,
     classification: 'new',
+    createdAt: createdAt,
     rating: 0,
     ratingCount: 0,
     likeCount: 0,
