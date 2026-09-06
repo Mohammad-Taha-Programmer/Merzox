@@ -167,6 +167,33 @@ class ApiService {
     );
   }
 
+  /// Puts one product photo on the image host and hands back its link.
+  ///
+  /// The bytes go to the server, not to the host: the host's key is a secret
+  /// and an app cannot keep one. What comes back is the URL a product stores,
+  /// which is the only shape a product's images have.
+  Future<String> uploadProductImage({
+    required String token,
+    required Uint8List bytes,
+    String contentType = 'image/jpeg',
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      '/businesses/me/product-images',
+      data: <String, dynamic>{
+        'image': base64Encode(bytes),
+        'contentType': contentType,
+      },
+      options: _authOptions(token),
+    );
+
+    final Map<String, dynamic> data =
+        response.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
+    final Map<String, dynamic> image =
+        data['image'] as Map<String, dynamic>? ?? <String, dynamic>{};
+
+    return image['url'] as String? ?? '';
+  }
+
   Future<AuthApiUser> me({required String token}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/auth/me',

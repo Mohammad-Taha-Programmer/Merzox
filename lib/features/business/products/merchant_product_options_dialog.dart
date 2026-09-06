@@ -177,23 +177,31 @@ class _ProductOptionsDialogState extends State<ProductOptionsDialog> {
   Widget build(BuildContext context) {
     // The board rests the panel's foot on the bottom bar rather than centring
     // it in the screen, which also keeps a dialog that is mostly a text field
-    // and a button within reach of a thumb. The keyboard's own inset is added
-    // so it lifts clear rather than being covered by what it is typed into.
+    // and a button within reach of a thumb.
+    //
+    // The keyboard is deliberately NOT added here. `Dialog` already adds the
+    // view insets to whatever padding it is given, so adding them again
+    // counted the keyboard twice and left the panel a sliver at the top of the
+    // screen - open, focused, and almost entirely gone.
     final double keyboard = MediaQuery.viewInsetsOf(context).bottom;
 
     return Dialog(
       backgroundColor: Colors.white,
       alignment: Alignment.bottomCenter,
-      insetPadding: EdgeInsets.only(
+      insetPadding: const EdgeInsets.only(
         left: 16,
         right: 16,
         top: 24,
-        bottom: 76 + keyboard,
+        bottom: 76,
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       child: Stack(
         children: <Widget>[
-          Padding(
+          // Scrollable, because the panel is lifted clear of the keyboard and
+          // what is left is not always enough to stand in. Raising the
+          // keyboard used to overflow this column by 254 pixels and take most
+          // of the panel off screen - including the field being typed into.
+          SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 27, 16, 64),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -260,7 +268,7 @@ class _ProductOptionsDialogState extends State<ProductOptionsDialog> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 55),
+                SizedBox(height: keyboard > 0 ? 24 : 55),
                 SizedBox(
                   height: 48,
                   child: Row(
@@ -423,51 +431,49 @@ class _OptionDetailsSheetState extends State<_OptionDetailsSheet> {
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 18),
-            Text(
-              'merchantProduct.priceOverride'.tr(),
-              style: const TextStyle(fontSize: 13),
+            // The same boxes, gaps and tick boxes as the form behind it: this
+            // sheet is drawn on the same artboard, and two sets of numbers for
+            // one look is how they drift apart.
+            ProductLabelled(
+              label: 'merchantProduct.priceOverride'.tr(),
+              child: ProductField(
+                controller: option.priceOverride,
+                hint: 'merchantProduct.priceOverrideHint'.tr(),
+                keyboardType: TextInputType.number,
+              ),
             ),
-            const SizedBox(height: 8),
-            ProductField(
-              controller: option.priceOverride,
-              hint: 'merchantProduct.priceOverrideHint'.tr(),
-              keyboardType: TextInputType.number,
+            const SizedBox(height: kProductGroupGap),
+            ProductLabelled(
+              label: 'merchantProduct.costPrice'.tr(),
+              child: ProductField(
+                controller: option.costPrice,
+                hint: 'merchantProduct.costPriceHint'.tr(),
+                keyboardType: TextInputType.number,
+              ),
             ),
-            const SizedBox(height: 14),
-            Text(
-              'merchantProduct.costPrice'.tr(),
-              style: const TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 8),
-            ProductField(
-              controller: option.costPrice,
-              hint: 'merchantProduct.costPriceHint'.tr(),
-              keyboardType: TextInputType.number,
-            ),
-            const SizedBox(height: 14),
-            SwitchListTile(
+            const SizedBox(height: kProductGroupGap),
+            ProductCheckRow(
+              label: 'merchantProduct.unlimited'.tr(),
               value: option.unlimitedStock,
               onChanged: (bool value) =>
                   setState(() => option.unlimitedStock = value),
-              title: Text('merchantProduct.unlimited'.tr()),
-              contentPadding: EdgeInsets.zero,
             ),
             if (!option.unlimitedStock) ...<Widget>[
+              const SizedBox(height: kProductCheckGap),
               ProductField(
                 controller: option.stockQuantity,
                 hint: 'merchantProduct.quantityHint'.tr(),
                 keyboardType: TextInputType.number,
               ),
-              const SizedBox(height: 14),
             ],
-            SwitchListTile(
+            const SizedBox(height: kProductGroupGap),
+            ProductCheckRow(
+              label: 'merchantProduct.variantActive'.tr(),
               value: option.isActive,
               onChanged: (bool value) =>
                   setState(() => option.isActive = value),
-              title: Text('merchantProduct.variantActive'.tr()),
-              contentPadding: EdgeInsets.zero,
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 18),
             OutlinedButton.icon(
               onPressed: () => Navigator.of(context).pop(true),
               style: OutlinedButton.styleFrom(

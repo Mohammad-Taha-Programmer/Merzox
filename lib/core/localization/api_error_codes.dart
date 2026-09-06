@@ -20,6 +20,15 @@ const Map<String, String> apiErrorMessageKeys = <String, String>{
   'AVATAR_IMAGE_INVALID': 'apiErrors.avatarImageInvalid',
   'AVATAR_IMAGE_TOO_LARGE': 'apiErrors.avatarImageTooLarge',
   'AVATAR_CONTENT_TYPE_UNSUPPORTED': 'apiErrors.avatarContentTypeUnsupported',
+  // The same rules, applied to a product photo. Separate codes because
+  // "that avatar is too large" on the product screen sends a merchant looking
+  // at the wrong thing.
+  'PRODUCT_IMAGE_REQUIRED': 'apiErrors.productImageRequired',
+  'PRODUCT_IMAGE_INVALID': 'apiErrors.productImageInvalid',
+  'PRODUCT_IMAGE_TOO_LARGE': 'apiErrors.productImageTooLarge',
+  'PRODUCT_CONTENT_TYPE_UNSUPPORTED': 'apiErrors.productContentTypeUnsupported',
+  // A body the server refused before any route saw it.
+  'PAYLOAD_TOO_LARGE': 'apiErrors.payloadTooLarge',
   'IMAGE_UPLOAD_FAILED': 'apiErrors.imageUploadFailed',
   'IMAGE_HOST_NOT_CONFIGURED': 'apiErrors.imageHostNotConfigured',
   'AUTH_REQUIRED': 'apiErrors.authRequired',

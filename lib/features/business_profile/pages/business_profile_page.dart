@@ -791,7 +791,7 @@ class _ProductCard extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: _ProductImage(imageUrl: product.imageUrl),
+                    child: ProductCardImage(imageUrl: product.imageUrl),
                   ),
                   // A merchant liking their own product would be a real
                   // customer mutation, so the control is absent in preview.
@@ -899,21 +899,41 @@ class _ProductCard extends StatelessWidget {
   }
 }
 
-class _ProductImage extends StatelessWidget {
+/// The picture on a product card in a shop's public profile.
+///
+/// Whatever the merchant attached - a photo from their phone now on the image
+/// host, or a link they pasted - arrives here as a URL and is drawn as one.
+///
+/// A URL that will not load falls back to the same placeholder an absent one
+/// gets. It used to have no error builder at all, which meant a link that had
+/// rotted threw on every paint and left the customer looking at a broken card
+/// with no idea what it was.
+class ProductCardImage extends StatelessWidget {
   final String imageUrl;
 
-  const _ProductImage({required this.imageUrl});
+  const ProductCardImage({super.key, required this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
-    if (imageUrl.isNotEmpty) {
-      return Image.network(imageUrl, fit: BoxFit.cover);
-    }
+    if (imageUrl.isEmpty) return const _ProductCardPlaceholder();
 
+    return Image.network(
+      imageUrl,
+      fit: BoxFit.cover,
+      errorBuilder: (_, _, _) => const _ProductCardPlaceholder(),
+    );
+  }
+}
+
+class _ProductCardPlaceholder extends StatelessWidget {
+  const _ProductCardPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       color: const Color(0xFFF1F1F1),
       alignment: Alignment.center,
-      child: Icon(
+      child: const Icon(
         Icons.shopping_bag_outlined,
         color: MerzoxColors.kColor3D5A80,
         size: 46,

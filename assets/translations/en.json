@@ -354,10 +354,16 @@
   "merchantImages": {
     "title": "Add photos",
     "primary": "Primary image",
-    "addHint": "Add an image by link",
+    "addHint": "Drag and drop images here",
     "addTitle": "Add an image",
     "urlHint": "Paste the image link",
-    "urlInvalid": "Enter a link starting with http or https"
+    "urlInvalid": "Enter a link starting with http or https",
+    "sourceTitle": "Add an image",
+    "sourceCamera": "Take a photo",
+    "sourceGallery": "Choose from this phone",
+    "sourceLink": "Add by link",
+    "uploading": "Uploading the image…",
+    "uploadFailed": "The image could not be uploaded. Try again."
   },
   "merchantPreview": {
     "title": "Store preview",
@@ -780,7 +786,12 @@
     "avatarImageTooLarge": "That picture is too large, the limit is 5 MB",
     "avatarContentTypeUnsupported": "That image format is not supported, use JPG or PNG",
     "imageUploadFailed": "The picture could not be uploaded, try again",
-    "imageHostNotConfigured": "Image uploads are not configured on the server"
+    "imageHostNotConfigured": "Image uploads are not configured on the server",
+    "productImageRequired": "Choose a product image first",
+    "productImageInvalid": "That product image could not be read. Try another.",
+    "productImageTooLarge": "That product image is too large. The limit is 5 MB.",
+    "productContentTypeUnsupported": "That product image format is not supported. Use JPG or PNG.",
+    "payloadTooLarge": "That file is too large. Choose a smaller image."
   },
   "courierLocation": {
     "loginEntry": "Share courier location",

@@ -354,10 +354,16 @@
   "merchantImages": {
     "title": "إضافة صور",
     "primary": "الصورة الأساسية",
-    "addHint": "أضف صورة عبر رابط",
+    "addHint": "اسحب وأسقط الصور هنا",
     "addTitle": "إضافة صورة",
     "urlHint": "الصق رابط الصورة",
-    "urlInvalid": "أدخل رابطاً يبدأ بـ http أو https"
+    "urlInvalid": "أدخل رابطاً يبدأ بـ http أو https",
+    "sourceTitle": "إضافة صورة",
+    "sourceCamera": "التقاط صورة",
+    "sourceGallery": "اختيار من الهاتف",
+    "sourceLink": "إضافة برابط",
+    "uploading": "جارٍ رفع الصورة…",
+    "uploadFailed": "تعذر رفع الصورة، حاول مرة أخرى"
   },
   "merchantPreview": {
     "title": "معاينة المتجر",
@@ -780,7 +786,12 @@
     "avatarImageTooLarge": "الصورة كبيرة جداً، الحد الأقصى 5 ميغابايت",
     "avatarContentTypeUnsupported": "صيغة الصورة غير مدعومة، استخدم JPG أو PNG",
     "imageUploadFailed": "تعذّر رفع الصورة، حاول مرة أخرى",
-    "imageHostNotConfigured": "رفع الصور غير مهيّأ على الخادم"
+    "imageHostNotConfigured": "رفع الصور غير مهيّأ على الخادم",
+    "productImageRequired": "اختر صورة للمنتج أولاً",
+    "productImageInvalid": "تعذرت قراءة صورة المنتج، جرب صورة أخرى",
+    "productImageTooLarge": "صورة المنتج كبيرة جداً، الحد الأعلى 5 ميجابايت",
+    "productContentTypeUnsupported": "صيغة صورة المنتج غير مدعومة، استخدم JPG أو PNG",
+    "payloadTooLarge": "الملف كبير جداً، اختر صورة أصغر"
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",

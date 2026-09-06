@@ -27,6 +27,7 @@ import {
   getMyBusinessDashboard,
   listMyBusinessOrders,
   listMyBusinessProducts,
+  uploadMyBusinessProductImage,
   revokeMyBusinessOrderCourierLocation,
   updateMyBusiness,
   updateMyBusinessOrderCourier,
@@ -111,6 +112,12 @@ router.get(
   listMerchantConversations
 );
 router.get('/me/products', requireAuth, requireBusinessUser, listMyBusinessProducts);
+router.post(
+  '/me/product-images',
+  requireAuth,
+  requireBusinessUser,
+  uploadMyBusinessProductImage
+);
 router.post(
   '/me/products',
   requireAuth,

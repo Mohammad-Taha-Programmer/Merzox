@@ -75,6 +75,24 @@ export function errorHandler(
       );
   }
 
+  // body-parser refuses an oversized body before any route sees it. Left
+  // unnamed it reaches the reader as "an unexpected error", which is both
+  // wrong and unactionable - the one thing they could do about it is send a
+  // smaller picture.
+  if (
+    error?.type ===
+      'entity.too.large' ||
+    error?.statusCode ===
+      413
+  ) {
+    normalized =
+      new AppError(
+        'That upload is too large',
+        413,
+        'PAYLOAD_TOO_LARGE'
+      );
+  }
+
   if (error?.code === 11000) {
     normalized =
       new AppError(

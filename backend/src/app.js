@@ -1,5 +1,10 @@
 import express from 'express';
 
+import {
+  IMAGE_UPLOAD_PATHS,
+  UPLOAD_BODY_LIMIT_BYTES
+} from './policies/avatar.policy.js';
+
 import { env } from './config/env.js';
 import { currentReadiness } from './runtime/readiness.js';
 import { applyProxyTrust } from './runtime/proxy-trust.js';
@@ -29,6 +34,14 @@ app.use(
 );
 
 applySecurityMiddleware(app);
+
+// Two routes carry a picture and nothing else does. They get a parser sized
+// for one; every other route keeps the small limit, so widening this for a
+// photo does not widen it for a login.
+const imageBody = express.json({ limit: UPLOAD_BODY_LIMIT_BYTES });
+for (const path of IMAGE_UPLOAD_PATHS) {
+  app.use(path, imageBody);
+}
 
 app.use(express.json({ limit: '32kb' }));
 
