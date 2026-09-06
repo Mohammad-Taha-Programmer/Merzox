@@ -99,4 +99,55 @@ void main() {
       );
     }
   });
+
+  test('the location can be read before the first route exists', () {
+    for (final StartupDestination destination in StartupDestination.values) {
+      final GoRouter router = _routerAt(destination);
+
+      expect(
+        () => currentAppLocation(router),
+        returnsNormally,
+        reason: '$destination cannot say where it is at launch',
+      );
+      expect(currentAppLocation(router), startsWith('/'));
+    }
+  });
+
+  testWidgets('and it follows a push, which is what the toggle turns on', (
+    WidgetTester tester,
+  ) async {
+    // The route information provider never moves for a `push` - it still
+    // reads the screen the push came from. A toggle built on it opens a second
+    // copy of the screen it meant to close, every time.
+    final GoRouter router = GoRouter(
+      initialLocation: '/home',
+      routes: <RouteBase>[
+        GoRoute(
+          path: '/home',
+          builder: (_, _) => const Scaffold(body: Text('home')),
+        ),
+        GoRoute(
+          path: '/notifications',
+          builder: (_, _) => const Scaffold(body: Text('notifications')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+    await tester.pumpAndSettle();
+    expect(currentAppLocation(router), '/home');
+
+    router.push('/notifications');
+    await tester.pumpAndSettle();
+    expect(
+      currentAppLocation(router),
+      '/notifications',
+      reason: 'the bell cannot tell it is standing on the screen it opened',
+    );
+
+    router.pop();
+    await tester.pumpAndSettle();
+    expect(currentAppLocation(router), '/home');
+  });
 }

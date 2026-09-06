@@ -57,6 +57,22 @@ class _MerzoxAppState extends State<MerzoxApp> {
     super.dispose();
   }
 
+  /// The bell opens the notifications screen, and closes it again.
+  ///
+  /// The location is read when the bell is tapped rather than when it was
+  /// built: a push does not necessarily rebuild this, and a toggle that acts
+  /// on a stale answer opens a second copy of the screen it meant to close.
+  void _toggleNotifications(String destination) {
+    final String location = currentAppLocation(_router);
+
+    if (location.startsWith('/notifications')) {
+      if (_router.canPop()) _router.pop();
+      return;
+    }
+
+    _router.push(destination);
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
@@ -78,14 +94,7 @@ class _MerzoxAppState extends State<MerzoxApp> {
         return Stack(
           children: <Widget>[
             child ?? const SizedBox.shrink(),
-            // Read from the route information rather than `GoRouter.state`.
-            // This builder runs on the very first frame, before the router has
-            // resolved anything, and `state` reads the last of an empty match
-            // list - `Bad state: No element`, painted as a red screen on every
-            // launch. The provider carries the location from the start.
-            if (globalBellWantedAt(
-              _router.routeInformationProvider.value.uri.toString(),
-            ))
+            if (globalBellWantedAt(currentAppLocation(_router)))
               PositionedDirectional(
                 top: MediaQuery.paddingOf(context).top + kGlobalBellInset,
                 // The trailing edge, which right-to-left is the left: where
@@ -98,7 +107,7 @@ class _MerzoxAppState extends State<MerzoxApp> {
                         businessAudience: businessAudience,
                         // The router itself, not `context.push`: this hangs
                         // above the router, so there is none in its context.
-                        onOpen: _router.push,
+                        onOpen: _toggleNotifications,
                       ),
                 ),
               ),
