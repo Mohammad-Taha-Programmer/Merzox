@@ -1,3 +1,4 @@
+import { applyLogoToConversations } from '../services/account-picture.service.js';
 import mongoose from 'mongoose';
 
 import { Business } from '../models/Business.js';
@@ -183,6 +184,14 @@ export const updateMyBusiness = asyncHandler(async (req, res) => {
   }
 
   await business.save();
+
+  // The inbox keeps a copy of the logo so it can draw a list without loading
+  // every shop behind it. Nothing refreshed that copy, so a merchant who
+  // changed their logo kept the old one in every conversation they had.
+  if (req.body.logoUrl !== undefined) {
+    await applyLogoToConversations(business._id, business.logoUrl);
+  }
+
   res.json({ success: true, data: { business: business.toOwnerJSON() } });
 });
 

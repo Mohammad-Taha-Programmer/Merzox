@@ -1,3 +1,4 @@
+import 'package:merzox/core/widgets/remote_circle_avatar.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:merzox/core/constants/dates.dart';
 import 'package:flutter/material.dart';
@@ -437,18 +438,14 @@ class _InboxAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (url.isNotEmpty) {
-      return CircleAvatar(
-        radius: 24,
-        backgroundColor: MerzoxColors.kColorDEEEF8,
-        backgroundImage: NetworkImage(url),
-      );
-    }
-
-    return const CircleAvatar(
+    return RemoteCircleAvatar(
+      url: url,
       radius: 24,
       backgroundColor: MerzoxColors.kColorDEEEF8,
-      child: Icon(Icons.storefront_rounded, color: MerzoxColors.kColor3D5A80),
+      fallback: const Icon(
+        Icons.storefront_rounded,
+        color: MerzoxColors.kColor3D5A80,
+      ),
     );
   }
 }
