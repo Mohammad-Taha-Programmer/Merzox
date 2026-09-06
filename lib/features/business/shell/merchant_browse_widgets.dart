@@ -9,6 +9,7 @@
 /// the boxes probed one pixel column at a time.
 library;
 
+import '../../notifications/widgets/global_notification_bell.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
@@ -52,9 +53,12 @@ const double kMerchantSearchToSection = 25;
 /// it is centred here, the way every other Merzox top bar centres its title.
 class MerchantTopBar extends StatelessWidget {
   final String title;
-  final Widget leading;
 
-  const MerchantTopBar({super.key, required this.title, required this.leading});
+  /// Optional since the notification bell moved out of every screen's bar and
+  /// became one control floating above them all.
+  final Widget? leading;
+
+  const MerchantTopBar({super.key, required this.title, this.leading});
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +76,11 @@ class MerchantTopBar extends StatelessWidget {
               ),
             ),
           ),
+          // Past the floating bell, not under it. This corner belongs to the
+          // bell on every screen, and the products bar puts its add button
+          // here - the two were drawn on top of each other.
           PositionedDirectional(
-            end: kMerchantGutter,
+            end: kMerchantGutter + kGlobalBellReservedWidth,
             top: 0,
             bottom: 0,
             child: Center(child: leading),

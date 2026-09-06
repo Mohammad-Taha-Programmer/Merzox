@@ -223,18 +223,6 @@ class _DetailHeader extends StatelessWidget {
             bottom: 0,
             child: Center(child: BackButton(color: MerzoxColors.kColor5E5E5E)),
           ),
-          PositionedDirectional(
-            end: 12,
-            top: 0,
-            bottom: 0,
-            child: Center(
-              child: Icon(
-                Icons.notifications_none_rounded,
-                size: 22,
-                color: MerzoxColors.kColor3D5A80,
-              ),
-            ),
-          ),
         ],
       ),
     );

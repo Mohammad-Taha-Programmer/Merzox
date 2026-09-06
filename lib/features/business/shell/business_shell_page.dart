@@ -1,3 +1,4 @@
+import '../../notifications/widgets/global_notification_bell.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -11,7 +12,6 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../authentication/bloc/auth_bloc.dart';
-import '../../notifications/widgets/notification_badge_button.dart';
 import '../../../injection/injector.dart';
 import '../../../services/push_service.dart';
 import '../../../services/realtime_service.dart';
@@ -286,13 +286,6 @@ class _PageHeader extends StatelessWidget {
           onPressed: () => context.push('/business/messages'),
           icon: const Icon(Icons.chat_bubble_outline_rounded),
         ),
-        NotificationBadgeButton(
-          tooltip: 'notifications.title'.tr(),
-          businessAudience: true,
-          onPressed: () => context.push('/notifications?audience=business'),
-          iconSize: 24,
-          badgeSize: 8,
-        ),
         if (onLogout case final VoidCallback signOut)
           IconButton(
             key: const ValueKey<String>('merzox.businessShell.logout'),
@@ -304,6 +297,9 @@ class _PageHeader extends StatelessWidget {
               color: MerzoxColors.kColor8D99AE,
             ),
           ),
+        // The floating bell owns this corner on every screen, so the bar
+        // leaves it free rather than being drawn under it.
+        const SizedBox(width: kGlobalBellReservedWidth),
       ],
     ),
   );
@@ -501,16 +497,7 @@ class _Orders extends StatelessWidget {
 
     return Column(
       children: <Widget>[
-        MerchantTopBar(
-          title: 'businessShell.ordersTitle'.tr(),
-          leading: NotificationBadgeButton(
-            tooltip: 'notifications.title'.tr(),
-            businessAudience: true,
-            onPressed: () => context.push('/notifications?audience=business'),
-            iconSize: 24,
-            badgeSize: 8,
-          ),
-        ),
+        MerchantTopBar(title: 'businessShell.ordersTitle'.tr()),
         const SizedBox(height: kMerchantTopBarToSearch),
         MerchantSearchRow(
           hint: 'businessShell.orderSearchPlaceholder'.tr(),

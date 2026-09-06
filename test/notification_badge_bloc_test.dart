@@ -6,7 +6,7 @@ import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/features/notifications/bloc/notification_badge_bloc.dart';
 import 'package:merzox/features/notifications/bloc/notification_badge_event.dart';
 import 'package:merzox/features/notifications/bloc/notification_badge_state.dart';
-import 'package:merzox/features/notifications/widgets/notification_badge_button.dart';
+import 'package:merzox/features/notifications/widgets/global_notification_bell.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/services/realtime_service.dart';
 
@@ -194,28 +194,28 @@ void main() {
     expect(api.calls, 2);
   });
 
-  testWidgets('badge dot is rendered only when unread count is positive', (
-    tester,
-  ) async {
+  testWidgets('the count is shown when there is one to show', (tester) async {
     final api = _BadgeApi()..unreadCount = 2;
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: NotificationBadgeButton(
-            tooltip: 'Notifications',
-            onPressed: () {},
-            apiService: api,
-            authSessionService: const _BadgeSessionService(
-              AuthSessionSnapshot(
-                type: AuthSessionType.customer,
-                token: 'token',
+          body: GlobalNotificationBell(
+            businessAudience: false,
+            onOpen: (String _) {},
+            blocBuilder: () => NotificationBadgeBloc(
+              apiService: api,
+              authSessionService: const _BadgeSessionService(
+                AuthSessionSnapshot(
+                  type: AuthSessionType.customer,
+                  token: 'token',
+                ),
               ),
+              realtimeNotificationInvalidations:
+                  const Stream<RealtimeNotificationInvalidation>.empty(),
+              realtimeConnectionStatuses:
+                  const Stream<RealtimeConnectionStatus>.empty(),
             ),
-            realtimeNotificationInvalidations:
-                const Stream<RealtimeNotificationInvalidation>.empty(),
-            realtimeConnectionStatuses:
-                const Stream<RealtimeConnectionStatus>.empty(),
           ),
         ),
       ),
@@ -223,38 +223,35 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const ValueKey('notification-unread-dot')),
-      findsOneWidget,
-    );
+    // A number, not a dot: a dot says only that something happened, and a
+    // merchant deciding whether to stop what they are doing needs to know
+    // whether it is one order or nine.
+    expect(find.byKey(const ValueKey('merzox.unreadCount')), findsOneWidget);
+    expect(find.text('2'), findsOneWidget);
   });
 
-  testWidgets('zero unread count renders no fake notification dot', (
-    tester,
-  ) async {
+  testWidgets('nothing unread shows no badge at all', (tester) async {
     final api = _BadgeApi()..unreadCount = 0;
-
-    var pressed = false;
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: NotificationBadgeButton(
-            tooltip: 'Notifications',
-            onPressed: () {
-              pressed = true;
-            },
-            apiService: api,
-            authSessionService: const _BadgeSessionService(
-              AuthSessionSnapshot(
-                type: AuthSessionType.customer,
-                token: 'token',
+          body: GlobalNotificationBell(
+            businessAudience: false,
+            onOpen: (String _) {},
+            blocBuilder: () => NotificationBadgeBloc(
+              apiService: api,
+              authSessionService: const _BadgeSessionService(
+                AuthSessionSnapshot(
+                  type: AuthSessionType.customer,
+                  token: 'token',
+                ),
               ),
+              realtimeNotificationInvalidations:
+                  const Stream<RealtimeNotificationInvalidation>.empty(),
+              realtimeConnectionStatuses:
+                  const Stream<RealtimeConnectionStatus>.empty(),
             ),
-            realtimeNotificationInvalidations:
-                const Stream<RealtimeNotificationInvalidation>.empty(),
-            realtimeConnectionStatuses:
-                const Stream<RealtimeConnectionStatus>.empty(),
           ),
         ),
       ),
@@ -262,10 +259,7 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('notification-unread-dot')), findsNothing);
-
-    await tester.tap(find.byTooltip('Notifications'));
-
-    expect(pressed, isTrue);
+    expect(find.byKey(const ValueKey('merzox.unreadCount')), findsNothing);
+    expect(find.byKey(const ValueKey('merzox.globalBell')), findsOneWidget);
   });
 }

@@ -1,3 +1,4 @@
+import 'package:merzox/features/notifications/widgets/global_notification_bell.dart';
 import 'dart:async';
 
 import 'package:merzox/core/localization/api_error_localizer.dart';
@@ -24,7 +25,6 @@ import 'package:merzox/features/recommendation_preferences/bloc/recommendation_p
 import 'package:merzox/features/recommendation_preferences/bloc/recommendation_preference_event.dart';
 import 'package:merzox/features/recommendation_preferences/bloc/recommendation_preference_state.dart';
 import 'package:merzox/features/recommendation_preferences/widgets/recommendation_preference_control.dart';
-import 'package:merzox/features/notifications/widgets/notification_badge_button.dart';
 import 'package:merzox/features/messages/bloc/messages_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
@@ -753,6 +753,9 @@ class _HomeTopBar extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
+                // A signed-in reader has the bell that floats over every
+                // screen. A guest has nothing to count, so this stays: for
+                // them it is a way in, not a counter.
                 if (isGuest)
                   IconButton(
                     tooltip: 'home.notificationsTooltip'.tr(),
@@ -766,13 +769,6 @@ class _HomeTopBar extends StatelessWidget {
                       Icons.notifications_none_rounded,
                       size: 24,
                     ),
-                  )
-                else
-                  NotificationBadgeButton(
-                    tooltip: 'home.notificationsTooltip'.tr(),
-                    onPressed: () => context.push('/notifications'),
-                    iconSize: 24,
-                    badgeSize: 8,
                   ),
                 // Offered to guests too: a visitor who cannot read the
                 // interface has no way to sign in and reach the profile screen
@@ -800,6 +796,9 @@ class _HomeTopBar extends StatelessWidget {
                       color: MerzoxColors.kColor8D99AE,
                     ),
                   ),
+                // The floating bell owns this corner on every screen, so
+                // the bar leaves it free rather than being drawn under it.
+                const SizedBox(width: kGlobalBellReservedWidth),
               ],
             ),
           ),
@@ -1935,13 +1934,7 @@ class _AllBusinessesTopBar extends StatelessWidget {
                       size: 20,
                     ),
                   )
-                : NotificationBadgeButton(
-                    tooltip: 'home.notificationsTooltip'.tr(),
-                    onPressed: () => context.push('/notifications'),
-                    iconSize: 20,
-                    badgeSize: 7,
-                    iconColor: MerzoxColors.kColor3D5A80,
-                  ),
+                : const SizedBox.shrink(),
           ),
         ],
       ),
