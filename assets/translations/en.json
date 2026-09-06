@@ -531,7 +531,8 @@
     "orderNumberCopied": "Order number copied",
     "holdToCopy": "Hold to copy the order number",
     "tapToSeeFull": "Tap to read it in full",
-    "clearSearch": "Clear search"
+    "clearSearch": "Clear search",
+    "registerAsCustomer": "Register as a customer"
   },
   "profile": {
     "title": "Profile"
