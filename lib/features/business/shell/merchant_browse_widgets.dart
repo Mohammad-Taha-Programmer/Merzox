@@ -388,10 +388,23 @@ class MerchantProductCard extends StatelessWidget {
     required this.onAction,
   });
 
-  static const double height = 127;
+  /// The artboard's height, kept as a floor rather than a ceiling.
+  ///
+  /// A reader who turns the system font up - 1.3 on the phone this was found
+  /// on - needs more room than the board allowed for, and a card that refused
+  /// to give it printed the overflow stripe across the screen. Shrinking the
+  /// text back would argue with a setting they chose deliberately, so the card
+  /// grows and keeps the board's height whenever the text fits in it.
+  static const double minHeight = 127;
+
   static const double photoWidth = 84;
   static const double photoHeight = 95;
   static const double inset = 16;
+
+  /// The gap between the photo and the text, and between the text and the
+  /// menu at the far corner.
+  static const double photoGap = 12;
+  static const double menuGap = 24 + 12;
 
   @override
   Widget build(BuildContext context) {
@@ -405,8 +418,8 @@ class MerchantProductCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(8),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: SizedBox(
-              height: height,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: minHeight),
               child: Stack(
                 children: <Widget>[
                   if (product.isActive) const _PublishedCorner(),
@@ -415,11 +428,15 @@ class MerchantProductCard extends StatelessWidget {
                     top: inset,
                     child: _Photo(product: product),
                   ),
-                  PositionedDirectional(
-                    start: inset + photoWidth + 12,
-                    end: inset + 24 + 12,
-                    top: inset,
-                    bottom: inset,
+                  // The one child that is not positioned, so the card takes
+                  // its height from the text rather than imposing one on it.
+                  Padding(
+                    padding: const EdgeInsetsDirectional.fromSTEB(
+                      inset + photoWidth + photoGap,
+                      inset,
+                      inset + menuGap,
+                      inset,
+                    ),
                     child: _Details(product: product),
                   ),
                   PositionedDirectional(
@@ -506,6 +523,7 @@ class _Details extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         Text(
           product.name,
