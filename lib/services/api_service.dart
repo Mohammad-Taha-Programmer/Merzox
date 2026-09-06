@@ -1449,6 +1449,15 @@ class BusinessProductApiModel {
   final String imageUrl;
   final List<String> imageUrls;
   final String classification;
+
+  /// When the merchant added the product.
+  ///
+  /// The server has always sent it; nothing read it until a badge needed to
+  /// know how old a product is. Null on a payload that omits it, which reads
+  /// as "not new" rather than as "new" - an unknown age must not earn a mark
+  /// that expires.
+  final DateTime? createdAt;
+
   final double rating;
   final int ratingCount;
   final int likeCount;
@@ -1462,6 +1471,7 @@ class BusinessProductApiModel {
     required this.imageUrl,
     required this.imageUrls,
     required this.classification,
+    this.createdAt,
     required this.rating,
     required this.ratingCount,
     required this.likeCount,
@@ -1569,6 +1579,7 @@ class BusinessProductApiModel {
       imageUrl: imageUrls.isEmpty ? '' : imageUrls.first,
       imageUrls: imageUrls,
       classification: json['classification'] as String? ?? '',
+      createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
       ratingCount: (json['ratingCount'] as num?)?.toInt() ?? 0,
       likeCount: (json['likeCount'] as num?)?.toInt() ?? 0,
