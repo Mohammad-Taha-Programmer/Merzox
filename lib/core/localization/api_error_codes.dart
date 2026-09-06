@@ -61,6 +61,8 @@ const Map<String, String> apiErrorMessageKeys = <String, String>{
   'INVALID_BIRTH_DATE': 'apiErrors.invalidBirthDate',
   'BUSINESS_ACCOUNT_REQUIRED': 'apiErrors.businessAccountRequired',
   'CUSTOMER_ACCOUNT_REQUIRED': 'apiErrors.customerAccountRequired',
+  // Reviewing the shop you own. Anyone else who bought may review.
+  'CANNOT_REVIEW_OWN_BUSINESS': 'apiErrors.cannotReviewOwnBusiness',
   'BUSINESS_ALREADY_ENROLLED': 'apiErrors.businessAlreadyExists',
   'BUSINESS_ALREADY_EXISTS': 'apiErrors.businessAlreadyExists',
   'BUSINESS_PUBLIC_ID_UNAVAILABLE': 'apiErrors.businessPublicIdUnavailable',

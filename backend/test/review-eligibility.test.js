@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { requireCustomerUser } from '../src/middleware/auth.js';
+import {
+  OWN_BUSINESS_REVIEW_CODE,
+  reviewsOwnBusiness
+} from '../src/policies/review-authorship.policy.js';
+
 import {
   assertReviewEligible,
   getReviewEligibility,
@@ -91,24 +95,51 @@ test('pending, cancelled, or absent purchases cannot be synthesized as eligible'
   assert.equal(fake.calls[0].status, 'delivered');
 });
 
-test('business accounts are not customer reviewers and do not query orders', async () => {
+test('the shop owner is refused, and no order is read to decide it', async () => {
+  // It used to be the account type that decided this, which also refused a
+  // merchant buying from somebody else. What is actually being prevented is
+  // rating your own shop.
   const fake = fakeOrderModel({ existsResult: { _id: 'order-1' } });
 
   const result = await getReviewEligibility({
-    user: {
-      _id: 'merchant-1',
-      userType: 'business'
-    },
+    user: { _id: 'merchant-1', userType: 'business' },
     businessId: 'business-1',
+    ownerId: 'merchant-1',
     orderModel: fake.model
   });
 
   assert.deepEqual(result, {
     eligible: false,
-    reason: reviewEligibilityReasons.customerAccountRequired
+    reason: reviewEligibilityReasons.ownBusiness
   });
 
   assert.equal(fake.calls.length, 0);
+});
+
+test('a merchant who bought from another shop may review it', async () => {
+  const fake = fakeOrderModel({ existsResult: { _id: 'order-1' } });
+
+  const result = await getReviewEligibility({
+    user: { _id: 'merchant-1', userType: 'business' },
+    businessId: 'business-1',
+    ownerId: 'merchant-2',
+    orderModel: fake.model
+  });
+
+  assert.deepEqual(result, { eligible: true, reason: null });
+});
+
+test('buying nothing still bars the review, merchant or not', async () => {
+  const fake = fakeOrderModel({ existsResult: null });
+
+  const result = await getReviewEligibility({
+    user: { _id: 'merchant-1', userType: 'business' },
+    businessId: 'business-1',
+    ownerId: 'merchant-2',
+    orderModel: fake.model
+  });
+
+  assert.equal(result.reason, reviewEligibilityReasons.deliveredPurchaseRequired);
 });
 
 test('write-time fence rejects a normal user without delivered proof', async () => {
@@ -130,56 +161,45 @@ test('write-time fence rejects a normal user without delivered proof', async () 
   );
 });
 
-test('write-time fence rejects a business account with a stable code', async () => {
+test('the write-time fence names owning the shop, with a stable code', async () => {
   const fake = fakeOrderModel();
 
   await assert.rejects(
     () =>
       assertReviewEligible({
-        user: {
-          _id: 'merchant-1',
-          userType: 'business'
-        },
+        user: { _id: 'merchant-1', userType: 'business' },
         businessId: 'business-1',
+        ownerId: 'merchant-1',
         orderModel: fake.model
       }),
     (error) => {
       assert.equal(error.statusCode, 403);
-      assert.equal(error.code, 'CUSTOMER_ACCOUNT_REQUIRED');
+      assert.equal(error.code, OWN_BUSINESS_REVIEW_CODE);
       return true;
     }
   );
 });
 
-test('requireCustomerUser permits normal customers only', () => {
-  let nextCalls = 0;
+test('a merchant may review a shop that is not theirs', () => {
+  // The account type used to decide this, which meant a shopkeeper who bought
+  // from another shopkeeper had no way to say so.
+  assert.equal(reviewsOwnBusiness('merchant-1', 'merchant-2'), false);
+});
 
-  requireCustomerUser(
-    { user: normalUser() },
-    {},
-    () => {
-      nextCalls += 1;
-    }
-  );
+test('nobody reviews the shop they own', () => {
+  assert.equal(reviewsOwnBusiness('merchant-1', 'merchant-1'), true);
+});
 
-  assert.equal(nextCalls, 1);
+test('an id compares the same whatever shape it arrives in', () => {
+  // Mongoose hands back an ObjectId, a lean read the same, a test a string.
+  const asObjectId = { toHexString: () => 'merchant-1' };
 
-  assert.throws(
-    () =>
-      requireCustomerUser(
-        {
-          user: {
-            _id: 'merchant-1',
-            userType: 'business'
-          }
-        },
-        {},
-        () => {}
-      ),
-    (error) => {
-      assert.equal(error.statusCode, 403);
-      assert.equal(error.code, 'CUSTOMER_ACCOUNT_REQUIRED');
-      return true;
-    }
-  );
+  assert.equal(reviewsOwnBusiness('merchant-1', asObjectId), true);
+  assert.equal(reviewsOwnBusiness(asObjectId, 'merchant-1'), true);
+});
+
+test('a shop with no owner recorded belongs to nobody', () => {
+  // Refusing everyone would be the wrong way round.
+  assert.equal(reviewsOwnBusiness('merchant-1', null), false);
+  assert.equal(reviewsOwnBusiness(null, 'merchant-1'), false);
 });

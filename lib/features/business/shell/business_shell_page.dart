@@ -1,3 +1,4 @@
+import '../../../core/auth/role_switch_service.dart';
 import '../../../core/widgets/remote_circle_avatar.dart';
 import '../../messages/widgets/message_badge.dart';
 import '../../notifications/widgets/global_notification_bell.dart';
@@ -849,7 +850,12 @@ class _Profile extends StatelessWidget {
               children: <Widget>[
                 _ProfileIdentity(
                   business: business,
-                  onRegisterAsCustomer: () => context.push('/signup'),
+                  onRegisterAsCustomer: () async {
+                    // The same account, used the other way round: a shopkeeper
+                    // buying from another shopkeeper. Nothing is signed out.
+                    await const RoleSwitchService().actAsCustomer();
+                    if (context.mounted) context.go('/home');
+                  },
                 ),
                 MerchantProfileMenuRow(
                   icon: Icons.person_outline_rounded,
@@ -1022,7 +1028,7 @@ class _ProfileHeader extends StatelessWidget {
 /// The picture, the name and the customer button, which stand on the sheet.
 class _ProfileIdentity extends StatelessWidget {
   final OwnerBusiness business;
-  final VoidCallback onRegisterAsCustomer;
+  final Future<void> Function() onRegisterAsCustomer;
 
   const _ProfileIdentity({
     required this.business,
@@ -1066,7 +1072,7 @@ class _ProfileIdentity extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 16),
-        _RegisterAsCustomerButton(onPressed: onRegisterAsCustomer),
+        RegisterAsCustomerButton(onPressed: onRegisterAsCustomer),
         const SizedBox(height: 25),
       ],
     );
@@ -1085,10 +1091,15 @@ const double kProfileTitleBand = 44;
 const double kProfileSheetGap = 45;
 
 /// `التسجيل كزبون`, the mirror of the customer profile's `التسجيل كتاجر`.
-class _RegisterAsCustomerButton extends StatelessWidget {
-  final VoidCallback onPressed;
+/// The button that turns the shopkeeper into a customer.
+///
+/// Nothing is signed out and no second account is made: the same login, used
+/// the other way round, so a shopkeeper can buy from another shop. Public so
+/// the turn can be exercised without standing up the whole shell.
+class RegisterAsCustomerButton extends StatelessWidget {
+  final Future<void> Function() onPressed;
 
-  const _RegisterAsCustomerButton({required this.onPressed});
+  const RegisterAsCustomerButton({super.key, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
@@ -1096,7 +1107,7 @@ class _RegisterAsCustomerButton extends StatelessWidget {
       color: MerzoxColors.kColor3D5A80,
       borderRadius: BorderRadius.circular(kProfileRowRadius),
       child: InkWell(
-        onTap: onPressed,
+        onTap: () => onPressed(),
         borderRadius: BorderRadius.circular(kProfileRowRadius),
         child: Container(
           width: 182,

@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/auth/auth_gate.dart';
+import 'package:merzox/core/auth/role_switch_service.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/cart/bloc/cart_bloc.dart';
 import 'package:merzox/features/cart/bloc/cart_event.dart';
@@ -143,6 +144,27 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  /// Turns the app round to the merchant side of an account that already owns
+  /// a shop.
+  ///
+  /// This is not a way to become one. Enrolment is the card on the home tab
+  /// and stays the only way in, so an account that has not been through it is
+  /// refused here and sent there instead. The button that calls this is
+  /// already hidden from such an account; the refusal is the fence behind it,
+  /// for the case where the stored account type and the session disagree.
+  Future<void> _actAsMerchant(BuildContext context) async {
+    final bool switched = await const RoleSwitchService().actAsMerchant();
+
+    if (!context.mounted) return;
+
+    if (switched) {
+      context.go('/business');
+      return;
+    }
+
+    _openBusinessEnrollment(context);
+  }
+
   Future<void> _showLocationPrompt(BuildContext context, HomeBloc bloc) async {
     bloc.add(const HomeLocationPromptShown());
     final reason = bloc.state.locationPermissionReason;
@@ -256,7 +278,7 @@ class HomeScreen extends StatelessWidget {
                 onShareApp: () => context.push('/share-app'),
                 onSignupPressed: () => context.go('/signup'),
                 onLoginPressed: () => context.go('/login'),
-                onProtectedAction: () => _openBusinessEnrollment(context),
+                onActAsMerchant: () => _actAsMerchant(context),
                 notificationPreferenceGateway: notificationPreferenceGateway,
                 notificationPreferenceSessionReader:
                     notificationPreferenceSessionReader,
@@ -2065,7 +2087,7 @@ class _ProfileTab extends StatelessWidget {
   final VoidCallback onShareApp;
   final VoidCallback onSignupPressed;
   final VoidCallback onLoginPressed;
-  final VoidCallback onProtectedAction;
+  final Future<void> Function() onActAsMerchant;
   final NotificationPreferenceGateway? notificationPreferenceGateway;
   final NotificationPreferenceSessionReader?
   notificationPreferenceSessionReader;
@@ -2084,7 +2106,7 @@ class _ProfileTab extends StatelessWidget {
     required this.onShareApp,
     required this.onSignupPressed,
     required this.onLoginPressed,
-    required this.onProtectedAction,
+    required this.onActAsMerchant,
     this.notificationPreferenceGateway,
     this.notificationPreferenceSessionReader,
     this.recommendationPreferenceGateway,
@@ -2118,7 +2140,7 @@ class _ProfileTab extends StatelessWidget {
         ),
       ],
       child: _ProfileXdContent(
-        onProtectedAction: onProtectedAction,
+        onActAsMerchant: onActAsMerchant,
         onEditProfile: onEditProfile,
         onOrders: onOrders,
         onMap: onMap,
@@ -2132,7 +2154,7 @@ class _ProfileTab extends StatelessWidget {
 }
 
 class _ProfileXdContent extends StatefulWidget {
-  final VoidCallback onProtectedAction;
+  final Future<void> Function() onActAsMerchant;
   final VoidCallback onEditProfile;
   final VoidCallback onOrders;
   final VoidCallback onMap;
@@ -2142,7 +2164,7 @@ class _ProfileXdContent extends StatefulWidget {
   final VoidCallback onLogout;
 
   const _ProfileXdContent({
-    required this.onProtectedAction,
+    required this.onActAsMerchant,
     required this.onEditProfile,
     required this.onOrders,
     required this.onMap,
@@ -2216,8 +2238,27 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
                     },
                   ),
                   const SizedBox(height: 18),
-                  _ProfileMerchantButton(onPressed: widget.onProtectedAction),
-                  const SizedBox(height: 18),
+                  FutureBuilder<_StoredUserProfile>(
+                    future: _profileFuture,
+                    builder: (context, snapshot) {
+                      // Offered only to an account that owns a shop. For
+                      // everyone else the way to a shop is the enrolment card
+                      // on the home tab, and a button here that looked like a
+                      // second way in would make that one optional.
+                      if (!accountOwnsBusiness(snapshot.data?.userType)) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Column(
+                        children: [
+                          _ProfileMerchantButton(
+                            onPressed: widget.onActAsMerchant,
+                          ),
+                          const SizedBox(height: 18),
+                        ],
+                      );
+                    },
+                  ),
                   _ProfileXdMenuTile(
                     title: 'profileEdit.title'.tr(),
                     icon: Icons.edit_outlined,
@@ -2312,7 +2353,7 @@ class _ProfileXdAvatar extends StatelessWidget {
 }
 
 class _ProfileMerchantButton extends StatelessWidget {
-  final VoidCallback onPressed;
+  final Future<void> Function() onPressed;
 
   const _ProfileMerchantButton({required this.onPressed});
 
@@ -2322,7 +2363,7 @@ class _ProfileMerchantButton extends StatelessWidget {
       width: 120,
       height: 42,
       child: FilledButton.icon(
-        onPressed: onPressed,
+        onPressed: () => onPressed(),
         icon: const Icon(Icons.storefront_outlined, size: 16),
         label: Text(
           'home.registerAsMerchant'.tr(),

@@ -35,11 +35,7 @@ import {
   updateMyBusinessOrderStatus,
   updateMyBusinessProduct
 } from '../controllers/merchant.controller.js';
-import {
-  requireAuth,
-  requireBusinessUser,
-  requireCustomerUser
-} from '../middleware/auth.js';
+import { requireAuth, requireBusinessUser } from '../middleware/auth.js';
 import {
   validateBusinessEnrollment,
   validateBusinessOrderStatus,
@@ -147,10 +143,12 @@ router.get(
   getBusinessProductReviewEligibility
 );
 router.get('/:id/products/:productId/reviews', listBusinessProductReviews);
+// No customer-only guard: a merchant buying from another merchant is that
+// shop's customer like any other. The one review nobody may write - their own
+// shop's - is refused by the handler, which knows whose shop it is.
 router.post(
   '/:id/products/:productId/reviews',
   requireAuth,
-  requireCustomerUser,
   createBusinessProductReview
 );
 router.post('/:id/products/:productId/like', requireAuth, likeBusinessProduct);
@@ -161,12 +159,7 @@ router.get(
   getBusinessReviewEligibility
 );
 router.get('/:id/reviews', listBusinessReviews);
-router.post(
-  '/:id/reviews',
-  requireAuth,
-  requireCustomerUser,
-  createBusinessReview
-);
+router.post('/:id/reviews', requireAuth, createBusinessReview);
 router.get('/:id', getBusiness);
 
 export default router;

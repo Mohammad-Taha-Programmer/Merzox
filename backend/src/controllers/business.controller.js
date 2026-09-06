@@ -495,6 +495,7 @@ export const getBusinessProductReviewEligibility = asyncHandler(
     const eligibility = await getReviewEligibility({
       user: req.user,
       businessId: business._id,
+      ownerId: business.owner,
       productId: product._id
     });
 
@@ -519,6 +520,7 @@ export const createBusinessProductReview = asyncHandler(async (req, res) => {
   await assertReviewEligible({
     user: req.user,
     businessId: business._id,
+    ownerId: business.owner,
     productId: product._id
   });
 
@@ -616,7 +618,8 @@ export const getBusinessReviewEligibility = asyncHandler(
 
     const eligibility = await getReviewEligibility({
       user: req.user,
-      businessId: business._id
+      businessId: business._id,
+      ownerId: business.owner
     });
 
     res.json({
@@ -640,7 +643,8 @@ export const createBusinessReview = asyncHandler(async (req, res) => {
 
   await assertReviewEligible({
     user: req.user,
-    businessId: business._id
+    businessId: business._id,
+    ownerId: business.owner
   });
 
   const review = await BusinessReview.findOneAndUpdate(

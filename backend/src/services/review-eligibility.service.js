@@ -1,8 +1,13 @@
 import { Order } from '../models/Order.js';
+import {
+  OWN_BUSINESS_REVIEW_CODE,
+  reviewsOwnBusiness
+} from '../policies/review-authorship.policy.js';
 import { AppError } from '../utils/AppError.js';
 
 export const reviewEligibilityReasons = Object.freeze({
   customerAccountRequired: 'customerAccountRequired',
+  ownBusiness: 'ownBusiness',
   deliveredPurchaseRequired: 'deliveredPurchaseRequired'
 });
 
@@ -30,13 +35,25 @@ function deliveredPurchaseFilter({ userId, businessId, productId }) {
 export async function getReviewEligibility({
   user,
   businessId,
+  /// The shop's owner, so the one review nobody may write can be recognised.
+  ownerId,
   productId,
   orderModel = Order
 }) {
-  if (!user || user.userType !== 'normal') {
+  if (!user) {
     return {
       eligible: false,
       reason: reviewEligibilityReasons.customerAccountRequired
+    };
+  }
+
+  // A merchant buying from another merchant is that shop's customer like any
+  // other. The thing worth preventing is rating your own shop, and that is
+  // what is checked - not the type printed on the account.
+  if (reviewsOwnBusiness(user._id, ownerId)) {
+    return {
+      eligible: false,
+      reason: reviewEligibilityReasons.ownBusiness
     };
   }
 
@@ -79,6 +96,14 @@ export async function assertReviewEligible(options) {
       'A customer account is required to submit reviews',
       403,
       'CUSTOMER_ACCOUNT_REQUIRED'
+    );
+  }
+
+  if (eligibility.reason === reviewEligibilityReasons.ownBusiness) {
+    throw new AppError(
+      'A shop cannot be reviewed by the person who owns it',
+      403,
+      OWN_BUSINESS_REVIEW_CODE
     );
   }
 

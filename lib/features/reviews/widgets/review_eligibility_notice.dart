@@ -44,6 +44,11 @@ final class ReviewEligibilityNotice extends StatelessWidget {
       case ReviewEligibilityStatus.customerAccountRequired:
         message = 'reviews.customerAccountRequired'.tr();
 
+      case ReviewEligibilityStatus.ownBusiness:
+        // Nothing to offer here: there is no step that would make this
+        // eligible, so the notice says why and stops.
+        message = 'reviews.ownBusiness'.tr();
+
       case ReviewEligibilityStatus.deliveredPurchaseRequired:
         message = productTarget
             ? 'reviews.productDeliveredPurchaseRequired'.tr()
