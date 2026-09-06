@@ -24,6 +24,11 @@ const API = 'https://api.cloudinary.com/v1_1';
 /** Where avatars are filed, so a bucket of them can be found and managed. */
 export const AVATAR_FOLDER = 'merzox/avatars';
 
+/// Product photos are kept apart from profile pictures: a merchant
+/// browsing their media should not have to tell one from the other, and
+/// the two have different lifetimes.
+export const PRODUCT_FOLDER = 'merzox/products';
+
 function credentials() {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -95,12 +100,14 @@ async function call(endpoint, body, fetchImpl) {
  */
 export async function uploadImage(
   base64,
-  { fetchImpl = fetch, contentType = 'image/png' } = {}
+  { fetchImpl = fetch, contentType = 'image/png', folder = AVATAR_FOLDER } = {}
 ) {
   const { cloudName, apiKey, apiSecret } = credentials();
   const timestamp = Math.floor(Date.now() / 1000);
 
-  const signed = { folder: AVATAR_FOLDER, timestamp };
+  // The folder is part of what is signed: an unsigned one would let a caller
+  // choose where somebody else's pictures land.
+  const signed = { folder, timestamp };
   const body = new URLSearchParams({
     ...signed,
     file: `data:${contentType};base64,${base64}`,

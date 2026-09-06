@@ -1,15 +1,20 @@
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 import {
-  AVATAR_CONTENT_TYPES,
-  AVATAR_MAX_BYTES,
-  readAvatarImage
+  UPLOAD_CONTENT_TYPES,
+  UPLOAD_MAX_BYTES,
+  readUploadedImage,
+  PRODUCT_IMAGE_CODES,
+  IMAGE_UPLOAD_PATHS,
+  UPLOAD_BODY_LIMIT_BYTES
 } from '../src/policies/avatar.policy.js';
 import {
   AVATAR_FOLDER,
   deleteImage,
+  PRODUCT_FOLDER,
   imageHostConfigured,
   signParams,
   uploadImage
@@ -50,14 +55,14 @@ function withoutCredentials() {
 }
 
 test('a bare base64 image is accepted', () => {
-  const read = readAvatarImage({ image: PIXEL });
+  const read = readUploadedImage({ image: PIXEL });
 
   assert.equal(read.base64, PIXEL);
   assert.ok(read.bytes > 0);
 });
 
 test('a data URL is accepted, and declares its own type', () => {
-  const read = readAvatarImage({ image: `data:image/png;base64,${PIXEL}` });
+  const read = readUploadedImage({ image: `data:image/png;base64,${PIXEL}` });
 
   assert.equal(read.base64, PIXEL);
   assert.equal(read.contentType, 'image/png');
@@ -67,13 +72,13 @@ test('wrapped base64 is read, not treated as corruption', () => {
   // Some encoders break the payload at 76 columns. The newlines are legal.
   const wrapped = PIXEL.replace(/(.{20})/g, '$1\n');
 
-  assert.equal(readAvatarImage({ image: wrapped }).base64, PIXEL);
+  assert.equal(readUploadedImage({ image: wrapped }).base64, PIXEL);
 });
 
 test('a missing image is named as such', () => {
   for (const body of [{}, { image: '' }, { image: '   ' }, { image: 42 }]) {
     assert.throws(
-      () => readAvatarImage(body),
+      () => readUploadedImage(body),
       (error) => error.code === 'AVATAR_IMAGE_REQUIRED',
       JSON.stringify(body)
     );
@@ -83,7 +88,7 @@ test('a missing image is named as such', () => {
 test('something that is not base64 is refused', () => {
   for (const image of ['not base64!', 'AAA', '####']) {
     assert.throws(
-      () => readAvatarImage({ image }),
+      () => readUploadedImage({ image }),
       (error) => error.code === 'AVATAR_IMAGE_INVALID',
       image
     );
@@ -92,24 +97,24 @@ test('something that is not base64 is refused', () => {
 
 test('a format the app cannot render is refused', () => {
   assert.throws(
-    () => readAvatarImage({ image: `data:image/tiff;base64,${PIXEL}` }),
+    () => readUploadedImage({ image: `data:image/tiff;base64,${PIXEL}` }),
     (error) => error.code === 'AVATAR_CONTENT_TYPE_UNSUPPORTED'
   );
 
-  for (const type of AVATAR_CONTENT_TYPES) {
+  for (const type of UPLOAD_CONTENT_TYPES) {
     assert.doesNotThrow(() =>
-      readAvatarImage({ image: `data:${type};base64,${PIXEL}` })
+      readUploadedImage({ image: `data:${type};base64,${PIXEL}` })
     );
   }
 });
 
 test('an oversized image is refused before it is decoded', () => {
   assert.doesNotThrow(() =>
-    readAvatarImage({ image: ofBytes(AVATAR_MAX_BYTES) })
+    readUploadedImage({ image: ofBytes(UPLOAD_MAX_BYTES) })
   );
 
   assert.throws(
-    () => readAvatarImage({ image: ofBytes(AVATAR_MAX_BYTES + 3) }),
+    () => readUploadedImage({ image: ofBytes(UPLOAD_MAX_BYTES + 3) }),
     (error) => error.code === 'AVATAR_IMAGE_TOO_LARGE'
   );
 });
@@ -339,4 +344,124 @@ test('a tidy-up that fails is reported, never thrown', async () => {
     await deleteImage('p', { fetchImpl: async () => ({ ok: true }) }),
     false
   );
+});
+
+/// Product photos travel the same road as a profile picture.
+///
+/// A product's images are stored as URLs, so until this the only way to add one
+/// was to already have it hosted somewhere - which asks a shopkeeper to run an
+/// image host before they can list a jar of cream. The rules are the same for
+/// both pictures; only the folder they land in and the codes a refusal carries
+/// are different.
+
+test('a product image is refused by the same rules as a profile picture', () => {
+  assert.throws(
+    () => readUploadedImage({ image: '   ' }, { codes: PRODUCT_IMAGE_CODES }),
+    (error) => error.code === 'PRODUCT_IMAGE_REQUIRED'
+  );
+
+  assert.throws(
+    () => readUploadedImage({ image: 'not base64!' }, { codes: PRODUCT_IMAGE_CODES }),
+    (error) => error.code === 'PRODUCT_IMAGE_INVALID'
+  );
+});
+
+test('a refusal names the picture it is about', () => {
+  // "That avatar is too large" for a product photo would send a merchant
+  // looking at the wrong screen.
+  assert.throws(
+    () =>
+      readUploadedImage(
+        { image: 'data:image/tiff;base64,AAAA' },
+        { codes: PRODUCT_IMAGE_CODES }
+      ),
+    (error) => error.code === 'PRODUCT_CONTENT_TYPE_UNSUPPORTED'
+  );
+});
+
+test('the codes default to the picture that had this first', () => {
+  assert.throws(
+    () => readUploadedImage({ image: '' }),
+    (error) => error.code === 'AVATAR_IMAGE_REQUIRED'
+  );
+});
+
+test('product photos are kept in their own folder', async () => {
+  const sent = [];
+  const fetchImpl = async (url, init) => {
+    sent.push(new URLSearchParams(init.body));
+    return {
+      ok: true,
+      json: async () => ({ secure_url: 'https://cdn/x.jpg', public_id: 'p' })
+    };
+  };
+
+  process.env.CLOUDINARY_CLOUD_NAME = 'c';
+  process.env.CLOUDINARY_API_KEY = 'k';
+  process.env.CLOUDINARY_API_SECRET = 's';
+
+  await uploadImage('AAAA', { fetchImpl, folder: PRODUCT_FOLDER });
+
+  assert.equal(sent[0].get('folder'), PRODUCT_FOLDER);
+  assert.notEqual(PRODUCT_FOLDER, AVATAR_FOLDER);
+});
+
+test('the folder is signed, not merely sent', async () => {
+  // An unsigned folder would let a caller choose where somebody else's
+  // pictures land.
+  const bodies = [];
+  const fetchImpl = async (url, init) => {
+    bodies.push(new URLSearchParams(init.body));
+    return {
+      ok: true,
+      json: async () => ({ secure_url: 'https://cdn/x.jpg', public_id: 'p' })
+    };
+  };
+
+  await uploadImage('AAAA', { fetchImpl, folder: AVATAR_FOLDER });
+  await uploadImage('AAAA', { fetchImpl, folder: PRODUCT_FOLDER });
+
+  assert.notEqual(bodies[0].get('signature'), bodies[1].get('signature'));
+});
+
+/// How large a body carrying a picture is allowed to be.
+///
+/// The rule said five megabytes and the body parser said thirty-two kilobytes,
+/// and the parser wins - it refuses the request before any route sees it. A
+/// photo from a phone camera is a few hundred kilobytes even after the picker
+/// shrinks it, so every upload came back as "an unexpected error" while the
+/// rule that would have accepted it never ran.
+
+test('the body limit clears an image at the ceiling, base64 and all', () => {
+  // Four bytes out for every three in, plus the JSON around it. A limit set to
+  // the image ceiling itself rejects every image at the ceiling.
+  const encoded = Math.ceil(UPLOAD_MAX_BYTES * 4 / 3);
+
+  assert.ok(UPLOAD_BODY_LIMIT_BYTES > encoded);
+  assert.ok(UPLOAD_BODY_LIMIT_BYTES < UPLOAD_MAX_BYTES * 2);
+});
+
+test('the limit is far past what a camera actually sends', () => {
+  // A real photo from the reader's phone, shrunk by the picker to 1600px at
+  // quality 85, measured 277 KB - 369 KB once encoded.
+  assert.ok(UPLOAD_BODY_LIMIT_BYTES > 400 * 1024);
+});
+
+test('both routes that carry a picture are named', () => {
+  assert.deepEqual(IMAGE_UPLOAD_PATHS, [
+    '/api/v1/users/me/avatar',
+    '/api/v1/businesses/me/product-images'
+  ]);
+});
+
+test('the paths are the ones the app actually posts to', async () => {
+  // Named here rather than guessed at the mount point: a route added without
+  // its entry goes back to the small limit and fails the same silent way.
+  const routes = await readFile(
+    new URL('../src/routes/business.routes.js', import.meta.url),
+    'utf8'
+  );
+
+  assert.ok(routes.includes("'/me/product-images'"));
+  assert.ok(IMAGE_UPLOAD_PATHS.some((path) => path.endsWith('/me/product-images')));
 });

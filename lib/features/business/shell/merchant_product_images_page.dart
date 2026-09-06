@@ -1,8 +1,13 @@
+import 'dart:typed_data';
 import 'dart:ui' show PathMetric;
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/services/api_service.dart';
 
 /// The product image manager of `الرئيسية – 14`.
 ///
@@ -12,20 +17,33 @@ import 'package:merzox/core/constants/colors.dart';
 /// the 235-tall preview, the 41-tall control bar under it and the 48-tall
 /// button.
 ///
-/// **One deliberate departure.** The artboard's target reads "drag and drop
-/// images here", and nothing in this system can accept a dropped file: there
-/// is no upload endpoint, no object storage and no multipart route anywhere in
-/// the backend, and a product's images are stored as URLs. Rather than draw a
-/// target that silently does nothing, the box asks for an image link — the one
-/// thing the API can actually store. When an upload path exists this widget is
-/// where it lands, and its wording goes back to the artboard's.
+/// The target used to ask for a link and nothing else, because nothing in this
+/// system could take a file: no upload route, no object storage. That is no
+/// longer true - the same image host the profile picture uses takes these too
+/// - so the box now offers the phone as well as a link, and its wording is the
+/// artboard's again.
 ///
-/// The artboard's crop control is likewise absent, for the same reason: with
-/// no bytes of our own to crop, there is nothing for it to act on.
+/// The bytes go through the server rather than to the host directly: the
+/// host's key is a secret and an app cannot keep one.
+///
+/// The artboard's crop control is still absent. Cropping needs an editor, not
+/// an upload, and drawing a control that does nothing is the defect this just
+/// stopped having.
 class MerchantProductImagesPage extends StatefulWidget {
   final List<String> imageUrls;
 
-  const MerchantProductImagesPage({super.key, required this.imageUrls});
+  /// Injected by tests, which have no server and no photo library.
+  final ApiService? apiService;
+  final AuthSessionService authSessionService;
+  final Future<Uint8List?> Function(ImageSource source)? pickImage;
+
+  const MerchantProductImagesPage({
+    super.key,
+    required this.imageUrls,
+    this.apiService,
+    this.authSessionService = const AuthSessionService(),
+    this.pickImage,
+  });
 
   @override
   State<MerchantProductImagesPage> createState() =>
@@ -58,15 +76,97 @@ class _MerchantProductImagesPageState extends State<MerchantProductImagesPage> {
     });
   }
 
+  /// True while bytes are on their way to the image host.
+  bool _uploading = false;
+
+  late final ApiService _api = widget.apiService ?? ApiService();
+
+  Future<Uint8List?> _pick(ImageSource source) async {
+    if (widget.pickImage != null) return widget.pickImage!(source);
+
+    final XFile? file = await ImagePicker().pickImage(
+      source: source,
+      // A product photo is shown at most a screen wide. Sending a
+      // twelve-megapixel original would spend the merchant's data on detail
+      // nothing renders, and the server refuses anything over five megabytes.
+      maxWidth: 1600,
+      maxHeight: 1600,
+      imageQuality: 85,
+    );
+
+    return file?.readAsBytes();
+  }
+
   Future<void> _add() async {
+    final _ImageSourceChoice? choice =
+        await showModalBottomSheet<_ImageSourceChoice>(
+          context: context,
+          builder: (BuildContext sheetContext) => const _SourceSheet(),
+        );
+
+    if (choice == null || !mounted) return;
+
+    if (choice == _ImageSourceChoice.link) {
+      await _addByLink();
+      return;
+    }
+
+    await _addFromDevice(
+      choice == _ImageSourceChoice.camera
+          ? ImageSource.camera
+          : ImageSource.gallery,
+    );
+  }
+
+  Future<void> _addByLink() async {
     final String? url = await showDialog<String>(
       context: context,
       builder: (BuildContext dialogContext) => const _AddImageDialog(),
     );
     final String trimmed = url?.trim() ?? '';
-    if (trimmed.isEmpty) return;
+    if (trimmed.isEmpty || !mounted) return;
 
     setState(() => _images.add(trimmed));
+  }
+
+  Future<void> _addFromDevice(ImageSource source) async {
+    final Uint8List? bytes = await _pick(source);
+    if (bytes == null || !mounted) return;
+
+    setState(() => _uploading = true);
+
+    try {
+      final AuthSessionSnapshot session = await widget.authSessionService
+          .read();
+      final String? token = session.token;
+      if (token == null) throw StateError('Authentication required');
+
+      final String url = await _api.uploadProductImage(
+        token: token,
+        bytes: bytes,
+      );
+
+      if (!mounted) return;
+      // An empty URL is a server that answered without giving us the one thing
+      // the request was for; adding it would put a broken image in the list.
+      if (url.isEmpty) {
+        _reportFailure('merchantImages.uploadFailed'.tr());
+        return;
+      }
+
+      setState(() => _images.add(url));
+    } catch (error) {
+      if (!mounted) return;
+      _reportFailure(localizeApiErrorOrRaw(ApiService.messageFromError(error)));
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
+
+  void _reportFailure(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -100,7 +200,11 @@ class _MerchantProductImagesPageState extends State<MerchantProductImagesPage> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(_gutter, 0, _gutter, 24),
         children: <Widget>[
-          _DropTarget(height: _dropTargetHeight, onTap: _add),
+          _DropTarget(
+            height: _dropTargetHeight,
+            onTap: _uploading ? null : _add,
+            busy: _uploading,
+          ),
           const SizedBox(height: 26),
           for (int index = 0; index < _images.length; index++)
             Padding(
@@ -142,11 +246,69 @@ class _MerchantProductImagesPageState extends State<MerchantProductImagesPage> {
 }
 
 /// The artboard's dashed box with its cloud glyph.
+/// What the reader chose to add a picture from.
+enum _ImageSourceChoice { camera, gallery, link }
+
+/// The three ways in, offered before anything is asked for.
+///
+/// A link still works: a merchant who already hosts their catalogue elsewhere
+/// should not have to re-upload it to use this screen.
+class _SourceSheet extends StatelessWidget {
+  const _SourceSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const SizedBox(height: 8),
+          Text(
+            'merchantImages.sourceTitle'.tr(),
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: MerzoxColors.kColor2B2B2B,
+            ),
+          ),
+          ListTile(
+            key: const ValueKey<String>('merchantImages.camera'),
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: Text('merchantImages.sourceCamera'.tr()),
+            onTap: () => Navigator.of(context).pop(_ImageSourceChoice.camera),
+          ),
+          ListTile(
+            key: const ValueKey<String>('merchantImages.gallery'),
+            leading: const Icon(Icons.photo_library_outlined),
+            title: Text('merchantImages.sourceGallery'.tr()),
+            onTap: () => Navigator.of(context).pop(_ImageSourceChoice.gallery),
+          ),
+          ListTile(
+            key: const ValueKey<String>('merchantImages.link'),
+            leading: const Icon(Icons.link_rounded),
+            title: Text('merchantImages.sourceLink'.tr()),
+            onTap: () => Navigator.of(context).pop(_ImageSourceChoice.link),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
 class _DropTarget extends StatelessWidget {
   final double height;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
-  const _DropTarget({required this.height, required this.onTap});
+  /// While bytes are in flight the target says so and refuses a second tap,
+  /// so an impatient merchant does not upload the same photo twice.
+  final bool busy;
+
+  const _DropTarget({
+    required this.height,
+    required this.onTap,
+    this.busy = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -161,14 +323,23 @@ class _DropTarget extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: <Widget>[
-              const Icon(
-                Icons.cloud_upload_outlined,
-                size: 44,
-                color: MerzoxColors.kColor98C1D9,
-              ),
+              if (busy)
+                const SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                )
+              else
+                const Icon(
+                  Icons.cloud_upload_outlined,
+                  size: 44,
+                  color: MerzoxColors.kColor98C1D9,
+                ),
               const SizedBox(height: 14),
               Text(
-                'merchantImages.addHint'.tr(),
+                busy
+                    ? 'merchantImages.uploading'.tr()
+                    : 'merchantImages.addHint'.tr(),
                 style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w300,

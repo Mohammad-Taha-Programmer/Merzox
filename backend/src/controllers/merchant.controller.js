@@ -23,7 +23,15 @@ import {
   buildProductWrite,
   PRODUCT_VARIANT_ERRORS
 } from '../policies/product.policy.js';
+import {
+  PRODUCT_IMAGE_CODES,
+  readUploadedImage
+} from '../policies/avatar.policy.js';
 import { paginationParams } from '../policies/query.policy.js';
+import {
+  PRODUCT_FOLDER,
+  uploadImage
+} from '../services/image-host.service.js';
 import {
   createBusinessWithUniquePublicId
 } from '../services/business-public-id.service.js';
@@ -371,6 +379,34 @@ async function applyInventoryUpdate({ business, product, write, ownerId }) {
 
   throw new AppError(failure.message, failure.status, failure.code);
 }
+
+/**
+ * Takes one product photo from the merchant's phone and hands back its link.
+ *
+ * A product's images are stored as URLs, so until now the only way to add one
+ * was to already have it hosted somewhere - which asks a shopkeeper to run an
+ * image host before they can list a jar of cream. The bytes come here rather
+ * than going to the image host directly because the host's key is a secret and
+ * an app cannot keep one.
+ *
+ * The link is returned rather than written to a product: the editor holds an
+ * unsaved draft, and a photo attached to a product the merchant then abandons
+ * would be a change they never asked for.
+ */
+export const uploadMyBusinessProductImage = asyncHandler(async (req, res) => {
+  // Read before the upload is attempted: an image that will be refused for its
+  // size or its format should cost nothing to refuse.
+  const { base64, contentType } = readUploadedImage(req.body, {
+    codes: PRODUCT_IMAGE_CODES
+  });
+
+  const { url, publicId } = await uploadImage(base64, {
+    contentType: contentType || 'image/png',
+    folder: PRODUCT_FOLDER
+  });
+
+  res.status(201).json({ success: true, data: { image: { url, publicId } } });
+});
 
 export const updateMyBusinessProduct = asyncHandler(async (req, res) => {
   const business = await findOwnedBusiness(req);

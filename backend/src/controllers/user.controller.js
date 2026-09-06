@@ -6,7 +6,7 @@ import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { normalizeGender, normalizeIdentifier, normalizePhone } from '../utils/normalize.js';
 import { pick } from '../utils/pick.js';
-import { readAvatarImage } from '../policies/avatar.policy.js';
+import { readUploadedImage } from '../policies/avatar.policy.js';
 import { deleteImage, uploadImage } from '../services/image-host.service.js';
 import { applyPictureToOwnedBusiness } from '../services/account-picture.service.js';
 import {
@@ -235,7 +235,7 @@ export const updateMe = asyncHandler(async (req, res) => {
 export const updateMyAvatar = asyncHandler(async (req, res) => {
   // The body is read before the upload is attempted: an image that will be
   // refused for its size or its format should cost nothing to refuse.
-  const { base64 } = readAvatarImage(req.body);
+  const { base64 } = readUploadedImage(req.body);
 
   const { url, publicId } = await uploadImage(base64);
 

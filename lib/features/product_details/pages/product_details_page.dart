@@ -199,7 +199,7 @@ class _ImageSliderState extends State<_ImageSlider> {
 
   @override
   Widget build(BuildContext context) {
-    final images = _gallery(widget.product);
+    final images = productGallery(widget.product);
 
     return Column(
       children: [
@@ -1307,14 +1307,24 @@ class _ProductPhotoPlaceholder extends StatelessWidget {
   }
 }
 
-List<String> _gallery(BusinessProductApiModel product) {
+/// The pictures the slider at the head of the product pages through.
+///
+/// Every image the merchant attached, in the order they arranged them - the
+/// first is the one the storefront card shows, so the two screens agree about
+/// which picture the product "is".
+///
+/// The single `imageUrl` is the older shape of the same field and is still
+/// honoured, so a product saved before the gallery existed still shows its
+/// one picture. With nothing at all the slider pages through three empty
+/// frames rather than collapsing, which is what the artboard draws.
+List<String> productGallery(BusinessProductApiModel product) {
   if (product.imageUrls.isNotEmpty) {
     return product.imageUrls;
   }
 
   if (product.imageUrl.isNotEmpty) {
-    return [product.imageUrl];
+    return <String>[product.imageUrl];
   }
 
-  return const ['', '', ''];
+  return const <String>['', '', ''];
 }

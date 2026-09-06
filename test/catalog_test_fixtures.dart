@@ -93,6 +93,7 @@ BusinessProductApiModel catalogProduct({
   double? maxPrice,
   double? minFinalPrice,
   double? maxFinalPrice,
+  List<String> imageUrls = const <String>[],
 }) {
   final payable = finalPrice ?? price;
 
@@ -110,8 +111,9 @@ BusinessProductApiModel catalogProduct({
     maxPrice: hasVariants ? maxPrice : (maxPrice ?? price),
     minFinalPrice: hasVariants ? minFinalPrice : (minFinalPrice ?? payable),
     maxFinalPrice: hasVariants ? maxFinalPrice : (maxFinalPrice ?? payable),
-    imageUrl: '',
-    imageUrls: const [],
+    // The storefront card shows the first; the slider pages through them all.
+    imageUrl: imageUrls.isEmpty ? '' : imageUrls.first,
+    imageUrls: imageUrls,
     classification: 'new',
     rating: 0,
     ratingCount: 0,

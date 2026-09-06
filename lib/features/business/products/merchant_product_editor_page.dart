@@ -40,12 +40,59 @@ class MerchantProductEditorPage extends StatefulWidget {
       _MerchantProductEditorPageState();
 }
 
-const double _gutter = 17;
-const double _fieldHeight = 48;
+/// The artboard's own measurements, in its own 375-wide frame.
+///
+/// Every box on it is 343 wide inside a 16 gutter, every single-line field is
+/// 48 tall, and the vertical rhythm is regular: 44 from one box's foot to the
+/// next box's head where a label sits between them, and 10 where a tick box
+/// follows a field directly.
+const double kProductGutter = 16;
+const double kProductFieldHeight = 48;
 
-/// Label baseline to the top of its field, and field to the next label.
-const double _labelGap = 10;
-const double _groupGap = 16;
+/// The multi-line description box.
+const double kProductDescriptionHeight = 115;
+
+/// Label to the top of its field.
+const double kProductLabelGap = 11;
+
+/// One box's foot to the next label's head.
+const double kProductGroupGap = 14;
+
+/// A field's foot to a tick box that belongs to it.
+const double kProductCheckGap = 10;
+
+/// The tick box itself, and how far its label stands from it.
+const double kCheckBoxSide = 18;
+const double kCheckLabelGap = 10;
+
+/// `إضافة خيارات أخرى` and the ring beside it.
+///
+/// The board sets the ring at the reading edge and the words five pixels
+/// after it, the same way it pairs a tick box with its label.
+const double kProductOptionsGap = 5;
+
+/// Every outline on the board: the board's colours, at a weight that reads.
+///
+/// The board draws them at half a pixel. On the reader's phone - density 320,
+/// so two device pixels to one - half a pixel is exactly ONE physical pixel,
+/// the thinnest line hardware can make. Measured at that sampling, both axes
+/// get identical ink; what differs is length. The same faint line runs 328
+/// pixels across the top of a box and 48 down its side, and the long one reads
+/// while the short one disappears - so the box arrives as a pair of rules with
+/// nothing joining them.
+///
+/// A full pixel puts twice the ink on those short edges and closes the box.
+/// The colours are the board's exactly; only the weight is the phone's.
+const Color kProductOutline = MerzoxColors.kColor98C1D9;
+const Color kProductTickOutline = MerzoxColors.kColor3D5A80;
+const double kProductOutlineWidth = 1;
+
+/// The tick box when it is filled, which is the ink itself rather than a line
+/// of it.
+const Color kProductTickFill = MerzoxColors.kColor3D5A80;
+
+/// The dashes on the images panel, as the board's `dash: [5]` draws them.
+const double kProductDash = 5;
 
 class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
   static const int _maxVariants = 50;
@@ -343,13 +390,13 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                     key: _key,
                     child: ListView(
                       padding: const EdgeInsets.fromLTRB(
-                        _gutter,
-                        21,
-                        _gutter,
+                        kProductGutter,
+                        19,
+                        kProductGutter,
                         28,
                       ),
                       children: <Widget>[
-                        _Labelled(
+                        ProductLabelled(
                           label: 'merchantProduct.name'.tr(),
                           child: ProductField(
                             controller: _name,
@@ -357,12 +404,12 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                             validator: _requiredValidator,
                           ),
                         ),
-                        const SizedBox(height: _groupGap),
+                        const SizedBox(height: kProductGroupGap),
 
                         // Unticking `غير محدودة` is what puts a number here at
                         // all: the artboard drops the field entirely while the
                         // stock is unlimited.
-                        _Labelled(
+                        ProductLabelled(
                           label: 'merchantProduct.quantity'.tr(),
                           child: _unlimitedStock
                               ? const SizedBox.shrink()
@@ -373,20 +420,22 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                                   validator: _stockValidator,
                                 ),
                         ),
-                        SizedBox(height: _unlimitedStock ? 0 : 9),
-                        _CheckRow(
+                        SizedBox(
+                          height: _unlimitedStock ? 0 : kProductCheckGap,
+                        ),
+                        ProductCheckRow(
                           label: 'merchantProduct.unlimited'.tr(),
                           value: _unlimitedStock,
                           onChanged: (bool value) =>
                               setState(() => _unlimitedStock = value),
                         ),
-                        const SizedBox(height: 15),
+                        const SizedBox(height: kProductGroupGap),
 
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             Expanded(
-                              child: _Labelled(
+                              child: ProductLabelled(
                                 label: 'merchantProduct.price'.tr(),
                                 child: ProductField(
                                   controller: _price,
@@ -400,7 +449,7 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                             ),
                             const SizedBox(width: 20),
                             Expanded(
-                              child: _Labelled(
+                              child: ProductLabelled(
                                 label: 'merchantProduct.costPrice'.tr(),
                                 child: ProductField(
                                   controller: _costPrice,
@@ -412,15 +461,15 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 8),
-                        _CheckRow(
+                        const SizedBox(height: kProductCheckGap),
+                        ProductCheckRow(
                           label: 'merchantProduct.hasDiscount'.tr(),
                           value: _hasDiscount,
                           onChanged: (bool value) =>
                               setState(() => _hasDiscount = value),
                         ),
                         if (_hasDiscount) ...<Widget>[
-                          const SizedBox(height: _labelGap),
+                          const SizedBox(height: kProductCheckGap),
                           ProductField(
                             controller: _priceAfterDiscount,
                             hint: 'merchantProduct.priceAfterDiscount'.tr(),
@@ -429,9 +478,9 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                             validator: _priceAfterDiscountValidator,
                           ),
                         ],
-                        const SizedBox(height: 15),
+                        const SizedBox(height: kProductGroupGap),
 
-                        _Labelled(
+                        ProductLabelled(
                           label: 'merchantProduct.classification'.tr(),
                           child: _ClassificationField(
                             value: _classification,
@@ -439,26 +488,26 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                                 setState(() => _classification = value),
                           ),
                         ),
-                        const SizedBox(height: _groupGap),
+                        const SizedBox(height: kProductGroupGap),
 
-                        _Labelled(
+                        ProductLabelled(
                           label: 'merchantProduct.description'.tr(),
                           child: ProductField(
                             controller: _description,
                             hint: 'merchantProduct.descriptionHint'.tr(),
-                            height: 115,
+                            height: kProductDescriptionHeight,
                             maxLines: 5,
                           ),
                         ),
                         const SizedBox(height: 12),
 
-                        _OptionsRow(
+                        ProductOptionsRow(
                           count: _variants.length,
                           onPressed: _editOptions,
                         ),
                         const SizedBox(height: 14),
 
-                        _Labelled(
+                        ProductLabelled(
                           label: 'merchantProduct.keywords'.tr(),
                           child: ProductField(
                             controller: _keywords,
@@ -468,9 +517,9 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                                 : null,
                           ),
                         ),
-                        const SizedBox(height: _groupGap),
+                        const SizedBox(height: kProductGroupGap),
 
-                        _Labelled(
+                        ProductLabelled(
                           label: 'merchantProduct.images'.tr(),
                           child: _ImagesDropZone(
                             imageUrls: _imageUrls,
@@ -485,7 +534,7 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                               setState(() => _isActive = value),
                         ),
                         const SizedBox(height: 6),
-                        _CheckRow(
+                        ProductCheckRow(
                           label: 'merchantProduct.isService'.tr(),
                           value: _isService,
                           onChanged: (bool value) =>
@@ -570,11 +619,11 @@ Future<void> confirmProductDeletion(
 }
 
 /// A 13px label over its control, the way every group on the board is set.
-class _Labelled extends StatelessWidget {
+class ProductLabelled extends StatelessWidget {
   final String label;
   final Widget child;
 
-  const _Labelled({required this.label, required this.child});
+  const ProductLabelled({super.key, required this.label, required this.child});
 
   @override
   Widget build(BuildContext context) {
@@ -589,7 +638,7 @@ class _Labelled extends StatelessWidget {
             color: MerzoxColors.kColor2B2B2B,
           ),
         ),
-        const SizedBox(height: _labelGap),
+        const SizedBox(height: kProductLabelGap),
         child,
       ],
     );
@@ -612,7 +661,7 @@ class ProductField extends StatelessWidget {
     super.key,
     required this.controller,
     required this.hint,
-    this.height = _fieldHeight,
+    this.height = kProductFieldHeight,
     this.maxLines = 1,
     this.keyboardType,
     this.suffix,
@@ -630,6 +679,11 @@ class ProductField extends StatelessWidget {
       validator: validator,
       onChanged: onChanged,
       textAlign: textAlign,
+      // A tall box holds its text at the top when there is room for several
+      // lines, and centred when there is room for one.
+      textAlignVertical: maxLines > 1
+          ? TextAlignVertical.top
+          : TextAlignVertical.center,
       style: const TextStyle(fontSize: 12, color: MerzoxColors.kColor2B2B2B),
       decoration: InputDecoration(
         hintText: hint,
@@ -638,6 +692,20 @@ class ProductField extends StatelessWidget {
           color: MerzoxColors.kColor9F9F9F,
         ),
         hintTextDirection: Directionality.of(context),
+        // What makes the box the height the artboard draws.
+        //
+        // `constraints` was the obvious way and is the wrong one: it stretches
+        // the decorator while the outline keeps wrapping the text, so the box
+        // painted 18 of the 48 it occupied and the screen looked cramped with
+        // gaps under every field. Vertical padding is the other obvious way,
+        // and it moves with the font - the same numbers gave 54 here.
+        //
+        // A zero-width spacer at the start sets the height of the row the
+        // outline is drawn around, which is the thing being specified. It
+        // costs no width, and an error message still lands below the box
+        // rather than squeezing it.
+        prefixIcon: SizedBox(width: 0, height: height),
+        prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: height),
         // The currency sits at the far end of the box on the board, opposite
         // the hint.
         suffixIcon: suffix == null
@@ -654,11 +722,12 @@ class ProductField extends StatelessWidget {
               ),
         suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
         isDense: true,
-        constraints: BoxConstraints(minHeight: height, maxHeight: height),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-        border: _border(MerzoxColors.kColorCBE0EC),
-        enabledBorder: _border(MerzoxColors.kColorCBE0EC),
-        focusedBorder: _border(MerzoxColors.kColor98C1D9),
+        // One outline, in one colour: the artboard draws no focused state, and
+        // inventing a second blue for it is the guessing this branch removed.
+        border: _border(kProductOutline),
+        enabledBorder: _border(kProductOutline),
+        focusedBorder: _border(kProductOutline),
         errorBorder: _border(MerzoxColors.kColorEE6C4D),
         focusedErrorBorder: _border(MerzoxColors.kColorEE6C4D),
         errorStyle: const TextStyle(fontSize: 10),
@@ -668,17 +737,23 @@ class ProductField extends StatelessWidget {
 
   OutlineInputBorder _border(Color color) => OutlineInputBorder(
     borderRadius: BorderRadius.circular(5),
-    borderSide: BorderSide(color: color),
+    borderSide: BorderSide(color: color, width: kProductOutlineWidth),
   );
 }
 
-/// A label with a square tick box at the far end, as the board draws it.
-class _CheckRow extends StatelessWidget {
+/// A tick box with its label beside it, as the board draws it.
+///
+/// The box used to sit at the far end of the row with the label pushed to the
+/// other, the whole width between them - which reads as two unrelated things
+/// on one line rather than as one control. The artboard keeps them together:
+/// the box at the reading edge and the label [kCheckLabelGap] away from it.
+class ProductCheckRow extends StatelessWidget {
   final String label;
   final bool value;
   final ValueChanged<bool> onChanged;
 
-  const _CheckRow({
+  const ProductCheckRow({
+    super.key,
     required this.label,
     required this.value,
     required this.onChanged,
@@ -689,10 +764,28 @@ class _CheckRow extends StatelessWidget {
     return InkWell(
       onTap: () => onChanged(!value),
       child: SizedBox(
-        height: 20,
+        height: kCheckBoxSide,
         child: Row(
           children: <Widget>[
-            Expanded(
+            Container(
+              width: kCheckBoxSide,
+              height: kCheckBoxSide,
+              decoration: BoxDecoration(
+                // Ticked, the board fills the square and puts a white mark in
+                // it; empty, it is white inside the same outline.
+                color: value ? kProductTickFill : Colors.white,
+                borderRadius: BorderRadius.circular(3),
+                border: Border.all(
+                  color: kProductTickOutline,
+                  width: kProductOutlineWidth,
+                ),
+              ),
+              child: value
+                  ? const Icon(Icons.check, size: 13, color: Colors.white)
+                  : null,
+            ),
+            const SizedBox(width: kCheckLabelGap),
+            Flexible(
               child: Text(
                 label,
                 style: const TextStyle(
@@ -701,22 +794,6 @@ class _CheckRow extends StatelessWidget {
                   color: MerzoxColors.kColor3B3B3B,
                 ),
               ),
-            ),
-            Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                color: value ? MerzoxColors.kColor3D5A80 : Colors.white,
-                borderRadius: BorderRadius.circular(3),
-                border: Border.all(
-                  color: value
-                      ? MerzoxColors.kColor3D5A80
-                      : MerzoxColors.kColorCBE0EC,
-                ),
-              ),
-              child: value
-                  ? const Icon(Icons.check, size: 13, color: Colors.white)
-                  : null,
             ),
           ],
         ),
@@ -734,11 +811,11 @@ class _ClassificationField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: _fieldHeight,
+      height: kProductFieldHeight,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(5),
-        border: Border.all(color: MerzoxColors.kColorCBE0EC),
+        border: Border.all(color: kProductOutline, width: kProductOutlineWidth),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
@@ -776,11 +853,15 @@ class _ClassificationField extends StatelessWidget {
 }
 
 /// `إضافة خيارات أخرى` and the circled plus that opens the options dialog.
-class _OptionsRow extends StatelessWidget {
+class ProductOptionsRow extends StatelessWidget {
   final int count;
   final VoidCallback onPressed;
 
-  const _OptionsRow({required this.count, required this.onPressed});
+  const ProductOptionsRow({
+    super.key,
+    required this.count,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -788,14 +869,38 @@ class _OptionsRow extends StatelessWidget {
       onTap: onPressed,
       child: SizedBox(
         height: 24,
+        // The ring first and the words beside it. A spacer used to hold them
+        // at opposite ends of the row, which reads as two separate controls
+        // rather than as one thing to press - the same fault the tick boxes
+        // had.
         child: Row(
           children: <Widget>[
-            Text(
-              'merchantProduct.moreOptions'.tr(),
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: MerzoxColors.kColor2B2B2B,
+            Container(
+              width: 18,
+              height: 18,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: kProductOutline,
+                  width: kProductOutlineWidth,
+                ),
+              ),
+              child: const Icon(
+                Icons.add,
+                size: 13,
+                color: MerzoxColors.kColor98C1D9,
+              ),
+            ),
+            const SizedBox(width: kProductOptionsGap),
+            Flexible(
+              child: Text(
+                'merchantProduct.moreOptions'.tr(),
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: MerzoxColors.kColor2B2B2B,
+                ),
               ),
             ),
             if (count > 0) ...<Widget>[
@@ -809,20 +914,6 @@ class _OptionsRow extends StatelessWidget {
                 ),
               ),
             ],
-            const Spacer(),
-            Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: MerzoxColors.kColor98C1D9),
-              ),
-              child: const Icon(
-                Icons.add,
-                size: 13,
-                color: MerzoxColors.kColor98C1D9,
-              ),
-            ),
           ],
         ),
       ),
@@ -900,15 +991,15 @@ class _ImagesDropZone extends StatelessWidget {
 }
 
 class _DashedBorderPainter extends CustomPainter {
-  static const double _dash = 6;
-  static const double _gap = 5;
+  static const double _dash = kProductDash;
+  static const double _gap = kProductDash;
 
   @override
   void paint(Canvas canvas, Size size) {
     final Paint paint = Paint()
-      ..color = MerzoxColors.kColor98C1D9
+      ..color = kProductOutline
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
+      ..strokeWidth = kProductOutlineWidth;
 
     final Path outline = Path()
       ..addRRect(
