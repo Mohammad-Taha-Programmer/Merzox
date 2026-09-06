@@ -1,13 +1,17 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/constants/dates.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../bloc/chat_bloc.dart';
 import '../bloc/chat_event.dart';
 import '../bloc/chat_state.dart';
+import '../highlighted_text.dart';
+import '../widgets/match_navigator.dart';
 
 class ChatPage extends StatefulWidget {
   const ChatPage({super.key});
@@ -20,6 +24,35 @@ class _ChatPageState extends State<ChatPage> {
   final TextEditingController _composerController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   int _renderedMessageCount = 0;
+
+  /// One key per occurrence the reader can be sent to.
+  final Map<String, GlobalKey> _matchKeys = <String, GlobalKey>{};
+
+  /// The occurrence already shown, so a rebuild does not scroll again under a
+  /// reader who has since scrolled somewhere else themselves.
+  String _shownMatch = '';
+
+  GlobalKey _keyFor(String messageId) =>
+      _matchKeys.putIfAbsent(messageId, GlobalKey.new);
+
+  /// Brings an occurrence into view.
+  ///
+  /// A little above centre rather than at the very top: the lines before it
+  /// are what make it readable, and a phrase pinned to the top edge arrives
+  /// without the sentence it was part of.
+  void _revealMatch(String messageId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final BuildContext? target = _matchKeys[messageId]?.currentContext;
+      if (target == null) return;
+
+      Scrollable.ensureVisible(
+        target,
+        alignment: 0.35,
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    });
+  }
 
   @override
   void dispose() {
@@ -53,11 +86,23 @@ class _ChatPageState extends State<ChatPage> {
         child: BlocConsumer<ChatBloc, ChatState>(
           listenWhen: (previous, current) =>
               previous.messages.length != current.messages.length ||
-              previous.errorMessage != current.errorMessage,
+              previous.errorMessage != current.errorMessage ||
+              previous.matchIndex != current.matchIndex ||
+              previous.status != current.status,
           listener: (context, state) {
-            if (state.messages.length > _renderedMessageCount) {
+            final String match = state.currentMatchId;
+
+            if (match.isNotEmpty && state.status == ChatStatus.ready) {
+              // A reader who arrived from a result is taken to the place they
+              // chose, not to the end of the thread.
+              if (match != _shownMatch) {
+                _shownMatch = match;
+                _revealMatch(match);
+              }
+            } else if (state.messages.length > _renderedMessageCount) {
               _scrollToLatest();
             }
+
             _renderedMessageCount = state.messages.length;
 
             if (state.errorMessage.isNotEmpty) {
@@ -74,8 +119,35 @@ class _ChatPageState extends State<ChatPage> {
                 _ChatHeader(title: state.title, avatarUrl: state.avatarUrl),
                 const Divider(height: 1, color: MerzoxColors.kColorEFEFEF),
                 if (state.readSyncFailed) const _ReadSyncNotice(),
+                if (!state.anchorReached) const _MatchOutOfReachNotice(),
                 Expanded(
-                  child: _ChatBody(state: state, controller: _scrollController),
+                  child: Stack(
+                    children: <Widget>[
+                      _ChatBody(
+                        state: state,
+                        controller: _scrollController,
+                        keyFor: _keyFor,
+                      ),
+                      if (state.matchIds.length > 1)
+                        PositionedDirectional(
+                          // The reading edge, where the artboard puts every
+                          // control that belongs to the thread rather than to
+                          // the app - the far corner is the bell's.
+                          start: kMatchNavigatorInset,
+                          bottom: kMatchNavigatorInset,
+                          child: MatchNavigator(
+                            current: state.matchIndex,
+                            total: state.matchIds.length,
+                            onNext: () => context.read<ChatBloc>().add(
+                              const ChatMatchStepped(1),
+                            ),
+                            onPrevious: () => context.read<ChatBloc>().add(
+                              const ChatMatchStepped(-1),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
                 _Composer(
                   controller: _composerController,
@@ -159,11 +231,55 @@ class _ReadSyncNotice extends StatelessWidget {
   }
 }
 
+/// Says plainly that the place the reader tapped is further back than the
+/// thread would page.
+///
+/// The alternative was to land somewhere near it and let them believe they had
+/// arrived, which is worse than saying so.
+class _MatchOutOfReachNotice extends StatelessWidget {
+  const _MatchOutOfReachNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: MerzoxColors.kColorF3EBB9.withValues(alpha: 0.45),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+      child: Row(
+        children: <Widget>[
+          const Icon(
+            Icons.search_off_rounded,
+            size: 15,
+            color: MerzoxColors.kColor767676,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'messages.matchNotReached'.tr(),
+              style: const TextStyle(
+                fontSize: 10,
+                color: MerzoxColors.kColor5E5E5E,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ChatBody extends StatelessWidget {
   final ChatState state;
   final ScrollController controller;
 
-  const _ChatBody({required this.state, required this.controller});
+  /// Hands each message the key that lets the page scroll to it.
+  final GlobalKey Function(String messageId) keyFor;
+
+  const _ChatBody({
+    required this.state,
+    required this.controller,
+    required this.keyFor,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -257,6 +373,13 @@ class _ChatBody extends StatelessWidget {
       child: ListView.builder(
         controller: controller,
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+        // While walking search results the whole thread is laid out, so an
+        // occurrence far off screen has a context to be scrolled to. A list
+        // that only builds what is visible cannot be told to reveal what is
+        // not.
+        scrollCacheExtent: state.isWalkingMatches
+            ? const ScrollCacheExtent.pixels(kChatWalkCacheExtent)
+            : null,
         itemCount: state.messages.length + (state.hasMore ? 1 : 0),
         itemBuilder: (context, index) {
           if (state.hasMore && index == 0) {
@@ -273,17 +396,35 @@ class _ChatBody extends StatelessWidget {
           }
 
           final message = state.messages[state.hasMore ? index - 1 : index];
-          return _MessageBubble(message: message);
+          return Column(
+            key: state.matchIds.contains(message.id)
+                ? keyFor(message.id)
+                : null,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              _MessageBubble(message: message, query: state.highlightQuery),
+              _MessageStamp(at: message.createdAt, isMine: message.isMine),
+            ],
+          );
         },
       ),
     );
   }
 }
 
+/// How far beyond the viewport the thread is laid out while a reader is
+/// stepping between search results. Large enough to cover the pages an anchor
+/// can drag in, which is what makes an off-screen occurrence reachable.
+const double kChatWalkCacheExtent = 20000;
+
 class _MessageBubble extends StatelessWidget {
   final MessageApiModel message;
 
-  const _MessageBubble({required this.message});
+  /// What the reader searched for, marked wherever it appears. Empty when they
+  /// arrived at the thread normally.
+  final String query;
+
+  const _MessageBubble({required this.message, this.query = ''});
 
   @override
   Widget build(BuildContext context) {
@@ -293,59 +434,112 @@ class _MessageBubble extends StatelessWidget {
     // #3D5A80 and what you were told at the end in #F9F9F9 — the sides a
     // reader of any direction expects, rather than mirroring with the
     // language. The tail is the corner that points back at whoever spoke.
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        mainAxisAlignment: isMine
-            ? MainAxisAlignment.start
-            : MainAxisAlignment.end,
-        children: [
-          Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.sizeOf(context).width * 0.72,
+    return Row(
+      mainAxisAlignment: isMine
+          ? MainAxisAlignment.start
+          : MainAxisAlignment.end,
+      children: [
+        Flexible(
+          child: Container(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.sizeOf(context).width * 0.72,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: isMine
+                  ? MerzoxColors.kColor3D5A80
+                  : MerzoxColors.kColorF9F9F9,
+              borderRadius: BorderRadiusDirectional.only(
+                topStart: const Radius.circular(14),
+                topEnd: const Radius.circular(14),
+                bottomStart: Radius.circular(isMine ? 2 : 14),
+                bottomEnd: Radius.circular(isMine ? 14 : 2),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isMine
-                    ? MerzoxColors.kColor3D5A80
-                    : MerzoxColors.kColorF9F9F9,
-                borderRadius: BorderRadiusDirectional.only(
-                  topStart: const Radius.circular(14),
-                  topEnd: const Radius.circular(14),
-                  bottomStart: Radius.circular(isMine ? 2 : 14),
-                  bottomEnd: Radius.circular(isMine ? 14 : 2),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    message.body,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text.rich(
+                  highlightedSpan(
+                    text: message.body,
+                    query: query,
                     style: TextStyle(
                       color: isMine ? Colors.white : MerzoxColors.kColor3B3B3B,
                       fontSize: 12,
                       height: 1.5,
                     ),
+                    // A wash that reads on both bubbles, with the darker
+                    // text over it: the same mark whichever side spoke.
+                    background: MerzoxColors.kColorF2CB06,
+                    foreground: MerzoxColors.kColor2B2B2B,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _formatTime(message.createdAt),
-                    style: TextStyle(
-                      color: isMine
-                          ? Colors.white70
-                          : MerzoxColors.kColor8D99AE,
-                      fontSize: 9,
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// When a message arrived, under the bubble it belongs to.
+///
+/// It used to sit inside the bubble at 9pt, in white-on-blue for your own
+/// messages, and carried the clock with no day - so a thread read weeks later
+/// said 9:43 without saying 9:43 of when. Outside the bubble it can be the
+/// same colour on both sides and large enough to actually read, and the day
+/// travels with the clock.
+class _MessageStamp extends StatelessWidget {
+  final DateTime? at;
+
+  /// Which side the bubble above it is on, so the stamp sits under its own
+  /// corner rather than floating between two messages.
+  final bool isMine;
+
+  const _MessageStamp({required this.at, required this.isMine});
+
+  @override
+  Widget build(BuildContext context) {
+    if (at == null) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsetsDirectional.only(start: 6, end: 6, top: 3),
+      child: Row(
+        mainAxisAlignment: isMine
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.end,
+        children: <Widget>[
+          Text(
+            merzoxMessageStamp(at),
+            // Laid out left to right whatever the language around it. Both
+            // halves are digits, and in an Arabic paragraph the runs reorder:
+            // the day ends up after the clock, which reads as a different
+            // stamp rather than as the same one written differently.
+            textDirection: TextDirection.ltr,
+            style: const TextStyle(
+              fontSize: kChatStampSize,
+              color: MerzoxColors.kColor8D99AE,
             ),
           ),
         ],
       ),
     );
   }
+}
+
+/// Small, but not too small to read: the size the row above it uses for its
+/// own last line, one step down.
+const double kChatStampSize = 11;
+
+/// The day and the clock of one message, in that order.
+///
+/// The day is the app's one calendar format; putting it first keeps a column
+/// of stamps aligned on the part that changes least.
+String merzoxMessageStamp(DateTime? value) {
+  if (value == null) return '';
+
+  return '${merzoxDay(value)} - ${_formatTime(value)}';
 }
 
 class _Composer extends StatelessWidget {

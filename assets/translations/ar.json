@@ -163,7 +163,17 @@
     "readSyncFailed": "تعذر تحديث حالة القراءة، الرسائل معروضة كما هي",
     "openError": "تعذر فتح المحادثة",
     "threadPrivacy": "من أجل خصوصيتك ننصحك بالاحتفاظ بجميع المحادثات خلال تطبيق Merzox، في حال واجهتك أي مشكلة يرجى ابلاغ فريقنا بالدعم الفني",
-    "threadSupportHours": "فريقنا متواجد على مدار الساعة لخدمتكم"
+    "threadSupportHours": "فريقنا متواجد على مدار الساعة لخدمتكم",
+    "searchOpen": "بحث في الرسائل",
+    "searchClose": "إغلاق البحث",
+    "searchHint": "ابحث باسم المستخدم أو بكلمة وردت في الرسائل",
+    "searchPeople": "المحادثات",
+    "searchInMessages": "في نصوص الرسائل",
+    "searchNoResults": "لا توجد نتائج لـ «{query}»",
+    "matchPosition": "{current} من {total}",
+    "matchPrevious": "النتيجة السابقة",
+    "matchNext": "النتيجة التالية",
+    "matchNotReached": "تعذر الوصول إلى موضع هذه النتيجة"
   },
   "notifications": {
     "title": "الاشعارات",

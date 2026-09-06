@@ -6,6 +6,7 @@ import {
   listMyConversations,
   markConversationRead,
   openConversation,
+  searchMyConversations,
   sendConversationMessage
 } from '../controllers/message.controller.js';
 import { requireAuth } from '../middleware/auth.js';
@@ -20,6 +21,7 @@ router.use(requireAuth);
 
 // Declared before `/:id/...` so the literal segment is never read as an id.
 router.get('/unread-count', getMyConversationUnreadCount);
+router.get('/search', searchMyConversations);
 router.get('/', listMyConversations);
 router.post('/', validateConversationOpen, openConversation);
 router.get('/:id/messages', listConversationMessages);

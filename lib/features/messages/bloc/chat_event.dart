@@ -34,3 +34,14 @@ final class ChatRefreshRequested extends ChatEvent {
 final class ChatRealtimeSyncRequested extends ChatEvent {
   const ChatRealtimeSyncRequested();
 }
+
+/// Moves to another occurrence of the searched-for phrase.
+///
+/// +1 for the arrow pointing forward through the conversation, -1 back. The
+/// walk wraps, so the reader at the last of nine reaches the first again
+/// rather than pressing a dead button.
+final class ChatMatchStepped extends ChatEvent {
+  final int delta;
+
+  const ChatMatchStepped(this.delta);
+}

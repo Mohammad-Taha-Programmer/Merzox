@@ -316,6 +316,13 @@ class AppRouter {
                 conversationId: conversationId,
                 title: parameters['title'] ?? '',
                 avatarUrl: parameters['avatarUrl'] ?? '',
+                // Set when the reader arrived from a search result: what they
+                // were looking for, and every place it was said.
+                highlightQuery: parameters['q'] ?? '',
+                matchIds: (parameters['matches'] ?? '')
+                    .split(',')
+                    .where((String id) => id.isNotEmpty)
+                    .toList(),
               );
 
               // Coming from a store page there is no thread yet, so the bloc

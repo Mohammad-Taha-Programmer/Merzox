@@ -104,6 +104,7 @@ import 'package:merzox/features/search/pages/search_page.dart';
 import 'package:merzox/features/notifications/bloc/notifications_bloc.dart';
 import 'package:merzox/features/notifications/bloc/notifications_event.dart';
 import 'package:merzox/features/messages/bloc/messages_bloc.dart';
+import 'package:merzox/features/messages/bloc/messages_search_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/bloc/messages_state.dart';
 import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
@@ -2967,13 +2968,18 @@ void main() {
           tester,
           BlocProvider<MessagesBloc>.value(
             value: bloc,
-            child: withMerzoxGoldenDeviceInsets(
-              Scaffold(
-                backgroundColor: Colors.white,
-                body: SafeArea(
-                  child: Builder(
-                    builder: (BuildContext context) =>
-                        MessagesInboxView(title: 'messages.title'.tr()),
+            // The bar over the inbox owns the search box, so the view needs
+            // the bloc behind it even in a capture that never opens it.
+            child: BlocProvider<MessagesSearchBloc>(
+              create: (_) => MessagesSearchBloc(),
+              child: withMerzoxGoldenDeviceInsets(
+                Scaffold(
+                  backgroundColor: Colors.white,
+                  body: SafeArea(
+                    child: Builder(
+                      builder: (BuildContext context) =>
+                          MessagesInboxView(title: 'messages.title'.tr()),
+                    ),
                   ),
                 ),
               ),
@@ -2997,13 +3003,18 @@ void main() {
           tester,
           BlocProvider<MessagesBloc>.value(
             value: bloc,
-            child: withMerzoxGoldenDeviceInsets(
-              Scaffold(
-                backgroundColor: Colors.white,
-                body: SafeArea(
-                  child: Builder(
-                    builder: (BuildContext context) =>
-                        MessagesInboxView(title: 'messages.title'.tr()),
+            // The bar over the inbox owns the search box, so the view needs
+            // the bloc behind it even in a capture that never opens it.
+            child: BlocProvider<MessagesSearchBloc>(
+              create: (_) => MessagesSearchBloc(),
+              child: withMerzoxGoldenDeviceInsets(
+                Scaffold(
+                  backgroundColor: Colors.white,
+                  body: SafeArea(
+                    child: Builder(
+                      builder: (BuildContext context) =>
+                          MessagesInboxView(title: 'messages.title'.tr()),
+                    ),
                   ),
                 ),
               ),
@@ -3845,13 +3856,18 @@ void main() {
           tester,
           BlocProvider<MessagesBloc>.value(
             value: bloc,
-            child: withMerzoxGoldenDeviceInsets(
-              Scaffold(
-                backgroundColor: Colors.white,
-                body: SafeArea(
-                  child: Builder(
-                    builder: (BuildContext context) =>
-                        MessagesInboxView(title: 'messages.title'.tr()),
+            // The bar over the inbox owns the search box, so the view needs
+            // the bloc behind it even in a capture that never opens it.
+            child: BlocProvider<MessagesSearchBloc>(
+              create: (_) => MessagesSearchBloc(),
+              child: withMerzoxGoldenDeviceInsets(
+                Scaffold(
+                  backgroundColor: Colors.white,
+                  body: SafeArea(
+                    child: Builder(
+                      builder: (BuildContext context) =>
+                          MessagesInboxView(title: 'messages.title'.tr()),
+                    ),
                   ),
                 ),
               ),

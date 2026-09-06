@@ -7,6 +7,18 @@ import {
 } from '../utils/safe-log.js';
 
 import { Business } from '../models/Business.js';
+import {
+  MAX_MESSAGE_HITS,
+  MAX_PEOPLE_RESULTS,
+  groupMessageHits,
+  normalizeSearchQuery,
+  searchPattern
+} from '../policies/message-search.policy.js';
+import {
+  counterpartSenderType,
+  lastReceivedByConversation,
+  lastReceivedPipeline
+} from '../policies/conversation-stamp.policy.js';
 import { paginationParams, readFilterParam } from '../policies/query.policy.js';
 import { Conversation } from '../models/Conversation.js';
 import { Message } from '../models/Message.js';
@@ -121,7 +133,10 @@ async function resolveViewer(req, conversation) {
   throw new AppError('Conversation was not found', 404, 'CONVERSATION_NOT_FOUND');
 }
 
-async function listConversationsFor(res, { filter, query, baseFilter, mapper, unreadField }) {
+async function listConversationsFor(
+  res,
+  { filter, query, baseFilter, mapper, unreadField, viewerType }
+) {
   const { page, limit, skip } = paginationParams(query);
   const criteria = { ...baseFilter, isActive: true };
 
@@ -142,10 +157,26 @@ async function listConversationsFor(res, { filter, query, baseFilter, mapper, un
     })
   ]);
 
+  // When the other side last wrote, for this page only: the row's stamp is
+  // about how long someone has been waiting, not about when the thread last
+  // moved, and answering someone moves the thread.
+  const received = lastReceivedByConversation(
+    await Message.aggregate(
+      lastReceivedPipeline(
+        conversations.map((conversation) => conversation._id),
+        counterpartSenderType(viewerType)
+      )
+    )
+  );
+
   res.json({
     success: true,
     data: {
-      conversations: conversations.map(mapper),
+      conversations: conversations.map((conversation) =>
+        mapper(conversation, {
+          lastReceivedAt: received.get(conversation._id.toString()) ?? null
+        })
+      ),
       unreadConversationCount: unreadTotal,
       pagination: { page, limit, total, hasMore: skip + conversations.length < total }
     }
@@ -157,8 +188,9 @@ export const listMyConversations = asyncHandler(async (req, res) => {
     filter: conversationFilter(req.query),
     query: req.query,
     baseFilter: { user: req.user._id },
-    mapper: (conversation) => conversation.toCustomerJSON(),
-    unreadField: 'unreadForUser'
+    mapper: (conversation, stamps) => conversation.toCustomerJSON(stamps),
+    unreadField: 'unreadForUser',
+    viewerType: 'customer'
   });
 });
 
@@ -169,8 +201,91 @@ export const listMerchantConversations = asyncHandler(async (req, res) => {
     filter: conversationFilter(req.query),
     query: req.query,
     baseFilter: { business: business._id },
-    mapper: (conversation) => conversation.toMerchantJSON(),
-    unreadField: 'unreadForBusiness'
+    mapper: (conversation, stamps) => conversation.toMerchantJSON(stamps),
+    unreadField: 'unreadForBusiness',
+    viewerType: 'business'
+  });
+});
+
+/**
+ * Answers both halves of one typed query.
+ *
+ * `people` are threads whose other side is named like the query; `messages`
+ * are threads where something like the query was said, one row each, opening
+ * at the first time it was said.
+ *
+ * The two are kept apart on the wire rather than merged and ranked. A reader
+ * who typed a name wants the thread; a reader who typed a phrase wants the
+ * place - and no ranking can tell those apart from the letters alone.
+ */
+async function searchConversationsFor(res, { query, baseFilter, nameField, mapper }) {
+  if (!query) {
+    res.json({ success: true, data: { query: '', people: [], messages: [] } });
+    return;
+  }
+
+  const pattern = searchPattern(query);
+  const criteria = { ...baseFilter, isActive: true };
+
+  const [people, mine] = await Promise.all([
+    Conversation.find({ ...criteria, [nameField]: pattern })
+      .sort({ updatedAt: -1, _id: -1 })
+      .limit(MAX_PEOPLE_RESULTS),
+    // Scoped to the caller's own threads before a single body is read, so the
+    // search can never reach a conversation they are not part of.
+    Conversation.find(criteria).select({ _id: 1 })
+  ]);
+
+  const hits = await Message.find({
+    conversation: { $in: mine.map((conversation) => conversation._id) },
+    body: pattern
+  })
+    .sort({ createdAt: 1, _id: 1 })
+    .limit(MAX_MESSAGE_HITS);
+
+  const grouped = groupMessageHits(hits);
+  const threads = await Conversation.find({
+    _id: { $in: grouped.map((group) => group.conversationId) }
+  });
+  const byId = new Map(
+    threads.map((conversation) => [conversation._id.toString(), conversation])
+  );
+
+  res.json({
+    success: true,
+    data: {
+      query,
+      people: people.map(mapper),
+      messages: grouped
+        .filter((group) => byId.has(group.conversationId))
+        .map((group) => ({
+          conversation: mapper(byId.get(group.conversationId)),
+          matchCount: group.matchCount,
+          matchIds: group.matchIds,
+          snippet: group.snippet,
+          sentAt: group.firstMatchAt
+        }))
+    }
+  });
+}
+
+export const searchMyConversations = asyncHandler(async (req, res) => {
+  await searchConversationsFor(res, {
+    query: normalizeSearchQuery(req.query.q ?? req.query.query),
+    baseFilter: { user: req.user._id },
+    nameField: 'businessName',
+    mapper: (conversation) => conversation.toCustomerJSON()
+  });
+});
+
+export const searchMerchantConversations = asyncHandler(async (req, res) => {
+  const business = await requireOwnedBusiness(req);
+
+  await searchConversationsFor(res, {
+    query: normalizeSearchQuery(req.query.q ?? req.query.query),
+    baseFilter: { business: business._id },
+    nameField: 'userName',
+    mapper: (conversation) => conversation.toMerchantJSON()
   });
 });
 

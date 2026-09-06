@@ -910,6 +910,29 @@ class ApiService {
     );
   }
 
+  /// Answers one typed query with both halves at once.
+  ///
+  /// Names and message bodies are searched separately and returned separately:
+  /// a reader who typed a name wants the thread, one who typed a phrase wants
+  /// the place it was said, and no ranking can tell those apart.
+  Future<ConversationSearchApiResponse> searchConversations({
+    required String token,
+    required String query,
+    bool businessAudience = false,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      businessAudience
+          ? '/businesses/me/conversations/search'
+          : '/conversations/search',
+      queryParameters: <String, dynamic>{'q': query},
+      options: _authOptions(token),
+    );
+
+    return ConversationSearchApiResponse.fromJson(
+      response.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{},
+    );
+  }
+
   /// Opens the thread with a business, reusing the existing one when the
   /// customer has written to that store before.
   Future<ConversationApiModel> openConversation({
@@ -3076,6 +3099,14 @@ class ConversationApiModel {
   final ConversationPartyApiModel? business;
   final ConversationPartyApiModel? customer;
   final ConversationLastMessageApiModel lastMessage;
+
+  /// When the other side last wrote, which is not when the thread last moved.
+  ///
+  /// Answering someone moves the thread and would move the stamp onto your own
+  /// reply. Null until they have written at all, and absent outside the inbox
+  /// listing, which is the only place that shows it.
+  final DateTime? lastReceivedAt;
+
   final int unreadCount;
   final int messageCount;
   final DateTime? updatedAt;
@@ -3090,6 +3121,7 @@ class ConversationApiModel {
     required this.unreadCount,
     required this.messageCount,
     required this.updatedAt,
+    this.lastReceivedAt,
   });
 
   bool get hasUnread => unreadCount > 0;
@@ -3110,6 +3142,9 @@ class ConversationApiModel {
           : ConversationPartyApiModel.fromJson(customer),
       lastMessage: ConversationLastMessageApiModel.fromJson(
         json['lastMessage'] as Map<String, dynamic>? ?? const {},
+      ),
+      lastReceivedAt: DateTime.tryParse(
+        json['lastReceivedAt'] as String? ?? '',
       ),
       unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
       messageCount: (json['messageCount'] as num?)?.toInt() ?? 0,
@@ -3144,6 +3179,89 @@ class ConversationListApiResponse {
           (json['unreadConversationCount'] as num?)?.toInt() ?? 0,
       page: (pagination['page'] as num?)?.toInt() ?? 1,
       hasMore: pagination['hasMore'] as bool? ?? false,
+    );
+  }
+}
+
+/// One thread in which something the reader typed was actually said.
+///
+/// A word said nine times is one row with a count of nine, not nine rows -
+/// and the row opens at the FIRST time it was said, so stepping forward walks
+/// the conversation the way it happened.
+class ConversationMessageMatchApiModel {
+  final ConversationApiModel conversation;
+
+  /// How many times it was said. May exceed [matchIds] on a long thread; the
+  /// count stays honest even when the walk is capped.
+  final int matchCount;
+
+  /// The places to stand, oldest first.
+  final List<String> matchIds;
+
+  /// The first matching message, as it reads.
+  final String snippet;
+
+  final DateTime? sentAt;
+
+  const ConversationMessageMatchApiModel({
+    required this.conversation,
+    required this.matchCount,
+    required this.matchIds,
+    required this.snippet,
+    required this.sentAt,
+  });
+
+  /// Where tapping the row lands. Empty when the server sent a count with no
+  /// ids, which the caller treats as "open the thread at the end".
+  String get firstMatchId => matchIds.isEmpty ? '' : matchIds.first;
+
+  factory ConversationMessageMatchApiModel.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> ids = json['matchIds'] as List<dynamic>? ?? const [];
+
+    return ConversationMessageMatchApiModel(
+      conversation: ConversationApiModel.fromJson(
+        json['conversation'] as Map<String, dynamic>? ?? const {},
+      ),
+      matchCount: (json['matchCount'] as num?)?.toInt() ?? 0,
+      matchIds: ids.whereType<String>().toList(),
+      snippet: json['snippet'] as String? ?? '',
+      sentAt: DateTime.tryParse(json['sentAt'] as String? ?? ''),
+    );
+  }
+}
+
+class ConversationSearchApiResponse {
+  final String query;
+
+  /// Threads whose other side is named like the query.
+  final List<ConversationApiModel> people;
+
+  /// Threads where something like the query was said.
+  final List<ConversationMessageMatchApiModel> messages;
+
+  const ConversationSearchApiResponse({
+    required this.query,
+    required this.people,
+    required this.messages,
+  });
+
+  bool get isEmpty => people.isEmpty && messages.isEmpty;
+
+  factory ConversationSearchApiResponse.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> people = json['people'] as List<dynamic>? ?? const [];
+    final List<dynamic> messages =
+        json['messages'] as List<dynamic>? ?? const [];
+
+    return ConversationSearchApiResponse(
+      query: json['query'] as String? ?? '',
+      people: people
+          .whereType<Map<String, dynamic>>()
+          .map(ConversationApiModel.fromJson)
+          .toList(),
+      messages: messages
+          .whereType<Map<String, dynamic>>()
+          .map(ConversationMessageMatchApiModel.fromJson)
+          .toList(),
     );
   }
 }
