@@ -10,7 +10,11 @@ import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../bloc/messages_bloc.dart';
 import '../bloc/messages_event.dart';
+import '../bloc/messages_search_bloc.dart';
+import '../bloc/messages_search_state.dart';
 import '../bloc/messages_state.dart';
+import '../widgets/messages_header.dart';
+import '../widgets/messages_search_results.dart';
 
 /// The inbox from the design: an "all / unread" pair of tabs over a list of
 /// threads. It is shared by the customer tab and the merchant shell, which
@@ -20,11 +24,16 @@ class MessagesInboxView extends StatefulWidget {
   final EdgeInsets padding;
   final bool showTitle;
 
+  /// Whether the header offers a way back. The merchant reaches the inbox from
+  /// their profile; the customer's is a tab and has nowhere to return to.
+  final bool showBack;
+
   const MessagesInboxView({
     super.key,
     required this.title,
     this.padding = const EdgeInsets.fromLTRB(16, 18, 16, 118),
     this.showTitle = true,
+    this.showBack = false,
   });
 
   @override
@@ -76,8 +85,56 @@ class _MessagesInboxViewState extends State<MessagesInboxView> {
     bloc.add(const MessagesRefreshRequested());
   }
 
+  /// Opens the thread at the first place a searched-for phrase was said.
+  ///
+  /// The whole match list travels with it, so the chat can offer the reader
+  /// the other places without asking the server the same question twice.
+  Future<void> _openMatch(ConversationMessageMatchApiModel match) async {
+    final MessagesSearchBloc search = context.read<MessagesSearchBloc>();
+    final MessagesBloc bloc = context.read<MessagesBloc>();
+
+    await context.push(
+      Uri(
+        path: '/chat',
+        queryParameters: <String, String>{
+          'conversationId': match.conversation.id,
+          'title': match.conversation.title,
+          'avatarUrl': match.conversation.avatarUrl,
+          'q': search.state.answeredQuery,
+          'matches': match.matchIds.join(','),
+        },
+      ).toString(),
+    );
+
+    if (!mounted) return;
+    bloc.add(const MessagesRefreshRequested());
+  }
+
   @override
   Widget build(BuildContext context) {
+    return BlocBuilder<MessagesSearchBloc, MessagesSearchState>(
+      builder: (BuildContext context, MessagesSearchState search) {
+        return Column(
+          children: <Widget>[
+            if (widget.showTitle)
+              MessagesHeader(title: widget.title, showBack: widget.showBack),
+            Expanded(
+              child: search.showsResults
+                  ? MessagesSearchResults(
+                      state: search,
+                      padding: widget.padding.copyWith(top: 0),
+                      onOpenThread: _openThread,
+                      onOpenMatch: _openMatch,
+                    )
+                  : _list(context),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _list(BuildContext context) {
     return BlocBuilder<MessagesBloc, MessagesState>(
       builder: (context, state) {
         return RefreshIndicator(
@@ -89,16 +146,6 @@ class _MessagesInboxViewState extends State<MessagesInboxView> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: widget.padding,
             children: [
-              if (widget.showTitle)
-                Text(
-                  widget.title,
-                  style: const TextStyle(
-                    color: MerzoxColors.kColor2B2B2B,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              const SizedBox(height: 14),
               _InboxTabs(
                 filter: state.filter,
                 unreadCount: state.unreadConversationCount,
@@ -223,23 +270,25 @@ class _InboxTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The artboard puts `الكل` at the reading edge and `غير مقروءة` at the far
+    // one, with the whole width between them rather than a fixed gap.
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _InboxTab(
-          label: 'messages.tabUnread'.tr(),
-          badge: unreadCount,
-          selected: filter == MessagesFilter.unread,
-          onTap: () => context.read<MessagesBloc>().add(
-            const MessagesFilterChanged(MessagesFilter.unread),
-          ),
-        ),
-        const SizedBox(width: 22),
         _InboxTab(
           label: 'messages.tabAll'.tr(),
           badge: 0,
           selected: filter == MessagesFilter.all,
           onTap: () => context.read<MessagesBloc>().add(
             const MessagesFilterChanged(MessagesFilter.all),
+          ),
+        ),
+        _InboxTab(
+          label: 'messages.tabUnread'.tr(),
+          badge: unreadCount,
+          selected: filter == MessagesFilter.unread,
+          onTap: () => context.read<MessagesBloc>().add(
+            const MessagesFilterChanged(MessagesFilter.unread),
           ),
         ),
       ],
@@ -324,6 +373,33 @@ class _InboxTab extends StatelessWidget {
   }
 }
 
+/// The moment a row's stamp is about.
+///
+/// The last message RECEIVED, not the last message. The two differ every time
+/// you answer someone: the thread rises to the top and the stamp would jump to
+/// your own reply, so a row would tell you when you last spoke rather than how
+/// long they have been waiting.
+///
+/// Before anyone has written back there is no such moment, and the row falls
+/// back to the thread's own last message rather than showing a gap where a
+/// time belongs - the only case where the two can disagree and the honest
+/// answer is nothing at all.
+DateTime? conversationStamp(ConversationApiModel conversation) =>
+    conversation.lastReceivedAt ?? conversation.lastMessage.sentAt;
+
+/// The row's type sizes.
+///
+/// The artboard sets the name at 13 and the last line at 10, which measured
+/// fine on a 375-wide board and reads small on a phone held at arm's length.
+/// These are that scale raised by the two steps a body face needs before it is
+/// comfortable, keeping the difference between the three intact.
+const double kInboxNameSize = 15;
+const double kInboxPreviewSize = 12;
+const double kInboxStampSize = 12;
+
+/// How far the stamp drops to sit on the name's baseline.
+const double kInboxStampNudge = 3;
+
 class _ConversationTile extends StatelessWidget {
   final ConversationApiModel conversation;
   final VoidCallback onTap;
@@ -350,77 +426,92 @@ class _ConversationTile extends StatelessWidget {
                 label: conversation.title,
               ),
               const SizedBox(width: 12),
+              // The two text columns are top-aligned to each other while the
+              // avatar stays centred on the row: the artboard sets the stamp
+              // on the name's line, not halfway down the card.
               Expanded(
-                child: Column(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      conversation.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: conversation.hasUnread
-                            ? FontWeight.w800
-                            : FontWeight.w600,
-                        color: MerzoxColors.kColor2B2B2B,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            conversation.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: kInboxNameSize,
+                              fontWeight: conversation.hasUnread
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
+                              color: MerzoxColors.kColor2B2B2B,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            conversation.lastMessage.body.isEmpty
+                                ? 'messages.noMessagesYet'.tr()
+                                : conversation.lastMessage.body,
+                            // The artboard wraps a long last message onto a
+                            // second line rather than cutting it at the first.
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: kInboxPreviewSize,
+                              color: conversation.hasUnread
+                                  ? MerzoxColors.kColor3B3B3B
+                                  : MerzoxColors.kColor767676,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      conversation.lastMessage.body.isEmpty
-                          ? 'messages.noMessagesYet'.tr()
-                          : conversation.lastMessage.body,
-                      // The artboard wraps a long last message onto a second
-                      // line rather than cutting it at the first.
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: conversation.hasUnread
-                            ? MerzoxColors.kColor3B3B3B
-                            : MerzoxColors.kColor767676,
+                    const SizedBox(width: 10),
+                    Padding(
+                      // A smaller face sits higher in its line box; this drops
+                      // the stamp back onto the name's baseline.
+                      padding: const EdgeInsets.only(top: kInboxStampNudge),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            _formatTimestamp(
+                              conversationStamp(conversation),
+                              context.locale.toLanguageTag(),
+                            ),
+                            style: const TextStyle(
+                              fontSize: kInboxStampSize,
+                              color: MerzoxColors.kColor8D99AE,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          if (conversation.hasUnread)
+                            Container(
+                              width: 18,
+                              height: 18,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(
+                                color: MerzoxColors.kColorEE6C4D,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Text(
+                                '${conversation.unreadCount}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            )
+                          else
+                            const SizedBox(height: 18),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    _formatTimestamp(
-                      conversation.lastMessage.sentAt,
-                      context.locale.toLanguageTag(),
-                    ),
-                    style: const TextStyle(
-                      fontSize: 10,
-                      color: MerzoxColors.kColor8D99AE,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (conversation.hasUnread)
-                    Container(
-                      width: 18,
-                      height: 18,
-                      alignment: Alignment.center,
-                      decoration: const BoxDecoration(
-                        color: MerzoxColors.kColorEE6C4D,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        '${conversation.unreadCount}',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    )
-                  else
-                    const SizedBox(height: 18),
-                ],
               ),
             ],
           ),

@@ -8,6 +8,11 @@ import '../../../services/realtime_service.dart';
 import 'chat_event.dart';
 import 'chat_state.dart';
 
+/// How far back a tapped search result may drag the thread.
+///
+/// One tap must not become an unbounded run of requests.
+const int kChatAnchorMaxPages = 12;
+
 class ChatBloc extends Bloc<ChatEvent, ChatState> {
   final ApiService _apiService;
   final AuthSessionService _authSessionService;
@@ -31,6 +36,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     String conversationId = '',
     String title = '',
     String avatarUrl = '',
+    String highlightQuery = '',
+    List<String> matchIds = const <String>[],
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
        super(
@@ -38,6 +45,11 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
            conversationId: conversationId,
            title: title,
            avatarUrl: avatarUrl,
+           highlightQuery: highlightQuery,
+           matchIds: matchIds,
+           // The first place it was said: the reader tapped a result, so the
+           // thread opens there rather than at the end.
+           matchIndex: matchIds.isEmpty ? -1 : 0,
          ),
        ) {
     on<ChatStarted>(_onStarted);
@@ -46,6 +58,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatOlderMessagesRequested>(_onOlderMessagesRequested);
     on<ChatRefreshRequested>(_onRefreshRequested);
     on<ChatRealtimeSyncRequested>(_onRealtimeSyncRequested);
+    on<ChatMatchStepped>(_onMatchStepped);
 
     _bindRealtime(
       messageInvalidations: realtimeMessageInvalidations,
@@ -185,6 +198,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         ),
       );
 
+      await _reachAnchor(emit, token);
       await _markReadBestEffort(emit, token);
     } catch (error) {
       emit(
@@ -194,6 +208,62 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         ),
       );
     }
+  }
+
+  /// Pages back until the message the reader tapped is actually loaded.
+  ///
+  /// The thread is served newest first, and the place they chose is the OLDEST
+  /// occurrence, so it can sit several pages behind. Walking back is a handful
+  /// of requests for any conversation two people have actually had; the cap is
+  /// there so a pathological thread cannot turn one tap into a hundred calls,
+  /// and when it bites the screen says the place could not be reached rather
+  /// than landing somewhere else and pretending.
+  Future<void> _reachAnchor(Emitter<ChatState> emit, String token) async {
+    final String anchor = state.currentMatchId;
+    if (anchor.isEmpty) return;
+
+    bool holds() => state.messages.any((message) => message.id == anchor);
+
+    if (holds()) {
+      emit(state.copyWith(anchorReached: true));
+      return;
+    }
+
+    for (int walked = 0; walked < kChatAnchorMaxPages; walked += 1) {
+      if (!state.hasMore) break;
+
+      final response = await _apiService.conversationMessages(
+        token: token,
+        conversationId: state.conversationId,
+        page: state.page + 1,
+      );
+
+      emit(
+        state.copyWith(
+          messages: _mergeOrdered(response.messages, state.messages),
+          page: response.page,
+          hasMore: response.hasMore,
+        ),
+      );
+
+      if (holds()) {
+        emit(state.copyWith(anchorReached: true));
+        return;
+      }
+    }
+
+    emit(state.copyWith(anchorReached: false));
+  }
+
+  void _onMatchStepped(ChatMatchStepped event, Emitter<ChatState> emit) {
+    final int total = state.matchIds.length;
+    if (total == 0) return;
+
+    // Wraps rather than stopping: at the last of nine, forward means the first
+    // again, which is what a reader stepping through a thread expects.
+    final int next = (state.matchIndex + event.delta) % total;
+
+    emit(state.copyWith(matchIndex: next < 0 ? next + total : next));
   }
 
   Future<void> _onOlderMessagesRequested(

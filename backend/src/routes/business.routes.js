@@ -16,7 +16,8 @@ import {
 import { setBusinessFavorite } from '../controllers/favorite.controller.js';
 import {
   getMerchantConversationUnreadCount,
-  listMerchantConversations
+  listMerchantConversations,
+  searchMerchantConversations
 } from '../controllers/message.controller.js';
 import {
   createMyBusinessProduct,
@@ -96,6 +97,12 @@ router.get(
   requireAuth,
   requireBusinessUser,
   getMerchantConversationUnreadCount
+);
+router.get(
+  '/me/conversations/search',
+  requireAuth,
+  requireBusinessUser,
+  searchMerchantConversations
 );
 router.get(
   '/me/conversations',

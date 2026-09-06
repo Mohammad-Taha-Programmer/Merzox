@@ -59,7 +59,16 @@ function lastMessageJSON(conversation) {
   };
 }
 
-conversationSchema.methods.toCustomerJSON = function toCustomerJSON() {
+/**
+ * When the other side last wrote, as opposed to when the thread last moved.
+ *
+ * Supplied by the listing, which reads it for a whole page in one query. The
+ * other endpoints leave it out: only the inbox row shows it, and inventing a
+ * value here would mean guessing at something the caller did not ask for.
+ */
+conversationSchema.methods.toCustomerJSON = function toCustomerJSON({
+  lastReceivedAt = null
+} = {}) {
   return {
     id: this._id.toString(),
     business: {
@@ -70,6 +79,7 @@ conversationSchema.methods.toCustomerJSON = function toCustomerJSON() {
     title: this.businessName,
     avatarUrl: this.businessLogoUrl,
     lastMessage: lastMessageJSON(this),
+    lastReceivedAt,
     unreadCount: this.unreadForUser,
     messageCount: this.messageCount,
     createdAt: this.createdAt,
@@ -77,7 +87,9 @@ conversationSchema.methods.toCustomerJSON = function toCustomerJSON() {
   };
 };
 
-conversationSchema.methods.toMerchantJSON = function toMerchantJSON() {
+conversationSchema.methods.toMerchantJSON = function toMerchantJSON({
+  lastReceivedAt = null
+} = {}) {
   return {
     id: this._id.toString(),
     customer: {
@@ -87,6 +99,7 @@ conversationSchema.methods.toMerchantJSON = function toMerchantJSON() {
     title: this.userName,
     avatarUrl: '',
     lastMessage: lastMessageJSON(this),
+    lastReceivedAt,
     unreadCount: this.unreadForBusiness,
     messageCount: this.messageCount,
     createdAt: this.createdAt,

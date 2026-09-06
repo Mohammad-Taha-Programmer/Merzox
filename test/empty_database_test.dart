@@ -15,6 +15,7 @@ import 'package:merzox/features/home/presentation/bloc/home_bloc.dart';
 import 'package:merzox/features/home/presentation/bloc/home_event.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/messages/bloc/messages_bloc.dart';
+import 'package:merzox/features/messages/bloc/messages_search_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/bloc/messages_state.dart';
 import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
@@ -357,10 +358,13 @@ void main() {
       tester,
       BlocProvider<MessagesBloc>.value(
         value: bloc,
-        // The inbox is drawn inside the shell's messages tab, so it expects a
-        // Scaffold above it the way its own golden gives it one.
-        child: const Scaffold(
-          body: SafeArea(child: MessagesInboxView(title: 'الرسائل')),
+        // The bar over the inbox owns the search box, so the view needs that
+        // bloc as well as the list's own.
+        child: BlocProvider<MessagesSearchBloc>(
+          create: (_) => MessagesSearchBloc(),
+          child: const Scaffold(
+            body: SafeArea(child: MessagesInboxView(title: 'الرسائل')),
+          ),
         ),
       ),
     );

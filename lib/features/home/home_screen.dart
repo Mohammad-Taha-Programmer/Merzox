@@ -27,6 +27,7 @@ import 'package:merzox/features/recommendation_preferences/bloc/recommendation_p
 import 'package:merzox/features/recommendation_preferences/bloc/recommendation_preference_state.dart';
 import 'package:merzox/features/recommendation_preferences/widgets/recommendation_preference_control.dart';
 import 'package:merzox/features/messages/bloc/messages_bloc.dart';
+import 'package:merzox/features/messages/bloc/messages_search_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
 import 'package:merzox/injection/injector.dart';
@@ -2038,11 +2039,16 @@ class _ChatTab extends StatelessWidget {
         ? locator<RealtimeService>()
         : null;
 
-    return BlocProvider(
-      create: (_) => MessagesBloc(
-        realtimeMessageInvalidations: realtimeService?.messageInvalidations,
-        realtimeConnectionStatuses: realtimeService?.connectionStatuses,
-      )..add(const MessagesStarted()),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<MessagesBloc>(
+          create: (_) => MessagesBloc(
+            realtimeMessageInvalidations: realtimeService?.messageInvalidations,
+            realtimeConnectionStatuses: realtimeService?.connectionStatuses,
+          )..add(const MessagesStarted()),
+        ),
+        BlocProvider<MessagesSearchBloc>(create: (_) => MessagesSearchBloc()),
+      ],
       child: MessagesInboxView(title: 'messages.title'.tr()),
     );
   }
