@@ -183,12 +183,29 @@ flutter pub get
 Run against a locally hosted API:
 
 ```powershell
-flutter run --dart-define=MERZOX_API_BASE_URL=http://10.0.2.2:3000/api/v1
+dart run tool/dev_config.dart
+flutter run --dart-define-from-file=config/merzox.dev.json
 ```
 
-Use `10.0.2.2` for the Android emulator. For a physical device, replace it with
-the development computer's LAN address and ensure the device and computer are on
-the same network. On the iOS simulator, `localhost` can normally be used.
+The first command reads this machine's LAN address and writes it to
+`config/merzox.dev.json`, which the second reads at build time. The file is not
+committed: it names one machine's place on one router, and a shared copy is
+wrong for everybody else. Re-run the first command whenever the router hands
+out a different number.
+
+An emulator or the desktop app needs neither command — a build given nothing
+falls back to `10.0.2.2` on Android, which is the emulator's alias for its
+host's loopback, and to `127.0.0.1` everywhere else.
+
+A physical device needs both. It is on neither of those addresses, and there is
+none this side can guess for it, so "the server is unreachable" on a real phone
+is almost always a build made without the file.
+
+Pressing Run in an IDE is such a build: the editor assembles its own command
+line and does not know about a flag typed at a terminal. Use the committed
+**merzox (dev API)** configuration — `.run/` for Android Studio,
+`.vscode/launch.json` for VS Code — rather than the auto-created `main.dart`
+one. See [config/README.md](config/README.md).
 
 ## Store Sharing Configuration
 

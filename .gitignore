@@ -62,3 +62,7 @@ test/golden/failures/
 # Gradle writes its reports here; only the root /build/ was ignored, so a
 # build left an untracked HTML report in every status.
 android/build/
+
+# The development API address, generated per machine by tool/dev_config.dart.
+# Committing one machine's LAN address is how the last one went stale.
+config/merzox.dev.json
