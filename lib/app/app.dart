@@ -1,3 +1,4 @@
+import 'package:merzox/features/notifications/widgets/global_notification_bell.dart';
 import 'dart:async';
 
 import 'package:easy_localization/easy_localization.dart';
@@ -70,6 +71,40 @@ class _MerzoxAppState extends State<MerzoxApp> {
         useMaterial3: true,
       ),
       routerConfig: _router,
+      // The bell is mounted once, here, above every route. Each screen used to
+      // draw its own and several drew none, so a merchant deep in a product
+      // editor could take an order and have no way to know.
+      builder: (BuildContext context, Widget? child) {
+        return Stack(
+          children: <Widget>[
+            child ?? const SizedBox.shrink(),
+            // Read from the route information rather than `GoRouter.state`.
+            // This builder runs on the very first frame, before the router has
+            // resolved anything, and `state` reads the last of an empty match
+            // list - `Bad state: No element`, painted as a red screen on every
+            // launch. The provider carries the location from the start.
+            if (globalBellWantedAt(
+              _router.routeInformationProvider.value.uri.toString(),
+            ))
+              PositionedDirectional(
+                top: MediaQuery.paddingOf(context).top + kGlobalBellInset,
+                // The trailing edge, which right-to-left is the left: where
+                // every bar that had a bell already drew one. The leading edge
+                // is where the account's picture lives.
+                end: kGlobalBellInset,
+                child: GlobalBellAudience(
+                  builder: (BuildContext _, bool businessAudience) =>
+                      GlobalNotificationBell(
+                        businessAudience: businessAudience,
+                        // The router itself, not `context.push`: this hangs
+                        // above the router, so there is none in its context.
+                        onOpen: _router.push,
+                      ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

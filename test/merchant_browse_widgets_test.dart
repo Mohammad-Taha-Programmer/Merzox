@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/features/business/shell/merchant_browse_widgets.dart';
+import 'package:merzox/features/notifications/widgets/global_notification_bell.dart';
 import 'package:merzox/features/business/shell/widgets/order_status_presentation.dart';
 
 import 'localization_test_harness.dart';
@@ -216,6 +217,53 @@ void main() {
       // to change size as soon as it is used.
       expect(field.style?.fontSize, greaterThanOrEqualTo(13));
       expect(field.decoration?.hintStyle?.fontSize, field.style?.fontSize);
+    });
+  });
+
+  group('the top bar', () {
+    testWidgets('its action leaves the floating bell its corner', (
+      WidgetTester tester,
+    ) async {
+      await pumpLocalized(
+        tester,
+        const Scaffold(
+          body: MerchantTopBar(
+            title: 'المنتجات',
+            leading: SizedBox(
+              key: ValueKey<String>('action'),
+              width: 40,
+              height: 40,
+            ),
+          ),
+        ),
+      );
+
+      final Rect bar = tester.getRect(find.byType(MerchantTopBar));
+      final Rect action = tester.getRect(
+        find.byKey(const ValueKey<String>('action')),
+      );
+
+      // The bell hangs over this corner on every screen. The add-product
+      // button used to be drawn underneath it.
+      expect(
+        action.left - bar.left,
+        greaterThanOrEqualTo(kGlobalBellReservedWidth),
+        reason: 'the action is drawn under the bell',
+      );
+    });
+
+    testWidgets('a bar with no action still centres its title', (
+      WidgetTester tester,
+    ) async {
+      await pumpLocalized(
+        tester,
+        const Scaffold(body: MerchantTopBar(title: 'الطلبات')),
+      );
+
+      final Rect bar = tester.getRect(find.byType(MerchantTopBar));
+      final Rect title = tester.getRect(find.text('الطلبات'));
+
+      expect(title.center.dx, closeTo(bar.center.dx, 1));
     });
   });
 }

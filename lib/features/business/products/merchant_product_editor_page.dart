@@ -11,7 +11,6 @@ import 'package:merzox/features/business/shell/business_bloc.dart';
 import 'package:merzox/features/business/shell/business_navigation_bar.dart';
 import 'package:merzox/features/business/shell/merchant_browse_widgets.dart';
 import 'package:merzox/features/business/shell/merchant_product_images_page.dart';
-import 'package:merzox/features/notifications/widgets/notification_badge_button.dart';
 
 /// `إضافة منتجات` — the merchant's product form, as its three artboards draw
 /// it.
@@ -338,12 +337,6 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                   title: widget.product == null
                       ? 'merchantProduct.addTitle'.tr()
                       : 'merchantProduct.editTitle'.tr(),
-                  leading: NotificationBadgeButton(
-                    tooltip: 'notifications.title'.tr(),
-                    businessAudience: true,
-                    onPressed: () => Navigator.of(context).pop(),
-                    iconSize: 24,
-                  ),
                 ),
                 Expanded(
                   child: Form(
