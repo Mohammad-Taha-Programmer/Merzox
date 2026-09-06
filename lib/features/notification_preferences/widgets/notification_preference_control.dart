@@ -10,9 +10,18 @@ class NotificationPreferenceControl extends StatelessWidget {
   /// Which row this is. One control drives one preference, so it names it.
   final String labelKey;
 
+  /// The two profile screens draw their rows to different boards, and this
+  /// row has to sit in a line with the ones beside it on either.
+  final double height;
+  final double cornerRadius;
+  final double gap;
+
   const NotificationPreferenceControl({
     super.key,
     this.labelKey = 'notificationPreferences.productOffers',
+    this.height = 38,
+    this.cornerRadius = 4,
+    this.gap = 10,
   });
 
   @override
@@ -32,11 +41,11 @@ class NotificationPreferenceControl extends StatelessWidget {
       },
       builder: (context, state) {
         return Container(
-          height: 38,
-          margin: const EdgeInsets.only(bottom: 10),
+          height: height,
+          margin: EdgeInsets.only(bottom: gap),
           decoration: BoxDecoration(
             color: MerzoxColors.kColorF5F9FC,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(cornerRadius),
           ),
           child: Padding(
             padding: const EdgeInsetsDirectional.only(start: 10, end: 12),

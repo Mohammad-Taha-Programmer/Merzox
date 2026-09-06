@@ -531,7 +531,8 @@
     "orderNumberCopied": "تم نسخ رقم الطلب",
     "holdToCopy": "اضغط مطولاً لنسخ رقم الطلب",
     "tapToSeeFull": "اضغط لعرض النص كاملاً",
-    "clearSearch": "مسح البحث"
+    "clearSearch": "مسح البحث",
+    "registerAsCustomer": "التسجيل كزبون"
   },
   "profile": {
     "title": "الملف الشخصي"
