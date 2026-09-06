@@ -1,3 +1,4 @@
+import '../../messages/widgets/message_badge.dart';
 import '../../notifications/widgets/global_notification_bell.dart';
 import 'dart:async';
 import 'dart:typed_data';
@@ -284,7 +285,10 @@ class _PageHeader extends StatelessWidget {
         IconButton(
           tooltip: 'messages.title'.tr(),
           onPressed: () => context.push('/business/messages'),
-          icon: const Icon(Icons.chat_bubble_outline_rounded),
+          icon: const MessageBadge(
+            businessAudience: true,
+            child: Icon(Icons.chat_bubble_outline_rounded),
+          ),
         ),
         if (onLogout case final VoidCallback signOut)
           IconButton(

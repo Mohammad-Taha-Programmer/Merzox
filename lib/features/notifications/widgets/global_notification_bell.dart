@@ -190,7 +190,12 @@ class UnreadCountBadge extends StatelessWidget {
         maxLines: 1,
         textAlign: TextAlign.center,
         textDirection: TextDirection.ltr,
+        // The family is named rather than inherited. The count is dropped onto
+        // whatever icon a screen already draws, and one of those may sit where
+        // no `DefaultTextStyle` reaches - and the digits then render as empty
+        // boxes, so the badge says nothing at all.
         style: const TextStyle(
+          fontFamily: 'Tajawal',
           color: Colors.white,
           fontSize: 9,
           height: 1.1,

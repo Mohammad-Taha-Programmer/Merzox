@@ -1000,6 +1000,24 @@ class ApiService {
     );
   }
 
+  /// How many conversations are waiting on the reader.
+  ///
+  /// Conversations, not messages: the badge answers "how many people are
+  /// waiting", which is what a merchant or a customer acts on. Both listings
+  /// already report it, so this asks for the shortest page it can and reads
+  /// the total off the envelope rather than counting rows.
+  Future<int> messageUnreadCount({
+    required String token,
+    bool businessAudience = false,
+  }) async {
+    final ConversationListApiResponse list = businessAudience
+        ? await merchantConversations(token: token, unreadOnly: true, limit: 1)
+        : await conversations(token: token, unreadOnly: true, limit: 1);
+
+    final int count = list.unreadConversationCount;
+    return count < 0 ? 0 : count;
+  }
+
   Future<int> notificationUnreadCount({
     required String token,
     bool businessAudience = false,

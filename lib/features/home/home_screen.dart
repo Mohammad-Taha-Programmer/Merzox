@@ -2,6 +2,7 @@ import 'package:merzox/features/notifications/widgets/global_notification_bell.d
 import 'dart:async';
 
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/features/messages/widgets/message_badge.dart';
 import 'package:merzox/features/cart/widgets/cart_items_view.dart';
 import 'package:merzox/core/localization/language_toggle_button.dart';
 import 'package:merzox/services/api_service.dart';
@@ -315,6 +316,7 @@ class _HomeBottomNavigationBar extends StatelessWidget {
       label: 'nav.messages',
       icon: Icons.chat_bubble_outline_rounded,
       selectedIcon: Icons.chat_bubble_rounded,
+      countsMessages: true,
     ),
     _HomeNavData(
       label: 'nav.profile',
@@ -425,10 +427,14 @@ class _HomeNavData {
   final IconData icon;
   final IconData selectedIcon;
 
+  /// Whether this tab wears the waiting-conversation count.
+  final bool countsMessages;
+
   const _HomeNavData({
     required this.label,
     required this.icon,
     required this.selectedIcon,
+    this.countsMessages = false,
   });
 }
 
@@ -460,11 +466,21 @@ class _HomeNavItem extends StatelessWidget {
             children: [
               MerzoxNavIndicator(selected: selected),
               const SizedBox(height: kMerzoxNavIndicatorGap),
-              Icon(
-                selected ? data.selectedIcon : data.icon,
-                color: selected ? MerzoxColors.kColorEE6C4D : inactiveColor,
-                size: 25,
-              ),
+              if (data.countsMessages)
+                MessageBadge(
+                  businessAudience: false,
+                  child: Icon(
+                    selected ? data.selectedIcon : data.icon,
+                    color: selected ? MerzoxColors.kColorEE6C4D : inactiveColor,
+                    size: 25,
+                  ),
+                )
+              else
+                Icon(
+                  selected ? data.selectedIcon : data.icon,
+                  color: selected ? MerzoxColors.kColorEE6C4D : inactiveColor,
+                  size: 25,
+                ),
             ],
           ),
         ),
