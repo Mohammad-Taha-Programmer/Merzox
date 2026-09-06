@@ -318,4 +318,22 @@ void main() {
       reason: 'the disc must not be the colour of the bell on it',
     );
   });
+
+  testWidgets('the count names its own font rather than inheriting one', (
+    WidgetTester tester,
+  ) async {
+    // The badge is dropped onto whatever icon a screen already draws, and one
+    // of those may sit where no `DefaultTextStyle` reaches. Inherited, the
+    // digits render as empty boxes and the badge says nothing at all.
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.rtl,
+        child: UnreadCountBadge(count: 4),
+      ),
+    );
+
+    final Text digits = tester.widget<Text>(find.text('4'));
+    expect(digits.style?.fontFamily, isNotNull);
+    expect(digits.style?.color, Colors.white);
+  });
 }

@@ -1,3 +1,4 @@
+import { bellNotificationFilter } from '../policies/notification-audience.policy.js';
 import mongoose from 'mongoose';
 
 import { Notification } from '../models/Notification.js';
@@ -41,7 +42,10 @@ export const listMyNotifications = asyncHandler(async (req, res) => {
   const onlyUnread =
     readFilterParam(req.query.filter, 'INVALID_NOTIFICATION_FILTER') ===
     'unread';
-  const baseFilter = { user: req.user._id, audience };
+  // Messages are the messages icon's business, not the bell's. The records
+  // stay - push and the history both need them - they simply are not what
+  // this list is for.
+  const baseFilter = bellNotificationFilter({ user: req.user._id, audience });
   const criteria = onlyUnread ? { ...baseFilter, readAt: null } : baseFilter;
 
   const [notifications, total, unreadCount] = await Promise.all([
@@ -72,11 +76,13 @@ export const listMyNotifications = asyncHandler(async (req, res) => {
 
 export const getMyNotificationUnreadCount = asyncHandler(async (req, res) => {
   const audience = audienceFrom(req.query, req.user);
-  const unreadCount = await Notification.countDocuments({
-    user: req.user._id,
-    audience,
-    readAt: null
-  });
+  const unreadCount = await Notification.countDocuments(
+    bellNotificationFilter({
+      user: req.user._id,
+      audience,
+      readAt: null
+    })
+  );
 
   res.json({ success: true, data: { unreadCount } });
 });
@@ -119,8 +125,11 @@ export const markNotificationRead = asyncHandler(async (req, res) => {
 
 export const markAllNotificationsRead = asyncHandler(async (req, res) => {
   const audience = audienceFrom(req.body, req.user);
+  // Only what the bell shows. Marking everything read here would silence a
+  // message the reader has never opened, and the messages icon would go quiet
+  // with nothing having been read.
   const result = await Notification.updateMany(
-    { user: req.user._id, audience, readAt: null },
+    bellNotificationFilter({ user: req.user._id, audience, readAt: null }),
     { $set: { readAt: new Date() } }
   );
 
