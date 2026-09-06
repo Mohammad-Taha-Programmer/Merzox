@@ -51,7 +51,7 @@ final class AuthRouteGuard {
     }
 
     if (_businessRoutes.contains(path) && !session.isBusiness) {
-      return session.isAuthenticated ? '/business/enroll' : '/business/login';
+      return _awayFromTheMerchantSide(session);
     }
 
     if (path == '/business') {
@@ -59,11 +59,27 @@ final class AuthRouteGuard {
         return '/business/login';
       }
       if (!session.isBusiness) {
-        return '/business/enroll';
+        return _awayFromTheMerchantSide(session);
       }
     }
 
     return null;
+  }
+
+  /// Where a reader goes when a merchant-only route is not theirs to open.
+  ///
+  /// Enrolment is the answer only for an account that has no shop. A shop
+  /// owner who is currently acting as a customer - the switch on their
+  /// profile - would otherwise be told to enrol a shop they already own,
+  /// which is both untrue and a dead end: the enrolment refuses a second one.
+  /// They are sent to the customer side they chose instead, and turn back
+  /// through the same button they came by.
+  static String _awayFromTheMerchantSide(AuthSessionSnapshot session) {
+    if (!session.isAuthenticated) {
+      return '/business/login';
+    }
+
+    return session.ownsBusiness ? '/home' : '/business/enroll';
   }
 
   static String? _normalizeNotifications(Uri uri, AuthSessionSnapshot session) {

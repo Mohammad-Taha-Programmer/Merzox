@@ -33,7 +33,8 @@
     "title": "التقييمات",
     "publish": "نشر",
     "allReviews": "كل التقييمات",
-    "count": "({} تقييم)"
+    "count": "({} تقييم)",
+    "ownBusiness": "لا يمكنك تقييم متجرك أو منتجاتك"
   },
   "nav": {
     "home": "الرئيسية",
@@ -793,7 +794,8 @@
     "productImageInvalid": "تعذرت قراءة صورة المنتج، جرب صورة أخرى",
     "productImageTooLarge": "صورة المنتج كبيرة جداً، الحد الأعلى 5 ميجابايت",
     "productContentTypeUnsupported": "صيغة صورة المنتج غير مدعومة، استخدم JPG أو PNG",
-    "payloadTooLarge": "الملف كبير جداً، اختر صورة أصغر"
+    "payloadTooLarge": "الملف كبير جداً، اختر صورة أصغر",
+    "cannotReviewOwnBusiness": "لا يمكنك تقييم متجرك أو منتجاتك"
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",

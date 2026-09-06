@@ -16,6 +16,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static const String nameKey = 'auth_user_name';
   static const String addressKey = 'auth_user_address';
   static const String userTypeKey = 'auth_user_type';
+
+  /// Which side of the app the account is being used from.
+  ///
+  /// Separate from [userTypeKey], which says what the account IS. One value
+  /// used to carry both, which made the two impossible to tell apart - and a
+  /// shopkeeper who wanted to buy from another shopkeeper had nowhere to say
+  /// so.
+  static const String activeRoleKey = 'auth_active_role';
   static const String emailKey = 'auth_user_email';
   static const String phoneKey = 'auth_user_phone';
   static const String genderKey = 'auth_user_gender';
@@ -254,6 +262,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await prefs.remove(nameKey);
     await prefs.remove(addressKey);
     await prefs.remove(userTypeKey);
+    await prefs.remove(activeRoleKey);
     await prefs.remove(emailKey);
     await prefs.remove(phoneKey);
     await prefs.remove(genderKey);
@@ -277,6 +286,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await prefs.setString(nameKey, auth.user.name);
     await prefs.setString(addressKey, auth.user.address);
     await prefs.setString(userTypeKey, auth.user.userType);
+    // A fresh login starts on the side the account belongs to; the reader
+    // turns it from there.
+    await prefs.remove(activeRoleKey);
     await prefs.setString(emailKey, auth.user.email ?? '');
     await prefs.setString(phoneKey, auth.user.phone ?? '');
     await prefs.setString(genderKey, auth.user.gender);

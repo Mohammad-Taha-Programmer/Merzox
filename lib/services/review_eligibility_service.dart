@@ -3,6 +3,12 @@ import 'package:merzox/services/api_service.dart';
 
 enum ReviewEligibilityReason {
   customerAccountRequired,
+  /// The reader owns the shop being looked at.
+  ///
+  /// Not a matter of the account type: a shopkeeper may review any shop but
+  /// their own, and the server decides it by comparing the reader with the
+  /// shop's owner.
+  ownBusiness,
   deliveredPurchaseRequired,
 }
 
@@ -12,6 +18,7 @@ enum ReviewEligibilityStatus {
   eligible,
   loginRequired,
   customerAccountRequired,
+  ownBusiness,
   deliveredPurchaseRequired,
   failure,
 }
@@ -129,6 +136,7 @@ final class ReviewEligibilityService implements ReviewEligibilityGateway {
     final reason = switch (rawReason) {
       'customerAccountRequired' =>
         ReviewEligibilityReason.customerAccountRequired,
+      'ownBusiness' => ReviewEligibilityReason.ownBusiness,
       'deliveredPurchaseRequired' =>
         ReviewEligibilityReason.deliveredPurchaseRequired,
       _ => throw const ApiContractException(
@@ -151,6 +159,7 @@ ReviewEligibilityStatus statusForReviewDecision(
   return switch (decision.reason) {
     ReviewEligibilityReason.customerAccountRequired =>
       ReviewEligibilityStatus.customerAccountRequired,
+    ReviewEligibilityReason.ownBusiness => ReviewEligibilityStatus.ownBusiness,
     ReviewEligibilityReason.deliveredPurchaseRequired =>
       ReviewEligibilityStatus.deliveredPurchaseRequired,
     null => ReviewEligibilityStatus.failure,

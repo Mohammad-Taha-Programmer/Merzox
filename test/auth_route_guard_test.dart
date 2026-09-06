@@ -354,4 +354,43 @@ void main() {
       );
     });
   });
+
+  group('a shop owner acting as a customer', () {
+    // The switch on the merchant profile. The account still owns its shop; it
+    // is only being used the other way round, so a merchant-only route is
+    // closed to it for now - but enrolment is not the answer, because there
+    // is nothing left to enrol.
+    const owner = AuthSessionSnapshot(
+      type: AuthSessionType.customer,
+      ownsBusiness: true,
+      token: 'owner-token',
+    );
+
+    for (final route in ['/business', '/business/messages', '/business/preview']) {
+      test('is sent home from $route, not to enrolment', () {
+        expect(
+          AuthRouteGuard.redirect(uri: Uri.parse(route), session: owner),
+          '/home',
+        );
+      });
+    }
+
+    test('an account with no shop is still sent to enrolment', () {
+      expect(
+        AuthRouteGuard.redirect(uri: Uri.parse('/business'), session: customer),
+        '/business/enroll',
+      );
+    });
+
+    test('the customer side itself is left alone', () {
+      expect(
+        AuthRouteGuard.redirect(uri: Uri.parse('/home'), session: owner),
+        isNull,
+      );
+      expect(
+        AuthRouteGuard.redirect(uri: Uri.parse('/orders'), session: owner),
+        isNull,
+      );
+    });
+  });
 }

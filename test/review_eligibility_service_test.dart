@@ -97,6 +97,43 @@ void main() {
     expect(result.reason, ReviewEligibilityReason.deliveredPurchaseRequired);
   });
 
+  test('the shop owner reason is parsed, and named in the notice', () async {
+    // The server grew this reason when the customer-account rule was replaced
+    // by an authorship rule. A client that did not know the word would treat
+    // every owner's own shop as a broken response.
+    final dio = Dio(BaseOptions(baseUrl: 'http://example.test/api/v1'));
+
+    dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) {
+          handler.resolve(
+            Response<Map<String, dynamic>>(
+              requestOptions: options,
+              statusCode: 200,
+              data: const {
+                'success': true,
+                'data': {
+                  'eligibility': {'eligible': false, 'reason': 'ownBusiness'},
+                },
+              },
+            ),
+          );
+        },
+      ),
+    );
+
+    final result = await ReviewEligibilityService(
+      dio: dio,
+    ).businessEligibility(token: 'owner-token', businessId: 'business-1');
+
+    expect(result.eligible, isFalse);
+    expect(result.reason, ReviewEligibilityReason.ownBusiness);
+    expect(
+      statusForReviewDecision(result),
+      ReviewEligibilityStatus.ownBusiness,
+    );
+  });
+
   test('malformed eligibility payload fails closed', () async {
     final dio = Dio(BaseOptions(baseUrl: 'http://example.test/api/v1'));
 

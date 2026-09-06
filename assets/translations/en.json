@@ -33,7 +33,8 @@
     "title": "Reviews",
     "publish": "Publish",
     "allReviews": "All reviews",
-    "count": "({} reviews)"
+    "count": "({} reviews)",
+    "ownBusiness": "You cannot review your own shop or its products"
   },
   "nav": {
     "home": "Home",
@@ -793,7 +794,8 @@
     "productImageInvalid": "That product image could not be read. Try another.",
     "productImageTooLarge": "That product image is too large. The limit is 5 MB.",
     "productContentTypeUnsupported": "That product image format is not supported. Use JPG or PNG.",
-    "payloadTooLarge": "That file is too large. Choose a smaller image."
+    "payloadTooLarge": "That file is too large. Choose a smaller image.",
+    "cannotReviewOwnBusiness": "You cannot review your own shop or its products"
   },
   "courierLocation": {
     "loginEntry": "Share courier location",

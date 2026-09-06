@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'role_switch_service.dart';
 import 'secure_token_store.dart';
 
 import '../../features/authentication/bloc/auth_bloc.dart';
@@ -7,10 +8,25 @@ import '../../features/authentication/bloc/auth_bloc.dart';
 enum AuthSessionType { unauthenticated, customer, business }
 
 final class AuthSessionSnapshot {
+  /// Which side of the app this session is on right now.
+  ///
+  /// A shop owner may be on the customer side; that is the point of the
+  /// switch. Everything that routes should read this.
   final AuthSessionType type;
+
+  /// Whether the account owns a shop at all.
+  ///
+  /// What the account IS, as opposed to how it is being used. Only enrolling
+  /// changes it, and it is the gate on taking the merchant side.
+  final bool ownsBusiness;
+
   final String? token;
 
-  const AuthSessionSnapshot({required this.type, this.token});
+  const AuthSessionSnapshot({
+    required this.type,
+    this.ownsBusiness = false,
+    this.token,
+  });
 
   bool get isAuthenticated => type != AuthSessionType.unauthenticated;
 
@@ -78,11 +94,19 @@ class AuthSessionService {
       return const AuthSessionSnapshot(type: AuthSessionType.unauthenticated);
     }
 
-    final userType = prefs.getString(AuthBloc.userTypeKey);
+    final bool ownsBusiness = accountOwnsBusiness(
+      prefs.getString(AuthBloc.userTypeKey),
+    );
+    final MerzoxRole role = activeRoleFor(
+      ownsBusiness: ownsBusiness,
+      stored: prefs.getString(AuthBloc.activeRoleKey),
+    );
+
     return AuthSessionSnapshot(
-      type: userType == 'business'
+      type: role == MerzoxRole.merchant
           ? AuthSessionType.business
           : AuthSessionType.customer,
+      ownsBusiness: ownsBusiness,
       token: token.trim(),
     );
   }
