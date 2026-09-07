@@ -114,7 +114,7 @@ class _CourierLocationPageState extends State<CourierLocationPage>
       body: BlocConsumer<CourierLocationBloc, CourierLocationState>(
         listenWhen: (previous, current) =>
             !previous.hasUploaded && current.hasUploaded,
-        listener: (_, __) {
+        listener: (_, _) {
           // After the backend has accepted the first location snapshot,
           // the visible input no longer needs to retain the capability.
           _capabilityController.clear();

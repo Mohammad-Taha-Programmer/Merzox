@@ -190,7 +190,7 @@ class _OrdersPageState extends State<OrdersPage> {
         itemCount:
             state.orders.length +
             (state.status == OrdersStatus.loadingMore ? 1 : 0),
-        separatorBuilder: (_, __) => const SizedBox(height: 16),
+        separatorBuilder: (_, _) => const SizedBox(height: 16),
         itemBuilder: (context, index) {
           if (index == state.orders.length) {
             return const Padding(
@@ -709,13 +709,13 @@ class _OrderProductImage extends StatelessWidget {
       image = Image.network(
         imageUrl,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => placeholder,
+        errorBuilder: (_, _, _) => placeholder,
       );
     } else if (imageUrl.startsWith('assets/')) {
       image = Image.asset(
         imageUrl,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => placeholder,
+        errorBuilder: (_, _, _) => placeholder,
       );
     }
 

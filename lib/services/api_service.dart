@@ -218,10 +218,10 @@ class ApiService {
     final response = await _dio.patch<Map<String, dynamic>>(
       '/users/me',
       data: {
-        if (name != null) 'name': name,
-        if (gender != null) 'gender': gender,
-        if (address != null) 'address': address,
-        if (birthDate != null) 'birthDate': birthDate,
+        'name': ?name,
+        'gender': ?gender,
+        'address': ?address,
+        'birthDate': ?birthDate,
         if (emails != null)
           'emails': emails.map((email) => email.toJson()).toList(),
         if (phones != null)
@@ -244,9 +244,9 @@ class ApiService {
       '/users/me',
       data: {
         'permissions': {
-          if (location != null) 'location': location,
-          if (aiPersonalization != null) 'aiPersonalization': aiPersonalization,
-          if (contacts != null) 'contacts': contacts,
+          'location': ?location,
+          'aiPersonalization': ?aiPersonalization,
+          'contacts': ?contacts,
         },
       },
       options: _authOptions(token),
@@ -293,10 +293,10 @@ class ApiService {
         'limit': limit,
         if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
         if (sort != null && sort.trim().isNotEmpty) 'sort': sort.trim(),
-        if (discounted != null) 'discounted': discounted,
-        if (latitude != null) 'lat': latitude,
-        if (longitude != null) 'lng': longitude,
-        if (radiusMeters != null) 'radiusMeters': radiusMeters,
+        'discounted': ?discounted,
+        'lat': ?latitude,
+        'lng': ?longitude,
+        'radiusMeters': ?radiusMeters,
       },
     );
     final data = response.data?['data'] as Map<String, dynamic>? ?? {};
@@ -491,7 +491,7 @@ class ApiService {
         'deliveryAddress': deliveryAddress,
         'paymentMethod': paymentMethod,
         'deliveryOption': deliveryOption,
-        if (clientOrderId != null) 'clientOrderId': clientOrderId,
+        'clientOrderId': ?clientOrderId,
       },
       options: _authOptions(token),
     );
@@ -682,8 +682,8 @@ class ApiService {
       '/auth/signup',
       data: {
         'name': name,
-        if (email != null) 'email': email,
-        if (phone != null) 'phone': phone,
+        'email': ?email,
+        'phone': ?phone,
         'password': password,
         'address': address,
         'userType': userType,

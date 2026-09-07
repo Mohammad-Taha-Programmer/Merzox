@@ -1014,7 +1014,7 @@ Map<String, dynamic> _seedHomeBusiness(int index, {String? discount}) {
     'ratingCount': 20,
     'followerCount': 8,
     'viewCount': 300,
-    if (discount != null) 'discount': discount,
+    'discount': ?discount,
     'colorValue': 0xFFDEEEF8,
   };
 }

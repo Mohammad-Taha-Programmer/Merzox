@@ -534,7 +534,7 @@ final class MerchantOrderFilter {
   /// Dates go as plain calendar days: the merchant picked a day on a
   /// calendar, not an instant, so no time zone is implied either way.
   Map<String, String> toQueryParameters() => <String, String>{
-    if (status != null) 'status': status!,
+    'status': ?status,
     if (query.isNotEmpty) 'q': query,
     if (orderNumber.isNotEmpty) 'orderNumber': orderNumber,
     if (customerName.isNotEmpty) 'customerName': customerName,

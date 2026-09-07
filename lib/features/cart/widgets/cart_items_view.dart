@@ -224,7 +224,7 @@ class _CartItemTile extends StatelessWidget {
                   : Image.network(
                       item.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => const _CartImageFallback(),
+                      errorBuilder: (_, _, _) => const _CartImageFallback(),
                     ),
             ),
           ),

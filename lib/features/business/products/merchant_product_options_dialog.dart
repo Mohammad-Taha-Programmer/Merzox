@@ -254,7 +254,7 @@ class _ProductOptionsDialogState extends State<ProductOptionsDialog> {
                         child: ListView.separated(
                           scrollDirection: Axis.horizontal,
                           itemCount: _options.length,
-                          separatorBuilder: (_, __) =>
+                          separatorBuilder: (_, _) =>
                               const SizedBox(width: 16),
                           itemBuilder: (BuildContext context, int index) =>
                               _OptionChip(

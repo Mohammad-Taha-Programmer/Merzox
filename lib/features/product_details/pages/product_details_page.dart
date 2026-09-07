@@ -256,7 +256,7 @@ class _ProductImageSliderState extends State<ProductImageSlider> {
                         : Image.network(
                             imageUrl,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) =>
+                            errorBuilder: (_, _, _) =>
                                 const _ProductPhotoPlaceholder(),
                           ),
                   );

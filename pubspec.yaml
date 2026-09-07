@@ -36,11 +36,22 @@ dependencies:
   flutter_bloc: ^9.1.1
   shared_preferences: ^2.5.5
   dio: ^5.10.0
-  go_router: ^17.3.0
+  go_router: ^18.0.1
   get_it: ^9.2.1
+  # Held at 10 deliberately, and not to be bumped casually. Version 11 removes
+  # the ciphers and the `encryptedSharedPreferences` backend that 10 wrote
+  # with, and its changelog says data saved by them is unusable afterwards -
+  # every signed-in reader would lose their token silently on the update. The
+  # bearer token lives here. Moving to 11 is a migration to plan, not a
+  # version to bump: run 10's own migration path first, then upgrade.
   flutter_secure_storage: ^10.3.1
   easy_localization: ^3.0.8
   flutter_native_splash: ^2.4.6
+  # Held at 12. Version 13 requires `compileSdk 37`, which this Flutter
+  # release does not default to and which is not a released Android platform
+  # on this machine - only a preview codename. What 13 adds is the Android 17
+  # `ACCESS_LOCAL_NETWORK` permission, which this app does not ask for.
+  # Revisit when 37 is a released platform and Flutter's default reaches it.
   permission_handler: ^12.0.3
   # Picks the profile picture off the camera or the gallery.
   image_picker: ^1.1.2
@@ -50,6 +61,13 @@ dependencies:
   url_launcher: ^6.3.2
   share_plus: ^13.2.0
   socket_io_client: 3.1.6
+  # Held together, and they move together: messaging 16.6 requires core 4.14.
+  # On 4.14 every Android build prints "Your app uses the following plugins
+  # that apply Kotlin Gradle Plugin (KGP): firebase_core / Future versions of
+  # Flutter will fail to build". Measured, both ways round: the warning is
+  # absent on 4.13 and present on 4.14. What the pair buys in return is a new
+  # `AuthorizationStatus.deniedPermanently` this app treats as a denial like
+  # any other. Revisit when Firebase ships a built-in-Kotlin version.
   firebase_core: 4.13.0
   firebase_messaging: 16.5.0
   # Direct, not transitive: `initializeDateFormatting` lives in
@@ -67,7 +85,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 flutter_native_splash:
   background_image: assets/images/logo_background.png

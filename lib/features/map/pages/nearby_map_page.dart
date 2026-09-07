@@ -205,7 +205,7 @@ class _NearbyMapPageState extends State<NearbyMapPage> {
                 interactionOptions: const InteractionOptions(
                   flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
                 ),
-                onTap: (_, __) => context.read<NearbyMapBloc>().add(
+                onTap: (_, _) => context.read<NearbyMapBloc>().add(
                   const NearbyMapBusinessSelected(''),
                 ),
               ),
@@ -444,7 +444,7 @@ class _MapBusinessResults extends StatelessWidget {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         itemCount: businesses.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 7),
+        separatorBuilder: (_, _) => const SizedBox(width: 7),
         itemBuilder: (context, index) {
           final business = businesses[index];
           final selected = business.id == selectedBusinessId;
