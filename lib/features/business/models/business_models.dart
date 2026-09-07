@@ -1,34 +1,34 @@
+/// The ways a shop can be reached that belong to the shop.
+///
+/// There is no plain phone number among them, and that is the point: the one
+/// the shop would print is the owner's, which the account already holds and
+/// which they already gave at sign-up and can correct in their own profile. A
+/// box for it here asked for it a third time and kept a third copy, which the
+/// other two could then drift away from.
 final class BusinessSocialLinks {
   final String instagram;
   final String whatsapp;
-  final String mobile;
   final String facebook;
 
   const BusinessSocialLinks({
     this.instagram = '',
     this.whatsapp = '',
-    this.mobile = '',
     this.facebook = '',
   });
 
   bool get isEmpty =>
-      instagram.isEmpty &&
-      whatsapp.isEmpty &&
-      mobile.isEmpty &&
-      facebook.isEmpty;
+      instagram.isEmpty && whatsapp.isEmpty && facebook.isEmpty;
 
   factory BusinessSocialLinks.fromJson(Map<String, dynamic> json) =>
       BusinessSocialLinks(
         instagram: json['instagram'] as String? ?? '',
         whatsapp: json['whatsapp'] as String? ?? '',
-        mobile: json['mobile'] as String? ?? '',
         facebook: json['facebook'] as String? ?? '',
       );
 
   Map<String, dynamic> toJson() => {
     'instagram': instagram,
     'whatsapp': whatsapp,
-    'mobile': mobile,
     'facebook': facebook,
   };
 }

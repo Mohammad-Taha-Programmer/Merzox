@@ -311,6 +311,16 @@ test('store settings are allowlisted and validated', () => {
     rejectCode(validateBusinessProfilePatch, { socialLinks: 'x' }),
     'INVALID_BUSINESS_SOCIAL_LINKS'
   );
+
+  // A shop's plain phone number is not among these any more. The one it would
+  // print is its owner's, given at sign-up and corrected in their profile, so
+  // asking for it here kept a third copy of it that nothing read.
+  assert.equal(
+    rejectCode(validateBusinessProfilePatch, {
+      socialLinks: { mobile: '+972590000001' }
+    }),
+    'INVALID_BUSINESS_SOCIAL_LINKS'
+  );
 });
 
 test('a profile patch accepts an optional canonical birth date', () => {

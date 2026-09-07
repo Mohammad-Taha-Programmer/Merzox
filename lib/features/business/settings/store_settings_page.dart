@@ -68,9 +68,6 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
   late final TextEditingController _whatsapp = TextEditingController(
     text: widget.business.socialLinks.whatsapp,
   );
-  late final TextEditingController _mobile = TextEditingController(
-    text: widget.business.socialLinks.mobile,
-  );
   late final TextEditingController _facebook = TextEditingController(
     text: widget.business.socialLinks.facebook,
   );
@@ -86,7 +83,6 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
       _attachmentUrl,
       _instagram,
       _whatsapp,
-      _mobile,
       _facebook,
     ]) {
       controller.dispose();
@@ -145,7 +141,6 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
         'socialLinks': {
           'instagram': _instagram.text.trim(),
           'whatsapp': _whatsapp.text.trim(),
-          'mobile': _mobile.text.trim(),
           'facebook': _facebook.text.trim(),
         },
       }),
@@ -290,12 +285,6 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                           controller: _whatsapp,
                           label: 'storeSettings.whatsapp'.tr(),
                           icon: Icons.chat_outlined,
-                          keyboardType: TextInputType.phone,
-                        ),
-                        _Field(
-                          controller: _mobile,
-                          label: 'storeSettings.mobile'.tr(),
-                          icon: Icons.phone_outlined,
                           keyboardType: TextInputType.phone,
                         ),
                         _Field(

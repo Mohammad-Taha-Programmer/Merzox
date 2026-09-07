@@ -118,6 +118,21 @@ void main() {
     expect(find.textContaining('ميجا'), findsNothing);
   });
 
+  testWidgets('the social section asks for no phone number of its own', (
+    WidgetTester tester,
+  ) async {
+    // The number a shop would print is its owner's, and the account holds it
+    // already - given at sign-up, corrected in the personal profile. A box
+    // here asked for it a third time and kept a third copy.
+    await _openLogoSection(tester, api: _LogoApi());
+
+    await tester.tap(find.text('وسائل التواصل الاجتماعي'));
+    await settleFrames(tester);
+
+    expect(find.text('قم بإدخال رقم الواتس مع المقدمة'), findsOneWidget);
+    expect(find.byIcon(Icons.phone_outlined), findsNothing);
+  });
+
   testWidgets('a chosen picture is stored, and the box shows it', (
     WidgetTester tester,
   ) async {

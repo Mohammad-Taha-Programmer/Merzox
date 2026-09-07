@@ -177,7 +177,7 @@ export const updateMyBusiness = asyncHandler(async (req, res) => {
   }
 
   if (req.body.socialLinks !== undefined) {
-    for (const key of ['instagram', 'whatsapp', 'mobile', 'facebook']) {
+    for (const key of ['instagram', 'whatsapp', 'facebook']) {
       if (req.body.socialLinks[key] !== undefined) {
         business.socialLinks[key] = String(req.body.socialLinks[key]).trim();
       }

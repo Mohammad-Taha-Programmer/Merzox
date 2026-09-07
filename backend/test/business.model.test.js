@@ -39,6 +39,28 @@ test('business keeps merchant registration fields private and filters inactive p
   assert.equal(product.isActive, false);
 });
 
+test('a shop keeps its own ways of being reached, not the owner number', () => {
+  // `socialLinks.mobile` was a plain phone number on the shop. The one a shop
+  // would print is the owner's, which the account holds already, so this was
+  // a third copy of it - and the screen that collected it asked for the same
+  // number a third time.
+  assert.equal(Business.schema.path('socialLinks.mobile'), undefined);
+  assert.ok(Business.schema.path('socialLinks.whatsapp'));
+
+  const business = new Business({
+    owner: new mongoose.Types.ObjectId(),
+    publicId: 'MXB-TEST-0003',
+    name: 'متجر',
+    category: 'Groceries',
+    socialLinks: { whatsapp: '+970599000000', mobile: '+970599000000' }
+  });
+
+  assert.equal(business.socialLinks.mobile, undefined);
+  assert.equal(business.socialLinks.whatsapp, '+970599000000');
+  assert.equal(business.toDetailJSON().socialLinks.mobile, undefined);
+  assert.equal(business.toDetailJSON().socialLinks.whatsapp, '+970599000000');
+});
+
 test('a shop carries no copy of the person who owns it', () => {
   // It used to. `contacts` was a name, a phone and an email taken from the
   // owner at enrolment and never written again, so the day they changed

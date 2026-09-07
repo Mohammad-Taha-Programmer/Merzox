@@ -146,11 +146,18 @@ const productSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+/**
+ * The ways a shop can be reached that belong to the shop.
+ *
+ * Deliberately without a plain phone number. The one a shop would print is
+ * its owner's, and the account already holds it - given at sign-up, corrected
+ * in the personal profile. A third copy here is a third thing to keep in step
+ * with the other two, for a field nothing read.
+ */
 const socialLinksSchema = new mongoose.Schema(
   {
     instagram: { type: String, trim: true, maxlength: 200, default: '' },
     whatsapp: { type: String, trim: true, maxlength: 20, default: '' },
-    mobile: { type: String, trim: true, maxlength: 20, default: '' },
     facebook: { type: String, trim: true, maxlength: 200, default: '' }
   },
   { _id: false }
@@ -319,7 +326,6 @@ businessSchema.methods.toDetailJSON = function toDetailJSON() {
     socialLinks: {
       instagram: this.socialLinks?.instagram ?? '',
       whatsapp: this.socialLinks?.whatsapp ?? '',
-      mobile: this.socialLinks?.mobile ?? '',
       facebook: this.socialLinks?.facebook ?? ''
     },
     location: this.location ?? null,
