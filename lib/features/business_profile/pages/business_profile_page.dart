@@ -14,6 +14,7 @@ import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart'
     show MerzoxNavIndicator, kMerzoxNavIndicatorGap;
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
+import 'package:merzox/features/business/contact/store_contact_page.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/services/store_share_service.dart';
 import 'package:merzox/core/constants/money.dart';
@@ -325,6 +326,82 @@ Rect? _shareOrigin(BuildContext context) {
   if (box is! RenderBox || !box.hasSize) return null;
 
   return box.localToGlobal(Offset.zero) & box.size;
+}
+
+/// The shop's own ways of being reached, or nothing at all.
+///
+/// The page is built here rather than at the tap, so the row can ask it
+/// whether it has anything to show. A row that opened an empty page would be
+/// exactly the dead end the contact screen refuses to draw a row for, and a
+/// shop that published no links and gave no permission has nothing.
+StoreContactPage? visitorContactPage(BusinessDetailApiModel? detail) {
+  if (detail == null) return null;
+
+  final StoreContactPage page = StoreContactPage.forVisitor(
+    storeName: detail.name,
+    category: detail.category,
+    logoUrl: detail.logoUrl,
+    socialLinks: detail.socialLinks,
+    contact: detail.contact,
+  );
+
+  return page.isEmpty ? null : page;
+}
+
+/// The way into a shop's contact screen, in the shape that screen's own rows
+/// have - so what a tap opens looks like what was tapped.
+class StoreContactRow extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const StoreContactRow({required this.onPressed, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: MerzoxColors.kColorF5F9FC,
+      borderRadius: BorderRadius.circular(6),
+      child: InkWell(
+        key: const ValueKey<String>('storefront.contact'),
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(6),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 48),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          child: Row(
+            children: <Widget>[
+              const Icon(
+                Icons.phone_outlined,
+                size: 20,
+                color: MerzoxColors.kColor3D5A80,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'businessShell.contactUs'.tr(),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: MerzoxColors.kColor2B2B2B,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // The same glyph the rows on the page this opens use, which is
+              // not the one the Back control uses. Both carry
+              // `matchTextDirection` and Material turns each of them, so
+              // borrowing the back chevron here would have drawn an arrow
+              // pointing out of the row a reader is being invited into.
+              const Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: MerzoxColors.kColor98C1D9,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Tell somebody about this shop.
@@ -652,6 +729,11 @@ class _AboutTab extends StatelessWidget {
             .toList() ??
         const <BusinessProductApiModel>[];
 
+    // Read from the public detail, never from the list seed the storefront
+    // opened with: the seed carries no links and no permission, so a row
+    // drawn from it would be a guess about somebody else's shop.
+    final StoreContactPage? contact = visitorContactPage(state.business);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -688,6 +770,14 @@ class _AboutTab extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+        if (contact != null) ...[
+          const SizedBox(height: 18),
+          StoreContactRow(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => contact),
+            ),
           ),
         ],
         const SizedBox(height: 34),

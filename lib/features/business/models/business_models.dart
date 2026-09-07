@@ -44,6 +44,14 @@ final class OwnerBusiness {
   final String logoUrl;
   final BusinessSocialLinks socialLinks;
 
+  /// Whether the owner's own number and address may be shown to a customer.
+  ///
+  /// The links above were typed to be published, so they need no permission.
+  /// A phone and an email were given at sign-up to open an account, and
+  /// putting them on a public storefront is a second use of them - so this
+  /// starts false and only the owner can change it.
+  final bool showOwnerContact;
+
   const OwnerBusiness({
     required this.id,
     required this.name,
@@ -54,6 +62,7 @@ final class OwnerBusiness {
     required this.attachmentUrl,
     this.logoUrl = '',
     this.socialLinks = const BusinessSocialLinks(),
+    this.showOwnerContact = false,
   });
 
   factory OwnerBusiness.fromJson(Map<String, dynamic> json) => OwnerBusiness(
@@ -68,6 +77,9 @@ final class OwnerBusiness {
     socialLinks: BusinessSocialLinks.fromJson(
       json['socialLinks'] as Map<String, dynamic>? ?? const {},
     ),
+    // Absent means no. A payload that lost the field - an older server, a
+    // truncated response - must not read as permission that was never given.
+    showOwnerContact: json['showOwnerContact'] as bool? ?? false,
   );
 }
 

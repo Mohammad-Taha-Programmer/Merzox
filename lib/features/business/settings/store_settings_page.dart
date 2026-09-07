@@ -72,6 +72,9 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
     text: widget.business.socialLinks.facebook,
   );
 
+  /// Whether a customer may see the number and address on this account.
+  late bool _showOwnerContact = widget.business.showOwnerContact;
+
   @override
   void dispose() {
     for (final controller in [
@@ -143,6 +146,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
           'whatsapp': _whatsapp.text.trim(),
           'facebook': _facebook.text.trim(),
         },
+        'showOwnerContact': _showOwnerContact,
       }),
     );
 
@@ -292,6 +296,15 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                           label: 'storeSettings.facebook'.tr(),
                           icon: Icons.facebook_outlined,
                         ),
+                        // Under the links because it answers the same
+                        // question - how a customer reaches this shop - and
+                        // separate from them because these are not the
+                        // shop's to publish without being asked.
+                        _PermissionSwitch(
+                          value: _showOwnerContact,
+                          onChanged: (bool value) =>
+                              setState(() => _showOwnerContact = value),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -310,6 +323,48 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Whether the account's own number and address go on the storefront.
+///
+/// Worded as a question about the reader rather than about a setting: what a
+/// merchant is deciding is whether a stranger who opens their shop can call
+/// the phone in their pocket.
+class _PermissionSwitch extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _PermissionSwitch({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      child: SwitchListTile.adaptive(
+        key: const ValueKey<String>('storeSettings.showOwnerContact'),
+        value: value,
+        onChanged: onChanged,
+        contentPadding: EdgeInsets.zero,
+        activeThumbColor: MerzoxColors.kColorEE6C4D,
+        title: Text(
+          'storeSettings.showOwnerContact'.tr(),
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: MerzoxColors.kColor2B2B2B,
+          ),
+        ),
+        subtitle: Text(
+          'storeSettings.showOwnerContactHint'.tr(),
+          style: const TextStyle(
+            fontSize: 11,
+            height: 1.5,
+            color: MerzoxColors.kColor8D99AE,
           ),
         ),
       ),

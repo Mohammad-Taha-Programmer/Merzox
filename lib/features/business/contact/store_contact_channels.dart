@@ -140,9 +140,19 @@ List<StoreContactChannel> storeSocialChannels(BusinessSocialLinks links) {
 List<StoreContactChannel> storePhoneChannels(AuthApiUser? account) {
   if (account == null) return const <StoreContactChannel>[];
 
+  return contactPhoneChannels(_phonesOf(account));
+}
+
+/// The same rows from numbers that arrived on their own.
+///
+/// A customer looking at a storefront never holds the merchant's account -
+/// what reaches them is a list the server published - so the turning of a
+/// number into something a phone can dial is kept apart from where the
+/// numbers came from, and both sides get the same rows out of it.
+List<StoreContactChannel> contactPhoneChannels(List<ContactPhone> phones) {
   final List<StoreContactChannel> channels = <StoreContactChannel>[];
 
-  for (final ContactPhone phone in _phonesOf(account)) {
+  for (final ContactPhone phone in phones) {
     final Uri? uri = telUri(phone.value);
     if (uri == null) continue;
 
@@ -162,9 +172,13 @@ List<StoreContactChannel> storePhoneChannels(AuthApiUser? account) {
 List<StoreContactChannel> storeEmailChannels(AuthApiUser? account) {
   if (account == null) return const <StoreContactChannel>[];
 
+  return contactEmailChannels(_emailsOf(account));
+}
+
+List<StoreContactChannel> contactEmailChannels(List<ContactEmail> emails) {
   final List<StoreContactChannel> channels = <StoreContactChannel>[];
 
-  for (final ContactEmail email in _emailsOf(account)) {
+  for (final ContactEmail email in emails) {
     final Uri? uri = mailtoUri(email.value);
     if (uri == null) continue;
 

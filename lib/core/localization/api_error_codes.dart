@@ -90,6 +90,7 @@ const Map<String, String> apiErrorMessageKeys = <String, String>{
   'INVALID_BUSINESS_LOGO_URL': 'apiErrors.invalidBusinessUrl',
   'INVALID_ATTACHMENT_URL': 'apiErrors.invalidBusinessUrl',
   'INVALID_BUSINESS_SOCIAL_LINKS': 'apiErrors.invalidSocialLinks',
+  'INVALID_OWNER_CONTACT_PERMISSION': 'apiErrors.invalidOwnerContactPermission',
   'INVALID_BUSINESS_SOCIAL_NUMBER': 'apiErrors.invalidSocialLinks',
 
   // -- Products ------------------------------------------------------------

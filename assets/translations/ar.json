@@ -331,7 +331,9 @@
     "aboutStore": "نبذة عن المتجر",
     "addressLabel": "أضف عنوان المتجر",
     "categoryLabel": "ما نوع المنتجات التي تبيعها",
-    "logoChangeHint": "اضغط مطولاً لتغيير الشعار"
+    "logoChangeHint": "اضغط مطولاً لتغيير الشعار",
+    "showOwnerContact": "إظهار رقمي وبريدي للزبائن",
+    "showOwnerContactHint": "رقم حسابك وبريدك يظهران في صفحة «تواصل معنا» لأي زائر لمتجرك. روابط المتجر فوق تظهر دائمًا."
   },
   "merchantProduct": {
     "addTitle": "إضافة منتجات",
@@ -834,7 +836,8 @@
     "conversationBlocked": "هذه المحادثة مغلقة.",
     "cannotBlockSelf": "لا يمكن حظر حسابك.",
     "invalidReport": "اختر سبب البلاغ أولاً.",
-    "cannotReportSelf": "لا يمكن الإبلاغ عن حسابك."
+    "cannotReportSelf": "لا يمكن الإبلاغ عن حسابك.",
+    "invalidOwnerContactPermission": "تعذر حفظ إظهار رقمك وبريدك. حاول مرة أخرى."
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",
@@ -919,7 +922,8 @@
     "emails": "البريد الإلكتروني",
     "empty": "لم تُضِف بعد أي وسيلة تواصل.\nأضف روابط متجرك من إعدادات المتجر، وأرقامك وبريدك من ملفك الشخصي.",
     "emptyAction": "إعدادات المتجر",
-    "couldNotOpen": "تعذر فتح هذه الوسيلة على جهازك."
+    "couldNotOpen": "تعذر فتح هذه الوسيلة على جهازك.",
+    "emptyForVisitor": "لم يضع هذا المتجر أي وسيلة تواصل بعد."
   },
   "storefront": {
     "shareStore": "مشاركة المتجر"

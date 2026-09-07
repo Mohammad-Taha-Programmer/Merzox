@@ -432,7 +432,8 @@ export function validateBusinessProfilePatch(req, _res, next) {
     'address',
     'attachmentUrl',
     'logoUrl',
-    'socialLinks'
+    'socialLinks',
+    'showOwnerContact'
   ];
   const keys = Object.keys(req.body);
   const invalid = keys.filter((key) => !allowed.includes(key));
@@ -469,6 +470,19 @@ export function validateBusinessProfilePatch(req, _res, next) {
     if (logoUrl.length > 1000 || !isOptionalHttpUrl(logoUrl)) {
       throw new AppError('Business logo URL is invalid', 400, 'INVALID_BUSINESS_LOGO_URL');
     }
+  }
+  // A real boolean, never a string. `"false"` is truthy, and the mistake this
+  // refuses is the one that would publish a merchant's own number after they
+  // said no.
+  if (
+    req.body.showOwnerContact !== undefined &&
+    typeof req.body.showOwnerContact !== 'boolean'
+  ) {
+    throw new AppError(
+      'Owner contact permission must be true or false',
+      400,
+      'INVALID_OWNER_CONTACT_PERMISSION'
+    );
   }
   if (req.body.socialLinks !== undefined) {
     const links = req.body.socialLinks;

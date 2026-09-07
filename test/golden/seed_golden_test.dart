@@ -36,6 +36,7 @@ import 'package:merzox/features/about_us/pages/about_us_page.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/pages/login_page.dart';
 import 'package:merzox/features/authentication/pages/signup_page.dart';
+import 'package:merzox/features/business/contact/store_contact_page.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/preview/store_preview_page.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
@@ -1477,6 +1478,19 @@ final class _SeedStorefrontApi extends ApiService {
       viewCount: 99,
       discount: null,
       colorValue: 0xffdeeef8,
+      // What this shop published about reaching it. The links were typed into
+      // store settings to be shown; the number is here because this owner
+      // turned that permission on, and a shop that had not would carry an
+      // empty `contact` and no way in to draw a row for.
+      socialLinks: const BusinessSocialLinks(
+        whatsapp: '+970599123456',
+        instagram: 'yasmin.store',
+      ),
+      contact: const StorePublicContact(
+        phones: <ContactPhone>[
+          ContactPhone(value: '+970599123456', label: 'mobile'),
+        ],
+      ),
     );
   }
 
@@ -1985,7 +1999,70 @@ void main() {
         expect(shareBox.left, chatBox.left);
         expect(shareBox.right, chatBox.right);
 
+        // This shop published a way to be reached, so the About tab offers
+        // one. A shop that published nothing draws no row at all rather than
+        // one that opens an empty page - which is the case the widget tests
+        // hold, since a seed that showed it would have nothing to show.
+        expect(
+          find.byKey(const ValueKey<String>('storefront.contact')),
+          findsOneWidget,
+        );
+
+        // The floating circles are drawn above the list and can come to rest
+        // over a row in it. What must never happen is the one that happened
+        // to the thread menu under the bell: a control whose tap another
+        // control silently swallows. The circles hang at the far edge, so
+        // this holds the half the reader actually presses - the icon and the
+        // words - clear of the room they reserve.
+        final Rect contactBox = tester.getRect(
+          find.byKey(const ValueKey<String>('storefront.contact')),
+        );
+        expect(
+          shareBox.right,
+          lessThan(contactBox.left + contactBox.width / 2),
+          reason: 'the share circle must not reach the label side of the row',
+        );
+
         await expectMerzoxSeedGolden('store_details_customer_ar_375x812.png');
+      });
+
+      // -- 10b. What that row opens ---------------------------------------
+      //
+      // The merchant's own contact screen and this one are the same widget
+      // from two sources: the merchant reads the account they are signed in
+      // as, a customer reads what the shop published. Seeded from the same
+      // shop as the storefront above, so the two can be read together.
+      testWidgets('store contact renders its Arabic customer baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(
+          tester,
+          withMerzoxGoldenDeviceInsets(
+            StoreContactPage.forVisitor(
+              storeName: 'متجر الياسمين',
+              category: 'أفضل المتاجر',
+              logoUrl: '',
+              socialLinks: const BusinessSocialLinks(
+                whatsapp: '+970599123456',
+                instagram: 'yasmin.store',
+              ),
+              contact: const StorePublicContact(
+                phones: <ContactPhone>[
+                  ContactPhone(value: '+970599123456', label: 'mobile'),
+                ],
+              ),
+              // A golden must not hand a URL to the machine running it.
+              open: (Uri _) async => true,
+            ),
+          ),
+        );
+
+        // The number is here because this shop's owner turned the permission
+        // on. Nothing else of that account travels with it.
+        expect(find.text('+970599123456'), findsNWidgets(2));
+        expect(find.text('yasmin.store'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('store_contact_customer_ar_375x812.png');
       });
 
       // -- 11/12. The storefront's other two tabs -------------------------
