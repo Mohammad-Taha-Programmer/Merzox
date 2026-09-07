@@ -230,7 +230,13 @@ class _ChatPageState extends State<ChatPage> {
           builder: (context, state) {
             return Column(
               children: [
-                _ChatHeader(title: state.title, avatarUrl: state.avatarUrl),
+                _ChatHeader(
+                  title: state.title,
+                  avatarUrl: state.avatarUrl,
+                  blockedByMe: state.blockedByMe,
+                  onToggleBlock: () =>
+                      context.read<ChatBloc>().add(const ChatBlockToggled()),
+                ),
                 const Divider(height: 1, color: MerzoxColors.kColorEFEFEF),
                 if (state.readSyncFailed) const _ReadSyncNotice(),
                 if (!state.anchorReached) const _MatchOutOfReachNotice(),
@@ -264,18 +270,27 @@ class _ChatPageState extends State<ChatPage> {
                     ],
                   ),
                 ),
-                _Composer(
-                  controller: _composerController,
-                  enabled: state.status != ChatStatus.sending,
-                  onSend: _send,
-                  onShareProduct: _pickProduct,
-                  pendingProduct: _pendingProduct,
-                  onDropPendingProduct: () =>
-                      setState(() => _pendingProduct = null),
-                  pendingReply: _pendingReply,
-                  onDropPendingReply: () =>
-                      setState(() => _pendingReply = null),
-                ),
+                // The box is replaced rather than disabled: one that took
+                // words nothing would carry is worse than its absence.
+                if (state.isBlocked)
+                  _BlockedNotice(
+                    blockedByMe: state.blockedByMe,
+                    onUnblock: () =>
+                        context.read<ChatBloc>().add(const ChatBlockToggled()),
+                  )
+                else
+                  _Composer(
+                    controller: _composerController,
+                    enabled: state.status != ChatStatus.sending,
+                    onSend: _send,
+                    onShareProduct: _pickProduct,
+                    pendingProduct: _pendingProduct,
+                    onDropPendingProduct: () =>
+                        setState(() => _pendingProduct = null),
+                    pendingReply: _pendingReply,
+                    onDropPendingReply: () =>
+                        setState(() => _pendingReply = null),
+                  ),
               ],
             );
           },
@@ -289,7 +304,19 @@ class _ChatHeader extends StatelessWidget {
   final String title;
   final String avatarUrl;
 
-  const _ChatHeader({required this.title, required this.avatarUrl});
+  /// Whether this reader has closed the door, which decides what the menu
+  /// offers rather than whether it appears.
+  final bool blockedByMe;
+
+  /// Closes the door, or opens it again.
+  final VoidCallback onToggleBlock;
+
+  const _ChatHeader({
+    required this.title,
+    required this.avatarUrl,
+    required this.blockedByMe,
+    required this.onToggleBlock,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +352,103 @@ class _ChatHeader extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
+          // At the far end of the bar, where what belongs to the thread as a
+          // whole lives rather than to any one message in it.
+          IconButton(
+            key: const ValueKey<String>('chat.threadMenu'),
+            tooltip: 'messages.inboxMenuTooltip'.tr(),
+            onPressed: () => showModalBottomSheet<void>(
+              context: context,
+              builder: (BuildContext sheetContext) => SafeArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    const SizedBox(height: 8),
+                    ListTile(
+                      key: const ValueKey<String>('chat.toggleBlock'),
+                      leading: Icon(
+                        blockedByMe
+                            ? Icons.lock_open_rounded
+                            : Icons.block_rounded,
+                        color: blockedByMe
+                            ? MerzoxColors.kColor3D5A80
+                            : MerzoxColors.kColorE40909,
+                      ),
+                      title: Text(
+                        blockedByMe
+                            ? 'messages.unblockUser'.tr()
+                            : 'messages.blockUser'.tr(),
+                      ),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        onToggleBlock();
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
+            ),
+            icon: const Icon(
+              Icons.more_vert_rounded,
+              size: 20,
+              color: MerzoxColors.kColor5E5E5E,
+            ),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
+    );
+  }
+}
+
+/// Why nothing can be written here.
+///
+/// It stands where the message box was, because the box is gone: a field that
+/// took words nothing would carry is worse than its absence. The two cases
+/// are told apart - one of them the reader can undo from here, and the other
+/// is not theirs to undo.
+class _BlockedNotice extends StatelessWidget {
+  final bool blockedByMe;
+  final VoidCallback onUnblock;
+
+  const _BlockedNotice({required this.blockedByMe, required this.onUnblock});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const ValueKey<String>('chat.blockedNotice'),
+      width: double.infinity,
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 14,
+        bottom: 16 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      color: MerzoxColors.kColorF9F9F9,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            blockedByMe
+                ? 'messages.blockedByMeNotice'.tr()
+                : 'messages.blockedMeNotice'.tr(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12,
+              height: 1.6,
+              color: MerzoxColors.kColor8D99AE,
+            ),
+          ),
+          if (blockedByMe) ...<Widget>[
+            const SizedBox(height: 10),
+            OutlinedButton(
+              key: const ValueKey<String>('chat.unblockFromNotice'),
+              onPressed: onUnblock,
+              child: Text('messages.unblockUser'.tr()),
+            ),
+          ],
         ],
       ),
     );

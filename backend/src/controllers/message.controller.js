@@ -45,6 +45,12 @@ import {
   requireReplyTarget
 } from '../policies/message-actions.policy.js';
 import { MessageBookmark } from '../models/MessageBookmark.js';
+import { UserBlock } from '../models/UserBlock.js';
+import {
+  assertBlockableCounterpart,
+  assertNotBlocked,
+  conversationCounterpart
+} from '../policies/user-block.policy.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 function conversationFilter(query) {
@@ -120,6 +126,41 @@ async function loadConversation(id) {
   }
 
   return conversation;
+}
+
+/**
+ * The other side of a conversation, as an account id.
+ *
+ * A customer faces the shop's owner; a merchant faces the customer. Read from
+ * the conversation rather than from the request, which is what makes a block
+ * unforgeable: there is no id to send.
+ */
+async function counterpartOf(req, conversation, viewerType, business) {
+  if (viewerType === 'business') {
+    return conversationCounterpart({ conversation, viewerType });
+  }
+
+  const shop = business ?? (await Business.findById(conversation.business));
+
+  return conversationCounterpart({
+    conversation,
+    viewerType,
+    businessOwnerId: shop?.owner ?? null
+  });
+}
+
+/** Whether either of two accounts has closed the door on the other. */
+async function blockStateBetween(readerId, counterpartId) {
+  if (!counterpartId) {
+    return { blockedByMe: false, blockedMe: false };
+  }
+
+  const [mine, theirs] = await Promise.all([
+    UserBlock.exists({ blocker: readerId, blocked: counterpartId }),
+    UserBlock.exists({ blocker: counterpartId, blocked: readerId })
+  ]);
+
+  return { blockedByMe: Boolean(mine), blockedMe: Boolean(theirs) };
 }
 
 /**
@@ -354,8 +395,15 @@ export const openConversation = asyncHandler(async (req, res) => {
 
 export const listConversationMessages = asyncHandler(async (req, res) => {
   const conversation = await loadConversation(req.params.id);
-  const { viewerType } = await resolveViewer(req, conversation);
+  const { viewerType, business } = await resolveViewer(req, conversation);
   const { page, limit, skip } = paginationParams(req.query);
+
+  // So the thread can say the door is closed rather than letting the reader
+  // write a message that will be refused when they press send.
+  const block = await blockStateBetween(
+    req.user._id,
+    await counterpartOf(req, conversation, viewerType, business)
+  );
 
   const [messages, total] = await Promise.all([
     Message.find({ conversation: conversation._id })
@@ -384,6 +432,10 @@ export const listConversationMessages = asyncHandler(async (req, res) => {
           bookmarked: marked.has(message._id.toString())
         })
       ),
+      // Told apart on purpose: one is undone from here, the other is not
+      // this reader's to undo.
+      blockedByMe: block.blockedByMe,
+      blockedMe: block.blockedMe,
       pagination: { page, limit, total, hasMore: skip + messages.length < total }
     }
   });
@@ -420,6 +472,17 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
   const body = String(req.body.body ?? '').trim();
   const sharedProductId = readSharedProductId(req.body);
   const replyToId = readReplyToId(req.body);
+
+  // Before anything is read or looked up: a message that will not be carried
+  // should cost nothing to refuse. Both directions, because a block that let
+  // the blocker keep writing would turn refusing to hear into a way to speak
+  // unanswerable.
+  assertNotBlocked(
+    await blockStateBetween(
+      req.user._id,
+      await counterpartOf(req, conversation, viewerType, business)
+    )
+  );
 
   let replyTo = null;
   if (replyToId) {
@@ -692,6 +755,119 @@ export const listMyBookmarks = asyncHandler(async (req, res) => {
       pagination: { page, limit, total, hasMore: skip + bookmarks.length < total }
     }
   });
+});
+
+/**
+ * Closes a conversation from the reader's side, or opens it again.
+ *
+ * Whom it names is never asked: it is the other side of this conversation,
+ * read from the conversation itself. Blocking twice is one block, which the
+ * unique index makes true rather than a check that could race with a second
+ * tap, and unblocking something that was never blocked is not an error - the
+ * point of the call is the absence.
+ */
+async function setConversationBlock(req, res, blocked) {
+  const conversation = await loadConversation(req.params.id);
+  const { viewerType, business } = await resolveViewer(req, conversation);
+
+  const counterpartId = assertBlockableCounterpart(
+    req.user._id,
+    await counterpartOf(req, conversation, viewerType, business)
+  );
+
+  if (blocked) {
+    await UserBlock.updateOne(
+      { blocker: req.user._id, blocked: counterpartId },
+      { $setOnInsert: { blocker: req.user._id, blocked: counterpartId } },
+      { upsert: true }
+    );
+  } else {
+    await UserBlock.deleteOne({
+      blocker: req.user._id,
+      blocked: counterpartId
+    });
+  }
+
+  res.json({ success: true, data: { blockedByMe: blocked } });
+}
+
+export const blockConversationCounterpart = asyncHandler((req, res) =>
+  setConversationBlock(req, res, true)
+);
+
+export const unblockConversationCounterpart = asyncHandler((req, res) =>
+  setConversationBlock(req, res, false)
+);
+
+/**
+ * Everyone this reader has closed the door on, newest first.
+ *
+ * Named by the thread they were blocked from, because that is how a reader
+ * remembers them: a shop's name, or a customer's. A block whose thread has
+ * since gone still counts - it is still in force - and says so with the name
+ * the account carries.
+ */
+export const listMyBlocks = asyncHandler(async (req, res) => {
+  const { page, limit, skip } = paginationParams(req.query);
+
+  const [blocks, total] = await Promise.all([
+    UserBlock.find({ blocker: req.user._id })
+      .sort({ createdAt: -1, _id: -1 })
+      .skip(skip)
+      .limit(limit),
+    UserBlock.countDocuments({ blocker: req.user._id })
+  ]);
+
+  const blockedIds = blocks.map((block) => block.blocked);
+
+  const [accounts, shops] = await Promise.all([
+    req.user.constructor
+      .find({ _id: { $in: blockedIds } })
+      .select('name avatarUrl'),
+    Business.find({ owner: { $in: blockedIds } }).select('owner name logoUrl')
+  ]);
+
+  const accountById = new Map(
+    accounts.map((account) => [account._id.toString(), account])
+  );
+  const shopByOwner = new Map(
+    shops.map((shop) => [shop.owner.toString(), shop])
+  );
+
+  const items = blocks.map((block) => {
+    const id = block.blocked.toString();
+    const shop = shopByOwner.get(id);
+    const account = accountById.get(id);
+
+    return {
+      userId: id,
+      // A shop is known by its own name rather than its owner's, which is the
+      // name the reader was talking to.
+      name: shop?.name ?? account?.name ?? '',
+      avatarUrl: shop?.logoUrl ?? account?.avatarUrl ?? '',
+      blockedAt: block.createdAt
+    };
+  });
+
+  res.json({
+    success: true,
+    data: {
+      blocks: items,
+      pagination: { page, limit, total, hasMore: skip + blocks.length < total }
+    }
+  });
+});
+
+/** Opens the door again, from the list rather than from a thread. */
+export const unblockUser = asyncHandler(async (req, res) => {
+  const blockedId = String(req.params.userId ?? '');
+
+  await UserBlock.deleteOne({
+    blocker: req.user._id,
+    blocked: mongoose.isValidObjectId(blockedId) ? blockedId : null
+  });
+
+  res.json({ success: true, data: { blockedByMe: false } });
 });
 
 export const markConversationRead = asyncHandler(async (req, res) => {

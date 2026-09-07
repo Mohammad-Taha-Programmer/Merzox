@@ -189,7 +189,13 @@
     "quotedFallbackName": "Message",
     "bookmarksTitle": "Bookmarked messages",
     "bookmarksEmpty": "You have not bookmarked any message yet.",
-    "inboxMenuTooltip": "Options"
+    "inboxMenuTooltip": "Options",
+    "blockUser": "Block this user",
+    "unblockUser": "Unblock",
+    "blockedByMeNotice": "You blocked this conversation. Nothing will reach you from it, and nothing can be sent to it.",
+    "blockedMeNotice": "This conversation is closed, and nothing can be sent in it.",
+    "blockedUsersTitle": "Blocked users",
+    "blockedUsersEmpty": "You have not blocked anybody."
   },
   "notifications": {
     "title": "Notifications",
@@ -811,7 +817,9 @@
     "payloadTooLarge": "That file is too large. Choose a smaller image.",
     "cannotReviewOwnBusiness": "You cannot review your own shop or its products",
     "sharedProductUnavailable": "That product is no longer available in this store.",
-    "repliedMessageUnavailable": "That message is no longer in this conversation."
+    "repliedMessageUnavailable": "That message is no longer in this conversation.",
+    "conversationBlocked": "This conversation is closed.",
+    "cannotBlockSelf": "An account cannot block itself."
   },
   "courierLocation": {
     "loginEntry": "Share courier location",

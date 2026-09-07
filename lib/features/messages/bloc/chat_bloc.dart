@@ -56,6 +56,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatOpenedForBusiness>(_onOpenedForBusiness);
     on<ChatMessageSent>(_onMessageSent);
     on<ChatMessageBookmarkToggled>(_onBookmarkToggled);
+    on<ChatBlockToggled>(_onBlockToggled);
     on<ChatOlderMessagesRequested>(_onOlderMessagesRequested);
     on<ChatRefreshRequested>(_onRefreshRequested);
     on<ChatRealtimeSyncRequested>(_onRealtimeSyncRequested);
@@ -196,6 +197,8 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           messages: response.messages,
           page: response.page,
           hasMore: response.hasMore,
+          blockedByMe: response.blockedByMe,
+          blockedMe: response.blockedMe,
         ),
       );
 
@@ -295,6 +298,10 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           messages: merged,
           page: response.page,
           hasMore: response.hasMore,
+          // Re-read with every sync: the other side may have closed the door
+          // while this thread was open.
+          blockedByMe: response.blockedByMe,
+          blockedMe: response.blockedMe,
         ),
       );
     } catch (error) {
@@ -320,6 +327,10 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     if ((body.isEmpty && productId.isEmpty) || state.conversationId.isEmpty) {
       return;
     }
+
+    // The server refuses it too. Stopping here as well means the composer
+    // never sends what it already knows will come back refused.
+    if (state.isBlocked) return;
 
     if (state.status == ChatStatus.sending) {
       return;
@@ -349,6 +360,29 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
           errorMessage: ApiService.messageFromError(error),
         ),
       );
+    }
+  }
+
+  /// Closes the thread from this reader's side, or opens it again.
+  ///
+  /// Whom it blocks is never named: the server reads the other side from the
+  /// conversation, so there is nothing here to get wrong.
+  Future<void> _onBlockToggled(
+    ChatBlockToggled event,
+    Emitter<ChatState> emit,
+  ) async {
+    if (state.conversationId.isEmpty) return;
+
+    try {
+      final bool blockedByMe = await _apiService.setConversationBlock(
+        token: await _token(),
+        conversationId: state.conversationId,
+        blocked: !state.blockedByMe,
+      );
+
+      emit(state.copyWith(blockedByMe: blockedByMe));
+    } catch (error) {
+      emit(state.copyWith(errorMessage: ApiService.messageFromError(error)));
     }
   }
 

@@ -37,6 +37,17 @@ final class ChatState {
   /// reports rather than silently landing somewhere else.
   final bool anchorReached;
 
+  /// Whether this reader has closed the door on the other side.
+  final bool blockedByMe;
+
+  /// Whether the other side has closed it on them. Told apart because one is
+  /// undone from here and the other is not this reader's to undo - and the
+  /// screen says a different thing for each.
+  final bool blockedMe;
+
+  /// Whether anything can be sent at all.
+  bool get isBlocked => blockedByMe || blockedMe;
+
   const ChatState({
     this.status = ChatStatus.initial,
     this.conversationId = '',
@@ -51,6 +62,8 @@ final class ChatState {
     this.matchIds = const <String>[],
     this.matchIndex = -1,
     this.anchorReached = true,
+    this.blockedByMe = false,
+    this.blockedMe = false,
   });
 
   /// Whether the reader arrived here from a search result.
@@ -78,6 +91,8 @@ final class ChatState {
     List<String>? matchIds,
     int? matchIndex,
     bool? anchorReached,
+    bool? blockedByMe,
+    bool? blockedMe,
   }) {
     return ChatState(
       status: status ?? this.status,
@@ -93,6 +108,8 @@ final class ChatState {
       matchIds: matchIds ?? this.matchIds,
       matchIndex: matchIndex ?? this.matchIndex,
       anchorReached: anchorReached ?? this.anchorReached,
+      blockedByMe: blockedByMe ?? this.blockedByMe,
+      blockedMe: blockedMe ?? this.blockedMe,
     );
   }
 }
