@@ -1,16 +1,34 @@
+import 'dart:typed_data';
+
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/business/models/business_models.dart';
+import 'package:merzox/core/auth/auth_session_service.dart';
+import 'package:merzox/features/business/settings/widgets/store_logo_field.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
+import 'package:merzox/services/api_service.dart';
 
 /// Store settings flow from the design: one page with the three sections
 /// the artboards split across tabs — logo, description, and social links.
 class StoreSettingsPage extends StatefulWidget {
   final OwnerBusiness business;
 
-  const StoreSettingsPage({super.key, required this.business});
+  /// Injected by tests, which have no server, no camera and no network.
+  final ApiService? apiService;
+  final AuthSessionService authSessionService;
+  final StoreLogoDevicePicker? logoDevicePicker;
+  final StoreLogoLinkReader? logoLinkReader;
+
+  const StoreSettingsPage({
+    super.key,
+    required this.business,
+    this.apiService,
+    this.authSessionService = const AuthSessionService(),
+    this.logoDevicePicker,
+    this.logoLinkReader,
+  });
 
   @override
   State<StoreSettingsPage> createState() => _StoreSettingsPageState();
@@ -20,9 +38,11 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
   late final TextEditingController _name = TextEditingController(
     text: widget.business.name,
   );
-  late final TextEditingController _logoUrl = TextEditingController(
-    text: widget.business.logoUrl,
-  );
+  /// The logo as it stands, which the picker replaces.
+  ///
+  /// Not a controller any more: the link box is gone, and this is set by
+  /// uploading rather than by typing.
+  late String _logoUrl = widget.business.logoUrl;
   late final TextEditingController _description = TextEditingController(
     text: widget.business.description,
   );
@@ -59,7 +79,6 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
   void dispose() {
     for (final controller in [
       _name,
-      _logoUrl,
       _description,
       _address,
       _category,
@@ -75,11 +94,49 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
     super.dispose();
   }
 
+  late final ApiService _api = widget.apiService ?? ApiService();
+
+  /// Stores a chosen logo and answers with where it now lives.
+  ///
+  /// It goes to the account picture endpoint, which is not a detour: a
+  /// merchant has one picture, and the server puts it on the shop they own and
+  /// on every conversation that shows it. Setting the shop's logo by itself
+  /// would leave a second copy that the next change of picture silently
+  /// overwrote.
+  ///
+  /// That upload also deletes the file it replaces, so a shop that has had
+  /// five logos is not paying to keep five.
+  Future<String?> _uploadLogo(Uint8List bytes) async {
+    final AuthSessionSnapshot session = await widget.authSessionService.read();
+    final String? token = session.token;
+    if (token == null) throw StateError('Authentication required');
+
+    final AuthApiUser account = await _api.uploadMyAvatar(
+      token: token,
+      bytes: bytes,
+    );
+
+    final String url = account.avatarUrl.trim();
+    if (url.isEmpty) return null;
+
+    if (mounted) setState(() => _logoUrl = url);
+
+    // The shell is holding the shop it loaded before this. Reading it again is
+    // how the bar, the storefront preview and the inbox pick the new picture
+    // up without the merchant having to leave and come back.
+    if (mounted) context.read<BusinessBloc>().add(const BusinessRefreshed());
+
+    return url;
+  }
+
   void _save() {
     context.read<BusinessBloc>().add(
       BusinessProfileSaved({
         'name': _name.text.trim(),
-        'logoUrl': _logoUrl.text.trim(),
+        // The logo is not in here. It is stored the moment it is chosen, by
+        // the same upload that files it and deletes the one before it, so
+        // sending a copy of it back with the rest of the form could only ever
+        // undo that.
         'description': _description.text.trim(),
         'address': _address.text.trim(),
         'category': _category.text.trim(),
@@ -109,8 +166,6 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final String logoUrl = _logoUrl.text.trim();
-
     return Directionality(
       textDirection: Directionality.of(context),
       child: Scaffold(
@@ -169,38 +224,19 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                         ),
                         const SizedBox(height: 12),
                         Center(
-                          child: Container(
-                            width: 96,
-                            height: 96,
-                            clipBehavior: Clip.antiAlias,
-                            decoration: BoxDecoration(
-                              color: MerzoxColors.kColorF3F7FA,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: MerzoxColors.kColorDEEEF8,
-                                width: 2,
-                              ),
-                            ),
-                            child: logoUrl.isEmpty
-                                ? const Icon(
-                                    Icons.file_upload_outlined,
-                                    size: 32,
-                                    color: MerzoxColors.kColor98C1D9,
-                                  )
-                                : Image.network(
-                                    logoUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => const Icon(
-                                      Icons.broken_image_outlined,
-                                      size: 30,
-                                      color: MerzoxColors.kColorBEBEBE,
-                                    ),
-                                  ),
+                          child: StoreLogoField(
+                            logoUrl: _logoUrl,
+                            onPicked: _uploadLogo,
+                            devicePicker: widget.logoDevicePicker,
+                            linkReader: widget.logoLinkReader,
                           ),
                         ),
                         const SizedBox(height: 10),
-                        // The artboard states the size it wants rather than
-                        // letting a merchant discover it by rejection.
+                        // The artboard states the shape it wants. It used to
+                        // state a file size too, which asked a shopkeeper to
+                        // know what half a megabyte looks like; the app brings
+                        // the picture down itself now, so the demand is gone
+                        // and only the shape is left.
                         Text(
                           'storeSettings.logoSpec'.tr(),
                           textAlign: TextAlign.center,
@@ -208,13 +244,6 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                             fontSize: 11,
                             color: MerzoxColors.kColorEE6C4D,
                           ),
-                        ),
-                        const SizedBox(height: 12),
-                        _Field(
-                          controller: _logoUrl,
-                          label: 'storeSettings.logoHint'.tr(),
-                          keyboardType: TextInputType.url,
-                          onChanged: (_) => setState(() {}),
                         ),
                       ],
                     ),
@@ -370,7 +399,6 @@ class _Field extends StatelessWidget {
   final int maxLines;
   final IconData? icon;
   final TextInputType? keyboardType;
-  final ValueChanged<String>? onChanged;
 
   const _Field({
     required this.controller,
@@ -378,7 +406,6 @@ class _Field extends StatelessWidget {
     this.maxLines = 1,
     this.icon,
     this.keyboardType,
-    this.onChanged,
   });
 
   @override
@@ -389,7 +416,6 @@ class _Field extends StatelessWidget {
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
-        onChanged: onChanged,
         decoration: InputDecoration(
           labelText: label,
           prefixIcon: icon == null ? null : Icon(icon, size: 18),
