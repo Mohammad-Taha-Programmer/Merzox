@@ -890,5 +890,12 @@
     "makeDefault": "Make this my default address",
     "regionRequired": "Please choose a governorate and a city",
     "closed": "Closed"
+  },
+  "storeContact": {
+    "phones": "Phone numbers",
+    "emails": "Email",
+    "empty": "You have not added any way to be reached yet.\nAdd your store links in store settings, and your numbers and email in your personal profile.",
+    "emptyAction": "Store settings",
+    "couldNotOpen": "That could not be opened on your device."
   }
 }

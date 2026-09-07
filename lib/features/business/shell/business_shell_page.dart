@@ -27,6 +27,7 @@ import 'widgets/merchant_dashboard_controls.dart';
 import 'widgets/merchant_orders_table.dart';
 import 'widgets/order_status_presentation.dart';
 import '../orders/merchant_order_route.dart';
+import '../contact/store_contact_page.dart';
 import '../settings/store_settings_page.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_bloc.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_event.dart';
@@ -887,9 +888,31 @@ class _Profile extends StatelessWidget {
                 MerchantProfileMenuRow(
                   icon: Icons.phone_outlined,
                   label: 'businessShell.contactUs'.tr(),
-                  // The About Us screen carries the company's contact details,
-                  // which is where a merchant asking for help ends up anyway.
-                  onTap: () => context.push('/about'),
+                  showChevron: true,
+                  // It used to push `/about`, which is not a route - the one
+                  // that exists is `/about-us` - so the row opened an error
+                  // screen. It opens the shop's own ways of being reached
+                  // now: the links from store settings and the numbers and
+                  // addresses on the account, gathered in one place.
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => StoreContactPage(
+                        business: business,
+                        account: state.account,
+                        onEditSettings: () {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => BlocProvider<BusinessBloc>.value(
+                                value: context.read<BusinessBloc>(),
+                                child: StoreSettingsPage(business: business),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ),
                 MerchantProfileMenuRow(
                   icon: Icons.visibility_outlined,
