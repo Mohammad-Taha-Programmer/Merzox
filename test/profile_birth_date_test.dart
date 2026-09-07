@@ -93,13 +93,11 @@ Future<void> _pumpProfileEdit(WidgetTester tester, ProfileEditBloc bloc) async {
 
 /// Pumps the page inside a real router, and returns it.
 ///
-/// A successful save is a navigating action: the page's own listener calls
-/// `context.go('/home')`. The plain [pumpLocalized] harness puts no router in
-/// the tree, so that production navigation throws `No GoRouter found in
-/// context` and takes the assertion under test down with it. The answer is to
-/// give the test the navigation environment the app really has, not to remove
-/// the navigation — so the destination route below is real and the test can
-/// assert the page arrived there.
+/// A save used to be a navigating action: the page's listener called
+/// `context.go('/home')`, which for a shopkeeper editing their own details
+/// dropped them on the customer side of the app. It no longer navigates, and
+/// this router is what proves it — the home route below is real and
+/// reachable, so the test can assert the page did not go to it.
 Future<GoRouter> _pumpRoutedProfileEdit(
   WidgetTester tester,
   ProfileEditBloc bloc, {
@@ -551,10 +549,17 @@ void main() {
       final patch = requests.firstWhere((request) => request.method == 'PATCH');
       expect((patch.data as Map)['birthDate'], '1800-05-04');
 
-      // The save really did succeed, rather than the page merely surviving: the
-      // production success listener ran its navigation to completion.
-      expect(router.routerDelegate.currentConfiguration.uri.path, _homeRoute);
-      expect(find.text(_homeRouteMarker), findsOneWidget);
+      // The save really did succeed, rather than the page merely surviving:
+      // the production success listener ran and said so.
+      expect(find.text('تم حفظ التعديلات'), findsOneWidget);
+
+      // And it stayed where it was. Leaving was the bug: the reader closes
+      // this screen themselves, by the way they came.
+      expect(
+        router.routerDelegate.currentConfiguration.uri.path,
+        _profileEditRoute,
+      );
+      expect(find.text(_homeRouteMarker), findsNothing);
     });
 
     testWidgets('a partial birth date is refused before any request', (

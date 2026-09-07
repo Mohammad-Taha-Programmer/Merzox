@@ -9,7 +9,6 @@ import 'package:merzox/features/profile/bloc/profile_edit_event.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_state.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
-import 'dart:ui' as ui;
 
 class ProfileEditPage extends StatefulWidget {
   const ProfileEditPage({super.key});
@@ -63,6 +62,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     }
 
     _initialized = true;
+    _adopt(user);
+  }
+
+  /// Takes the account as the server now holds it.
+  ///
+  /// Read once when the screen opens, and again after a save, because the
+  /// reader stays here afterwards: the one-time name and gender changes may
+  /// have just been spent, and the contact lists come back normalised - lower
+  /// cased, de-duplicated, the first one primary - so leaving the typed text
+  /// on screen would show something other than what was stored.
+  void _adopt(AuthApiUser user) {
     _canChangeName = user.canChangeName;
     _canChangeGender = user.canChangeGender;
     _nameController.text = user.name;
@@ -74,11 +84,17 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final birthDate = canonicalBirthDate(user.birthDate);
     _initialBirthDate = birthDate;
 
-    if (birthDate != null) {
+    if (birthDate == null) {
+      _birthYear = null;
+      _birthMonth = null;
+      _birthDay = null;
+    } else {
       _birthYear = int.parse(birthDate.substring(0, 4));
       _birthMonth = int.parse(birthDate.substring(5, 7));
       _birthDay = int.parse(birthDate.substring(8, 10));
     }
+
+    _birthDateError = null;
 
     final emails = user.emails.isNotEmpty
         ? user.emails
@@ -92,6 +108,13 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             if ((user.phone ?? '').isNotEmpty)
               ContactPhone(value: user.phone!, label: 'mobile'),
           ];
+
+    for (final email in _emails) {
+      email.dispose();
+    }
+    for (final phone in _phones) {
+      phone.dispose();
+    }
 
     _emails
       ..clear()
@@ -315,7 +338,15 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
           ScaffoldMessenger.of(
             context,
           ).showSnackBar(SnackBar(content: Text('profileEdit.saved'.tr())));
-          context.go('/home');
+
+          // Saving used to walk to the customer home, which for a shopkeeper
+          // editing their own details meant the app appeared to change sides
+          // under them. Saving is not leaving: the screen says it saved and
+          // stays, and the reader closes it by the way they came.
+          final user = state.user;
+          if (user != null) {
+            setState(() => _adopt(user));
+          }
         }
 
         if (state.status == ProfileEditStatus.failure &&
@@ -347,7 +378,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                       child: ListView(
                         padding: const EdgeInsets.fromLTRB(21, 18, 21, 32),
                         children: [
-                          _ProfileEditHeader(onBack: () => context.pop()),
+                          ProfileEditHeader(onBack: () => context.pop()),
                           const SizedBox(height: 34),
                           _ProfileLabel(text: 'auth.fullNameLabel'.tr()),
                           _ProfileTextField(
@@ -417,7 +448,9 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           const SizedBox(height: 18),
                           _ProfileLabel(text: 'profileEdit.gender'.tr()),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.end,
+                            // Under the word they answer. They sat at the
+                            // far edge, across the screen from `الجنس`.
+                            mainAxisAlignment: MainAxisAlignment.start,
                             children: [
                               _GenderChoice(
                                 label: 'profileEdit.genderFemale'.tr(),
@@ -460,7 +493,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                             onMonthChanged: _onBirthMonthChanged,
                             onYearChanged: _onBirthYearChanged,
                           ),
-                          const SizedBox(height: 124),
+                          const SizedBox(height: kProfileSaveGap),
                           Center(
                             child: SizedBox(
                               width: 210,
@@ -503,15 +536,49 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 }
 
-class _ProfileEditHeader extends StatelessWidget {
+/// The run of white between the birth date and the Save button.
+///
+/// It was 124, which put the button so far below the last field that the two
+/// stopped reading as one form. Half of that still separates the button from
+/// the fields without stranding it.
+const double kProfileSaveGap = 62;
+
+/// Where the language toggle stands, measured in from the trailing edge.
+///
+/// Between two things, and centred between them. The bell that floats over
+/// this corner is a white disc on a white bar, so what the eye sees of it is
+/// the glyph, which ends 40 in from the edge - eight for the bell's inset,
+/// eight for its own padding, twenty-four for the icon. The title begins at
+/// 94. The globe is put in the middle of that span.
+///
+/// Standing it hard against the 48 the bell reserves left it a third of the
+/// way across instead, near enough to the words to read as part of them.
+const double kProfileToggleInset = 43;
+
+/// How much of each end of the bar the title must keep clear.
+///
+/// The toggle now stands past the bell - eight for the bell's inset from the
+/// edge, forty for the bell, forty for the toggle itself - and four more keeps
+/// the words off the globe. The same room is left at the other end so the
+/// title stays centred on the screen rather than on what is left of it.
+///
+/// It matters at the reader's own settings: at a system font scale of 1.3 the
+/// title is 243 wide, which without this runs straight through the globe.
+const double kProfileHeaderTitleRoom = 92;
+
+/// The bar over the form: the way back, the title, and the language toggle.
+///
+/// Public so its geometry can be measured. Two of the three things in it are
+/// placed against something outside the bar - the reading direction, and the
+/// bell that floats above every screen - and neither can be checked by
+/// reading the bar's own code.
+class ProfileEditHeader extends StatelessWidget {
   final VoidCallback onBack;
 
-  const _ProfileEditHeader({required this.onBack});
+  const ProfileEditHeader({super.key, required this.onBack});
 
   @override
   Widget build(BuildContext context) {
-    final isRtl = Directionality.of(context) == ui.TextDirection.rtl;
-
     return SizedBox(
       width: double.infinity,
       height: 48,
@@ -519,12 +586,23 @@ class _ProfileEditHeader extends StatelessWidget {
         alignment: Alignment.center,
         children: [
           Center(
-            child: Text(
-              'profileEdit.title'.tr(),
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF2B2B2B),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: kProfileHeaderTitleRoom,
+              ),
+              // Shrinks only when it has to. At the ordinary font scale the
+              // title is drawn at its full size and nothing here touches it.
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'profileEdit.title'.tr(),
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF2B2B2B),
+                  ),
+                ),
               ),
             ),
           ),
@@ -533,18 +611,27 @@ class _ProfileEditHeader extends StatelessWidget {
             child: IconButton(
               tooltip: 'common.back'.tr(),
               onPressed: onBack,
-              icon: Icon(
-                isRtl
-                    ? Icons.arrow_forward_ios_rounded
-                    : Icons.arrow_back_ios_new_rounded,
+              // Named for what it does, not for where it points. This icon
+              // carries `matchTextDirection`, so Material turns it round in a
+              // right-to-left reading on its own; picking the forward arrow
+              // there turned it round a second time and left Arabic with the
+              // English arrow.
+              icon: const Icon(
+                Icons.arrow_back_ios_new_rounded,
                 size: 28,
-                color: const Color(0xFF686868),
+                color: Color(0xFF686868),
               ),
             ),
           ),
+          // The bell floats over every screen at this corner and covered the
+          // globe almost exactly. It now stands clear of the bell, midway
+          // between it and the title.
           const Align(
             alignment: AlignmentDirectional.centerEnd,
-            child: LanguageToggleButton(),
+            child: Padding(
+              padding: EdgeInsetsDirectional.only(end: kProfileToggleInset),
+              child: LanguageToggleButton(),
+            ),
           ),
         ],
       ),
@@ -616,7 +703,7 @@ class _EmailInputRow extends StatelessWidget {
     return _LabeledContactRow(
       controller: data.controller,
       label: data.label,
-      labels: _emailLabels,
+      labels: profileEmailLabels,
       hintText: 'profileEdit.emailHint'.tr(),
       enabled: enabled,
       canRemove: canRemove,
@@ -652,7 +739,7 @@ class _PhoneInputRow extends StatelessWidget {
     return _LabeledContactRow(
       controller: data.controller,
       label: data.label,
-      labels: _phoneLabels,
+      labels: profilePhoneLabels,
       hintText: 'profileEdit.phoneHint'.tr(),
       enabled: enabled,
       canRemove: canRemove,
@@ -1069,14 +1156,20 @@ class _PhoneFieldData {
   void dispose() => controller.dispose();
 }
 
-const _emailLabels = {
+/// What a saved address may be called, and the words for each.
+///
+/// The keys are the wire values, and the server keeps only these: anything
+/// else it is sent is silently rewritten to `other`, so a label added here
+/// alone would look accepted and come back changed. A test holds the two
+/// lists together.
+const profileEmailLabels = {
   'personal': 'profileEdit.contactLabels.personal',
   'work': 'profileEdit.contactLabels.work',
   'home': 'profileEdit.contactLabels.home',
   'other': 'profileEdit.contactLabels.other',
 };
 
-const _phoneLabels = {
+const profilePhoneLabels = {
   'mobile': 'profileEdit.contactLabels.mobile',
   'work': 'profileEdit.contactLabels.work',
   'home': 'profileEdit.contactLabels.home',
