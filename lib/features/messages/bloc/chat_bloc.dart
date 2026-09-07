@@ -55,6 +55,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatStarted>(_onStarted);
     on<ChatOpenedForBusiness>(_onOpenedForBusiness);
     on<ChatMessageSent>(_onMessageSent);
+    on<ChatMessageBookmarkToggled>(_onBookmarkToggled);
     on<ChatOlderMessagesRequested>(_onOlderMessagesRequested);
     on<ChatRefreshRequested>(_onRefreshRequested);
     on<ChatRealtimeSyncRequested>(_onRealtimeSyncRequested);
@@ -312,6 +313,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
   ) async {
     final body = event.body.trim();
     final String productId = event.productId?.trim() ?? '';
+    final String replyToId = event.replyToId?.trim() ?? '';
 
     // A shared product card is a message without words; only the two together
     // being absent is nothing to send.
@@ -331,6 +333,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         conversationId: state.conversationId,
         body: body,
         productId: productId.isEmpty ? null : productId,
+        replyToId: replyToId.isEmpty ? null : replyToId,
       );
 
       // The sender receives the same realtime invalidation as the counterpart.
@@ -347,6 +350,60 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         ),
       );
     }
+  }
+
+  /// Turns a mark on or off, and keeps the thread showing what the server
+  /// agreed to rather than what was asked for.
+  Future<void> _onBookmarkToggled(
+    ChatMessageBookmarkToggled event,
+    Emitter<ChatState> emit,
+  ) async {
+    final int index = state.messages.indexWhere(
+      (MessageApiModel message) => message.id == event.messageId,
+    );
+    if (index == -1) return;
+
+    final MessageApiModel target = state.messages[index];
+
+    try {
+      final bool bookmarked = await _apiService.setMessageBookmark(
+        token: await _token(),
+        conversationId: state.conversationId,
+        messageId: target.id,
+        bookmarked: !target.bookmarked,
+      );
+
+      final List<MessageApiModel> messages = List<MessageApiModel>.of(
+        state.messages,
+      );
+      messages[index] = _withBookmark(target, bookmarked);
+
+      emit(state.copyWith(messages: messages));
+    } catch (error) {
+      emit(
+        state.copyWith(errorMessage: ApiService.messageFromError(error)),
+      );
+    }
+  }
+
+  /// The same message with its mark changed.
+  ///
+  /// Rebuilt rather than mutated: the model is immutable, and a `copyWith` on
+  /// it would exist for this one caller.
+  MessageApiModel _withBookmark(MessageApiModel message, bool bookmarked) {
+    return MessageApiModel(
+      id: message.id,
+      conversationId: message.conversationId,
+      senderType: message.senderType,
+      senderName: message.senderName,
+      body: message.body,
+      sharedProduct: message.sharedProduct,
+      replyTo: message.replyTo,
+      bookmarked: bookmarked,
+      isMine: message.isMine,
+      readAt: message.readAt,
+      createdAt: message.createdAt,
+    );
   }
 
   Future<void> _onRealtimeSyncRequested(

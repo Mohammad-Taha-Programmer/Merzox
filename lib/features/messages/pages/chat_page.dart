@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/constants/dates.dart';
@@ -62,6 +63,12 @@ class _ChatPageState extends State<ChatPage> {
   /// something about it first - which is usually why they are sharing it.
   BusinessProductApiModel? _pendingProduct;
 
+  /// The message being answered, shown as a quote over the box.
+  ///
+  /// An answer may be words, a product, or both - the quote is what makes it
+  /// an answer, and it is dropped once it is sent.
+  MessageApiModel? _pendingReply;
+
   /// One key per occurrence the reader can be sent to.
   final Map<String, GlobalKey> _matchKeys = <String, GlobalKey>{};
 
@@ -101,15 +108,64 @@ class _ChatPageState extends State<ChatPage> {
   void _send() {
     final body = _composerController.text.trim();
     final BusinessProductApiModel? product = _pendingProduct;
+    final MessageApiModel? answered = _pendingReply;
 
-    // A card on its own is a message; only both being absent is nothing.
+    // A card on its own is a message; only both being absent is nothing. A
+    // quote is not content of its own - answering with nothing said is not a
+    // message.
     if (body.isEmpty && product == null) return;
 
     context.read<ChatBloc>().add(
-      ChatMessageSent(body, productId: product?.id),
+      ChatMessageSent(body, productId: product?.id, replyToId: answered?.id),
     );
     _composerController.clear();
-    if (product != null) setState(() => _pendingProduct = null);
+
+    if (product != null || answered != null) {
+      setState(() {
+        _pendingProduct = null;
+        _pendingReply = null;
+      });
+    }
+  }
+
+  /// Offers what can be done with one message.
+  ///
+  /// A long press rather than a tap: a tap on a shared card opens the
+  /// product, and the two must not fight over the same touch.
+  Future<void> _openMessageActions(MessageApiModel message) async {
+    final _MessageAction? action = await showModalBottomSheet<_MessageAction>(
+      context: context,
+      builder: (BuildContext sheetContext) =>
+          _MessageActionsSheet(message: message),
+    );
+
+    if (action == null || !mounted) return;
+
+    switch (action) {
+      case _MessageAction.reply:
+        setState(() => _pendingReply = message);
+
+      case _MessageAction.copy:
+        await Clipboard.setData(ClipboardData(text: _copyableText(message)));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text('messages.actionCopied'.tr())));
+
+      case _MessageAction.bookmark:
+        context.read<ChatBloc>().add(ChatMessageBookmarkToggled(message.id));
+    }
+  }
+
+  /// What copying a message puts on the clipboard.
+  ///
+  /// A shared card has no words of its own, so the product's name stands in -
+  /// copying it and getting an empty clipboard would read as a fault.
+  String _copyableText(MessageApiModel message) {
+    final String body = message.body.trim();
+    if (body.isNotEmpty) return body;
+
+    return message.sharedProduct?.name ?? '';
   }
 
   Future<void> _pickProduct() async {
@@ -185,6 +241,7 @@ class _ChatPageState extends State<ChatPage> {
                         state: state,
                         controller: _scrollController,
                         keyFor: _keyFor,
+                        onMessageActions: _openMessageActions,
                       ),
                       if (state.matchIds.length > 1)
                         PositionedDirectional(
@@ -215,6 +272,9 @@ class _ChatPageState extends State<ChatPage> {
                   pendingProduct: _pendingProduct,
                   onDropPendingProduct: () =>
                       setState(() => _pendingProduct = null),
+                  pendingReply: _pendingReply,
+                  onDropPendingReply: () =>
+                      setState(() => _pendingReply = null),
                 ),
               ],
             );
@@ -350,7 +410,11 @@ class _ChatBody extends StatelessWidget {
   /// Hands each message the key that lets the page scroll to it.
   final GlobalKey Function(String messageId) keyFor;
 
+  /// Opens what can be done with one message.
+  final void Function(MessageApiModel message) onMessageActions;
+
   const _ChatBody({
+    required this.onMessageActions,
     required this.state,
     required this.controller,
     required this.keyFor,
@@ -477,7 +541,11 @@ class _ChatBody extends StatelessWidget {
                 : null,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              _MessageBubble(message: message, query: state.highlightQuery),
+              _MessageBubble(
+                message: message,
+                query: state.highlightQuery,
+                onLongPress: () => onMessageActions(message),
+              ),
               _MessageStamp(at: message.createdAt, isMine: message.isMine),
             ],
           );
@@ -495,11 +563,19 @@ const double kChatWalkCacheExtent = 20000;
 class _MessageBubble extends StatelessWidget {
   final MessageApiModel message;
 
+  /// Opens what can be done with this message. Null in a context where
+  /// nothing can be - the marked list, which only shows them.
+  final VoidCallback? onLongPress;
+
   /// What the reader searched for, marked wherever it appears. Empty when they
   /// arrived at the thread normally.
   final String query;
 
-  const _MessageBubble({required this.message, this.query = ''});
+  const _MessageBubble({
+    required this.message,
+    this.query = '',
+    this.onLongPress,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -516,51 +592,62 @@ class _MessageBubble extends StatelessWidget {
           : MainAxisAlignment.end,
       children: [
         Flexible(
-          child: Container(
-            constraints: BoxConstraints(
-              maxWidth: MediaQuery.sizeOf(context).width * 0.72,
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isMine
-                  ? MerzoxColors.kColor3D5A80
-                  : MerzoxColors.kColorF9F9F9,
-              borderRadius: BorderRadiusDirectional.only(
-                topStart: const Radius.circular(14),
-                topEnd: const Radius.circular(14),
-                bottomStart: Radius.circular(isMine ? 2 : 14),
-                bottomEnd: Radius.circular(isMine ? 14 : 2),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onLongPress: onLongPress,
+            child: Container(
+              constraints: BoxConstraints(
+                maxWidth: MediaQuery.sizeOf(context).width * 0.72,
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (shared != null) ...<Widget>[
-                  SharedProductCard.shared(
-                    product: shared,
-                    onTap: () => openSharedProduct(context, shared),
-                  ),
-                  // Only when there are words to separate from it. A card sent
-                  // on its own is the whole message.
-                  if (message.body.trim().isNotEmpty) const SizedBox(height: 8),
-                ],
-                if (message.body.trim().isNotEmpty)
-                  Text.rich(
-                  highlightedSpan(
-                    text: message.body,
-                    query: query,
-                    style: TextStyle(
-                      color: isMine ? Colors.white : MerzoxColors.kColor3B3B3B,
-                      fontSize: 12,
-                      height: 1.5,
-                    ),
-                    // A wash that reads on both bubbles, with the darker
-                    // text over it: the same mark whichever side spoke.
-                    background: MerzoxColors.kColorF2CB06,
-                    foreground: MerzoxColors.kColor2B2B2B,
-                  ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isMine
+                    ? MerzoxColors.kColor3D5A80
+                    : MerzoxColors.kColorF9F9F9,
+                borderRadius: BorderRadiusDirectional.only(
+                  topStart: const Radius.circular(14),
+                  topEnd: const Radius.circular(14),
+                  bottomStart: Radius.circular(isMine ? 2 : 14),
+                  bottomEnd: Radius.circular(isMine ? 14 : 2),
                 ),
-              ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (message.replyTo != null) ...<Widget>[
+                    _QuotedMessage(reply: message.replyTo!, onDark: isMine),
+                    const SizedBox(height: 8),
+                  ],
+                  if (shared != null) ...<Widget>[
+                    SharedProductCard.shared(
+                      product: shared,
+                      onTap: () => openSharedProduct(context, shared),
+                    ),
+                    // Only when there are words to separate from it. A card sent
+                    // on its own is the whole message.
+                    if (message.body.trim().isNotEmpty)
+                      const SizedBox(height: 8),
+                  ],
+                  if (message.body.trim().isNotEmpty)
+                    Text.rich(
+                      highlightedSpan(
+                        text: message.body,
+                        query: query,
+                        style: TextStyle(
+                          color: isMine
+                              ? Colors.white
+                              : MerzoxColors.kColor3B3B3B,
+                          fontSize: 12,
+                          height: 1.5,
+                        ),
+                        // A wash that reads on both bubbles, with the darker
+                        // text over it: the same mark whichever side spoke.
+                        background: MerzoxColors.kColorF2CB06,
+                        foreground: MerzoxColors.kColor2B2B2B,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -639,13 +726,19 @@ class _Composer extends StatelessWidget {
   final BusinessProductApiModel? pendingProduct;
   final VoidCallback onDropPendingProduct;
 
+  /// The message being answered, quoted over the box.
+  final MessageApiModel? pendingReply;
+  final VoidCallback onDropPendingReply;
+
   const _Composer({
     required this.controller,
     required this.enabled,
     required this.onSend,
     required this.onShareProduct,
     required this.onDropPendingProduct,
+    required this.onDropPendingReply,
     this.pendingProduct,
+    this.pendingReply,
   });
 
   @override
@@ -662,6 +755,8 @@ class _Composer extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
+          if (pendingReply != null)
+            _PendingReply(message: pendingReply!, onRemove: onDropPendingReply),
           if (pending != null)
             _PendingProduct(product: pending, onRemove: onDropPendingProduct),
           Row(
@@ -749,6 +844,216 @@ class _Composer extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What can be done with one message.
+enum _MessageAction { reply, copy, bookmark }
+
+/// The sheet a long press opens.
+class _MessageActionsSheet extends StatelessWidget {
+  final MessageApiModel message;
+
+  const _MessageActionsSheet({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          const SizedBox(height: 8),
+          ListTile(
+            key: const ValueKey<String>('chat.actionReply'),
+            leading: const Icon(Icons.reply_rounded),
+            title: Text('messages.actionReply'.tr()),
+            onTap: () => Navigator.of(context).pop(_MessageAction.reply),
+          ),
+          ListTile(
+            key: const ValueKey<String>('chat.actionCopy'),
+            leading: const Icon(Icons.copy_rounded),
+            title: Text('messages.actionCopy'.tr()),
+            onTap: () => Navigator.of(context).pop(_MessageAction.copy),
+          ),
+          ListTile(
+            key: const ValueKey<String>('chat.actionBookmark'),
+            leading: Icon(
+              message.bookmarked
+                  ? Icons.bookmark_rounded
+                  : Icons.bookmark_border_rounded,
+            ),
+            // The same entry either way round: it is one mark, and a reader
+            // who marked something by mistake looks for it where they put it.
+            title: Text(
+              message.bookmarked
+                  ? 'messages.actionUnbookmark'.tr()
+                  : 'messages.actionBookmark'.tr(),
+            ),
+            onTap: () => Navigator.of(context).pop(_MessageAction.bookmark),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+}
+
+/// The message an answer answers, drawn inside the answer.
+///
+/// A bar down the reading edge and the words beside it, dimmed - the shape a
+/// quote has everywhere, so it reads as "about this" rather than as part of
+/// what was said.
+class _QuotedMessage extends StatelessWidget {
+  final MessageReplyApiModel reply;
+
+  /// True inside one's own bubble, which is dark: the same quote has to be
+  /// legible on both.
+  final bool onDark;
+
+  const _QuotedMessage({required this.reply, required this.onDark});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color ink = onDark ? Colors.white : MerzoxColors.kColor3B3B3B;
+
+    return Container(
+      key: const ValueKey<String>('chat.quotedMessage'),
+      padding: const EdgeInsetsDirectional.only(start: 8, top: 4, bottom: 4),
+      decoration: BoxDecoration(
+        color: (onDark ? Colors.white : MerzoxColors.kColor8D99AE).withValues(
+          alpha: onDark ? 0.14 : 0.10,
+        ),
+        borderRadius: BorderRadius.circular(6),
+        border: BorderDirectional(
+          start: BorderSide(
+            color: onDark ? Colors.white : MerzoxColors.kColor98C1D9,
+            width: 3,
+          ),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Text(
+            reply.senderName.trim().isEmpty
+                ? 'messages.quotedFallbackName'.tr()
+                : reply.senderName,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: ink.withValues(alpha: 0.85),
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            quotedMessagePreview(reply),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11,
+              height: 1.4,
+              color: ink.withValues(alpha: 0.75),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What a quote shows of the message it quotes.
+///
+/// A shared card has no words of its own, so the quote says what it was.
+/// Showing an empty line there would read as a fault rather than as a card.
+String quotedMessagePreview(MessageReplyApiModel reply) {
+  final String body = reply.body.trim();
+  if (body.isNotEmpty) return body;
+
+  return reply.hasProduct
+      ? 'messages.quotedProduct'.tr()
+      : 'messages.quotedEmpty'.tr();
+}
+
+/// The message being answered, over the box the answer is written in.
+class _PendingReply extends StatelessWidget {
+  final MessageApiModel message;
+  final VoidCallback onRemove;
+
+  const _PendingReply({required this.message, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    final String preview = message.body.trim().isNotEmpty
+        ? message.body.trim()
+        : (message.sharedProduct != null
+              ? 'messages.quotedProduct'.tr()
+              : 'messages.quotedEmpty'.tr());
+
+    return Container(
+      key: const ValueKey<String>('chat.pendingReply'),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsetsDirectional.only(start: 10, top: 6, bottom: 6),
+      decoration: BoxDecoration(
+        color: MerzoxColors.kColorF9F9F9,
+        borderRadius: BorderRadius.circular(8),
+        border: const BorderDirectional(
+          start: BorderSide(color: MerzoxColors.kColor98C1D9, width: 3),
+        ),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(
+                  'messages.replyingTo'.tr(
+                    args: <String>[
+                      message.senderName.trim().isEmpty
+                          ? 'messages.quotedFallbackName'.tr()
+                          : message.senderName,
+                    ],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: MerzoxColors.kColor8D99AE,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  preview,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: MerzoxColors.kColor3B3B3B,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            key: const ValueKey<String>('chat.dropPendingReply'),
+            tooltip: 'common.cancel'.tr(),
+            onPressed: onRemove,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            icon: const Icon(
+              Icons.close_rounded,
+              size: 18,
+              color: MerzoxColors.kColor8D99AE,
+            ),
           ),
         ],
       ),

@@ -162,13 +162,38 @@ void main() {
         ),
       );
 
-      // Pinned to the two edges of the list's content box. A fixed gap would
-      // leave both of them huddled at the reading edge, which is what the
-      // screen did before.
-      expect(all.right, closeTo(merzoxGoldenSurfaceSize.width - _gutter, 6));
+      // The three dots now hold the reading edge, with `الكل` immediately
+      // inside them - the reader asked for them before it - so the tab is no
+      // longer the outermost thing on that side.
+      final Rect menu = tester.getRect(
+        find.byKey(const ValueKey<String>('messages.inboxMenu')),
+      );
+
+      expect(menu.right, closeTo(merzoxGoldenSurfaceSize.width - _gutter, 6));
+
+      // And they stand together: a thumb's width apart, not half the screen.
+      // Three children of a space-between row split the leftover width into
+      // two gaps, which put as much space here as between the two filters.
+      expect(menu.left - all.right, closeTo(kInboxMenuGap, 2));
+
+      // The far edge is unchanged, and the space between the two tabs is
+      // still the width rather than a constant. A fixed gap would leave both
+      // of them huddled at the reading edge, which is what the screen did
+      // before.
       expect(unread.left, closeTo(_gutter, 6));
-      // And the space between them is the width, not a constant.
-      expect(all.left - unread.right, greaterThan(100));
+      // Eighty-odd rather than the hundred-odd it was: the three dots take
+      // their width out of the middle. What is asserted is that the gap is
+      // the leftover width, which is why it moved when something joined the
+      // row - a fixed gap would not have.
+      expect(all.left - unread.right, greaterThan(60));
+
+      // The three of them together span the content box: whatever is left
+      // over after the dots and the two labels is the gap, which is the
+      // property a fixed gap would not have.
+      expect(
+        menu.right - unread.left,
+        closeTo(merzoxGoldenSurfaceSize.width - _gutter * 2, 12),
+      );
     });
 
     testWidgets('`الكل` is the one at the reading edge', (

@@ -25,6 +25,7 @@ import {
   messageHasContent,
   readSharedProductId
 } from '../policies/shared-product.policy.js';
+import { readReplyToId } from '../policies/message-actions.policy.js';
 
 export function validateSignup(req, _res, next) {
   const { name, email, phone, password } = req.body;
@@ -851,7 +852,7 @@ export function validateConversationOpen(req, _res, next) {
 }
 
 export function validateMessageCreate(req, _res, next) {
-  const allowed = ['body', 'productId'];
+  const allowed = ['body', 'productId', 'replyToId'];
   const invalid = Object.keys(req.body).filter(
     (key) => !allowed.includes(key)
   );
@@ -867,6 +868,9 @@ export function validateMessageCreate(req, _res, next) {
   // read from the shop by the handler, so nothing a client sends can put a
   // price on a card that the shop is not asking.
   const productId = readSharedProductId(req.body);
+  // Read here so a malformed one is refused at the door rather than inside
+  // the handler, where it would already have cost a lookup.
+  readReplyToId(req.body);
 
   const body = String(req.body.body ?? '').trim();
   if (!messageHasContent({ body, productId })) {

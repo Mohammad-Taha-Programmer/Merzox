@@ -13,6 +13,7 @@ import '../bloc/messages_event.dart';
 import '../bloc/messages_search_bloc.dart';
 import '../bloc/messages_search_state.dart';
 import '../bloc/messages_state.dart';
+import 'bookmarks_page.dart';
 import '../widgets/messages_header.dart';
 import '../widgets/messages_search_results.dart';
 
@@ -262,6 +263,13 @@ class _MessagesInboxViewState extends State<MessagesInboxView> {
   }
 }
 
+/// What separates the dots from `الكل`.
+///
+/// Enough that a thumb aimed at one does not land on the other, and no more:
+/// they are one group at the reading edge, and the width of the screen
+/// belongs between the two filters rather than inside this pair.
+const double kInboxMenuGap = 8;
+
 class _InboxTabs extends StatelessWidget {
   final MessagesFilter filter;
   final int unreadCount;
@@ -275,13 +283,28 @@ class _InboxTabs extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _InboxTab(
-          label: 'messages.tabAll'.tr(),
-          badge: 0,
-          selected: filter == MessagesFilter.all,
-          onTap: () => context.read<MessagesBloc>().add(
-            const MessagesFilterChanged(MessagesFilter.all),
-          ),
+        // The dots and `الكل` travel together at the reading edge, with only
+        // a thumb's width between them. Left as three children of a
+        // space-between row they split the leftover width into two gaps, and
+        // the one between these two was as wide as the one that is meant to
+        // be - the whole point of which is to push the two filters apart.
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            // What hangs off the dots belongs to the reader rather than to
+            // any one thread - what they marked, and later what they blocked
+            // or reported.
+            const _InboxMenuButton(),
+            const SizedBox(width: kInboxMenuGap),
+            _InboxTab(
+              label: 'messages.tabAll'.tr(),
+              badge: 0,
+              selected: filter == MessagesFilter.all,
+              onTap: () => context.read<MessagesBloc>().add(
+                const MessagesFilterChanged(MessagesFilter.all),
+              ),
+            ),
+          ],
         ),
         _InboxTab(
           label: 'messages.tabUnread'.tr(),
@@ -292,6 +315,55 @@ class _InboxTabs extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// The three dots beside the filters.
+///
+/// One entry today - the marked messages - and it is deliberately the only
+/// one: blocking and reporting are named in the same breath but are not
+/// built, and a menu entry that did nothing would be worse than its absence.
+class _InboxMenuButton extends StatelessWidget {
+  const _InboxMenuButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      key: const ValueKey<String>('messages.inboxMenu'),
+      tooltip: 'messages.inboxMenuTooltip'.tr(),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+      onPressed: () => showModalBottomSheet<void>(
+        context: context,
+        builder: (BuildContext sheetContext) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const SizedBox(height: 8),
+              ListTile(
+                key: const ValueKey<String>('messages.openBookmarks'),
+                leading: const Icon(Icons.bookmark_border_rounded),
+                title: Text('messages.bookmarksTitle'.tr()),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const BookmarksPage(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+      icon: const Icon(
+        Icons.more_vert_rounded,
+        size: 20,
+        color: MerzoxColors.kColor3D5A80,
+      ),
     );
   }
 }
