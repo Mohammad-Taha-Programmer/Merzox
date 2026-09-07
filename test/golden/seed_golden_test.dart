@@ -1985,43 +1985,38 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
         expect(find.text('متجر الياسمين'), findsOneWidget);
 
-        // The two floating controls hang from one column, so the circle that
-        // shares the shop stands exactly as far from the frame as the one that
-        // opens a chat. Pinned to `end: 12` separately they did not: a button
-        // keeps a tap target wider than the circle it draws, which left them
-        // 12px and 16px out.
+        // This shop published a way to be reached, so the storefront offers
+        // the circle that opens it. A shop that published nothing draws no
+        // circle at all rather than one that opens an empty page - the case
+        // the widget tests hold, since a seed that showed it would have
+        // nothing to show.
+        expect(
+          find.byKey(const ValueKey<String>('storefront.contact')),
+          findsOneWidget,
+        );
+
+        // The three floating controls hang from one column, so each circle
+        // stands exactly as far from the frame as the others. Pinned to
+        // `end: 12` separately they did not: a button keeps a tap target
+        // wider than the circle it draws, which left them 12px and 16px out.
         final Rect shareBox = tester.getRect(
           find.byKey(const ValueKey<String>('storefront.share')),
         );
         final Rect chatBox = tester.getRect(
           find.widgetWithIcon(IconButton, Icons.chat_bubble_outline_rounded),
         );
-        expect(shareBox.left, chatBox.left);
-        expect(shareBox.right, chatBox.right);
-
-        // This shop published a way to be reached, so the About tab offers
-        // one. A shop that published nothing draws no row at all rather than
-        // one that opens an empty page - which is the case the widget tests
-        // hold, since a seed that showed it would have nothing to show.
-        expect(
-          find.byKey(const ValueKey<String>('storefront.contact')),
-          findsOneWidget,
-        );
-
-        // The floating circles are drawn above the list and can come to rest
-        // over a row in it. What must never happen is the one that happened
-        // to the thread menu under the bell: a control whose tap another
-        // control silently swallows. The circles hang at the far edge, so
-        // this holds the half the reader actually presses - the icon and the
-        // words - clear of the room they reserve.
         final Rect contactBox = tester.getRect(
           find.byKey(const ValueKey<String>('storefront.contact')),
         );
-        expect(
-          shareBox.right,
-          lessThan(contactBox.left + contactBox.width / 2),
-          reason: 'the share circle must not reach the label side of the row',
-        );
+        for (final Rect box in <Rect>[chatBox, contactBox]) {
+          expect(box.left, shareBox.left);
+          expect(box.right, shareBox.right);
+        }
+
+        // And in the order they were asked for: the contact circle sits under
+        // the one that opens a chat.
+        expect(shareBox.bottom, lessThanOrEqualTo(chatBox.top));
+        expect(chatBox.bottom, lessThanOrEqualTo(contactBox.top));
 
         await expectMerzoxSeedGolden('store_details_customer_ar_375x812.png');
       });

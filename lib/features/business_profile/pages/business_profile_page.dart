@@ -184,12 +184,13 @@ class _BusinessProfileView extends StatelessWidget {
                     // the LEFT edge in RTL, so 0 pinned it flush to the frame.
                     end: 12,
                     bottom: 21,
-                    // The two things a customer does about a shop rather than
-                    // inside it - talk to it, or tell somebody about it - hang
-                    // from one column so they keep one centre line. Pinning
-                    // each of them to `end: 12` on its own did not: a button
-                    // keeps a tap target wider than the circle it draws, so
-                    // the circles ended up 12px and 16px from the frame.
+                    // What a customer does about a shop rather than inside
+                    // it - tell somebody about it, talk to it, or find
+                    // another way to reach it - hangs from one column so the
+                    // circles keep one centre line. Pinning each of them to
+                    // `end: 12` on its own did not: a button keeps a tap
+                    // target wider than the circle it draws, so they ended up
+                    // 12px and 16px from the frame.
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -219,6 +220,21 @@ class _BusinessProfileView extends StatelessWidget {
                             ),
                           ),
                         ),
+                        // Only when the shop actually published a way to be
+                        // reached. A circle that opened an empty page would
+                        // be the dead end that page refuses to draw a row
+                        // for, and this one is read from the public detail
+                        // rather than the list seed the storefront opened
+                        // with - the seed carries no links and no permission,
+                        // so a control drawn from it would be a guess about
+                        // somebody else's shop.
+                        if (visitorContactPage(state.business)
+                            case final StoreContactPage contact)
+                          StoreContactButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(builder: (_) => contact),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -348,58 +364,30 @@ StoreContactPage? visitorContactPage(BusinessDetailApiModel? detail) {
   return page.isEmpty ? null : page;
 }
 
-/// The way into a shop's contact screen, in the shape that screen's own rows
-/// have - so what a tap opens looks like what was tapped.
-class StoreContactRow extends StatelessWidget {
+/// The way into a shop's contact screen.
+///
+/// It began as a tile inside the About tab and did not belong there: a light
+/// panel on a white page reads as a patch of a different screen. As a circle
+/// it is the same kind of thing as the two above it - something you do about
+/// a shop rather than inside it - and it borrows their shape instead of
+/// introducing a third one.
+class StoreContactButton extends StatelessWidget {
   final VoidCallback onPressed;
 
-  const StoreContactRow({required this.onPressed, super.key});
+  const StoreContactButton({required this.onPressed, super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: MerzoxColors.kColorF5F9FC,
-      borderRadius: BorderRadius.circular(6),
-      child: InkWell(
-        key: const ValueKey<String>('storefront.contact'),
-        onTap: onPressed,
-        borderRadius: BorderRadius.circular(6),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Row(
-            children: <Widget>[
-              const Icon(
-                Icons.phone_outlined,
-                size: 20,
-                color: MerzoxColors.kColor3D5A80,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'businessShell.contactUs'.tr(),
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: MerzoxColors.kColor2B2B2B,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // The same glyph the rows on the page this opens use, which is
-              // not the one the Back control uses. Both carry
-              // `matchTextDirection` and Material turns each of them, so
-              // borrowing the back chevron here would have drawn an arrow
-              // pointing out of the row a reader is being invited into.
-              const Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: MerzoxColors.kColor98C1D9,
-              ),
-            ],
-          ),
-        ),
+    return IconButton.filled(
+      key: const ValueKey<String>('storefront.contact'),
+      onPressed: onPressed,
+      tooltip: 'businessShell.contactUs'.tr(),
+      style: IconButton.styleFrom(
+        backgroundColor: MerzoxColors.kColor98C1D9,
+        foregroundColor: Colors.white,
+        fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
       ),
+      icon: const Icon(Icons.phone_outlined, size: 19),
     );
   }
 }
@@ -729,11 +717,6 @@ class _AboutTab extends StatelessWidget {
             .toList() ??
         const <BusinessProductApiModel>[];
 
-    // Read from the public detail, never from the list seed the storefront
-    // opened with: the seed carries no links and no permission, so a row
-    // drawn from it would be a guess about somebody else's shop.
-    final StoreContactPage? contact = visitorContactPage(state.business);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -770,14 +753,6 @@ class _AboutTab extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ],
-        if (contact != null) ...[
-          const SizedBox(height: 18),
-          StoreContactRow(
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => contact),
-            ),
           ),
         ],
         const SizedBox(height: 34),

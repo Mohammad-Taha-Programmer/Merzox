@@ -273,7 +273,7 @@ void main() {
     });
   });
 
-  group('the row that leads there', () {
+  group('the circle that leads there', () {
     testWidgets('is a control, and answers a tap', (
       WidgetTester tester,
     ) async {
@@ -284,11 +284,11 @@ void main() {
       await pumpLocalized(
         tester,
         Scaffold(
-          body: StoreContactRow(onPressed: () => taps += 1),
+          body: Center(
+            child: StoreContactButton(onPressed: () => taps += 1),
+          ),
         ),
       );
-
-      expect(find.text('businessShell.contactUs'.tr()), findsOneWidget);
 
       await tester.tap(
         find.byKey(const ValueKey<String>('storefront.contact')),
