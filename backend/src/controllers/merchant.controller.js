@@ -133,14 +133,7 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
     description: String(req.body.description ?? '').trim(),
     category: String(req.body.category).trim(),
     address: String(req.body.address ?? user.address ?? '').trim(),
-    attachmentUrl: String(req.body.attachmentUrl ?? '').trim(),
-    contacts: [
-      {
-        name: user.name,
-        phone,
-        email
-      }
-    ]
+    attachmentUrl: String(req.body.attachmentUrl ?? '').trim()
   });
 
   try {

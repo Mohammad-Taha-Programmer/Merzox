@@ -65,13 +65,6 @@ function buildBusiness(index, ownerId) {
       type: 'Point',
       coordinates: [35.2 + template / 100, 31.9 + template / 100]
     },
-    contacts: [
-      {
-        name: 'خدمة العملاء',
-        phone: `+9725900${index.toString().padStart(4, '0')}`,
-        email: `business${index}@merzox.local`
-      }
-    ],
     products: productSets[template].map((name, productIndex) => ({
       name,
       description: `منتج ${name} من ${businessNames[template]}`,

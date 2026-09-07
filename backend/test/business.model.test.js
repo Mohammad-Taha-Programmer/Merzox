@@ -38,3 +38,26 @@ test('business keeps merchant registration fields private and filters inactive p
   assert.equal(detail.viewCount, 0);
   assert.equal(product.isActive, false);
 });
+
+test('a shop carries no copy of the person who owns it', () => {
+  // It used to. `contacts` was a name, a phone and an email taken from the
+  // owner at enrolment and never written again, so the day they changed
+  // either one the shop still held the old value - and nothing in the app
+  // ever read it. Those details belong to the account, which is where they
+  // are edited and where every screen reads them.
+  assert.equal(Business.schema.path('contacts'), undefined);
+
+  const business = new Business({
+    owner: new mongoose.Types.ObjectId(),
+    publicId: 'MXB-TEST-0002',
+    name: 'متجر بلا نسخة',
+    category: 'Groceries',
+    contacts: [{ name: 'someone', phone: '+970599000000', email: 'a@b.test' }]
+  });
+
+  // Handed one anyway, it keeps nothing: the field is gone from the schema,
+  // so there is no half-alive copy to drift.
+  assert.equal(business.get('contacts'), undefined);
+  assert.equal(business.toOwnerJSON().contacts, undefined);
+  assert.equal(business.toDetailJSON().contacts, undefined);
+});

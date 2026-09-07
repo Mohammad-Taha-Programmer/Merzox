@@ -13,15 +13,6 @@ import {
   variantCommerceFacts
 } from '../policies/product.policy.js';
 
-const contactSchema = new mongoose.Schema(
-  {
-    name: { type: String, trim: true, maxlength: 80 },
-    phone: { type: String, trim: true },
-    email: { type: String, trim: true, lowercase: true }
-  },
-  { _id: false }
-);
-
 const locationSchema = new mongoose.Schema(
   {
     type: { type: String, enum: ['Point'], default: 'Point' },
@@ -231,7 +222,10 @@ const businessSchema = new mongoose.Schema(
     address: { type: String, trim: true, maxlength: 250, default: '' },
     attachmentUrl: { type: String, trim: true, maxlength: 1000, default: '' },
     location: { type: locationSchema, index: '2dsphere' },
-    contacts: { type: [contactSchema], default: [] },
+    // No contact copy here. The owner's name, phone and email are the
+    // account's, and the account is where they are edited and read. A second
+    // copy on the shop was written once at enrolment and never again, so the
+    // moment the owner changed either one the shop disagreed with them.
     products: { type: [productSchema], default: [] },
 
     /**
@@ -338,8 +332,7 @@ businessSchema.methods.toDetailJSON = function toDetailJSON() {
 businessSchema.methods.toOwnerJSON = function toOwnerJSON() {
   return {
     ...this.toDetailJSON(),
-    attachmentUrl: this.attachmentUrl,
-    contacts: this.contacts
+    attachmentUrl: this.attachmentUrl
   };
 };
 
