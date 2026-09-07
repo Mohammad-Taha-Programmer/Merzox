@@ -1077,6 +1077,62 @@ class ApiService {
     return data['bookmarked'] as bool? ?? bookmarked;
   }
 
+  /// Closes a conversation from this reader's side, or opens it again.
+  ///
+  /// Whom it blocks is never sent: it is the other side of this conversation,
+  /// which the server reads from the conversation itself. There is no id to
+  /// forge and no list to search.
+  Future<bool> setConversationBlock({
+    required String token,
+    required String conversationId,
+    required bool blocked,
+  }) async {
+    final String path = '/conversations/$conversationId/block';
+
+    final Response<Map<String, dynamic>> response = blocked
+        ? await _dio.post<Map<String, dynamic>>(
+            path,
+            options: _authOptions(token),
+          )
+        : await _dio.delete<Map<String, dynamic>>(
+            path,
+            options: _authOptions(token),
+          );
+
+    final Map<String, dynamic> data =
+        response.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
+
+    return data['blockedByMe'] as bool? ?? blocked;
+  }
+
+  /// Everyone this reader has closed the door on, newest first.
+  Future<BlockedUserListApiResponse> blockedUsers({
+    required String token,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/conversations/blocks',
+      queryParameters: <String, dynamic>{'page': page, 'limit': limit},
+      options: _authOptions(token),
+    );
+
+    return BlockedUserListApiResponse.fromJson(
+      response.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{},
+    );
+  }
+
+  /// Opens the door again, from the list rather than from a thread.
+  Future<void> unblockUser({
+    required String token,
+    required String userId,
+  }) async {
+    await _dio.delete<Map<String, dynamic>>(
+      '/conversations/blocks/$userId',
+      options: _authOptions(token),
+    );
+  }
+
   /// Everything this reader has marked, newest first.
   Future<BookmarkListApiResponse> bookmarks({
     required String token,
@@ -3574,6 +3630,61 @@ class BookmarkListApiResponse {
   }
 }
 
+/// One account this reader has closed the door on.
+class BlockedUserApiModel {
+  final String userId;
+
+  /// A shop by its own name rather than its owner's - the name the reader
+  /// was talking to.
+  final String name;
+  final String avatarUrl;
+  final DateTime? blockedAt;
+
+  const BlockedUserApiModel({
+    required this.userId,
+    required this.name,
+    required this.avatarUrl,
+    required this.blockedAt,
+  });
+
+  factory BlockedUserApiModel.fromJson(Map<String, dynamic> json) {
+    return BlockedUserApiModel(
+      userId: json['userId'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      avatarUrl: json['avatarUrl'] as String? ?? '',
+      blockedAt: DateTime.tryParse(json['blockedAt'] as String? ?? ''),
+    );
+  }
+}
+
+class BlockedUserListApiResponse {
+  final List<BlockedUserApiModel> blocks;
+  final int page;
+  final bool hasMore;
+
+  const BlockedUserListApiResponse({
+    required this.blocks,
+    required this.page,
+    required this.hasMore,
+  });
+
+  factory BlockedUserListApiResponse.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> rows =
+        json['blocks'] as List<dynamic>? ?? const <dynamic>[];
+    final Map<String, dynamic> pagination =
+        json['pagination'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+
+    return BlockedUserListApiResponse(
+      blocks: rows
+          .whereType<Map<String, dynamic>>()
+          .map(BlockedUserApiModel.fromJson)
+          .toList(),
+      page: pagination['page'] as int? ?? 1,
+      hasMore: pagination['hasMore'] as bool? ?? false,
+    );
+  }
+}
+
 class ConversationMessagesApiResponse {
   final ConversationApiModel conversation;
 
@@ -3583,11 +3694,20 @@ class ConversationMessagesApiResponse {
   final int page;
   final bool hasMore;
 
+  /// Whether this reader has closed the door on the other side.
+  final bool blockedByMe;
+
+  /// Whether the other side has closed it on them. Told apart because one is
+  /// undone from here and the other is not this reader's to undo.
+  final bool blockedMe;
+
   const ConversationMessagesApiResponse({
     required this.conversation,
     required this.messages,
     required this.page,
     required this.hasMore,
+    this.blockedByMe = false,
+    this.blockedMe = false,
   });
 
   factory ConversationMessagesApiResponse.fromJson(Map<String, dynamic> json) {
@@ -3606,6 +3726,8 @@ class ConversationMessagesApiResponse {
           .toList(),
       page: (pagination['page'] as num?)?.toInt() ?? 1,
       hasMore: pagination['hasMore'] as bool? ?? false,
+      blockedByMe: json['blockedByMe'] as bool? ?? false,
+      blockedMe: json['blockedMe'] as bool? ?? false,
     );
   }
 }

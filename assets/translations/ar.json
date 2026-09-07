@@ -189,7 +189,13 @@
     "quotedFallbackName": "رسالة",
     "bookmarksTitle": "الرسائل المعلَّمة",
     "bookmarksEmpty": "لم تضع علامة على أي رسالة بعد.",
-    "inboxMenuTooltip": "خيارات"
+    "inboxMenuTooltip": "خيارات",
+    "blockUser": "حظر هذا المستخدم",
+    "unblockUser": "إلغاء الحظر",
+    "blockedByMeNotice": "لقد حظرت هذه المحادثة. لن تصلك رسائل منها ولن تستطيع الإرسال إليها.",
+    "blockedMeNotice": "هذه المحادثة مغلقة، ولا يمكن الإرسال فيها.",
+    "blockedUsersTitle": "المستخدمون المحظورون",
+    "blockedUsersEmpty": "لم تحظر أحداً."
   },
   "notifications": {
     "title": "الاشعارات",
@@ -811,7 +817,9 @@
     "payloadTooLarge": "الملف كبير جداً، اختر صورة أصغر",
     "cannotReviewOwnBusiness": "لا يمكنك تقييم متجرك أو منتجاتك",
     "sharedProductUnavailable": "هذا المنتج لم يعد متاحاً في هذا المتجر.",
-    "repliedMessageUnavailable": "هذه الرسالة لم تعد موجودة في المحادثة."
+    "repliedMessageUnavailable": "هذه الرسالة لم تعد موجودة في المحادثة.",
+    "conversationBlocked": "هذه المحادثة مغلقة.",
+    "cannotBlockSelf": "لا يمكن حظر حسابك."
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",

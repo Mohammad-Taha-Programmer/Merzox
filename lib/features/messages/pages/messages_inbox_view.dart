@@ -13,6 +13,7 @@ import '../bloc/messages_event.dart';
 import '../bloc/messages_search_bloc.dart';
 import '../bloc/messages_search_state.dart';
 import '../bloc/messages_state.dart';
+import 'blocked_users_page.dart';
 import 'bookmarks_page.dart';
 import '../widgets/messages_header.dart';
 import '../widgets/messages_search_results.dart';
@@ -321,9 +322,10 @@ class _InboxTabs extends StatelessWidget {
 
 /// The three dots beside the filters.
 ///
-/// One entry today - the marked messages - and it is deliberately the only
-/// one: blocking and reporting are named in the same breath but are not
-/// built, and a menu entry that did nothing would be worse than its absence.
+/// What hangs off it belongs to the reader rather than to any one thread:
+/// what they marked, and whom they closed the door on. Reporting is named in
+/// the same breath and is not built, so it is not here - a menu entry that
+/// did nothing would be worse than its absence.
 class _InboxMenuButton extends StatelessWidget {
   const _InboxMenuButton();
 
@@ -350,6 +352,19 @@ class _InboxMenuButton extends StatelessWidget {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => const BookmarksPage(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                key: const ValueKey<String>('messages.openBlockedUsers'),
+                leading: const Icon(Icons.block_rounded),
+                title: Text('messages.blockedUsersTitle'.tr()),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const BlockedUsersPage(),
                     ),
                   );
                 },

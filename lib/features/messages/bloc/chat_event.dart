@@ -28,6 +28,14 @@ final class ChatMessageSent extends ChatEvent {
   const ChatMessageSent(this.body, {this.productId, this.replyToId});
 }
 
+/// Closes this conversation from the reader's side, or opens it again.
+///
+/// Whom it blocks is the thread's own other side, which the server reads from
+/// the conversation - there is no id to carry and none to forge.
+final class ChatBlockToggled extends ChatEvent {
+  const ChatBlockToggled();
+}
+
 /// Marks a message to come back to, or takes the mark off.
 ///
 /// The mark is the reader's own: the same message is marked for one side of a

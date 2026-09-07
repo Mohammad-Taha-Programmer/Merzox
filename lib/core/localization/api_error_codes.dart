@@ -177,6 +177,8 @@ const Map<String, String> apiErrorMessageKeys = <String, String>{
   'INVALID_CONVERSATION_TARGET': 'apiErrors.invalidConversationTarget',
   'INVALID_MESSAGE_BODY': 'apiErrors.invalidMessageBody',
   'INVALID_SHARED_PRODUCT': 'apiErrors.sharedProductUnavailable',
+  'CONVERSATION_BLOCKED': 'apiErrors.conversationBlocked',
+  'CANNOT_BLOCK_SELF': 'apiErrors.cannotBlockSelf',
   'INVALID_REPLY_TARGET': 'apiErrors.repliedMessageUnavailable',
   'REPLY_TARGET_NOT_FOUND': 'apiErrors.repliedMessageUnavailable',
   'BOOKMARKED_MESSAGE_NOT_FOUND': 'apiErrors.repliedMessageUnavailable',
