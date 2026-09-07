@@ -47,6 +47,16 @@ class StoreContactPage extends StatelessWidget {
   /// do anything about it.
   final String emptyMessage;
 
+  /// Whether the account these numbers live on could not be read at all.
+  ///
+  /// The shell fetches it on an arm that is allowed to fail, because it was
+  /// once read only for a portrait and a shop that would not open over a
+  /// missing picture is the worse screen. This page then gave that failure
+  /// the same shape as an answer: a merchant with two numbers and three
+  /// addresses saw a page with only their store links on it, and nothing
+  /// saying why. So the two are told apart here.
+  final bool accountUnavailable;
+
   const StoreContactPage._({
     required this.storeName,
     required this.category,
@@ -55,6 +65,7 @@ class StoreContactPage extends StatelessWidget {
     required this.phones,
     required this.emails,
     required this.emptyMessage,
+    this.accountUnavailable = false,
     this.open,
     this.onEditSettings,
     super.key,
@@ -77,6 +88,9 @@ class StoreContactPage extends StatelessWidget {
       phones: storePhoneChannels(account),
       emails: storeEmailChannels(account),
       emptyMessage: 'storeContact.empty',
+      // The shell always asks for the account; absent means the asking
+      // failed, never that the merchant has no numbers.
+      accountUnavailable: account == null,
       open: open,
       onEditSettings: onEditSettings,
     );
@@ -176,7 +190,8 @@ class StoreContactPage extends StatelessWidget {
               logoUrl: logoUrl,
             ),
             const SizedBox(height: 20),
-            if (isEmpty)
+            if (accountUnavailable) const _AccountUnreadable(),
+            if (isEmpty && !accountUnavailable)
               _NothingYet(
                 message: emptyMessage,
                 onEditSettings: onEditSettings,
@@ -383,6 +398,52 @@ class _ChannelRow extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The account could not be read, so its numbers are missing rather than
+/// absent.
+///
+/// Said out loud instead of drawn as a shorter page: a merchant looking at
+/// their own contact screen knows what they filled in, and a page quietly
+/// missing half of it is a page that appears to have lost it.
+class _AccountUnreadable extends StatelessWidget {
+  const _AccountUnreadable();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: MerzoxColors.kColorF5F9FC,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Icon(
+              Icons.info_outline_rounded,
+              size: 18,
+              color: MerzoxColors.kColor8D99AE,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'storeContact.accountUnreadable'.tr(),
+                key: const ValueKey<String>('storeContact.accountUnreadable'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: MerzoxColors.kColor8D99AE,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

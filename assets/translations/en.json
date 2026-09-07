@@ -923,7 +923,8 @@
     "empty": "You have not added any way to be reached yet.\nAdd your store links in store settings, and your numbers and email in your personal profile.",
     "emptyAction": "Store settings",
     "couldNotOpen": "That could not be opened on your device.",
-    "emptyForVisitor": "This store has not added a way to be reached yet."
+    "emptyForVisitor": "This store has not added a way to be reached yet.",
+    "accountUnreadable": "Your numbers and email could not be read from your account, so this list may be incomplete. Reopen this screen to try again."
   },
   "storefront": {
     "shareStore": "Share this store"
