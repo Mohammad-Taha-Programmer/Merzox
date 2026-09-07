@@ -48,6 +48,13 @@ final class ChatState {
   /// Whether anything can be sent at all.
   bool get isBlocked => blockedByMe || blockedMe;
 
+  /// Something that went right, as a translation key.
+  ///
+  /// Separate from [errorMessage] because it is not a failure and must not be
+  /// dressed as one. Cleared as it is shown, so the same success is not
+  /// announced twice on the next rebuild.
+  final String noticeCode;
+
   const ChatState({
     this.status = ChatStatus.initial,
     this.conversationId = '',
@@ -64,6 +71,7 @@ final class ChatState {
     this.anchorReached = true,
     this.blockedByMe = false,
     this.blockedMe = false,
+    this.noticeCode = '',
   });
 
   /// Whether the reader arrived here from a search result.
@@ -93,6 +101,7 @@ final class ChatState {
     bool? anchorReached,
     bool? blockedByMe,
     bool? blockedMe,
+    String? noticeCode,
   }) {
     return ChatState(
       status: status ?? this.status,
@@ -110,6 +119,9 @@ final class ChatState {
       anchorReached: anchorReached ?? this.anchorReached,
       blockedByMe: blockedByMe ?? this.blockedByMe,
       blockedMe: blockedMe ?? this.blockedMe,
+      // Not carried forward: a notice is shown once, and every other change
+      // to the thread would otherwise show it again.
+      noticeCode: noticeCode ?? '',
     );
   }
 }

@@ -36,6 +36,17 @@ final class ChatBlockToggled extends ChatEvent {
   const ChatBlockToggled();
 }
 
+/// Tells the operator about the other side of this conversation.
+///
+/// Whom it names is the thread's own other side, which the server reads from
+/// the conversation. What this carries is why.
+final class ChatReportSubmitted extends ChatEvent {
+  final String reason;
+  final String note;
+
+  const ChatReportSubmitted({required this.reason, this.note = ''});
+}
+
 /// Marks a message to come back to, or takes the mark off.
 ///
 /// The mark is the reader's own: the same message is marked for one side of a

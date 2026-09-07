@@ -6,6 +6,7 @@ import 'package:merzox/features/messages/bloc/chat_bloc.dart';
 import 'package:merzox/features/messages/bloc/chat_event.dart';
 import 'package:merzox/features/messages/pages/blocked_users_page.dart';
 import 'package:merzox/features/messages/pages/chat_page.dart';
+import 'package:merzox/features/notifications/widgets/global_notification_bell.dart';
 import 'package:merzox/services/api_service.dart';
 
 import 'localization_test_harness.dart';
@@ -166,6 +167,26 @@ void main() {
 
   setUpAll(() async {
     await loadAppTranslations();
+  });
+
+  group('where the menu is', () {
+    testWidgets('it stands clear of the bell that floats over that corner', (
+      WidgetTester tester,
+    ) async {
+      // The bell is drawn above the router, so anything left in this corner
+      // is not merely half covered but unclickable: its taps go to the bell.
+      // The menu was there, and the block button could not be reached at all.
+      await _openChat(tester, _ChatApi());
+
+      final Rect menu = tester.getRect(
+        find.byKey(const ValueKey<String>('chat.threadMenu')),
+      );
+
+      expect(
+        menu.left,
+        greaterThanOrEqualTo(kGlobalBellInset + kGlobalBellReservedWidth),
+      );
+    });
   });
 
   group('closing a conversation', () {

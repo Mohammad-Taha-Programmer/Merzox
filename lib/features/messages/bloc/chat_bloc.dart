@@ -57,6 +57,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     on<ChatMessageSent>(_onMessageSent);
     on<ChatMessageBookmarkToggled>(_onBookmarkToggled);
     on<ChatBlockToggled>(_onBlockToggled);
+    on<ChatReportSubmitted>(_onReportSubmitted);
     on<ChatOlderMessagesRequested>(_onOlderMessagesRequested);
     on<ChatRefreshRequested>(_onRefreshRequested);
     on<ChatRealtimeSyncRequested>(_onRealtimeSyncRequested);
@@ -381,6 +382,31 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
       );
 
       emit(state.copyWith(blockedByMe: blockedByMe));
+    } catch (error) {
+      emit(state.copyWith(errorMessage: ApiService.messageFromError(error)));
+    }
+  }
+
+  /// Sends a report, and says so when it lands.
+  ///
+  /// Nothing is kept in the thread's state afterwards: a report is a thing
+  /// that was sent, not a thing the reader now owns, and there is no screen
+  /// where they could take it back.
+  Future<void> _onReportSubmitted(
+    ChatReportSubmitted event,
+    Emitter<ChatState> emit,
+  ) async {
+    if (state.conversationId.isEmpty) return;
+
+    try {
+      await _apiService.reportConversationCounterpart(
+        token: await _token(),
+        conversationId: state.conversationId,
+        reason: event.reason,
+        note: event.note,
+      );
+
+      emit(state.copyWith(noticeCode: 'messages.reportSent'));
     } catch (error) {
       emit(state.copyWith(errorMessage: ApiService.messageFromError(error)));
     }
