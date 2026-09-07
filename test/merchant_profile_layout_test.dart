@@ -89,7 +89,7 @@ void main() {
         find.byIcon(Icons.person_outline_rounded),
       );
       final Rect chevron = tester.getRect(
-        find.byIcon(Icons.chevron_left_rounded),
+        find.byIcon(Icons.chevron_right_rounded),
       );
       final Rect label = tester.getRect(find.text('الملف الشخصي'));
 
@@ -98,6 +98,18 @@ void main() {
       expect(icon.center.dx, greaterThan(label.center.dx));
       expect(chevron.center.dx, lessThan(label.center.dx));
       expect(icon.right, closeTo(375 - kProfileGutter - 14, 2));
+
+      // And it leans the way the board draws it. The chevron is named for
+      // where the row goes, and Material turns it for the reading; naming the
+      // left one turned it twice and left it pointing back at the words.
+      expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+      expect(
+        tester
+            .widget<Icon>(find.byIcon(Icons.chevron_right_rounded))
+            .icon!
+            .matchTextDirection,
+        isTrue,
+      );
     });
 
     testWidgets('a row without a screen behind it carries no chevron', (
@@ -119,7 +131,7 @@ void main() {
         ),
       );
 
-      expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+      expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
     });
 
     testWidgets('a row grows with the reader font rather than clipping', (

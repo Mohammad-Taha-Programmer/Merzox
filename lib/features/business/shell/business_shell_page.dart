@@ -1203,8 +1203,14 @@ class MerchantProfileMenuRow extends StatelessWidget {
                   ),
                 ),
                 if (showChevron)
+                  // Named for where the row goes, not for where the glyph
+                  // points. This icon carries `matchTextDirection`, so
+                  // Material turns it for the reading: it leans left in
+                  // Arabic, as the board draws it, and right in English.
+                  // Naming the left one instead turned it a second time and
+                  // left the board's chevron pointing back at the words.
                   const Icon(
-                    Icons.chevron_left_rounded,
+                    Icons.chevron_right_rounded,
                     size: 20,
                     color: MerzoxColors.kColor3D5A80,
                   ),
