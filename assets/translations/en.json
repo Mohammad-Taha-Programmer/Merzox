@@ -177,7 +177,19 @@
     "matchNotReached": "That result could not be reached",
     "shareProductTitle": "Share a product",
     "shareProductEmpty": "There are no products to share.",
-    "shareProductTooltip": "Share a product"
+    "shareProductTooltip": "Share a product",
+    "actionReply": "Reply to this message",
+    "actionCopy": "Copy message",
+    "actionCopied": "Message copied",
+    "actionBookmark": "Bookmark",
+    "actionUnbookmark": "Remove bookmark",
+    "replyingTo": "Replying to {}",
+    "quotedProduct": "Product card",
+    "quotedEmpty": "Message",
+    "quotedFallbackName": "Message",
+    "bookmarksTitle": "Bookmarked messages",
+    "bookmarksEmpty": "You have not bookmarked any message yet.",
+    "inboxMenuTooltip": "Options"
   },
   "notifications": {
     "title": "Notifications",
@@ -798,7 +810,8 @@
     "productContentTypeUnsupported": "That product image format is not supported. Use JPG or PNG.",
     "payloadTooLarge": "That file is too large. Choose a smaller image.",
     "cannotReviewOwnBusiness": "You cannot review your own shop or its products",
-    "sharedProductUnavailable": "That product is no longer available in this store."
+    "sharedProductUnavailable": "That product is no longer available in this store.",
+    "repliedMessageUnavailable": "That message is no longer in this conversation."
   },
   "courierLocation": {
     "loginEntry": "Share courier location",

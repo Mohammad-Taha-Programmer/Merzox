@@ -138,6 +138,7 @@ class _FakeMessagingApi extends ApiService {
     required String conversationId,
     required String body,
     String? productId,
+      String? replyToId,
   }) async {
     if (sendError != null) throw sendError!;
     sentBodies.add(body);

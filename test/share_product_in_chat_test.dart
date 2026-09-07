@@ -117,6 +117,7 @@ class _ChatApi extends ApiService {
     required String conversationId,
     required String body,
     String? productId,
+      String? replyToId,
   }) async {
     sentBodies.add(body);
     sentProductIds.add(productId);

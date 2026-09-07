@@ -1,14 +1,17 @@
 import { Router } from 'express';
 
 import {
+  bookmarkConversationMessage,
   getMyConversationUnreadCount,
   listConversationMessages,
+  listMyBookmarks,
   listMyConversations,
   listShareableProducts,
   markConversationRead,
   openConversation,
   searchMyConversations,
-  sendConversationMessage
+  sendConversationMessage,
+  unbookmarkConversationMessage
 } from '../controllers/message.controller.js';
 import { requireAuth } from '../middleware/auth.js';
 import {
@@ -23,6 +26,9 @@ router.use(requireAuth);
 // Declared before `/:id/...` so the literal segment is never read as an id.
 router.get('/unread-count', getMyConversationUnreadCount);
 router.get('/search', searchMyConversations);
+// Everything this reader marked, across every thread. Literal, so it is never
+// read as a conversation id.
+router.get('/bookmarks', listMyBookmarks);
 router.get('/', listMyConversations);
 router.post('/', validateConversationOpen, openConversation);
 router.get('/:id/messages', listConversationMessages);
@@ -30,6 +36,14 @@ router.get('/:id/messages', listConversationMessages);
 // which shop it is comes from the conversation, never from the caller.
 router.get('/:id/products', listShareableProducts);
 router.post('/:id/messages', validateMessageCreate, sendConversationMessage);
+router.post(
+  '/:id/messages/:messageId/bookmark',
+  bookmarkConversationMessage
+);
+router.delete(
+  '/:id/messages/:messageId/bookmark',
+  unbookmarkConversationMessage
+);
 router.post('/:id/read', markConversationRead);
 
 export default router;

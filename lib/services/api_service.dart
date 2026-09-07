@@ -1007,12 +1007,14 @@ class ApiService {
     required String conversationId,
     required String body,
     String? productId,
+    String? replyToId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/conversations/$conversationId/messages',
       data: <String, dynamic>{
         'body': body,
         if (productId != null && productId.isNotEmpty) 'productId': productId,
+        if (replyToId != null && replyToId.isNotEmpty) 'replyToId': replyToId,
       },
       options: _authOptions(token),
     );
@@ -1043,6 +1045,53 @@ class ApiService {
         .whereType<Map<String, dynamic>>()
         .map(BusinessProductApiModel.fromJson)
         .toList();
+  }
+
+  /// Marks a message to come back to, or takes the mark off.
+  ///
+  /// The mark belongs to the reader who made it: the same message is marked
+  /// for one side of a thread and not for the other, which is why it is not a
+  /// property of the message.
+  Future<bool> setMessageBookmark({
+    required String token,
+    required String conversationId,
+    required String messageId,
+    required bool bookmarked,
+  }) async {
+    final String path =
+        '/conversations/$conversationId/messages/$messageId/bookmark';
+
+    final Response<Map<String, dynamic>> response = bookmarked
+        ? await _dio.post<Map<String, dynamic>>(
+            path,
+            options: _authOptions(token),
+          )
+        : await _dio.delete<Map<String, dynamic>>(
+            path,
+            options: _authOptions(token),
+          );
+
+    final Map<String, dynamic> data =
+        response.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{};
+
+    return data['bookmarked'] as bool? ?? bookmarked;
+  }
+
+  /// Everything this reader has marked, newest first.
+  Future<BookmarkListApiResponse> bookmarks({
+    required String token,
+    int page = 1,
+    int limit = 20,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/conversations/bookmarks',
+      queryParameters: <String, dynamic>{'page': page, 'limit': limit},
+      options: _authOptions(token),
+    );
+
+    return BookmarkListApiResponse.fromJson(
+      response.data?['data'] as Map<String, dynamic>? ?? <String, dynamic>{},
+    );
   }
 
   Future<ConversationApiModel> markConversationRead({
@@ -3379,6 +3428,47 @@ class SharedProductApiModel {
   }
 }
 
+/// The message an answer answers, as it stood when the answer was written.
+///
+/// A copy made by the server, so a quote stays readable when what it quotes
+/// is a hundred messages back, or gone.
+class MessageReplyApiModel {
+  final String messageId;
+  final String senderName;
+  final String body;
+
+  /// Whether the answered message was a shared product card. Its body may be
+  /// empty then, and a quote showing an empty line would read as a fault.
+  final bool hasProduct;
+
+  /// Whether the answered message was this reader's own.
+  final bool isMine;
+
+  const MessageReplyApiModel({
+    required this.messageId,
+    required this.senderName,
+    required this.body,
+    required this.hasProduct,
+    required this.isMine,
+  });
+
+  /// Null for the ordinary message, which answers nothing.
+  static MessageReplyApiModel? fromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+
+    final String messageId = json['messageId'] as String? ?? '';
+    if (messageId.isEmpty) return null;
+
+    return MessageReplyApiModel(
+      messageId: messageId,
+      senderName: json['senderName'] as String? ?? '',
+      body: json['body'] as String? ?? '',
+      hasProduct: json['hasProduct'] as bool? ?? false,
+      isMine: json['isMine'] as bool? ?? false,
+    );
+  }
+}
+
 class MessageApiModel {
   final String id;
   final String conversationId;
@@ -3388,6 +3478,12 @@ class MessageApiModel {
 
   /// The product this message shares, or null - which is the ordinary case.
   final SharedProductApiModel? sharedProduct;
+
+  /// The message this one answers, or null.
+  final MessageReplyApiModel? replyTo;
+
+  /// Whether this reader has marked it to come back to.
+  final bool bookmarked;
 
   final bool isMine;
   final DateTime? readAt;
@@ -3403,6 +3499,8 @@ class MessageApiModel {
     required this.readAt,
     required this.createdAt,
     this.sharedProduct,
+    this.replyTo,
+    this.bookmarked = false,
   });
 
   factory MessageApiModel.fromJson(Map<String, dynamic> json) {
@@ -3413,9 +3511,65 @@ class MessageApiModel {
       senderName: json['senderName'] as String? ?? '',
       body: json['body'] as String? ?? '',
       sharedProduct: SharedProductApiModel.fromJson(json['sharedProduct']),
+      replyTo: MessageReplyApiModel.fromJson(json['replyTo']),
+      bookmarked: json['bookmarked'] as bool? ?? false,
       isMine: json['isMine'] as bool? ?? false,
       readAt: DateTime.tryParse(json['readAt'] as String? ?? ''),
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
+    );
+  }
+}
+
+/// One marked message, and the thread it was said in.
+class BookmarkApiModel {
+  final MessageApiModel message;
+  final ConversationApiModel conversation;
+  final DateTime? markedAt;
+
+  const BookmarkApiModel({
+    required this.message,
+    required this.conversation,
+    required this.markedAt,
+  });
+
+  factory BookmarkApiModel.fromJson(Map<String, dynamic> json) {
+    return BookmarkApiModel(
+      message: MessageApiModel.fromJson(
+        json['message'] as Map<String, dynamic>? ?? const <String, dynamic>{},
+      ),
+      conversation: ConversationApiModel.fromJson(
+        json['conversation'] as Map<String, dynamic>? ??
+            const <String, dynamic>{},
+      ),
+      markedAt: DateTime.tryParse(json['markedAt'] as String? ?? ''),
+    );
+  }
+}
+
+class BookmarkListApiResponse {
+  final List<BookmarkApiModel> bookmarks;
+  final int page;
+  final bool hasMore;
+
+  const BookmarkListApiResponse({
+    required this.bookmarks,
+    required this.page,
+    required this.hasMore,
+  });
+
+  factory BookmarkListApiResponse.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> rows =
+        json['bookmarks'] as List<dynamic>? ?? const <dynamic>[];
+    final Map<String, dynamic> pagination =
+        json['pagination'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+
+    return BookmarkListApiResponse(
+      bookmarks: rows
+          .whereType<Map<String, dynamic>>()
+          .map(BookmarkApiModel.fromJson)
+          .toList(),
+      page: pagination['page'] as int? ?? 1,
+      hasMore: pagination['hasMore'] as bool? ?? false,
     );
   }
 }

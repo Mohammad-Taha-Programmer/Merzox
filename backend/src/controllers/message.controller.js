@@ -38,6 +38,13 @@ import {
   readSharedProductId,
   sharedProductSnapshot
 } from '../policies/shared-product.policy.js';
+import {
+  readReplyToId,
+  replySnapshot,
+  requireBookmarkTarget,
+  requireReplyTarget
+} from '../policies/message-actions.policy.js';
+import { MessageBookmark } from '../models/MessageBookmark.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 function conversationFilter(query) {
@@ -358,6 +365,11 @@ export const listConversationMessages = asyncHandler(async (req, res) => {
     Message.countDocuments({ conversation: conversation._id })
   ]);
 
+  // The reader's own marks for this page, in one query rather than one per
+  // message. A mark belongs to whoever made it: the same message is marked
+  // for one side of a thread and not for the other.
+  const marked = await bookmarkedIdsFor(req.user._id, messages);
+
   res.json({
     success: true,
     data: {
@@ -367,7 +379,11 @@ export const listConversationMessages = asyncHandler(async (req, res) => {
           : conversation.toMerchantJSON(),
       // Newest first on the wire so paging back through history is a simple
       // skip; the client renders them oldest first.
-      messages: messages.map((message) => message.toClientJSON(viewerType)),
+      messages: messages.map((message) =>
+        message.toClientJSON(viewerType, {
+          bookmarked: marked.has(message._id.toString())
+        })
+      ),
       pagination: { page, limit, total, hasMore: skip + messages.length < total }
     }
   });
@@ -403,6 +419,21 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
   const { viewerType, business } = await resolveViewer(req, conversation);
   const body = String(req.body.body ?? '').trim();
   const sharedProductId = readSharedProductId(req.body);
+  const replyToId = readReplyToId(req.body);
+
+  let replyTo = null;
+  if (replyToId) {
+    // Scoped to this thread. There is no parameter for which conversation to
+    // search, so an id from somewhere else simply is not found.
+    replyTo = replySnapshot(
+      requireReplyTarget(
+        await Message.findOne({
+          _id: mongoose.isValidObjectId(replyToId) ? replyToId : null,
+          conversation: conversation._id
+        })
+      )
+    );
+  }
 
   let sharedProduct = null;
   if (sharedProductId) {
@@ -441,7 +472,8 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
     senderType: viewerType,
     senderName,
     body,
-    sharedProduct
+    sharedProduct,
+    replyTo
   });
 
   // What the inbox and the notification show for this thread. A card sent
@@ -527,6 +559,137 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
         viewerType === 'customer'
           ? updated.toCustomerJSON()
           : updated.toMerchantJSON()
+    }
+  });
+});
+
+/**
+ * The reader's own marks among a page of messages.
+ *
+ * Exported for the listing above and for nothing else; it exists so a page of
+ * thirty messages costs one query rather than thirty.
+ */
+async function bookmarkedIdsFor(userId, messages) {
+  if (messages.length === 0) return new Set();
+
+  const rows = await MessageBookmark.find({
+    user: userId,
+    message: { $in: messages.map((message) => message._id) }
+  }).select('message');
+
+  return new Set(rows.map((row) => row.message.toString()));
+}
+
+/** The message a mark is being put on or taken off, inside this thread. */
+async function loadMarkableMessage(req) {
+  const conversation = await loadConversation(req.params.id);
+  await resolveViewer(req, conversation);
+
+  const messageId = String(req.params.messageId ?? '');
+  const message = requireBookmarkTarget(
+    await Message.findOne({
+      _id: mongoose.isValidObjectId(messageId) ? messageId : null,
+      conversation: conversation._id
+    })
+  );
+
+  return { conversation, message };
+}
+
+/**
+ * Marks a message to come back to.
+ *
+ * Idempotent: marking twice is the same mark, which the unique index makes
+ * true rather than a check that could race with itself.
+ */
+export const bookmarkConversationMessage = asyncHandler(async (req, res) => {
+  const { conversation, message } = await loadMarkableMessage(req);
+
+  await MessageBookmark.updateOne(
+    { user: req.user._id, message: message._id },
+    { $setOnInsert: { conversation: conversation._id } },
+    { upsert: true }
+  );
+
+  res.json({ success: true, data: { bookmarked: true } });
+});
+
+/** Takes the mark off. Removing one that is not there is not an error. */
+export const unbookmarkConversationMessage = asyncHandler(async (req, res) => {
+  const { message } = await loadMarkableMessage(req);
+
+  await MessageBookmark.deleteOne({
+    user: req.user._id,
+    message: message._id
+  });
+
+  res.json({ success: true, data: { bookmarked: false } });
+});
+
+/**
+ * Everything this reader has marked, newest first.
+ *
+ * Each row carries the message and the thread it was said in, so the list can
+ * be read and any of it opened without a request per row. Marks whose message
+ * or conversation has since gone are left out rather than returned as holes.
+ */
+export const listMyBookmarks = asyncHandler(async (req, res) => {
+  const { page, limit, skip } = paginationParams(req.query);
+
+  const [bookmarks, total] = await Promise.all([
+    MessageBookmark.find({ user: req.user._id })
+      .sort({ createdAt: -1, _id: -1 })
+      .skip(skip)
+      .limit(limit),
+    MessageBookmark.countDocuments({ user: req.user._id })
+  ]);
+
+  const messages = await Message.find({
+    _id: { $in: bookmarks.map((bookmark) => bookmark.message) }
+  });
+  const conversations = await Conversation.find({
+    _id: { $in: bookmarks.map((bookmark) => bookmark.conversation) }
+  });
+
+  const messageById = new Map(
+    messages.map((message) => [message._id.toString(), message])
+  );
+  const conversationById = new Map(
+    conversations.map((conversation) => [
+      conversation._id.toString(),
+      conversation
+    ])
+  );
+
+  const items = [];
+  for (const bookmark of bookmarks) {
+    const message = messageById.get(bookmark.message.toString());
+    const conversation = conversationById.get(
+      bookmark.conversation.toString()
+    );
+    if (!message || !conversation) continue;
+
+    // Which side of that thread this reader is decides how the message reads
+    // back to them - their own words or the other side's.
+    const viewerType = conversation.user.equals(req.user._id)
+      ? 'customer'
+      : 'business';
+
+    items.push({
+      message: message.toClientJSON(viewerType, { bookmarked: true }),
+      conversation:
+        viewerType === 'customer'
+          ? conversation.toCustomerJSON()
+          : conversation.toMerchantJSON(),
+      markedAt: bookmark.createdAt
+    });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      bookmarks: items,
+      pagination: { page, limit, total, hasMore: skip + bookmarks.length < total }
     }
   });
 });

@@ -22,7 +22,20 @@ final class ChatMessageSent extends ChatEvent {
   /// when there is no product with it.
   final String? productId;
 
-  const ChatMessageSent(this.body, {this.productId});
+  /// The message being answered, when this is a reply.
+  final String? replyToId;
+
+  const ChatMessageSent(this.body, {this.productId, this.replyToId});
+}
+
+/// Marks a message to come back to, or takes the mark off.
+///
+/// The mark is the reader's own: the same message is marked for one side of a
+/// thread and not for the other.
+final class ChatMessageBookmarkToggled extends ChatEvent {
+  final String messageId;
+
+  const ChatMessageBookmarkToggled(this.messageId);
 }
 
 final class ChatOlderMessagesRequested extends ChatEvent {

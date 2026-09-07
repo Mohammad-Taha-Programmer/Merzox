@@ -177,7 +177,19 @@
     "matchNotReached": "تعذر الوصول إلى موضع هذه النتيجة",
     "shareProductTitle": "مشاركة منتج",
     "shareProductEmpty": "لا توجد منتجات لمشاركتها.",
-    "shareProductTooltip": "مشاركة منتج"
+    "shareProductTooltip": "مشاركة منتج",
+    "actionReply": "الرد على الرسالة",
+    "actionCopy": "نسخ الرسالة",
+    "actionCopied": "تم نسخ الرسالة",
+    "actionBookmark": "وضع علامة",
+    "actionUnbookmark": "إزالة العلامة",
+    "replyingTo": "رد على {}",
+    "quotedProduct": "بطاقة منتج",
+    "quotedEmpty": "رسالة",
+    "quotedFallbackName": "رسالة",
+    "bookmarksTitle": "الرسائل المعلَّمة",
+    "bookmarksEmpty": "لم تضع علامة على أي رسالة بعد.",
+    "inboxMenuTooltip": "خيارات"
   },
   "notifications": {
     "title": "الاشعارات",
@@ -798,7 +810,8 @@
     "productContentTypeUnsupported": "صيغة صورة المنتج غير مدعومة، استخدم JPG أو PNG",
     "payloadTooLarge": "الملف كبير جداً، اختر صورة أصغر",
     "cannotReviewOwnBusiness": "لا يمكنك تقييم متجرك أو منتجاتك",
-    "sharedProductUnavailable": "هذا المنتج لم يعد متاحاً في هذا المتجر."
+    "sharedProductUnavailable": "هذا المنتج لم يعد متاحاً في هذا المتجر.",
+    "repliedMessageUnavailable": "هذه الرسالة لم تعد موجودة في المحادثة."
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",
