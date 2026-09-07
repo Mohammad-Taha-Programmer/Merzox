@@ -471,7 +471,7 @@ export function validateBusinessProfilePatch(req, _res, next) {
       throw new AppError('Social links are invalid', 400, 'INVALID_BUSINESS_SOCIAL_LINKS');
     }
 
-    const allowedLinks = ['instagram', 'whatsapp', 'mobile', 'facebook'];
+    const allowedLinks = ['instagram', 'whatsapp', 'facebook'];
     const invalidLinks = Object.keys(links).filter(
       (key) => !allowedLinks.includes(key)
     );
@@ -484,7 +484,7 @@ export function validateBusinessProfilePatch(req, _res, next) {
         throw new AppError('Social links are invalid', 400, 'INVALID_BUSINESS_SOCIAL_LINKS');
       }
     }
-    for (const key of ['whatsapp', 'mobile']) {
+    for (const key of ['whatsapp']) {
       const value = String(links[key] ?? '').trim();
       if (value.length > 0 && !/^\+?[0-9]{7,15}$/.test(value)) {
         throw new AppError(
