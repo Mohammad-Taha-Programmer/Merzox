@@ -1,8 +1,12 @@
 gradle-wrapper.jar
 /.gradle
 /captures/
-/gradlew
-/gradlew.bat
+# The two wrapper scripts are kept, against Flutter's template, because one of
+# them carries a build setting: `--enable-native-access=ALL-UNNAMED` in
+# `DEFAULT_JVM_OPTS`, without which every build on a JDK of 24 or newer prints
+# four warnings and will one day be refused. The launcher reads that flag only
+# from the script - `gradle.properties` reaches the daemon, not the process
+# that starts it - so ignoring these files meant the fix could not be shared.
 /local.properties
 GeneratedPluginRegistrant.java
 .cxx/
