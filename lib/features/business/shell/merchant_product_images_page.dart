@@ -419,7 +419,7 @@ class _ImageEntry extends StatelessWidget {
             child: Image.network(
               url,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const ColoredBox(
+              errorBuilder: (_, _, _) => const ColoredBox(
                 color: MerzoxColors.kColorDEEEF8,
                 child: Icon(Icons.broken_image_outlined),
               ),

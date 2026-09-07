@@ -341,7 +341,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     return jsonEncode({
       'businessId': item.businessId,
       'productId': item.productId,
-      if (variantId != null) 'variantId': variantId,
+      'variantId': ?variantId,
       if (variantId != null) 'variantLabel': variantLabel ?? item.variantLabel,
       'name': name,
       'price': price,
@@ -396,7 +396,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       final sanitizedRaw = jsonEncode({
         'businessId': businessId,
         'productId': productId,
-        if (variantId != null) 'variantId': variantId,
+        'variantId': ?variantId,
         if (variantId != null) 'variantLabel': variantLabel,
         'name': name,
         'price': price,

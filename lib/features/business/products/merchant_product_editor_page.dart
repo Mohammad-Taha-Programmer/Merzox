@@ -966,14 +966,14 @@ class _ImagesDropZone extends StatelessWidget {
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.all(12),
                   itemCount: imageUrls.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 10),
+                  separatorBuilder: (_, _) => const SizedBox(width: 10),
                   itemBuilder: (BuildContext context, int index) => ClipRRect(
                     borderRadius: BorderRadius.circular(6),
                     child: Image.network(
                       imageUrls[index],
                       width: 92,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         width: 92,
                         color: MerzoxColors.kColorF3F7FA,
                         child: const Icon(

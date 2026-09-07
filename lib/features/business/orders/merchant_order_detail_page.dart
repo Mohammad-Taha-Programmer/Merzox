@@ -530,7 +530,7 @@ class _ItemRow extends StatelessWidget {
                   : Image.network(
                       item.imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
+                      errorBuilder: (_, _, _) => Container(
                         color: MerzoxColors.kColorF3F7FA,
                         child: const Icon(
                           Icons.inventory_2_outlined,

@@ -108,7 +108,7 @@ class AppRouter {
     routes: [
       GoRoute(
         path: '/onboarding',
-        builder: (context, __) => BlocProvider(
+        builder: (context, _) => BlocProvider(
           create: (_) => OnboardingBloc(),
           child: OnboardingScreen(
             onFinished: () => context.go('/home?guest=true'),
@@ -117,7 +117,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/login',
-        builder: (context, __) => BlocProvider(
+        builder: (context, _) => BlocProvider(
           create: (_) => AuthBloc(
             realtimeSessionController: _realtimeSessionController,
             pushSessionController: _pushSessionController,
@@ -166,7 +166,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/business/enroll',
-        builder: (context, __) => BlocProvider(
+        builder: (context, _) => BlocProvider(
           create: (_) => BusinessEnrollmentBloc(),
           child: BusinessEnrollmentPage(
             onCompleted: () => context.go('/business/login'),
@@ -175,7 +175,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/business/login',
-        builder: (context, __) => BlocProvider(
+        builder: (context, _) => BlocProvider(
           create: (_) => AuthBloc(
             realtimeSessionController: _realtimeSessionController,
             pushSessionController: _pushSessionController,
@@ -193,14 +193,14 @@ class AppRouter {
       ),
       GoRoute(
         path: '/courier/location',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => CourierLocationBloc(),
           child: const CourierLocationPage(),
         ),
       ),
       GoRoute(
         path: '/business/messages',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => MessagesBloc(
             merchantMode: true,
             realtimeMessageInvalidations:
@@ -215,21 +215,21 @@ class AppRouter {
       // somebody else's store.
       GoRoute(
         path: '/business/preview',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => BusinessBloc()..add(const BusinessStarted()),
           child: const StorePreviewPage(),
         ),
       ),
       GoRoute(
         path: '/business',
-        builder: (context, __) => BlocProvider(
+        builder: (context, _) => BlocProvider(
           create: (_) => BusinessBloc()..add(const BusinessStarted()),
           child: BusinessShellPage(onLoggedOut: () => context.go('/login')),
         ),
       ),
       GoRoute(
         path: '/signup',
-        builder: (context, __) => BlocProvider(
+        builder: (context, _) => BlocProvider(
           create: (_) => AuthBloc(
             realtimeSessionController: _realtimeSessionController,
             pushSessionController: _pushSessionController,
@@ -261,7 +261,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/checkout',
-        builder: (context, __) => BlocProvider<CartBloc>(
+        builder: (context, _) => BlocProvider<CartBloc>(
           // Its own cart instance: the flow reads the basket it is about to
           // submit, and submits through the same event the cart tab used.
           create: (_) => CartBloc()..add(const CartStarted()),
@@ -274,7 +274,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/orders',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => OrdersBloc()..add(const OrdersStarted()),
           child: const OrdersPage(),
         ),
@@ -350,49 +350,49 @@ class AppRouter {
       ),
       GoRoute(
         path: '/map',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => NearbyMapBloc()..add(const NearbyMapStarted()),
           child: const NearbyMapPage(),
         ),
       ),
       GoRoute(
         path: '/favorites',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => FavoritesBloc()..add(const FavoritesStarted()),
           child: const FavoritesPage(),
         ),
       ),
       GoRoute(
         path: '/about-us',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => AboutUsBloc(),
           child: const AboutUsPage(),
         ),
       ),
       GoRoute(
         path: '/share-app',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => ShareAppBloc(),
           child: const ShareAppPage(),
         ),
       ),
       GoRoute(
         path: '/profile/edit',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => ProfileEditBloc()..add(const ProfileEditStarted()),
           child: const ProfileEditPage(),
         ),
       ),
       GoRoute(
         path: '/search',
-        builder: (_, __) => BlocProvider(
+        builder: (_, _) => BlocProvider(
           create: (_) => SearchBloc()..add(const SearchStarted()),
           child: const SearchPage(),
         ),
       ),
       GoRoute(
         path: '/',
-        redirect: (_, __) => switch (destination) {
+        redirect: (_, _) => switch (destination) {
           StartupDestination.onboarding => '/onboarding',
           StartupDestination.login => '/login',
           StartupDestination.guestHome => '/home?guest=true',

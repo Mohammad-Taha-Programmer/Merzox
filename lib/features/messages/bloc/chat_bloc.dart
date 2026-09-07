@@ -468,7 +468,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
     return [
       for (final id in order)
-        if (byId[id] case final message?) message,
+        ?byId[id],
     ];
   }
 

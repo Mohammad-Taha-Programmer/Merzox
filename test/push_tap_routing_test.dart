@@ -61,8 +61,8 @@ Map<String, dynamic> _data({
     'audience': audience,
     'type': 'newMessage',
     'routeKind': routeKind,
-    if (conversationId != null) 'conversationId': conversationId,
-    if (orderId != null) 'orderId': orderId,
+    'conversationId': ?conversationId,
+    'orderId': ?orderId,
   };
 }
 
