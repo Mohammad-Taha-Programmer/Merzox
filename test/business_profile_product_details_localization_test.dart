@@ -181,12 +181,18 @@ void main() {
         _expectDirection(tester, find.text(followers), direction);
         _expectDirection(tester, find.text(about), direction);
 
-        expect(
-          find.byIcon(
-            isArabic ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
-          ),
-          findsOneWidget,
+        // One icon in both languages now. It used to be chosen by hand -
+        // right for Arabic, left for English - and `chevron_left` carries
+        // `matchTextDirection`, so Material turned it again and Arabic ended
+        // up with the English arrow. Naming the back chevron and leaving the
+        // turning to Material is the fix; this asserts the mechanism rather
+        // than the appearance, which is what stops it coming back.
+        final Icon back = tester.widget<Icon>(
+          find.byIcon(Icons.chevron_left_rounded),
         );
+
+        expect(back.icon!.matchTextDirection, isTrue);
+        expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
       });
 
       testWidgets(

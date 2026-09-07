@@ -1971,6 +1971,20 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
         expect(find.text('متجر الياسمين'), findsOneWidget);
 
+        // The two floating controls hang from one column, so the circle that
+        // shares the shop stands exactly as far from the frame as the one that
+        // opens a chat. Pinned to `end: 12` separately they did not: a button
+        // keeps a tap target wider than the circle it draws, which left them
+        // 12px and 16px out.
+        final Rect shareBox = tester.getRect(
+          find.byKey(const ValueKey<String>('storefront.share')),
+        );
+        final Rect chatBox = tester.getRect(
+          find.widgetWithIcon(IconButton, Icons.chat_bubble_outline_rounded),
+        );
+        expect(shareBox.left, chatBox.left);
+        expect(shareBox.right, chatBox.right);
+
         await expectMerzoxSeedGolden('store_details_customer_ar_375x812.png');
       });
 

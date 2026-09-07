@@ -920,5 +920,8 @@
     "empty": "You have not added any way to be reached yet.\nAdd your store links in store settings, and your numbers and email in your personal profile.",
     "emptyAction": "Store settings",
     "couldNotOpen": "That could not be opened on your device."
+  },
+  "storefront": {
+    "shareStore": "Share this store"
   }
 }
