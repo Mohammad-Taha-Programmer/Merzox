@@ -10,6 +10,7 @@ import {
   listMyConversations,
   listShareableProducts,
   markConversationRead,
+  reportConversationCounterpart,
   openConversation,
   searchMyConversations,
   sendConversationMessage,
@@ -55,6 +56,9 @@ router.delete(
 // Whom it blocks is the conversation's own other side, never a name in the
 // request - there is no id to forge.
 router.post('/:id/block', blockConversationCounterpart);
+// Whom it reports is the conversation's own other side, like a block. What it
+// carries beyond that is why.
+router.post('/:id/report', reportConversationCounterpart);
 router.delete('/:id/block', unblockConversationCounterpart);
 router.post('/:id/read', markConversationRead);
 

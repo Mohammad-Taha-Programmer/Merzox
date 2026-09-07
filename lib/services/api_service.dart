@@ -1077,6 +1077,27 @@ class ApiService {
     return data['bookmarked'] as bool? ?? bookmarked;
   }
 
+  /// Tells the operator about the other side of this conversation.
+  ///
+  /// Whom it names is never sent, exactly as a block is not: the server reads
+  /// it from the conversation. What travels is why - a reason from the list
+  /// the server knows, and words beside it when the list does not fit.
+  Future<void> reportConversationCounterpart({
+    required String token,
+    required String conversationId,
+    required String reason,
+    String note = '',
+  }) async {
+    await _dio.post<Map<String, dynamic>>(
+      '/conversations/$conversationId/report',
+      data: <String, dynamic>{
+        'reason': reason,
+        if (note.trim().isNotEmpty) 'note': note.trim(),
+      },
+      options: _authOptions(token),
+    );
+  }
+
   /// Closes a conversation from this reader's side, or opens it again.
   ///
   /// Whom it blocks is never sent: it is the other side of this conversation,
@@ -3441,6 +3462,21 @@ class ConversationSearchApiResponse {
     );
   }
 }
+
+/// The reasons a report can carry, as the server lists them.
+///
+/// Held in step with `user-report.policy.js` by a test: a reason this app
+/// offered but the server refused would be a form that fails on send.
+const List<String> merzoxReportReasons = <String>[
+  'spam',
+  'harassment',
+  'scam',
+  'inappropriate',
+  'other',
+];
+
+/// As much of a note as the server will take.
+const int kReportNoteMax = 500;
 
 /// A product carried by a message, as it stood when it was shared.
 ///

@@ -195,7 +195,20 @@
     "blockedByMeNotice": "You blocked this conversation. Nothing will reach you from it, and nothing can be sent to it.",
     "blockedMeNotice": "This conversation is closed, and nothing can be sent in it.",
     "blockedUsersTitle": "Blocked users",
-    "blockedUsersEmpty": "You have not blocked anybody."
+    "blockedUsersEmpty": "You have not blocked anybody.",
+    "reportUser": "Report this user",
+    "reportTitle": "Report user",
+    "reportSubtitle": "Choose a reason, and add details if you wish. The report goes to the app operator.",
+    "reportNoteHint": "More details (optional)",
+    "reportSend": "Send report",
+    "reportSent": "Your report was received",
+    "reportReasons": {
+      "spam": "Spam or advertising",
+      "harassment": "Abuse or harassment",
+      "scam": "Scam or fraud",
+      "inappropriate": "Inappropriate content",
+      "other": "Something else"
+    }
   },
   "notifications": {
     "title": "Notifications",
@@ -819,7 +832,9 @@
     "sharedProductUnavailable": "That product is no longer available in this store.",
     "repliedMessageUnavailable": "That message is no longer in this conversation.",
     "conversationBlocked": "This conversation is closed.",
-    "cannotBlockSelf": "An account cannot block itself."
+    "cannotBlockSelf": "An account cannot block itself.",
+    "invalidReport": "Choose a reason for the report first.",
+    "cannotReportSelf": "An account cannot report itself."
   },
   "courierLocation": {
     "loginEntry": "Share courier location",

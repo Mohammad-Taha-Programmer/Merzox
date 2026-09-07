@@ -46,6 +46,11 @@ import {
 } from '../policies/message-actions.policy.js';
 import { MessageBookmark } from '../models/MessageBookmark.js';
 import { UserBlock } from '../models/UserBlock.js';
+import { UserReport } from '../models/UserReport.js';
+import {
+  assertReportableCounterpart,
+  readReport
+} from '../policies/user-report.policy.js';
 import {
   assertBlockableCounterpart,
   assertNotBlocked,
@@ -798,6 +803,39 @@ export const blockConversationCounterpart = asyncHandler((req, res) =>
 export const unblockConversationCounterpart = asyncHandler((req, res) =>
   setConversationBlock(req, res, false)
 );
+
+/**
+ * Tells the operator about the other side of this conversation.
+ *
+ * Whom it names is read from the conversation, as a block is. What it adds is
+ * a reason and, when the reason does not fit, words - because a report is
+ * read by a person afterwards, and one that said only that somebody
+ * complained could not be acted on.
+ *
+ * Every report is kept, including a second about the same account: two
+ * complaints are two occasions, and it is the second that shows a pattern.
+ */
+export const reportConversationCounterpart = asyncHandler(async (req, res) => {
+  const { reason, note } = readReport(req.body);
+
+  const conversation = await loadConversation(req.params.id);
+  const { viewerType, business } = await resolveViewer(req, conversation);
+
+  const reportedId = assertReportableCounterpart(
+    req.user._id,
+    await counterpartOf(req, conversation, viewerType, business)
+  );
+
+  await UserReport.create({
+    reporter: req.user._id,
+    reported: reportedId,
+    conversation: conversation._id,
+    reason,
+    note
+  });
+
+  res.status(201).json({ success: true, data: { reported: true } });
+});
 
 /**
  * Everyone this reader has closed the door on, newest first.

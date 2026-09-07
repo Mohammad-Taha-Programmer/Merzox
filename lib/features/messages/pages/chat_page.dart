@@ -8,6 +8,8 @@ import 'package:merzox/core/constants/dates.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
+import 'package:merzox/features/notifications/widgets/global_notification_bell.dart';
+
 import '../bloc/chat_bloc.dart';
 import '../bloc/chat_event.dart';
 import '../bloc/chat_state.dart';
@@ -128,6 +130,26 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  /// Asks why, then sends it.
+  ///
+  /// A reason is required and comes from a fixed list, because a report is
+  /// read by a person afterwards and one that said only that somebody
+  /// complained could not be acted on. The words beside it are optional and
+  /// are where a reader says what the list does not cover.
+  Future<void> _openReport() async {
+    final _ReportDraft? draft = await showModalBottomSheet<_ReportDraft>(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext sheetContext) => const _ReportSheet(),
+    );
+
+    if (draft == null || !mounted) return;
+
+    context.read<ChatBloc>().add(
+      ChatReportSubmitted(reason: draft.reason, note: draft.note),
+    );
+  }
+
   /// Offers what can be done with one message.
   ///
   /// A long press rather than a tap: a tap on a shared card opens the
@@ -201,6 +223,7 @@ class _ChatPageState extends State<ChatPage> {
           listenWhen: (previous, current) =>
               previous.messages.length != current.messages.length ||
               previous.errorMessage != current.errorMessage ||
+              previous.noticeCode != current.noticeCode ||
               previous.matchIndex != current.matchIndex ||
               previous.status != current.status,
           listener: (context, state) {
@@ -219,6 +242,14 @@ class _ChatPageState extends State<ChatPage> {
 
             _renderedMessageCount = state.messages.length;
 
+            if (state.noticeCode.isNotEmpty) {
+              ScaffoldMessenger.of(context)
+                ..hideCurrentSnackBar()
+                ..showSnackBar(
+                  SnackBar(content: Text(state.noticeCode.tr())),
+                );
+            }
+
             if (state.errorMessage.isNotEmpty) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
@@ -236,6 +267,7 @@ class _ChatPageState extends State<ChatPage> {
                   blockedByMe: state.blockedByMe,
                   onToggleBlock: () =>
                       context.read<ChatBloc>().add(const ChatBlockToggled()),
+                  onReport: _openReport,
                 ),
                 const Divider(height: 1, color: MerzoxColors.kColorEFEFEF),
                 if (state.readSyncFailed) const _ReadSyncNotice(),
@@ -311,11 +343,15 @@ class _ChatHeader extends StatelessWidget {
   /// Closes the door, or opens it again.
   final VoidCallback onToggleBlock;
 
+  /// Tells the operator about the other side.
+  final VoidCallback onReport;
+
   const _ChatHeader({
     required this.title,
     required this.avatarUrl,
     required this.blockedByMe,
     required this.onToggleBlock,
+    required this.onReport,
   });
 
   @override
@@ -385,6 +421,18 @@ class _ChatHeader extends StatelessWidget {
                         onToggleBlock();
                       },
                     ),
+                    ListTile(
+                      key: const ValueKey<String>('chat.report'),
+                      leading: const Icon(
+                        Icons.flag_outlined,
+                        color: MerzoxColors.kColorEE6C4D,
+                      ),
+                      title: Text('messages.reportUser'.tr()),
+                      onTap: () {
+                        Navigator.of(sheetContext).pop();
+                        onReport();
+                      },
+                    ),
                     const SizedBox(height: 8),
                   ],
                 ),
@@ -396,7 +444,12 @@ class _ChatHeader extends StatelessWidget {
               color: MerzoxColors.kColor5E5E5E,
             ),
           ),
-          const SizedBox(width: 4),
+          // Past the whole of the floating bell - its inset from the edge
+          // plus the width it takes. The bell is drawn above the router, so
+          // anything left in this corner is not merely half covered but
+          // unclickable: its taps go to the bell. The same room every other
+          // bar in the app leaves it.
+          const SizedBox(width: kGlobalBellInset + kGlobalBellReservedWidth),
         ],
       ),
     );
@@ -1179,6 +1232,143 @@ class _PendingReply extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// What a reader chose to say about somebody.
+class _ReportDraft {
+  final String reason;
+  final String note;
+
+  const _ReportDraft({required this.reason, required this.note});
+}
+
+/// Asks why, before anything is sent.
+///
+/// The reasons are the server's own list; one this screen offered but the
+/// server refused would be a form that fails on send, so a test holds the two
+/// together.
+class _ReportSheet extends StatefulWidget {
+  const _ReportSheet();
+
+  @override
+  State<_ReportSheet> createState() => _ReportSheetState();
+}
+
+class _ReportSheetState extends State<_ReportSheet> {
+  final TextEditingController _note = TextEditingController();
+
+  /// Nothing is chosen to begin with: a reason picked by default is a reason
+  /// nobody chose, and the pile it lands in is the one nobody can trust.
+  String? _reason;
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          top: 12,
+          bottom: 16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                'messages.reportTitle'.tr(),
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: MerzoxColors.kColor2B2B2B,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'messages.reportSubtitle'.tr(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: MerzoxColors.kColor8D99AE,
+                ),
+              ),
+              const SizedBox(height: 8),
+              RadioGroup<String>(
+                groupValue: _reason,
+                onChanged: (String? value) => setState(() => _reason = value),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    for (final String reason in merzoxReportReasons)
+                      RadioListTile<String>(
+                        key: ValueKey<String>('chat.reportReason.$reason'),
+                        value: reason,
+                        contentPadding: EdgeInsets.zero,
+                        dense: true,
+                        title: Text(
+                          'messages.reportReasons.$reason'.tr(),
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 4),
+              TextField(
+                key: const ValueKey<String>('chat.reportNote'),
+                controller: _note,
+                minLines: 2,
+                maxLines: 4,
+                maxLength: kReportNoteMax,
+                decoration: InputDecoration(
+                  hintText: 'messages.reportNoteHint'.tr(),
+                  hintStyle: const TextStyle(
+                    color: MerzoxColors.kColor9F9F9F,
+                    fontSize: 12,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                style: const TextStyle(fontSize: 12),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  key: const ValueKey<String>('chat.reportSend'),
+                  // Nothing to send until a reason is chosen, and a button
+                  // that looked ready would only fail at the server.
+                  onPressed: _reason == null
+                      ? null
+                      : () => Navigator.of(context).pop(
+                          _ReportDraft(
+                            reason: _reason!,
+                            note: _note.text,
+                          ),
+                        ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: MerzoxColors.kColorEE6C4D,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  child: Text('messages.reportSend'.tr()),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

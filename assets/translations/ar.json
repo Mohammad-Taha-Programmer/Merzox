@@ -195,7 +195,20 @@
     "blockedByMeNotice": "لقد حظرت هذه المحادثة. لن تصلك رسائل منها ولن تستطيع الإرسال إليها.",
     "blockedMeNotice": "هذه المحادثة مغلقة، ولا يمكن الإرسال فيها.",
     "blockedUsersTitle": "المستخدمون المحظورون",
-    "blockedUsersEmpty": "لم تحظر أحداً."
+    "blockedUsersEmpty": "لم تحظر أحداً.",
+    "reportUser": "الإبلاغ عن هذا المستخدم",
+    "reportTitle": "الإبلاغ عن المستخدم",
+    "reportSubtitle": "اختر سبب البلاغ، وأضف تفاصيل إن أردت. سيصل البلاغ إلى إدارة التطبيق.",
+    "reportNoteHint": "تفاصيل إضافية (اختياري)",
+    "reportSend": "إرسال البلاغ",
+    "reportSent": "تم استلام بلاغك",
+    "reportReasons": {
+      "spam": "رسائل مزعجة أو دعائية",
+      "harassment": "إساءة أو مضايقة",
+      "scam": "احتيال أو نصب",
+      "inappropriate": "محتوى غير لائق",
+      "other": "سبب آخر"
+    }
   },
   "notifications": {
     "title": "الاشعارات",
@@ -819,7 +832,9 @@
     "sharedProductUnavailable": "هذا المنتج لم يعد متاحاً في هذا المتجر.",
     "repliedMessageUnavailable": "هذه الرسالة لم تعد موجودة في المحادثة.",
     "conversationBlocked": "هذه المحادثة مغلقة.",
-    "cannotBlockSelf": "لا يمكن حظر حسابك."
+    "cannotBlockSelf": "لا يمكن حظر حسابك.",
+    "invalidReport": "اختر سبب البلاغ أولاً.",
+    "cannotReportSelf": "لا يمكن الإبلاغ عن حسابك."
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",
