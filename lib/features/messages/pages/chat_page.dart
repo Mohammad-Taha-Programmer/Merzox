@@ -11,10 +11,41 @@ import '../bloc/chat_bloc.dart';
 import '../bloc/chat_event.dart';
 import '../bloc/chat_state.dart';
 import '../highlighted_text.dart';
+import '../widgets/shared_product_card.dart';
+import 'share_product_page.dart';
 import '../widgets/match_navigator.dart';
 
+/// Asks the reader to pick one of this conversation's products.
+///
+/// Returns what they chose, or null if they came back empty-handed.
+typedef ChatProductPicker =
+    Future<BusinessProductApiModel?> Function(
+      BuildContext context,
+      String conversationId,
+    );
+
+/// Opens the shelves this conversation may share from.
+///
+/// The conversation's id is the only thing handed over: which shop those
+/// shelves belong to is the server's answer, which is what keeps either side
+/// from reaching into a catalogue that is not part of this conversation.
+Future<BusinessProductApiModel?> openChatProductPicker(
+  BuildContext context,
+  String conversationId,
+) {
+  return Navigator.of(context).push<BusinessProductApiModel>(
+    MaterialPageRoute<BusinessProductApiModel>(
+      builder: (_) => ShareProductPage(conversationId: conversationId),
+    ),
+  );
+}
+
 class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
+  /// How a product is chosen. The default opens the picker screen; a test
+  /// hands one over without standing up a server.
+  final ChatProductPicker? productPicker;
+
+  const ChatPage({super.key, this.productPicker});
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -24,6 +55,12 @@ class _ChatPageState extends State<ChatPage> {
   final TextEditingController _composerController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   int _renderedMessageCount = 0;
+
+  /// Chosen from the shop's shelves and waiting under the message box.
+  ///
+  /// It sits here rather than being sent on the spot so the sender can say
+  /// something about it first - which is usually why they are sharing it.
+  BusinessProductApiModel? _pendingProduct;
 
   /// One key per occurrence the reader can be sent to.
   final Map<String, GlobalKey> _matchKeys = <String, GlobalKey>{};
@@ -63,10 +100,31 @@ class _ChatPageState extends State<ChatPage> {
 
   void _send() {
     final body = _composerController.text.trim();
-    if (body.isEmpty) return;
+    final BusinessProductApiModel? product = _pendingProduct;
 
-    context.read<ChatBloc>().add(ChatMessageSent(body));
+    // A card on its own is a message; only both being absent is nothing.
+    if (body.isEmpty && product == null) return;
+
+    context.read<ChatBloc>().add(
+      ChatMessageSent(body, productId: product?.id),
+    );
     _composerController.clear();
+    if (product != null) setState(() => _pendingProduct = null);
+  }
+
+  Future<void> _pickProduct() async {
+    final String conversationId = context.read<ChatBloc>().state.conversationId;
+    if (conversationId.isEmpty) return;
+
+    final BusinessProductApiModel? picked =
+        await (widget.productPicker ?? openChatProductPicker)(
+          context,
+          conversationId,
+        );
+
+    if (picked == null || !mounted) return;
+
+    setState(() => _pendingProduct = picked);
   }
 
   /// The thread is drawn oldest first, so any growth should land the viewer at
@@ -153,6 +211,10 @@ class _ChatPageState extends State<ChatPage> {
                   controller: _composerController,
                   enabled: state.status != ChatStatus.sending,
                   onSend: _send,
+                  onShareProduct: _pickProduct,
+                  pendingProduct: _pendingProduct,
+                  onDropPendingProduct: () =>
+                      setState(() => _pendingProduct = null),
                 ),
               ],
             );
@@ -175,7 +237,20 @@ class _ChatHeader extends StatelessWidget {
       height: 66,
       child: Row(
         children: [
-          const BackButton(color: MerzoxColors.kColor5E5E5E),
+          // A chevron rather than Material's full arrow, which is what the
+          // board draws. Named for what it does and left for Material to
+          // turn: `chevron_left` carries `matchTextDirection`, so it leans
+          // right in Arabic and left in English on its own.
+          IconButton(
+            key: const ValueKey<String>('chat.back'),
+            tooltip: 'common.back'.tr(),
+            onPressed: () => Navigator.of(context).maybePop(),
+            icon: const Icon(
+              Icons.chevron_left_rounded,
+              color: MerzoxColors.kColor5E5E5E,
+              size: 28,
+            ),
+          ),
           _ChatAvatar(url: avatarUrl, label: title, size: 40),
           const SizedBox(width: 12),
           Expanded(
@@ -429,6 +504,7 @@ class _MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isMine = message.isMine;
+    final SharedProductApiModel? shared = message.sharedProduct;
 
     // `الرسائل – 2` puts what you wrote at the START of the row in
     // #3D5A80 and what you were told at the end in #F9F9F9 — the sides a
@@ -459,7 +535,17 @@ class _MessageBubble extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text.rich(
+                if (shared != null) ...<Widget>[
+                  SharedProductCard.shared(
+                    product: shared,
+                    onTap: () => openSharedProduct(context, shared),
+                  ),
+                  // Only when there are words to separate from it. A card sent
+                  // on its own is the whole message.
+                  if (message.body.trim().isNotEmpty) const SizedBox(height: 8),
+                ],
+                if (message.body.trim().isNotEmpty)
+                  Text.rich(
                   highlightedSpan(
                     text: message.body,
                     query: query,
@@ -546,15 +632,26 @@ class _Composer extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
   final VoidCallback onSend;
+  final VoidCallback onShareProduct;
+
+  /// Chosen but not yet sent, shown above the box so the sender can see what
+  /// is going with their words - and take it back off.
+  final BusinessProductApiModel? pendingProduct;
+  final VoidCallback onDropPendingProduct;
 
   const _Composer({
     required this.controller,
     required this.enabled,
     required this.onSend,
+    required this.onShareProduct,
+    required this.onDropPendingProduct,
+    this.pendingProduct,
   });
 
   @override
   Widget build(BuildContext context) {
+    final BusinessProductApiModel? pending = pendingProduct;
+
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -562,64 +659,168 @@ class _Composer extends StatelessWidget {
         top: 8,
         bottom: 12 + MediaQuery.viewInsetsOf(context).bottom,
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: MerzoxColors.kColorF9F9F9,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: MerzoxColors.kColorEFEFEF),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: TextField(
-                controller: controller,
-                enabled: enabled,
-                minLines: 1,
-                maxLines: 4,
-                maxLength: 2000,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => onSend(),
-                decoration: InputDecoration(
-                  counterText: '',
-                  border: InputBorder.none,
-                  hintText: 'messages.composerHint'.tr(),
-                  hintStyle: const TextStyle(
-                    color: MerzoxColors.kColor9F9F9F,
-                    fontSize: 12,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (pending != null)
+            _PendingProduct(product: pending, onRemove: onDropPendingProduct),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: MerzoxColors.kColorF9F9F9,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: MerzoxColors.kColorEFEFEF),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: TextField(
+                    controller: controller,
+                    enabled: enabled,
+                    minLines: 1,
+                    maxLines: 4,
+                    maxLength: 2000,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => onSend(),
+                    decoration: InputDecoration(
+                      counterText: '',
+                      border: InputBorder.none,
+                      hintText: 'messages.composerHint'.tr(),
+                      hintStyle: const TextStyle(
+                        color: MerzoxColors.kColor9F9F9F,
+                        fontSize: 12,
+                      ),
+                    ),
+                    style: const TextStyle(fontSize: 12),
                   ),
                 ),
-                style: const TextStyle(fontSize: 12),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Material(
-            color: MerzoxColors.kColorEE6C4D,
-            shape: const CircleBorder(),
-            child: InkWell(
-              customBorder: const CircleBorder(),
-              onTap: enabled ? onSend : null,
-              child: SizedBox(
-                width: 46,
-                height: 46,
-                child: enabled
-                    ? const Icon(
-                        Icons.send_rounded,
+              // Beside the send button, and built like it: the same circle at
+              // the same size, in the board's light blue rather than its
+              // orange. The two things a reader does when they have finished
+              // composing, told apart by colour instead of by size - it was a
+              // bare glyph half the send button's weight, which read as a
+              // decoration next to it.
+              Material(
+                color: MerzoxColors.kColor98C1D9,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  key: const ValueKey<String>('chat.shareProduct'),
+                  customBorder: const CircleBorder(),
+                  onTap: enabled ? onShareProduct : null,
+                  child: Tooltip(
+                    message: 'messages.shareProductTooltip'.tr(),
+                    child: const SizedBox(
+                      width: kChatComposerButton,
+                      height: kChatComposerButton,
+                      child: Icon(
+                        Icons.local_offer_outlined,
                         color: Colors.white,
                         size: 20,
-                      )
-                    : const Padding(
-                        padding: EdgeInsets.all(14),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
                       ),
+                    ),
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+              Material(
+                color: MerzoxColors.kColorEE6C4D,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: enabled ? onSend : null,
+                  child: SizedBox(
+                    width: kChatComposerButton,
+                    height: kChatComposerButton,
+                    child: enabled
+                        ? const Icon(
+                            Icons.send_rounded,
+                            color: Colors.white,
+                            size: 20,
+                          )
+                        : const Padding(
+                            padding: EdgeInsets.all(14),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The round buttons at the end of the composer row.
+///
+/// One size for both: sending, and reaching for something to send.
+const double kChatComposerButton = 46;
+
+/// How tall the picture is on the card being written.
+///
+/// Shorter than the one in the thread: this sits above the keyboard, and a
+/// full-height card there would push the words being typed off the screen.
+const double kPendingProductImageHeight = 76;
+
+/// The product chosen but not yet sent, above the box the words go in.
+///
+/// The card and nothing else. It was wrapped in a rounded grey panel with a
+/// label beside it, which is the shape of the message field - so the empty
+/// half of that panel read as a second box that would not take any typing.
+/// The card carries its own dismiss badge instead, and the only thing on this
+/// screen shaped like a text field is the text field.
+class _PendingProduct extends StatelessWidget {
+  final BusinessProductApiModel product;
+  final VoidCallback onRemove;
+
+  const _PendingProduct({required this.product, required this.onRemove});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: const ValueKey<String>('chat.pendingProduct'),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: <Widget>[
+            SharedProductCard(
+              name: product.name,
+              price: product.displayPrice,
+              imageUrl: product.imageUrl,
+              imageHeight: kPendingProductImageHeight,
+            ),
+            PositionedDirectional(
+              top: -6,
+              end: -6,
+              child: Material(
+                color: Colors.white,
+                shape: const CircleBorder(),
+                elevation: 1,
+                shadowColor: Colors.black26,
+                child: InkWell(
+                  key: const ValueKey<String>('chat.dropPendingProduct'),
+                  customBorder: const CircleBorder(),
+                  onTap: onRemove,
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 16,
+                      color: MerzoxColors.kColor8D99AE,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

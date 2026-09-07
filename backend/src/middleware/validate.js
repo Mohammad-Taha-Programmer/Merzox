@@ -21,6 +21,10 @@ import {
   PRODUCT_LIMITS
 } from '../policies/product.policy.js';
 import { AppError } from '../utils/AppError.js';
+import {
+  messageHasContent,
+  readSharedProductId
+} from '../policies/shared-product.policy.js';
 
 export function validateSignup(req, _res, next) {
   const { name, email, phone, password } = req.body;
@@ -847,7 +851,10 @@ export function validateConversationOpen(req, _res, next) {
 }
 
 export function validateMessageCreate(req, _res, next) {
-  const invalid = Object.keys(req.body).filter((key) => key !== 'body');
+  const allowed = ['body', 'productId'];
+  const invalid = Object.keys(req.body).filter(
+    (key) => !allowed.includes(key)
+  );
   if (invalid.length > 0) {
     throw new AppError(
       `Unsupported message fields: ${invalid.join(', ')}`,
@@ -856,8 +863,13 @@ export function validateMessageCreate(req, _res, next) {
     );
   }
 
+  // Only the id travels. The name, the price and the picture on the card are
+  // read from the shop by the handler, so nothing a client sends can put a
+  // price on a card that the shop is not asking.
+  const productId = readSharedProductId(req.body);
+
   const body = String(req.body.body ?? '').trim();
-  if (body.length === 0) {
+  if (!messageHasContent({ body, productId })) {
     throw new AppError('Message body is required', 400, 'INVALID_MESSAGE_BODY');
   }
   if (body.length > 2000) {

@@ -8,7 +8,10 @@ import { normalizeGender, normalizeIdentifier, normalizePhone } from '../utils/n
 import { pick } from '../utils/pick.js';
 import { readUploadedImage } from '../policies/avatar.policy.js';
 import { deleteImage, uploadImage } from '../services/image-host.service.js';
-import { applyPictureToOwnedBusiness } from '../services/account-picture.service.js';
+import {
+  applyAvatarToConversations,
+  applyPictureToOwnedBusiness
+} from '../services/account-picture.service.js';
 import {
   notificationPreferenceView,
   parseNotificationPreferencePatch,
@@ -251,6 +254,10 @@ export const updateMyAvatar = asyncHandler(async (req, res) => {
   // logo, so the bar they look at and the card a customer sees are the same
   // image. A customer owns no shop and this does nothing.
   await applyPictureToOwnedBusiness(req.user._id, url);
+
+  // And the threads this account is the customer side of, where the merchant
+  // sees them. Both copies exist so a list of threads costs one query.
+  await applyAvatarToConversations(req.user._id, url);
 
   // Only once the new picture is safely stored, and never at the cost of the
   // request: a tidy-up that failed must not turn a successful change into an

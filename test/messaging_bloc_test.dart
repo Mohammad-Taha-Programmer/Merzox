@@ -129,14 +129,19 @@ class _FakeMessagingApi extends ApiService {
         );
   }
 
+  /// What was shared with each send, in step with [sentBodies].
+  final List<String?> sentProductIds = <String?>[];
+
   @override
   Future<MessageApiModel> sendMessage({
     required String token,
     required String conversationId,
     required String body,
+    String? productId,
   }) async {
     if (sendError != null) throw sendError!;
     sentBodies.add(body);
+    sentProductIds.add(productId);
     return _message(id: 'm2', body: body);
   }
 

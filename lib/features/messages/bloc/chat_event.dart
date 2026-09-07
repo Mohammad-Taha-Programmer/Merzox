@@ -16,7 +16,13 @@ final class ChatOpenedForBusiness extends ChatEvent {
 final class ChatMessageSent extends ChatEvent {
   final String body;
 
-  const ChatMessageSent(this.body);
+  /// A product of this conversation's shop, shared as a card.
+  ///
+  /// A message may be words, a card, or both - so an empty body is only empty
+  /// when there is no product with it.
+  final String? productId;
+
+  const ChatMessageSent(this.body, {this.productId});
 }
 
 final class ChatOlderMessagesRequested extends ChatEvent {

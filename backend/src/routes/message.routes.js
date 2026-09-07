@@ -4,6 +4,7 @@ import {
   getMyConversationUnreadCount,
   listConversationMessages,
   listMyConversations,
+  listShareableProducts,
   markConversationRead,
   openConversation,
   searchMyConversations,
@@ -25,6 +26,9 @@ router.get('/search', searchMyConversations);
 router.get('/', listMyConversations);
 router.post('/', validateConversationOpen, openConversation);
 router.get('/:id/messages', listConversationMessages);
+// The shop's shelves, as seen from inside this thread. Not a catalogue route:
+// which shop it is comes from the conversation, never from the caller.
+router.get('/:id/products', listShareableProducts);
 router.post('/:id/messages', validateMessageCreate, sendConversationMessage);
 router.post('/:id/read', markConversationRead);
 

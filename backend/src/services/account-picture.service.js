@@ -29,6 +29,30 @@ export async function applyLogoToConversations(
 }
 
 /**
+ * Carries a customer's picture into the threads that show it.
+ *
+ * The mirror of [applyLogoToConversations]: a conversation keeps the
+ * customer's picture as well as the shop's, so the merchant's inbox can draw
+ * a list without loading an account per row. Nothing refreshed that copy
+ * either, so a customer who set a picture kept a blank circle in every thread
+ * they had already opened.
+ */
+export async function applyAvatarToConversations(
+  userId,
+  avatarUrl,
+  { model = Conversation } = {}
+) {
+  if (!userId) return 0;
+
+  const result = await model.updateMany(
+    { user: userId },
+    { $set: { userAvatarUrl: avatarUrl ?? '' } }
+  );
+
+  return result?.modifiedCount ?? 0;
+}
+
+/**
  * Carries an account's new picture onto the shop it owns.
  *
  * A merchant has one picture, not two. Before this, setting it changed only

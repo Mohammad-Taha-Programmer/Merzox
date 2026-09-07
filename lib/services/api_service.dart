@@ -995,14 +995,25 @@ class ApiService {
     );
   }
 
+  /// Sends a message, optionally carrying one of the shop's products.
+  ///
+  /// Only the product's id travels. Its name, price and picture are read from
+  /// the shop by the server and copied onto the message there, so nothing the
+  /// app sends can put a price on a card that the shop is not asking - and
+  /// the id is looked up inside this conversation's own shop, which is what
+  /// keeps either side from reaching into another shop's catalogue.
   Future<MessageApiModel> sendMessage({
     required String token,
     required String conversationId,
     required String body,
+    String? productId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/conversations/$conversationId/messages',
-      data: {'body': body},
+      data: <String, dynamic>{
+        'body': body,
+        if (productId != null && productId.isNotEmpty) 'productId': productId,
+      },
       options: _authOptions(token),
     );
     final data = response.data?['data'] as Map<String, dynamic>? ?? {};
@@ -1010,6 +1021,28 @@ class ApiService {
     return MessageApiModel.fromJson(
       data['message'] as Map<String, dynamic>? ?? {},
     );
+  }
+
+  /// The products either side of a conversation may share into it.
+  ///
+  /// Which shop that is comes from the conversation, not from here: there is
+  /// no business parameter to point somewhere else, and that absence is the
+  /// access rule rather than a check that could be forgotten.
+  Future<List<BusinessProductApiModel>> conversationProducts({
+    required String token,
+    required String conversationId,
+  }) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      '/conversations/$conversationId/products',
+      options: _authOptions(token),
+    );
+    final data = response.data?['data'] as Map<String, dynamic>? ?? {};
+    final products = data['products'] as List<dynamic>? ?? const [];
+
+    return products
+        .whereType<Map<String, dynamic>>()
+        .map(BusinessProductApiModel.fromJson)
+        .toList();
   }
 
   Future<ConversationApiModel> markConversationRead({
@@ -3304,12 +3337,58 @@ class ConversationSearchApiResponse {
   }
 }
 
+/// A product carried by a message, as it stood when it was shared.
+///
+/// A copy rather than a reference, made by the server: the card says what was
+/// shared on the day it was shared, so a later price change cannot rewrite a
+/// conversation and a withdrawn product still leaves the message readable.
+/// The two ids are what let the card lead to the live product page.
+class SharedProductApiModel {
+  final String productId;
+  final String businessId;
+  final String name;
+  final double price;
+  final String imageUrl;
+
+  const SharedProductApiModel({
+    required this.productId,
+    required this.businessId,
+    required this.name,
+    required this.price,
+    required this.imageUrl,
+  });
+
+  /// Null for the ordinary message, which is most of them.
+  static SharedProductApiModel? fromJson(Object? json) {
+    if (json is! Map<String, dynamic>) return null;
+
+    final productId = json['productId'] as String? ?? '';
+    final businessId = json['businessId'] as String? ?? '';
+
+    // Without both there is no product page to lead to, and a card that goes
+    // nowhere is worse than the words it replaced.
+    if (productId.isEmpty || businessId.isEmpty) return null;
+
+    return SharedProductApiModel(
+      productId: productId,
+      businessId: businessId,
+      name: json['name'] as String? ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0,
+      imageUrl: json['imageUrl'] as String? ?? '',
+    );
+  }
+}
+
 class MessageApiModel {
   final String id;
   final String conversationId;
   final String senderType;
   final String senderName;
   final String body;
+
+  /// The product this message shares, or null - which is the ordinary case.
+  final SharedProductApiModel? sharedProduct;
+
   final bool isMine;
   final DateTime? readAt;
   final DateTime? createdAt;
@@ -3323,6 +3402,7 @@ class MessageApiModel {
     required this.isMine,
     required this.readAt,
     required this.createdAt,
+    this.sharedProduct,
   });
 
   factory MessageApiModel.fromJson(Map<String, dynamic> json) {
@@ -3332,6 +3412,7 @@ class MessageApiModel {
       senderType: json['senderType'] as String? ?? 'customer',
       senderName: json['senderName'] as String? ?? '',
       body: json['body'] as String? ?? '',
+      sharedProduct: SharedProductApiModel.fromJson(json['sharedProduct']),
       isMine: json['isMine'] as bool? ?? false,
       readAt: DateTime.tryParse(json['readAt'] as String? ?? ''),
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),

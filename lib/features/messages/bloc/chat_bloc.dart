@@ -311,8 +311,11 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     Emitter<ChatState> emit,
   ) async {
     final body = event.body.trim();
+    final String productId = event.productId?.trim() ?? '';
 
-    if (body.isEmpty || state.conversationId.isEmpty) {
+    // A shared product card is a message without words; only the two together
+    // being absent is nothing to send.
+    if ((body.isEmpty && productId.isEmpty) || state.conversationId.isEmpty) {
       return;
     }
 
@@ -327,6 +330,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
         token: await _token(),
         conversationId: state.conversationId,
         body: body,
+        productId: productId.isEmpty ? null : productId,
       );
 
       // The sender receives the same realtime invalidation as the counterpart.
