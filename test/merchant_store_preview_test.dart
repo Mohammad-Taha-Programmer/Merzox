@@ -670,10 +670,12 @@ void main() {
       expect(find.text('وضع المعاينة - هذا ما يراه الزبون'), findsNothing);
       expect(find.text('إنهاء المعاينة'), findsNothing);
 
-      // The exit is the shared top Back control. Rendered RTL here, so the
-      // chevron points right, exactly as it does in the customer storefront.
+      // The exit is the shared top Back control - the same one the customer
+      // storefront draws, which is the point of the preview. It is named for
+      // what it does and Material turns it for the reading; it used to be
+      // turned by hand as well, which left Arabic with the English arrow.
       expect(
-        find.widgetWithIcon(IconButton, Icons.chevron_right_rounded),
+        find.widgetWithIcon(IconButton, Icons.chevron_left_rounded),
         findsOneWidget,
       );
     });

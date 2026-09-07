@@ -15,6 +15,7 @@ import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart'
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/services/store_share_service.dart';
 import 'package:merzox/core/constants/money.dart';
 
 class BusinessProfilePage extends StatelessWidget {
@@ -35,6 +36,10 @@ class BusinessProfilePage extends StatelessWidget {
   @visibleForTesting
   final BusinessProfileBloc? bloc;
 
+  /// Hands the shop to whatever the phone shares with. Injected by tests,
+  /// which have no share sheet.
+  final StoreShareGateway shareGateway;
+
   const BusinessProfilePage({
     super.key,
     required this.business,
@@ -42,6 +47,7 @@ class BusinessProfilePage extends StatelessWidget {
     this.viewMode = BusinessProfileViewMode.customer,
     this.onClosePreview,
     this.bloc,
+    this.shareGateway = const StoreShareService(),
   });
 
   @override
@@ -57,6 +63,7 @@ class BusinessProfilePage extends StatelessWidget {
         business: business,
         onNavChanged: onNavChanged,
         viewMode: viewMode,
+        shareGateway: shareGateway,
       ),
     );
   }
@@ -66,11 +73,13 @@ class _BusinessProfileView extends StatelessWidget {
   final HomeBusiness business;
   final ValueChanged<int> onNavChanged;
   final BusinessProfileViewMode viewMode;
+  final StoreShareGateway shareGateway;
 
   const _BusinessProfileView({
     required this.business,
     required this.onNavChanged,
     required this.viewMode,
+    required this.shareGateway,
   });
 
   @override
@@ -174,21 +183,42 @@ class _BusinessProfileView extends StatelessWidget {
                     // the LEFT edge in RTL, so 0 pinned it flush to the frame.
                     end: 12,
                     bottom: 21,
-                    child: _ChatButton(
-                      onPressed: () => AuthGate.run(
-                        context,
-                        // The thread is created by the chat route on first
-                        // open, so only the store id travels with the tap.
-                        onAuthenticated: () => context.push(
-                          Uri(
-                            path: '/chat',
-                            queryParameters: {
-                              'businessId': resolvedBusiness.id,
-                              'title': resolvedBusiness.name,
-                            },
-                          ).toString(),
+                    // The two things a customer does about a shop rather than
+                    // inside it - talk to it, or tell somebody about it - hang
+                    // from one column so they keep one centre line. Pinning
+                    // each of them to `end: 12` on its own did not: a button
+                    // keeps a tap target wider than the circle it draws, so
+                    // the circles ended up 12px and 16px from the frame.
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Builder(
+                          builder: (BuildContext shareContext) =>
+                              StoreShareButton(
+                                onPressed: () => _share(
+                                  context: shareContext,
+                                  business: resolvedBusiness,
+                                  gateway: shareGateway,
+                                ),
+                              ),
                         ),
-                      ),
+                        _ChatButton(
+                          onPressed: () => AuthGate.run(
+                            context,
+                            // The thread is created by the chat route on first
+                            // open, so only the store id travels with the tap.
+                            onAuthenticated: () => context.push(
+                              Uri(
+                                path: '/chat',
+                                queryParameters: {
+                                  'businessId': resolvedBusiness.id,
+                                  'title': resolvedBusiness.name,
+                                },
+                              ).toString(),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
               ],
@@ -248,6 +278,85 @@ class _PreviewAwaitingPublicTruth extends StatelessWidget {
   }
 }
 
+/// The side of the round controls that float over a storefront.
+const double kStoreActionDiameter = 39;
+
+/// Hands the shop to whatever the phone shares with.
+///
+/// The public id travels with the name, because a name alone sends the reader
+/// looking through a list: the id is the one thing that leads back to exactly
+/// this shop, and the app already searches by it.
+Future<void> _share({
+  required BuildContext context,
+  required HomeBusiness business,
+  required StoreShareGateway gateway,
+}) {
+  return shareStoreCard(
+    gateway: gateway,
+    business: business,
+    languageCode: Localizations.localeOf(context).languageCode,
+    // Where the sheet points on the tablets that draw it as a popover.
+    sharePositionOrigin: _shareOrigin(context),
+  );
+}
+
+/// Which of a shop's facts travel when it is shared.
+///
+/// Its own function so the choice is checkable without the page around it:
+/// the name, the kind of shop, and the public id - which is the one that
+/// leads back to exactly this one.
+Future<void> shareStoreCard({
+  required StoreShareGateway gateway,
+  required HomeBusiness business,
+  required String languageCode,
+  Rect? sharePositionOrigin,
+}) {
+  return gateway.shareStore(
+    storeName: business.name,
+    category: business.category,
+    publicId: business.displayId,
+    languageCode: languageCode,
+    sharePositionOrigin: sharePositionOrigin,
+  );
+}
+
+Rect? _shareOrigin(BuildContext context) {
+  final RenderObject? box = context.findRenderObject();
+  if (box is! RenderBox || !box.hasSize) return null;
+
+  return box.localToGlobal(Offset.zero) & box.size;
+}
+
+/// Tell somebody about this shop.
+///
+/// Public so it can be exercised on its own: this page does not settle in a
+/// widget test - the same reason the product page's slider and its purchase
+/// controls were pulled out of it.
+class StoreShareButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const StoreShareButton({required this.onPressed, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // The same kind of button as the chat bubble below it, drawing the same
+    // circle: that is what lets the two share a column and land at the same
+    // distance from the frame, with neither of them holding a number that
+    // describes the other.
+    return IconButton.filled(
+      key: const ValueKey<String>('storefront.share'),
+      onPressed: onPressed,
+      tooltip: 'storefront.shareStore'.tr(),
+      style: IconButton.styleFrom(
+        backgroundColor: MerzoxColors.kColor98C1D9,
+        foregroundColor: Colors.white,
+        fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
+      ),
+      icon: const Icon(Icons.share_outlined, size: 18),
+    );
+  }
+}
+
 class _TopBar extends StatelessWidget {
   final VoidCallback onBack;
 
@@ -255,8 +364,6 @@ class _TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-
     return SizedBox(
       height: 42,
       child: Stack(
@@ -265,14 +372,15 @@ class _TopBar extends StatelessWidget {
           Align(
             alignment: AlignmentDirectional.centerStart,
             child: IconButton(
+              key: const ValueKey<String>('storefront.back'),
               tooltip: 'common.back'.tr(),
               onPressed: onBack,
-              icon: Icon(
-                isRtl
-                    ? Icons.chevron_right_rounded
-                    : Icons.chevron_left_rounded,
-                size: 34,
-              ),
+              // Named for what it does, not for where it points. This icon
+              // carries `matchTextDirection`, so Material turns it for a
+              // right-to-left reading on its own; choosing the direction here
+              // turned it a second time and left Arabic with the English
+              // arrow - the same mistake three other screens had.
+              icon: const Icon(Icons.chevron_left_rounded, size: 34),
             ),
           ),
           Align(
@@ -1266,7 +1374,7 @@ class _ChatButton extends StatelessWidget {
       style: IconButton.styleFrom(
         backgroundColor: MerzoxColors.kColor3D5A80,
         foregroundColor: Colors.white,
-        fixedSize: const Size(39, 39),
+        fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
       ),
       icon: const Icon(Icons.chat_bubble_outline_rounded, size: 22),
     );
