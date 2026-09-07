@@ -176,6 +176,8 @@ const Map<String, String> apiErrorMessageKeys = <String, String>{
   'INVALID_CONVERSATION_ID': 'apiErrors.conversationNotFound',
   'INVALID_CONVERSATION_TARGET': 'apiErrors.invalidConversationTarget',
   'INVALID_MESSAGE_BODY': 'apiErrors.invalidMessageBody',
+  'INVALID_SHARED_PRODUCT': 'apiErrors.sharedProductUnavailable',
+  'SHARED_PRODUCT_NOT_FOUND': 'apiErrors.sharedProductUnavailable',
   'MESSAGE_STATE_INCONSISTENT': 'apiErrors.messageNotStored',
   'REVIEW_NOT_ELIGIBLE': 'apiErrors.reviewNotEligible',
 

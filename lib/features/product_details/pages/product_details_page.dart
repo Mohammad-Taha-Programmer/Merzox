@@ -20,6 +20,16 @@ class ProductDetailsPage extends StatelessWidget {
   final HomeBusiness business;
   final BusinessProductApiModel product;
 
+  /// Whether the reader is the shop that sells this.
+  ///
+  /// A shopkeeper who opens their own product - which is what happens when a
+  /// customer shares one into a conversation and the shopkeeper taps the card
+  /// - has no use for the quantity stepper, the cart or the buy button, and
+  /// every use of them would be a mistake: their own order, in their own
+  /// shop, for their own stock. The controls stay where they are and stop
+  /// responding, rather than disappearing and changing the page under them.
+  final bool viewerOwnsProduct;
+
   /// Test seam, matching the one on the storefront page: an already-started
   /// bloc to render against. Nothing in the app supplies it.
   @visibleForTesting
@@ -30,6 +40,7 @@ class ProductDetailsPage extends StatelessWidget {
     required this.business,
     required this.product,
     this.bloc,
+    this.viewerOwnsProduct = false,
   });
 
   @override
@@ -45,15 +56,22 @@ class ProductDetailsPage extends StatelessWidget {
               initialProduct: product,
             ),
           )),
-      child: _ProductDetailsView(business: business),
+      child: _ProductDetailsView(
+        business: business,
+        viewerOwnsProduct: viewerOwnsProduct,
+      ),
     );
   }
 }
 
 class _ProductDetailsView extends StatelessWidget {
   final HomeBusiness business;
+  final bool viewerOwnsProduct;
 
-  const _ProductDetailsView({required this.business});
+  const _ProductDetailsView({
+    required this.business,
+    required this.viewerOwnsProduct,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +130,7 @@ class _ProductDetailsView extends StatelessWidget {
                               business: business,
                               product: product,
                               state: state,
+                              viewerOwnsProduct: viewerOwnsProduct,
                             )
                           else
                             _ReviewsTab(state: state),
@@ -161,9 +180,10 @@ class _ProductDetailsView extends StatelessWidget {
               ? null
               : SafeArea(
                   top: false,
-                  child: _BottomActions(
+                  child: ProductPurchaseActions(
                     selectionRequired: state.variantSelectionRequired,
                     inStock: state.selectedSellableInStock,
+                    enabled: !viewerOwnsProduct,
                     onAdd: () => AuthGate.run(
                       context,
                       onAuthenticated: () => context
@@ -457,10 +477,15 @@ class _DescriptionTab extends StatelessWidget {
   final BusinessProductApiModel product;
   final ProductDetailsState state;
 
+  /// Whether the reader is the shop that sells this. The quantity stepper is
+  /// frozen for them: there is no quantity of their own stock to choose.
+  final bool viewerOwnsProduct;
+
   const _DescriptionTab({
     required this.business,
     required this.product,
     required this.state,
+    this.viewerOwnsProduct = false,
   });
 
   @override
@@ -489,7 +514,10 @@ class _DescriptionTab extends StatelessWidget {
             ),
             const SizedBox(height: 24),
           ],
-          _QuantityRow(quantity: state.quantity),
+          ProductQuantityRow(
+            quantity: state.quantity,
+            enabled: !viewerOwnsProduct,
+          ),
           const SizedBox(height: 28),
           _SellerDetails(business: business),
         ],
@@ -562,10 +590,23 @@ class _VariantSelector extends StatelessWidget {
   }
 }
 
-class _QuantityRow extends StatelessWidget {
+/// How many of it to order.
+///
+/// Public so the one property worth guarding - that it stops answering for
+/// the shop that sells the product - is checkable without standing up the
+/// whole page, which does not settle in a test.
+class ProductQuantityRow extends StatelessWidget {
   final int quantity;
 
-  const _QuantityRow({required this.quantity});
+  /// False for the shop's own owner: there is no quantity of their own stock
+  /// for them to choose here.
+  final bool enabled;
+
+  const ProductQuantityRow({
+    required this.quantity,
+    this.enabled = true,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -582,9 +623,11 @@ class _QuantityRow extends StatelessWidget {
           children: [
             _StepperButton(
               icon: Icons.remove_rounded,
-              onPressed: () => context.read<ProductDetailsBloc>().add(
-                const ProductDetailsQuantityDecremented(),
-              ),
+              onPressed: enabled
+                  ? () => context.read<ProductDetailsBloc>().add(
+                      const ProductDetailsQuantityDecremented(),
+                    )
+                  : null,
             ),
             Container(
               width: 58,
@@ -605,9 +648,11 @@ class _QuantityRow extends StatelessWidget {
             ),
             _StepperButton(
               icon: Icons.add_rounded,
-              onPressed: () => context.read<ProductDetailsBloc>().add(
-                const ProductDetailsQuantityIncremented(),
-              ),
+              onPressed: enabled
+                  ? () => context.read<ProductDetailsBloc>().add(
+                      const ProductDetailsQuantityIncremented(),
+                    )
+                  : null,
             ),
           ],
         ),
@@ -618,7 +663,9 @@ class _QuantityRow extends StatelessWidget {
 
 class _StepperButton extends StatelessWidget {
   final IconData icon;
-  final VoidCallback onPressed;
+
+  /// Null freezes it: `IconButton` greys itself out and stops answering.
+  final VoidCallback? onPressed;
 
   const _StepperButton({required this.icon, required this.onPressed});
 
@@ -1080,17 +1127,27 @@ class _ProductLoadFailure extends StatelessWidget {
   }
 }
 
-class _BottomActions extends StatelessWidget {
+/// The two buttons along the foot of a product.
+///
+/// Public for the same reason as [ProductQuantityRow]: the page itself cannot
+/// be pumped, and whether these answer at all is worth a test.
+class ProductPurchaseActions extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onBuy;
   final bool inStock;
   final bool selectionRequired;
 
-  const _BottomActions({
+  /// False for the shop's own owner. The two buttons stay where they are and
+  /// stop answering, rather than vanishing and moving the page under them.
+  final bool enabled;
+
+  const ProductPurchaseActions({
+    super.key,
     required this.onAdd,
     required this.onBuy,
     required this.inStock,
     required this.selectionRequired,
+    this.enabled = true,
   });
 
   @override
@@ -1111,7 +1168,7 @@ class _BottomActions extends StatelessWidget {
         children: [
           Expanded(
             child: FilledButton(
-              onPressed: onAdd,
+              onPressed: enabled ? onAdd : null,
               style: FilledButton.styleFrom(
                 backgroundColor: MerzoxColors.kColorEE6C4D,
                 shape: const RoundedRectangleBorder(
@@ -1128,7 +1185,7 @@ class _BottomActions extends StatelessWidget {
           ),
           Expanded(
             child: OutlinedButton(
-              onPressed: onBuy,
+              onPressed: enabled ? onBuy : null,
               style: OutlinedButton.styleFrom(
                 foregroundColor: MerzoxColors.kColor2B2B2B,
                 side: BorderSide(color: MerzoxColors.kColorEE6C4D),

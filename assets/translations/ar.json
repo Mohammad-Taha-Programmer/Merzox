@@ -174,7 +174,10 @@
     "matchPosition": "{current} من {total}",
     "matchPrevious": "النتيجة السابقة",
     "matchNext": "النتيجة التالية",
-    "matchNotReached": "تعذر الوصول إلى موضع هذه النتيجة"
+    "matchNotReached": "تعذر الوصول إلى موضع هذه النتيجة",
+    "shareProductTitle": "مشاركة منتج",
+    "shareProductEmpty": "لا توجد منتجات لمشاركتها.",
+    "shareProductTooltip": "مشاركة منتج"
   },
   "notifications": {
     "title": "الاشعارات",
@@ -794,7 +797,8 @@
     "productImageTooLarge": "صورة المنتج كبيرة جداً، الحد الأعلى 5 ميجابايت",
     "productContentTypeUnsupported": "صيغة صورة المنتج غير مدعومة، استخدم JPG أو PNG",
     "payloadTooLarge": "الملف كبير جداً، اختر صورة أصغر",
-    "cannotReviewOwnBusiness": "لا يمكنك تقييم متجرك أو منتجاتك"
+    "cannotReviewOwnBusiness": "لا يمكنك تقييم متجرك أو منتجاتك",
+    "sharedProductUnavailable": "هذا المنتج لم يعد متاحاً في هذا المتجر."
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",

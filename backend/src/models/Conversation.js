@@ -22,6 +22,10 @@ const conversationSchema = new mongoose.Schema(
       index: true
     },
     userName: { type: String, trim: true, maxlength: 80, default: '' },
+    // The customer's picture, kept here for the same reason the shop's logo
+    // is: the merchant's inbox draws a list of threads without loading the
+    // account behind each one.
+    userAvatarUrl: { type: String, trim: true, maxlength: 1000, default: '' },
     business: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Business',
@@ -94,10 +98,13 @@ conversationSchema.methods.toMerchantJSON = function toMerchantJSON({
     id: this._id.toString(),
     customer: {
       id: this.user.toString(),
-      name: this.userName
+      name: this.userName,
+      avatarUrl: this.userAvatarUrl ?? ''
     },
     title: this.userName,
-    avatarUrl: '',
+    // It used to be blank here, so a merchant saw the first letter of a name
+    // where the customer's picture belonged - and had no way to be shown one.
+    avatarUrl: this.userAvatarUrl ?? '',
     lastMessage: lastMessageJSON(this),
     lastReceivedAt,
     unreadCount: this.unreadForBusiness,

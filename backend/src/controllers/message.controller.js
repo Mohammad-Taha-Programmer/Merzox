@@ -33,6 +33,11 @@ import {
 import { publishMessagesChanged } from '../realtime/realtime.publisher.js';
 import { notifyNewMessage } from '../services/notification.service.js';
 import { AppError } from '../utils/AppError.js';
+import {
+  findShareableProduct,
+  readSharedProductId,
+  sharedProductSnapshot
+} from '../policies/shared-product.policy.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 function conversationFilter(query) {
@@ -310,6 +315,7 @@ export const openConversation = asyncHandler(async (req, res) => {
     $setOnInsert: { user: req.user._id, business: business._id },
     $set: {
       userName: req.user.name,
+      userAvatarUrl: req.user.avatarUrl ?? '',
       businessName: business.name,
       businessLogoUrl: business.logoUrl ?? '',
       isActive: true
@@ -367,10 +373,52 @@ export const listConversationMessages = asyncHandler(async (req, res) => {
   });
 });
 
+/**
+ * The products either side of a conversation may share into it.
+ *
+ * The shop is the conversation's, never the caller's choice, which is what
+ * keeps a merchant to their own shelves and a customer to the shop they are
+ * actually talking to. Withdrawn products are left out: a card leading to a
+ * page that cannot be opened would be worse than no card.
+ */
+export const listShareableProducts = asyncHandler(async (req, res) => {
+  const conversation = await loadConversation(req.params.id);
+  await resolveViewer(req, conversation);
+
+  const business = await Business.findById(conversation.business);
+
+  if (!business || !business.isActive) {
+    throw new AppError('Business not found', 404, 'BUSINESS_NOT_FOUND');
+  }
+
+  const products = business.products
+    .filter((product) => product.isActive)
+    .map((product) => business.productToJSON(product));
+
+  res.json({ success: true, data: { products } });
+});
+
 export const sendConversationMessage = asyncHandler(async (req, res) => {
   const conversation = await loadConversation(req.params.id);
   const { viewerType, business } = await resolveViewer(req, conversation);
   const body = String(req.body.body ?? '').trim();
+  const sharedProductId = readSharedProductId(req.body);
+
+  let sharedProduct = null;
+  if (sharedProductId) {
+    // Looked up inside the conversation's own shop. There is deliberately no
+    // parameter for which shop to search: that absence is the access rule.
+    const shop = business ?? (await Business.findById(conversation.business));
+
+    if (!shop || !shop.isActive) {
+      throw new AppError('Business not found', 404, 'BUSINESS_NOT_FOUND');
+    }
+
+    sharedProduct = sharedProductSnapshot(
+      shop,
+      findShareableProduct(shop, sharedProductId)
+    );
+  }
 
   const senderName =
     viewerType === 'customer'
@@ -392,8 +440,15 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
     user: conversation.user,
     senderType: viewerType,
     senderName,
-    body
+    body,
+    sharedProduct
   });
+
+  // What the inbox and the notification show for this thread. A card sent
+  // without words would otherwise leave a blank line under the shop's name,
+  // so the product's own name stands in - it is the one part of the card that
+  // reads as a sentence in any language.
+  const summaryBody = body || sharedProduct?.name || '';
 
   let updated;
   try {
@@ -402,7 +457,7 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
       {
         $set: {
           lastMessage: {
-            body: message.body,
+            body: summaryBody,
             senderType: viewerType,
             sentAt: message.createdAt
           }
@@ -439,7 +494,7 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
         businessId: conversation.business,
         conversationId: conversation._id.toString(),
         senderName,
-        body: message.body
+        body: summaryBody
       });
     }
   } else {
@@ -449,7 +504,7 @@ export const sendConversationMessage = asyncHandler(async (req, res) => {
       businessId: conversation.business,
       conversationId: conversation._id.toString(),
       senderName,
-      body: message.body
+      body: summaryBody
     });
   }
 
