@@ -23,12 +23,26 @@ class _AvatarApi extends ApiService {
 
   String initialAvatar = '';
 
+  /// What the shop is wearing. The server puts the account's new picture here
+  /// in the same request that stores it, so the fake does too.
+  String businessLogo = '';
+
+  int businessReads = 0;
+
+  bool failBusinessRead = false;
+
   @override
-  Future<OwnerBusiness> ownerBusiness({required String token}) async =>
-      OwnerBusiness.fromJson(const <String, dynamic>{
-        'id': 'b1',
-        'name': 'متجر',
-      });
+  Future<OwnerBusiness> ownerBusiness({required String token}) async {
+    businessReads += 1;
+
+    if (failBusinessRead) throw StateError('the shop could not be read');
+
+    return OwnerBusiness.fromJson(<String, dynamic>{
+      'id': 'b1',
+      'name': 'متجر',
+      'logoUrl': businessLogo,
+    });
+  }
 
   @override
   Future<AuthApiUser> me({required String token}) async =>
@@ -67,6 +81,10 @@ class _AvatarApi extends ApiService {
 
     if (url == null) throw StateError('the image host refused');
 
+    // What `applyPictureToOwnedBusiness` does on the server: one picture, worn
+    // by the account and by the shop it owns.
+    businessLogo = url!;
+
     return AuthApiUser.fromJson(<String, dynamic>{
       'id': 'u1',
       'name': 'بتول طه',
@@ -102,8 +120,6 @@ void main() {
     api.initialAvatar = 'https://i.ibb.co/x/old.png';
     final BusinessBloc bloc = await started();
 
-    // The bar shows the account's picture, not the shop's logo: a shop's logo
-    // is a separate thing with its own place on its own screen.
     expect(bloc.state.account?.avatarUrl, 'https://i.ibb.co/x/old.png');
     expect(bloc.state.account?.name, 'بتول طه');
   });
@@ -124,6 +140,45 @@ void main() {
       expect(bloc.state.account?.avatarUrl, 'https://i.ibb.co/x/pic.png');
     },
   );
+
+  test('the shop wears the new picture too, without a reload', () async {
+    // A merchant has one picture: the server puts it on the shop in the same
+    // request. The shell held the shop it had loaded before that, so the bar
+    // showed the new picture while the settings screen and the storefront
+    // preview beside it still showed the old one.
+    final BusinessBloc bloc = await started();
+    expect(bloc.state.business?.logoUrl, '');
+
+    final int readsBefore = api.businessReads;
+
+    final Future<BusinessState> done = bloc.stream.firstWhere(
+      (BusinessState state) => state.account?.avatarUrl.isNotEmpty ?? false,
+    );
+    bloc.add(BusinessAvatarPicked(_bytes));
+    await done;
+
+    expect(bloc.state.business?.logoUrl, 'https://i.ibb.co/x/pic.png');
+    // Read back rather than guessed at, and one read - not the six the whole
+    // shell costs.
+    expect(api.businessReads, readsBefore + 1);
+  });
+
+  test('a shop that cannot be re-read does not sink the change', () async {
+    final BusinessBloc bloc = await started();
+
+    api.failBusinessRead = true;
+
+    final Future<BusinessState> done = bloc.stream.firstWhere(
+      (BusinessState state) => state.account?.avatarUrl.isNotEmpty ?? false,
+    );
+    bloc.add(BusinessAvatarPicked(_bytes));
+    await done;
+
+    // The picture was stored; a tidy-up that failed must not turn that into
+    // an error the merchant has to read.
+    expect(bloc.state.account?.avatarUrl, 'https://i.ibb.co/x/pic.png');
+    expect(bloc.state.errorMessage, isNull);
+  });
 
   test('a successful change says so', () async {
     final BusinessBloc bloc = await started();

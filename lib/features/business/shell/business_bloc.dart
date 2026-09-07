@@ -491,14 +491,29 @@ class BusinessBloc extends Bloc<BusinessEvent, BusinessState> {
     Emitter<BusinessState> emit,
   ) async {
     try {
+      final String token = await _token();
       final AuthApiUser account = await _apiService.uploadMyAvatar(
-        token: await _token(),
+        token: token,
         bytes: event.bytes,
       );
+
+      // The shop wears the same picture: the server puts it there in the same
+      // request. Reading the shop back rather than guessing at its new logo
+      // keeps the bar, the storefront preview and the settings screen showing
+      // one picture instead of the bar showing the new one and the rest the
+      // old. It is one request, on a rare action, and a shop that could not be
+      // re-read must not turn a successful change into an error.
+      OwnerBusiness? shop;
+      try {
+        shop = await _apiService.ownerBusiness(token: token);
+      } catch (_) {
+        shop = null;
+      }
 
       emit(
         state.copyWith(
           account: account,
+          business: shop,
           noticeCode: 'profileEdit.avatarUpdated',
         ),
       );

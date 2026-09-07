@@ -284,7 +284,6 @@
   "storeSettings": {
     "title": "Store settings",
     "logo": "Store logo",
-    "logoHint": "Add a link to the store logo",
     "description": "Store description",
     "socialLinks": "Social media",
     "instagram": "Instagram username or link",
@@ -295,10 +294,11 @@
     "storeDetails": "Store settings",
     "storeNameLabel": "Store name in Arabic or English",
     "logoAttach": "Attach your store logo",
-    "logoSpec": "Width 99 PX   Height 99 PX   Size 0.5 MB",
+    "logoSpec": "Width 99 PX   Height 99 PX",
     "aboutStore": "About the store",
     "addressLabel": "Add the store address",
-    "categoryLabel": "What kind of products do you sell"
+    "categoryLabel": "What kind of products do you sell",
+    "logoChangeHint": "Hold to change the logo"
   },
   "merchantProduct": {
     "addTitle": "Add products",

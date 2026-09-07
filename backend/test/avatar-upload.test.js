@@ -16,7 +16,10 @@ import {
   deleteImage,
   PRODUCT_FOLDER,
   imageHostConfigured,
+  DELIVERED_IMAGE_TRANSFORMATION,
+  deliveryUrl,
   signParams,
+  STORED_IMAGE_TRANSFORMATION,
   uploadImage
 } from '../src/services/image-host.service.js';
 
@@ -191,10 +194,96 @@ test('the file itself is not signed, only the parameters beside it', async () =>
   assert.equal(
     sent.get('signature'),
     signParams(
-      { folder: AVATAR_FOLDER, timestamp: Number(sent.get('timestamp')) },
+      {
+        folder: AVATAR_FOLDER,
+        timestamp: Number(sent.get('timestamp')),
+        transformation: STORED_IMAGE_TRANSFORMATION
+      },
       'test-secret'
     )
   );
+});
+
+test('the host is told to keep the smaller picture, not the one it was sent', async () => {
+  // Without this the original is what is stored, and a merchant who pasted a
+  // link to a twelve-megapixel photograph has one of those behind a
+  // ninety-six pixel box for ever. `c_limit` never enlarges, so a picture
+  // already inside the bounds is untouched by it.
+  withCredentials();
+  let sent = null;
+
+  await uploadImage(PIXEL, {
+    fetchImpl: async (_, options) => {
+      sent = options.body;
+      return {
+        ok: true,
+        json: async () => ({ secure_url: 'https://x/y.png', public_id: 'p' })
+      };
+    }
+  });
+
+  assert.equal(sent.get('transformation'), STORED_IMAGE_TRANSFORMATION);
+  assert.match(STORED_IMAGE_TRANSFORMATION, /^c_limit,w_\d+,h_\d+$/);
+
+  // Deliberately no quality here. Asked to re-encode on the way in, the host
+  // can only answer in the format it was given, and a 3000px PNG test image
+  // came back at 4.0MB with `q_auto:good` on this parameter against 690KB
+  // without it. Quality belongs on the way out, where the format is free.
+  assert.doesNotMatch(STORED_IMAGE_TRANSFORMATION, /q_auto/);
+
+  // Signed like the folder. A transformation a caller could strip would be no
+  // instruction at all.
+  assert.equal(
+    sent.get('signature'),
+    signParams(
+      {
+        folder: AVATAR_FOLDER,
+        timestamp: Number(sent.get('timestamp')),
+        transformation: sent.get('transformation')
+      },
+      'test-secret'
+    )
+  );
+});
+
+test('what comes back is the address to render from', async () => {
+  // Measured against the host: a 3000px image sent at 2.4MB is stored at
+  // 1600px, and this URL delivers 507KB of AVIF to a phone that takes one.
+  withCredentials();
+
+  const stored = await uploadImage(PIXEL, {
+    fetchImpl: async () => ({
+      ok: true,
+      json: async () => ({
+        secure_url:
+          'https://res.cloudinary.com/c/image/upload/v1/merzox/avatars/abc.png',
+        public_id: 'merzox/avatars/abc'
+      })
+    })
+  });
+
+  assert.equal(
+    stored.url,
+    `https://res.cloudinary.com/c/image/upload/${DELIVERED_IMAGE_TRANSFORMATION}/v1/merzox/avatars/abc.png`
+  );
+
+  // The id is the master, untouched: it is what deletion needs, and a URL
+  // cannot be turned back into one reliably.
+  assert.equal(stored.publicId, 'merzox/avatars/abc');
+});
+
+test('the delivery rewrite is idempotent, and leaves foreign URLs alone', () => {
+  const once = deliveryUrl(
+    'https://res.cloudinary.com/c/image/upload/v1/x.png'
+  );
+
+  assert.equal(deliveryUrl(once), once);
+  assert.equal(
+    deliveryUrl('https://images.elsewhere.test/logo.png'),
+    'https://images.elsewhere.test/logo.png'
+  );
+  assert.equal(deliveryUrl(''), '');
+  assert.equal(deliveryUrl(null), null);
 });
 
 test('a host that answers without both is a failure, not a blank picture', async () => {

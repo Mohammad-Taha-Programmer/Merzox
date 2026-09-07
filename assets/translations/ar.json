@@ -284,7 +284,6 @@
   "storeSettings": {
     "title": "إعدادات المتجر",
     "logo": "شعار المتجر",
-    "logoHint": "قم بإرفاق رابط شعار المتجر",
     "description": "وصف المتجر",
     "socialLinks": "وسائل التواصل الاجتماعي",
     "instagram": "قم بإدخال يوزر الانستغرام او الرابط",
@@ -295,10 +294,11 @@
     "storeDetails": "إعدادات المتجر",
     "storeNameLabel": "اسم المتجر بالعربية أو الإنجليزية",
     "logoAttach": "قم بإرفاق شعار المتجر",
-    "logoSpec": "العرض 99 PX   الطول 99 PX   الحجم 0.5 ميجا",
+    "logoSpec": "العرض 99 PX   الطول 99 PX",
     "aboutStore": "نبذة عن المتجر",
     "addressLabel": "أضف عنوان المتجر",
-    "categoryLabel": "ما نوع المنتجات التي تبيعها"
+    "categoryLabel": "ما نوع المنتجات التي تبيعها",
+    "logoChangeHint": "اضغط مطولاً لتغيير الشعار"
   },
   "merchantProduct": {
     "addTitle": "إضافة منتجات",

@@ -29,6 +29,65 @@ export const AVATAR_FOLDER = 'merzox/avatars';
 /// the two have different lifetimes.
 export const PRODUCT_FOLDER = 'merzox/products';
 
+/**
+ * What the host is told to keep, rather than what it was sent.
+ *
+ * Applied on the way in, so there is one file and it is the smaller one - the
+ * original is not filed beside it. `c_limit` never enlarges, so a picture
+ * already inside these bounds is stored as it is, and `q_auto:good` picks the
+ * compression that keeps it looking the same to the eye.
+ *
+ * This is here rather than in the app because it has to hold for every way a
+ * picture arrives: a camera, a gallery, or a link the merchant pasted, which
+ * the app never resized at all.
+ */
+export const STORED_IMAGE_TRANSFORMATION = 'c_limit,w_1600,h_1600';
+
+/**
+ * How the stored picture is asked for when it is rendered.
+ *
+ * The two halves of "smaller" are not the same job. Bounding the dimensions
+ * has to happen on the way in, or the host keeps the twelve-megapixel
+ * original for ever. Bounding the *bytes* has to happen on the way out: asked
+ * to re-encode a picture on the way in, the host can only answer in the
+ * format it arrived as, and a PNG re-encoded as a PNG comes back bigger - a
+ * three-thousand pixel test image went in at 2.4MB and was stored at 4.0MB
+ * before this was split in two.
+ *
+ * On the way out it may choose the format, so a phone that understands WebP
+ * or AVIF is sent one of those and everything else still gets the PNG or the
+ * JPEG. `q_auto:good` picks the compression that keeps it looking the same.
+ * Transparency survives, which a blanket conversion to JPEG would not, and a
+ * logo is the one picture most likely to have any.
+ */
+export const DELIVERED_IMAGE_TRANSFORMATION = 'f_auto,q_auto:good';
+
+/**
+ * Rewrites an upload URL into the one to render from.
+ *
+ * Cloudinary reads the transformation out of the path, so this is a text edit
+ * on a URL rather than a second request. Anything that is not one of its
+ * upload URLs is handed back untouched: this is not the place to decide a
+ * foreign address is wrong.
+ */
+export function deliveryUrl(url) {
+  if (typeof url !== 'string') return url;
+
+  const marker = '/image/upload/';
+  const at = url.indexOf(marker);
+  if (at === -1) return url;
+
+  const after = at + marker.length;
+  // Already carrying it - an upload answered twice, or a URL that has been
+  // through here before. Adding it again would not be wrong, but it would be
+  // a longer URL saying the same thing twice.
+  if (url.slice(after).startsWith(`${DELIVERED_IMAGE_TRANSFORMATION}/`)) {
+    return url;
+  }
+
+  return `${url.slice(0, after)}${DELIVERED_IMAGE_TRANSFORMATION}/${url.slice(after)}`;
+}
+
 function credentials() {
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
   const apiKey = process.env.CLOUDINARY_API_KEY;
@@ -106,8 +165,14 @@ export async function uploadImage(
   const timestamp = Math.floor(Date.now() / 1000);
 
   // The folder is part of what is signed: an unsigned one would let a caller
-  // choose where somebody else's pictures land.
-  const signed = { folder, timestamp };
+  // choose where somebody else's pictures land. So is the transformation - it
+  // is what makes the stored file the small one, and a caller who could drop
+  // it could fill the account with originals.
+  const signed = {
+    folder,
+    timestamp,
+    transformation: STORED_IMAGE_TRANSFORMATION
+  };
   const body = new URLSearchParams({
     ...signed,
     file: `data:${contentType};base64,${base64}`,
@@ -123,7 +188,9 @@ export async function uploadImage(
     throw new AppError('The image could not be uploaded', 502, 'IMAGE_UPLOAD_FAILED');
   }
 
-  return { url, publicId };
+  // What is handed back is the address to render from, not the address the
+  // master sits at. The id is the master, and that is what deletion needs.
+  return { url: deliveryUrl(url), publicId };
 }
 
 /**
