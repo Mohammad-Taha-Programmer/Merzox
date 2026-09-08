@@ -39,6 +39,29 @@ LocalAddress _at(String address, {String on = 'Wi-Fi'}) =>
     LocalAddress(interfaceName: on, address: address);
 
 void main() {
+  // Several cases below drive the real entry point, whose defaults name files
+  // in this repository. One that forgets to redirect them rewrites the
+  // developer's own environment file - where the database URI and the mail
+  // password live - and the damage is invisible until somebody opens it. That
+  // happened once, while this very feature was being written.
+  String? environmentBefore;
+
+  String? readEnvironment() {
+    final File env = File(dev_config.kDefaultEnvOutput);
+
+    return env.existsSync() ? env.readAsStringSync() : null;
+  }
+
+  setUpAll(() => environmentBefore = readEnvironment());
+
+  tearDownAll(() {
+    expect(
+      readEnvironment(),
+      environmentBefore,
+      reason: 'a test wrote to ${dev_config.kDefaultEnvOutput}',
+    );
+  });
+
   group('which addresses a phone could reach', () {
     test('the machine own loopback is not one of them', () {
       // Whoever asks, 127.0.0.1 means the asker - which for a phone is the
@@ -179,6 +202,7 @@ void main() {
       final int code = await dev_config.run(<String>[
         '--host=192.168.1.99',
         '--out=$out',
+        '--no-env',
       ], out: log);
 
       expect(code, 0);
@@ -194,6 +218,7 @@ void main() {
       await dev_config.run(<String>[
         '--host=192.168.1.99',
         '--out=$out',
+        '--no-env',
       ], out: log);
 
       // The file is useless without the flag that reads it, and the flag is
@@ -210,6 +235,7 @@ void main() {
           '--host=192.168.1.99',
           '--port=3000',
           '--out=$out',
+          '--no-env',
         ], out: _Captured());
 
         expect(File(out).readAsStringSync(), contains(':3000/api/v1'));
@@ -224,6 +250,7 @@ void main() {
         '--host=192.168.1.99',
         '--port=seventy',
         '--out=$out',
+        '--no-env',
       ], out: log);
 
       expect(code, 2);
@@ -299,6 +326,196 @@ void main() {
       expect(code, 0);
       expect(File(out).existsSync(), isFalse);
       expect(log.text, contains('--dart-define-from-file'));
+    });
+  });
+
+  group('the address the server puts in an email', () {
+    // `PUBLIC_BASE_URL` was written as `http://${CURRENT_IP_ADDRESS}:${PORT}`,
+    // and the reader does not expand that - the expansion needs a package the
+    // project does not carry. So the literal template failed validation, the
+    // server fell back to loopback, and every verification link it mailed
+    // pointed at whichever machine happened to open it. The address is
+    // written here now, from the same answer the app's file gets.
+
+    test('the server is given the origin, the app the api base', () {
+      // Two settings, one address. `PUBLIC_BASE_URL` goes in FRONT of
+      // `/api/v1/auth/verify-email`, so a prefix on it would be counted twice.
+      expect(devOrigin('192.168.1.13', 4000), 'http://192.168.1.13:4000');
+      expect(
+        devBaseUrl('192.168.1.13', 4000),
+        '${devOrigin('192.168.1.13', 4000)}/api/v1',
+      );
+    });
+
+    test('the setting is rewritten and nothing around it is touched', () {
+      // The line that has to survive intact is the one nobody wants to
+      // retype: this file is where the database URI and the mail password
+      // live, and rewriting it wholesale would take them with it.
+      const String before = '''
+PORT=4000
+MONGODB_URI=mongodb://user:p\$\$w0rd@cluster.example.net:27017/merzox?ssl=true
+PUBLIC_BASE_URL="http://\${CURRENT_IP_ADDRESS}:\${PORT}"
+SMTP_PASS=an-app-password
+''';
+
+      final String after = withPublicBaseUrl(before, 'http://192.168.1.99:4000');
+
+      expect(after, contains('PUBLIC_BASE_URL=http://192.168.1.99:4000'));
+      expect(after, isNot(contains('CURRENT_IP_ADDRESS')));
+      expect(
+        after,
+        contains(
+          'MONGODB_URI=mongodb://user:p\$\$w0rd@cluster.example.net:27017/merzox?ssl=true',
+        ),
+      );
+      expect(after, contains('SMTP_PASS=an-app-password'));
+      expect(after, contains('PORT=4000'));
+      expect(after.split('\n').length, before.split('\n').length);
+    });
+
+    test('a setting that is not there is added', () {
+      final String after = withPublicBaseUrl(
+        'PORT=4000\n',
+        'http://192.168.1.99:4000',
+      );
+
+      expect(after, 'PORT=4000\nPUBLIC_BASE_URL=http://192.168.1.99:4000\n');
+    });
+
+    test('a file with no trailing newline still gets one', () {
+      expect(
+        withPublicBaseUrl('PORT=4000', 'http://10.0.0.5:4000'),
+        'PORT=4000\nPUBLIC_BASE_URL=http://10.0.0.5:4000\n',
+      );
+    });
+
+    test('a commented-out setting stays commented out', () {
+      // Uncommenting somebody's note would turn a remark into configuration.
+      final String after = withPublicBaseUrl(
+        '# PUBLIC_BASE_URL=http://localhost:3000\nPORT=4000\n',
+        'http://192.168.1.99:4000',
+      );
+
+      expect(after, contains('# PUBLIC_BASE_URL=http://localhost:3000'));
+      expect(after, contains('\nPUBLIC_BASE_URL=http://192.168.1.99:4000\n'));
+    });
+
+    test('every uncommented copy is made to agree', () {
+      // Which one the reader honours is its business, not ours. Making them
+      // say the same thing is what stops the answer depending on that.
+      final String after = withPublicBaseUrl(
+        'PUBLIC_BASE_URL=http://one\nPORT=4000\nPUBLIC_BASE_URL=http://two\n',
+        'http://192.168.1.99:4000',
+      );
+
+      expect(after, isNot(contains('http://one')));
+      expect(after, isNot(contains('http://two')));
+      expect(
+        'PUBLIC_BASE_URL=http://192.168.1.99:4000'.allMatches(after).length,
+        2,
+      );
+    });
+
+    test('a file written with Windows endings keeps them', () {
+      // Rewriting one line in LF would leave a single odd line in a file the
+      // rest of which is CRLF, which is a diff nobody asked for.
+      final String after = withPublicBaseUrl(
+        'PORT=4000\r\nPUBLIC_BASE_URL=http://old\r\nSMTP_PASS=x\r\n',
+        'http://192.168.1.99:4000',
+      );
+
+      expect(after, 'PORT=4000\r\nPUBLIC_BASE_URL=http://192.168.1.99:4000\r\nSMTP_PASS=x\r\n');
+    });
+  });
+
+  group('writing both files', () {
+    late Directory scratch;
+
+    setUp(() async {
+      scratch = await Directory.systemTemp.createTemp('merzox-dev-config-env');
+    });
+
+    tearDown(() async {
+      if (scratch.existsSync()) await scratch.delete(recursive: true);
+    });
+
+    test('one run gives the app and the server the same address', () async {
+      final String out = '${scratch.path}/merzox.dev.json';
+      final String env = '${scratch.path}/.env';
+      File(env).writeAsStringSync('PORT=4000\nPUBLIC_BASE_URL=http://stale\n');
+
+      final int code = await dev_config.run(<String>[
+        '--host=192.168.1.99',
+        '--out=$out',
+        '--env=$env',
+      ], out: _Captured());
+
+      expect(code, 0);
+      expect(
+        jsonDecode(File(out).readAsStringSync()),
+        <String, dynamic>{
+          'MERZOX_API_BASE_URL': 'http://192.168.1.99:4000/api/v1',
+        },
+      );
+      expect(
+        File(env).readAsStringSync(),
+        contains('PUBLIC_BASE_URL=http://192.168.1.99:4000'),
+      );
+    });
+
+    test('a missing environment file is reported, never invented', () async {
+      // A file holding nothing but this setting is a server that cannot
+      // start, handed over as though something had been done for it.
+      final String out = '${scratch.path}/merzox.dev.json';
+      final String env = '${scratch.path}/absent/.env';
+      final _Captured log = _Captured();
+
+      final int code = await dev_config.run(<String>[
+        '--host=192.168.1.99',
+        '--out=$out',
+        '--env=$env',
+      ], out: log);
+
+      expect(code, 0);
+      expect(File(env).existsSync(), isFalse);
+      expect(log.text, contains('backend/.env.example'));
+      // The half that did work still says so.
+      expect(File(out).existsSync(), isTrue);
+    });
+
+    test('the server file can be left out of it', () async {
+      final String out = '${scratch.path}/merzox.dev.json';
+      final String env = '${scratch.path}/.env';
+      File(env).writeAsStringSync('PUBLIC_BASE_URL=http://untouched\n');
+
+      await dev_config.run(<String>[
+        '--host=192.168.1.99',
+        '--out=$out',
+        '--env=$env',
+        '--no-env',
+      ], out: _Captured());
+
+      expect(File(env).readAsStringSync(), contains('http://untouched'));
+    });
+
+    test('the default server file is the one the ignore rule names', () {
+      // If these two ever disagree, one machine's LAN address and the mail
+      // password beside it get committed.
+      expect(dev_config.kDefaultEnvOutput, 'backend/.env');
+      expect(
+        File('.gitignore').readAsStringSync(),
+        contains(dev_config.kDefaultEnvOutput),
+      );
+    });
+
+    test('the key written is the one the server reads', () {
+      // Renaming either side without the other puts the server back on
+      // loopback with a warning nobody reads.
+      expect(kPublicBaseUrlKey, 'PUBLIC_BASE_URL');
+      expect(
+        File('backend/src/config/environment.js').readAsStringSync(),
+        contains("'$kPublicBaseUrlKey'"),
+      );
     });
   });
 }
