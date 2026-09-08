@@ -13,17 +13,13 @@ abstract interface class PasswordRecoveryGateway {
 final class PasswordRecoveryApiService implements PasswordRecoveryGateway {
   final Dio _dio;
 
-  PasswordRecoveryApiService({Dio? dio, String? baseUrl})
+  // The same options every one of the app's API clients is built
+  // with. They all reach the one server, so a timeout raised for a
+  // slow network has to reach all of them or it fixes one screen.
+  PasswordRecoveryApiService({Dio? dio, String? baseUrl, Duration? timeout})
     : _dio =
           dio ??
-          Dio(
-            BaseOptions(
-              baseUrl: baseUrl ?? ApiService.defaultBaseUrl,
-              connectTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 10),
-              headers: const {'Content-Type': 'application/json'},
-            ),
-          );
+          Dio(ApiService.options(baseUrl: baseUrl, timeout: timeout));
 
   @override
   Future<void> requestPasswordReset({required String email}) async {
