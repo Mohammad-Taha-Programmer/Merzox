@@ -182,6 +182,48 @@ void main() {
         'http://192.168.1.13:4000/api/v1',
       );
     });
+
+    test('a define this tool does not own is carried over', () {
+      // The address is the only thing read off the machine. A build on a slow
+      // network also carries MERZOX_API_TIMEOUT_MS, put there by hand, and
+      // rewriting the file from scratch would drop it without saying so - to
+      // be missed on some later run rather than this one.
+      final Object? parsed = jsonDecode(
+        renderDevConfig(
+          baseUrl: 'http://192.168.1.99:4000/api/v1',
+          existing:
+              '{"MERZOX_API_BASE_URL": "http://stale:4000/api/v1", '
+              '"MERZOX_API_TIMEOUT_MS": "30000"}',
+        ),
+      );
+
+      expect(parsed, <String, dynamic>{
+        'MERZOX_API_BASE_URL': 'http://192.168.1.99:4000/api/v1',
+        'MERZOX_API_TIMEOUT_MS': '30000',
+      });
+    });
+
+    test('the address is the first line, whatever order it arrived in', () {
+      // It is the line somebody opens this file to read.
+      final String rendered = renderDevConfig(
+        baseUrl: 'http://192.168.1.99:4000/api/v1',
+        existing: '{"MERZOX_API_TIMEOUT_MS": "30000"}',
+      );
+
+      expect(rendered.split('\n')[1], contains('MERZOX_API_BASE_URL'));
+    });
+
+    test('a file that is not a config file is replaced, not mourned', () {
+      // There is nothing to carry over from a typo, and refusing to write
+      // would leave somebody stuck behind one.
+      for (final String rubbish in <String>['', '   ', 'not json', '[1,2]']) {
+        expect(
+          jsonDecode(renderDevConfig(baseUrl: 'http://x', existing: rubbish)),
+          <String, dynamic>{'MERZOX_API_BASE_URL': 'http://x'},
+          reason: rubbish,
+        );
+      }
+    });
   });
 
   group('running it', () {

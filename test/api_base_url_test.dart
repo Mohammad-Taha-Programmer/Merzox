@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/services/api_service.dart';
@@ -63,5 +66,86 @@ void main() {
     // that names its server must reach that server.
     expect(ApiService.configuredBaseUrl, isEmpty);
     expect(ApiService.defaultBaseUrl, endsWith(':4000/api/v1'));
+  });
+
+  group('how long a request is given', () {
+    // The server is only as near as the network the developer is on. On one
+    // of them the database sat 600ms away and a plain list took four and a
+    // half seconds - close enough to the limit that requests crossed it and
+    // surfaced as "the server is unreachable" with nothing wrong on either
+    // side. So a build can say otherwise. What ships must not change.
+
+    test('a build that says nothing gets what it always got', () {
+      expect(ApiService.configuredTimeoutMs, 0);
+      expect(ApiService.kDefaultTimeout, const Duration(seconds: 10));
+      expect(ApiService.defaultTimeout, const Duration(seconds: 10));
+    });
+
+    test('a build that names a timeout is given it', () {
+      expect(
+        ApiService.timeoutFrom(30000),
+        const Duration(milliseconds: 30000),
+      );
+    });
+
+    test('a number too small to be an answer is read as none', () {
+      // `MERZOX_API_TIMEOUT_MS=30` is a plausible way to write "thirty
+      // seconds" into a field whose name ends in MS. Honoured literally it
+      // gives every request thirty milliseconds and fails all of them, so it
+      // falls back to the value that already works instead.
+      for (final int slip in <int>[0, -1, 30, 999]) {
+        expect(
+          ApiService.timeoutFrom(slip),
+          ApiService.kDefaultTimeout,
+          reason: '$slip should not be honoured',
+        );
+      }
+
+      expect(
+        ApiService.timeoutFrom(ApiService.kMinimumTimeoutMs),
+        const Duration(milliseconds: 1000),
+      );
+    });
+
+    test('both limits are the one number, not two that drift', () {
+      // Connecting is the fast half and receiving is the slow one, but a
+      // build that raises the limit means the whole wait, not part of it.
+      final BaseOptions options = ApiService.options(
+        timeout: const Duration(seconds: 42),
+      );
+
+      expect(options.connectTimeout, const Duration(seconds: 42));
+      expect(options.receiveTimeout, const Duration(seconds: 42));
+      expect(options.baseUrl, ApiService.defaultBaseUrl);
+    });
+
+    test('every client that talks to the server is built the same way', () {
+      // Four services reach the one server, each with its own Dio. Raising
+      // the limit in one of them fixes one screen and leaves the other three
+      // crossing it, so this holds them to the shared options rather than to
+      // a number of their own.
+      const List<String> clients = <String>[
+        'lib/services/api_service.dart',
+        'lib/services/notification_preference_service.dart',
+        'lib/services/review_eligibility_service.dart',
+        'lib/features/authentication/password_recovery/data/'
+            'password_recovery_api_service.dart',
+      ];
+
+      for (final String path in clients) {
+        final String source = File(path).readAsStringSync();
+
+        expect(
+          source,
+          contains('options(baseUrl: baseUrl, timeout: timeout)'),
+          reason: '$path builds its client some other way',
+        );
+        expect(
+          source,
+          isNot(contains('connectTimeout: const Duration')),
+          reason: '$path still names a limit of its own',
+        );
+      }
+    });
   });
 }

@@ -15,6 +15,8 @@
 /// a test rather than trusted.
 library;
 
+import 'dart:convert';
+
 /// One IPv4 address found on one interface.
 class LocalAddress {
   /// The adapter's name, as the operating system reports it.
@@ -152,12 +154,54 @@ String withPublicBaseUrl(String contents, String origin) {
   return '$body$line$newline';
 }
 
+/// The define this tool owns.
+const String kApiBaseUrlKey = 'MERZOX_API_BASE_URL';
+
 /// The config file's contents.
 ///
 /// Written as the exact shape `--dart-define-from-file` expects: a flat JSON
 /// object of define names to string values. The comment a developer would
 /// want cannot go inside it - JSON has nowhere to put one - so the file is
 /// deliberately tiny and the explanation lives beside it in the example.
-String renderDevConfig({required String baseUrl}) {
-  return '{\n  "MERZOX_API_BASE_URL": "$baseUrl"\n}\n';
+///
+/// [existing] is the file as it stands, when there is one. Every define in it
+/// other than the address is carried over: the address is the only thing this
+/// tool knows, and a build may also carry `MERZOX_API_TIMEOUT_MS`, put there
+/// by hand for a slow network. Rewriting the file from scratch would drop it
+/// silently, and it would be missed on the next run rather than this one.
+///
+/// A file that cannot be parsed is replaced rather than mourned. There is
+/// nothing to carry over from something that is not a config file, and
+/// refusing to write would leave a developer stuck behind a typo.
+String renderDevConfig({required String baseUrl, String? existing}) {
+  final Map<String, String> defines = <String, String>{};
+
+  if (existing != null && existing.trim().isNotEmpty) {
+    try {
+      final Object? parsed = jsonDecode(existing);
+      if (parsed is Map<String, dynamic>) {
+        for (final MapEntry<String, dynamic> entry in parsed.entries) {
+          defines[entry.key] = '${entry.value}';
+        }
+      }
+    } on FormatException {
+      // Nothing to keep.
+    }
+  }
+
+  defines[kApiBaseUrlKey] = baseUrl;
+
+  // The address first, whatever order it arrived in, so the line a developer
+  // opens this file to read is the top one.
+  final List<String> names = <String>[
+    kApiBaseUrlKey,
+    ...defines.keys.where((String key) => key != kApiBaseUrlKey).toList()
+      ..sort(),
+  ];
+
+  final String body = names
+      .map((String name) => '  "$name": "${defines[name]}"')
+      .join(',\n');
+
+  return '{\n$body\n}\n';
 }

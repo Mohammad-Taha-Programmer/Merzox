@@ -53,7 +53,14 @@ Future<int> run(List<String> arguments, {required IOSink out}) async {
   final File file = File(output);
   await file.parent.create(recursive: true);
   await file.writeAsString(
-    renderDevConfig(baseUrl: devBaseUrl(host, port)),
+    renderDevConfig(
+      baseUrl: devBaseUrl(host, port),
+      // Anything already in the file that is not the address is kept. The
+      // address is the only define this tool knows; a build may also carry
+      // `MERZOX_API_TIMEOUT_MS`, added by hand for a slow network, and
+      // rewriting from scratch would drop it without saying so.
+      existing: file.existsSync() ? await file.readAsString() : null,
+    ),
     flush: true,
   );
 

@@ -16,7 +16,36 @@ flutter run --dart-define-from-file=config/merzox.dev.json
 
 The generator reads the address off this machine rather than asking you to
 type it, skipping loopback, link-local and virtual adapters. If it finds more
-than one candidate it lists them and asks, rather than guessing.
+than one candidate it lists them and asks, rather than guessing. It writes the
+same address into `backend/.env` as `PUBLIC_BASE_URL`, which is what the
+server puts in front of the verification link it mails, so the address a phone
+dials and the address an email names cannot drift apart.
+
+## When the network is slow
+
+`MERZOX_API_TIMEOUT_MS` is the second define this file may carry, and it is
+optional. A request is given ten seconds when nothing says otherwise, and that
+is what ships; the define exists because the server is only as near as the
+network you are on. On one network the database sat 600ms away and a plain
+list took four and a half seconds - close enough to the limit that requests
+crossed it and read as "the server is unreachable" with nothing wrong on
+either side.
+
+Add it beside the address when that happens:
+
+```json
+{
+  "MERZOX_API_BASE_URL": "http://192.168.1.13:4000/api/v1",
+  "MERZOX_API_TIMEOUT_MS": "30000"
+}
+```
+
+It is milliseconds, and a value under a thousand is read as nothing said -
+`30` is a plausible way to write "thirty seconds" into a field whose name ends
+in MS, and honoured literally it would fail every request.
+
+Re-running the generator keeps it. That command only knows the address, so it
+rewrites that line and carries everything else in the file over.
 
 Re-run it whenever the router hands out a different number. That is the first
 thing to try when a physical device says the server is unreachable: the

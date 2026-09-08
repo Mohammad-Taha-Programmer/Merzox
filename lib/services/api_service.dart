@@ -120,19 +120,70 @@ class ApiService {
     return '127.0.0.1';
   }
 
+  /// How long a request is given, in milliseconds, when a build says so.
+  ///
+  /// Zero means nothing said, which is the shipped case: [kDefaultTimeout]
+  /// answers instead, and a release built without this define behaves exactly
+  /// as it did before the define existed.
+  static const int configuredTimeoutMs = int.fromEnvironment(
+    'MERZOX_API_TIMEOUT_MS',
+    defaultValue: 0,
+  );
+
+  /// What a request is given when no build said otherwise.
+  static const Duration kDefaultTimeout = Duration(seconds: 10);
+
+  /// The shortest value that is treated as an answer rather than a slip.
+  ///
+  /// `MERZOX_API_TIMEOUT_MS=30` is a plausible way to write "thirty seconds"
+  /// in a field whose name ends in MS, and it would give every request thirty
+  /// milliseconds and fail all of them. Below this the define is read as
+  /// nothing said, which fails towards the behaviour that already works.
+  static const int kMinimumTimeoutMs = 1000;
+
+  /// How long a request is given.
+  ///
+  /// The define exists because the server is only as near as the network the
+  /// developer is on. On one network the database sat 600ms away and a plain
+  /// list took four and a half seconds, close enough to the ten below that
+  /// requests crossed it and surfaced as "the server is unreachable" - with
+  /// nothing wrong on either side. Raising it is a development answer to a
+  /// development problem, so it is a define rather than a new default: what
+  /// ships is unchanged.
+  static Duration get defaultTimeout => timeoutFrom(configuredTimeoutMs);
+
+  /// The rule itself, apart from the define.
+  ///
+  /// A define is fixed when the build is made, so a test cannot vary one.
+  /// Visible so what it decides can be stated rather than trusted - which is
+  /// the whole of what is worth checking here.
+  @visibleForTesting
+  static Duration timeoutFrom(int milliseconds) {
+    if (milliseconds >= kMinimumTimeoutMs) {
+      return Duration(milliseconds: milliseconds);
+    }
+
+    return kDefaultTimeout;
+  }
+
+  /// The options every one of the app's API clients is built with.
+  ///
+  /// Four services reach the same server, each with its own [Dio]. Raising the
+  /// timeout in one of them would have fixed one screen and left the other
+  /// three crossing the same limit, so the whole shape is named once here.
+  static BaseOptions options({String? baseUrl, Duration? timeout}) {
+    return BaseOptions(
+      baseUrl: baseUrl ?? defaultBaseUrl,
+      connectTimeout: timeout ?? defaultTimeout,
+      receiveTimeout: timeout ?? defaultTimeout,
+      headers: const {'Content-Type': 'application/json'},
+    );
+  }
+
   final Dio _dio;
 
-  ApiService({Dio? dio, String? baseUrl})
-    : _dio =
-          dio ??
-          Dio(
-            BaseOptions(
-              baseUrl: baseUrl ?? defaultBaseUrl,
-              connectTimeout: const Duration(seconds: 10),
-              receiveTimeout: const Duration(seconds: 10),
-              headers: {'Content-Type': 'application/json'},
-            ),
-          );
+  ApiService({Dio? dio, String? baseUrl, Duration? timeout})
+    : _dio = dio ?? Dio(options(baseUrl: baseUrl, timeout: timeout));
 
   Future<AuthApiResponse> login({
     required String identifier,
