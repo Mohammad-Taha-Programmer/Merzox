@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/core/auth/auth_route_guard.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
+import 'package:merzox/core/widgets/merzox_notched_nav_bar.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/preview/store_preview_page.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
@@ -1405,8 +1406,11 @@ void main() {
           direction,
         );
 
-        // Product editor owns a nested Directionality wrapper.
-        final addButton = find.byIcon(Icons.add_rounded);
+        // Product editor owns a nested Directionality wrapper. The raised
+        // button is found by its key rather than its glyph: the bar draws its
+        // own paths now, and a drawing is not an `IconData` anybody can
+        // search the tree for.
+        final addButton = find.byKey(MerzoxNotchedNavBar.buttonKey);
         expect(addButton, findsOneWidget);
 
         await tester.tap(addButton);
