@@ -10,8 +10,7 @@ import 'package:merzox/features/business_profile/bloc/business_profile_state.dar
 import 'package:merzox/features/reviews/widgets/review_eligibility_notice.dart';
 import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
-import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart'
-    show MerzoxNavIndicator, kMerzoxNavIndicatorGap;
+import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart';
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/business/contact/store_contact_page.dart';
@@ -248,7 +247,7 @@ class _BusinessProfileView extends StatelessWidget {
       // customer storefront only.
       bottomNavigationBar: viewMode.isPreview
           ? null
-          : _ProfileBottomNavigationBar(
+          : FeatureBottomNavigationBar(
               selectedIndex: 0,
               onChanged: onNavChanged,
             ),
@@ -1480,175 +1479,4 @@ class _WavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _ProfileBottomNavigationBar extends StatelessWidget {
-  final int selectedIndex;
-  final ValueChanged<int> onChanged;
-
-  const _ProfileBottomNavigationBar({
-    required this.selectedIndex,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      top: false,
-      child: SizedBox(
-        height: 92,
-        child: Stack(
-          clipBehavior: Clip.none,
-          alignment: Alignment.bottomCenter,
-          children: [
-            Positioned.fill(
-              top: 22,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 22,
-                      offset: const Offset(0, -7),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 0,
-              child: Container(
-                width: 86,
-                height: 86,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.06),
-                      blurRadius: 18,
-                      offset: const Offset(0, -4),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned.fill(
-              top: 22,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _ProfileNavIcon(
-                        icon: Icons.home_outlined,
-                        selectedIcon: Icons.home_rounded,
-                        selected: selectedIndex == 0,
-                        onTap: () => onChanged(0),
-                      ),
-                    ),
-                    Expanded(
-                      child: _ProfileNavIcon(
-                        icon: Icons.shopping_bag_outlined,
-                        selectedIcon: Icons.shopping_bag_rounded,
-                        selected: selectedIndex == 1,
-                        onTap: () => onChanged(1),
-                      ),
-                    ),
-                    const SizedBox(width: 92),
-                    Expanded(
-                      child: _ProfileNavIcon(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        selectedIcon: Icons.chat_bubble_rounded,
-                        selected: selectedIndex == 3,
-                        onTap: () => onChanged(3),
-                      ),
-                    ),
-                    Expanded(
-                      child: _ProfileNavIcon(
-                        icon: Icons.person_outline_rounded,
-                        selectedIcon: Icons.person_rounded,
-                        selected: selectedIndex == 4,
-                        onTap: () => onChanged(4),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              top: 7,
-              child: InkWell(
-                customBorder: const CircleBorder(),
-                onTap: () => onChanged(2),
-                child: Container(
-                  width: 58,
-                  height: 58,
-                  decoration: BoxDecoration(
-                    color: MerzoxColors.kColorEE6C4D,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: MerzoxColors.kColorEE6C4D.withValues(
-                          alpha: 0.32,
-                        ),
-                        blurRadius: 12,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.storefront_outlined,
-                    color: Colors.white,
-                    size: 29,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileNavIcon extends StatelessWidget {
-  final IconData icon;
-  final IconData selectedIcon;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ProfileNavIcon({
-    required this.icon,
-    required this.selectedIcon,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      customBorder: const CircleBorder(),
-      onTap: onTap,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // This bar drew no marker at all; the artboard puts one above the
-            // active icon at y=726..727 with the icon starting at y=743.
-            MerzoxNavIndicator(selected: selected),
-            const SizedBox(height: kMerzoxNavIndicatorGap),
-            Icon(
-              selected ? selectedIcon : icon,
-              color: selected
-                  ? MerzoxColors.kColorEE6C4D
-                  : MerzoxColors.kColor8D99AE,
-              size: 25,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }

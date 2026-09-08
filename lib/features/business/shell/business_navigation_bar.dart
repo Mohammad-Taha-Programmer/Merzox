@@ -1,11 +1,17 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:merzox/core/constants/colors.dart';
+
+import 'package:merzox/core/widgets/merzox_nav_icons.dart';
+import 'package:merzox/core/widgets/merzox_notched_nav_bar.dart';
 
 /// The merchant's bottom bar, with the add-a-product button raised out of it.
 ///
 /// Public and on its own because `إضافة منتجات` draws the same bar under the
 /// product form: the artboards put that form inside the shell, with the list
 /// scrolling behind the bar rather than replacing it.
+///
+/// The shape is [MerzoxNotchedNavBar]'s, the same one the customer's bar
+/// draws. Only the five places differ, and the glyph in the button.
 class BusinessNavigationBar extends StatelessWidget {
   /// Which tab reads as current. Index 2 is the raised button.
   final int selectedIndex;
@@ -19,84 +25,40 @@ class BusinessNavigationBar extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    top: false,
-    child: SizedBox(
-      height: 82,
-      child: Stack(
-        alignment: Alignment.topCenter,
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 14),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x18000000),
-                  blurRadius: 14,
-                  offset: Offset(0, -4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                _nav(Icons.home_outlined, Icons.home_rounded, 0),
-                _nav(
-                  Icons.receipt_long_outlined,
-                  Icons.receipt_long_rounded,
-                  1,
-                ),
-                const SizedBox(width: 72),
-                _nav(Icons.inventory_2_outlined, Icons.inventory_2_rounded, 3),
-                _nav(Icons.person_outline_rounded, Icons.person_rounded, 4),
-              ],
-            ),
-          ),
-          Positioned(
-            top: -4,
-            child: InkWell(
-              onTap: () => onChanged(2),
-              customBorder: const CircleBorder(),
-              child: Container(
-                width: 62,
-                height: 62,
-                decoration: BoxDecoration(
-                  color: MerzoxColors.kColorEE6C4D,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 5),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x30000000),
-                      blurRadius: 10,
-                      offset: Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.add_rounded,
-                  size: 30,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-
-  Widget _nav(IconData icon, IconData selectedIcon, int index) => Expanded(
-    child: InkWell(
-      onTap: () => onChanged(index),
-      child: Center(
-        child: Icon(
-          selectedIndex == index ? selectedIcon : icon,
-          color: selectedIndex == index
-              ? MerzoxColors.kColorEE6C4D
-              : MerzoxColors.kColor8D99AE,
+  Widget build(BuildContext context) {
+    return MerzoxNotchedNavBar(
+      leading: <MerzoxNavDestination>[
+        MerzoxNavDestination(
+          glyph: MerzoxNavGlyph.home,
+          label: 'nav.home'.tr(),
+          selected: selectedIndex == 0,
+          onTap: () => onChanged(0),
         ),
-      ),
-    ),
-  );
+        MerzoxNavDestination(
+          glyph: MerzoxNavGlyph.orders,
+          label: 'businessShell.orders'.tr(),
+          selected: selectedIndex == 1,
+          onTap: () => onChanged(1),
+        ),
+      ],
+      trailing: <MerzoxNavDestination>[
+        MerzoxNavDestination(
+          glyph: MerzoxNavGlyph.products,
+          label: 'businessShell.productsHeading'.tr(),
+          selected: selectedIndex == 3,
+          onTap: () => onChanged(3),
+        ),
+        MerzoxNavDestination(
+          glyph: MerzoxNavGlyph.profile,
+          label: 'nav.profile'.tr(),
+          selected: selectedIndex == 4,
+          onTap: () => onChanged(4),
+        ),
+      ],
+      buttonGlyph: MerzoxNavGlyph.add,
+      buttonLabel: 'businessShell.addProduct'.tr(),
+      buttonSelected: selectedIndex == 2,
+      onButtonPressed: () => onChanged(2),
+    );
+  }
 }

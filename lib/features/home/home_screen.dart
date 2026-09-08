@@ -44,8 +44,7 @@ import 'widgets/business_id_badge.dart';
 import 'widgets/business_rating_stars.dart';
 import 'widgets/discount_ribbon.dart';
 import 'widgets/plain_tab_title.dart';
-import 'widgets/feature_bottom_navigation_bar.dart'
-    show MerzoxNavIndicator, kMerzoxNavIndicatorGap;
+import 'widgets/feature_bottom_navigation_bar.dart';
 import 'widgets/home_promo_carousel.dart';
 
 class _StoredUserProfile {
