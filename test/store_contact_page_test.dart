@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/features/business/contact/store_contact_channels.dart';
@@ -111,6 +112,61 @@ void main() {
           reason: '$value should not become a link',
         );
       }
+    });
+  });
+
+  group('when the account behind the numbers could not be read', () {
+    testWidgets('it says so rather than drawing a shorter page', (
+      WidgetTester tester,
+    ) async {
+      // The shell fetches the account on an arm that is allowed to fail: it
+      // was once read only for a portrait, and a shop that would not open
+      // over a missing picture is the worse screen. This page then read that
+      // failure as an answer - a merchant with numbers on their account saw
+      // only their store links, with nothing saying why.
+      await pumpLocalized(
+        tester,
+        StoreContactPage(
+          business: _shop(links: const BusinessSocialLinks(facebook: 'albatoul')),
+          account: null,
+          open: (Uri _) async => true,
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey<String>('storeContact.accountUnreadable')),
+        findsOneWidget,
+      );
+
+      // What did arrive is still shown. The links come from the shop, and
+      // they were never the part that went missing.
+      expect(
+        find.byKey(const ValueKey<String>('storeContact.facebook')),
+        findsOneWidget,
+      );
+
+      // And it is not called an empty page: nothing here says the merchant
+      // has added no way to be reached, because that is not what happened.
+      expect(find.text('storeContact.empty'.tr()), findsNothing);
+    });
+
+    testWidgets('an account that really is empty still reads as empty', (
+      WidgetTester tester,
+    ) async {
+      await pumpLocalized(
+        tester,
+        StoreContactPage(
+          business: _shop(),
+          account: _account(),
+          open: (Uri _) async => true,
+        ),
+      );
+
+      expect(find.text('storeContact.empty'.tr()), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('storeContact.accountUnreadable')),
+        findsNothing,
+      );
     });
   });
 

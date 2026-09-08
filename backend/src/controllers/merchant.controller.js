@@ -176,6 +176,12 @@ export const updateMyBusiness = asyncHandler(async (req, res) => {
     }
   }
 
+  // Validation has already refused anything that is not a boolean, so this
+  // cannot be turned on by a string that merely looks like one.
+  if (req.body.showOwnerContact !== undefined) {
+    business.showOwnerContact = req.body.showOwnerContact;
+  }
+
   if (req.body.socialLinks !== undefined) {
     for (const key of ['instagram', 'whatsapp', 'facebook']) {
       if (req.body.socialLinks[key] !== undefined) {

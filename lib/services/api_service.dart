@@ -2024,6 +2024,36 @@ class SearchBusinessApiModel {
   }
 }
 
+/// The ways a shop published for a customer to reach it.
+///
+/// Read from the account behind the shop rather than copied onto it, and only
+/// when the owner turned the permission on - so a number corrected in a
+/// personal profile is corrected on the storefront in the same moment, and a
+/// shop that never agreed sends empty lists.
+class StorePublicContact {
+  final List<ContactPhone> phones;
+  final List<ContactEmail> emails;
+
+  const StorePublicContact({
+    this.phones = const <ContactPhone>[],
+    this.emails = const <ContactEmail>[],
+  });
+
+  bool get isEmpty => phones.isEmpty && emails.isEmpty;
+
+  factory StorePublicContact.fromJson(Map<String, dynamic> json) =>
+      StorePublicContact(
+        phones: (json['phones'] as List<dynamic>? ?? const <dynamic>[])
+            .whereType<Map<String, dynamic>>()
+            .map(ContactPhone.fromJson)
+            .toList(),
+        emails: (json['emails'] as List<dynamic>? ?? const <dynamic>[])
+            .whereType<Map<String, dynamic>>()
+            .map(ContactEmail.fromJson)
+            .toList(),
+      );
+}
+
 class BusinessDetailApiModel {
   final String id;
   final String publicId;
@@ -2045,6 +2075,12 @@ class BusinessDetailApiModel {
   final double? longitude;
   final DateTime? subscribedAt;
 
+  /// The shop's own links, as the merchant typed them into store settings.
+  final BusinessSocialLinks socialLinks;
+
+  /// The owner's number and address, when the shop publishes them.
+  final StorePublicContact contact;
+
   const BusinessDetailApiModel({
     required this.id,
     required this.publicId,
@@ -2065,6 +2101,8 @@ class BusinessDetailApiModel {
     this.latitude,
     this.longitude,
     this.subscribedAt,
+    this.socialLinks = const BusinessSocialLinks(),
+    this.contact = const StorePublicContact(),
   });
 
   factory BusinessDetailApiModel.fromJson(Map<String, dynamic> json) {
@@ -2103,6 +2141,12 @@ class BusinessDetailApiModel {
           ? (coordinates[1] as num?)?.toDouble()
           : null,
       subscribedAt: DateTime.tryParse(json['subscribedAt'] as String? ?? ''),
+      socialLinks: BusinessSocialLinks.fromJson(
+        json['socialLinks'] as Map<String, dynamic>? ?? const {},
+      ),
+      contact: StorePublicContact.fromJson(
+        json['contact'] as Map<String, dynamic>? ?? const {},
+      ),
     );
   }
 }

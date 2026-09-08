@@ -14,6 +14,7 @@ import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart'
     show MerzoxNavIndicator, kMerzoxNavIndicatorGap;
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
+import 'package:merzox/features/business/contact/store_contact_page.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/services/store_share_service.dart';
 import 'package:merzox/core/constants/money.dart';
@@ -183,12 +184,13 @@ class _BusinessProfileView extends StatelessWidget {
                     // the LEFT edge in RTL, so 0 pinned it flush to the frame.
                     end: 12,
                     bottom: 21,
-                    // The two things a customer does about a shop rather than
-                    // inside it - talk to it, or tell somebody about it - hang
-                    // from one column so they keep one centre line. Pinning
-                    // each of them to `end: 12` on its own did not: a button
-                    // keeps a tap target wider than the circle it draws, so
-                    // the circles ended up 12px and 16px from the frame.
+                    // What a customer does about a shop rather than inside
+                    // it - tell somebody about it, talk to it, or find
+                    // another way to reach it - hangs from one column so the
+                    // circles keep one centre line. Pinning each of them to
+                    // `end: 12` on its own did not: a button keeps a tap
+                    // target wider than the circle it draws, so they ended up
+                    // 12px and 16px from the frame.
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -218,6 +220,21 @@ class _BusinessProfileView extends StatelessWidget {
                             ),
                           ),
                         ),
+                        // Only when the shop actually published a way to be
+                        // reached. A circle that opened an empty page would
+                        // be the dead end that page refuses to draw a row
+                        // for, and this one is read from the public detail
+                        // rather than the list seed the storefront opened
+                        // with - the seed carries no links and no permission,
+                        // so a control drawn from it would be a guess about
+                        // somebody else's shop.
+                        if (visitorContactPage(state.business)
+                            case final StoreContactPage contact)
+                          StoreContactButton(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(builder: (_) => contact),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -325,6 +342,54 @@ Rect? _shareOrigin(BuildContext context) {
   if (box is! RenderBox || !box.hasSize) return null;
 
   return box.localToGlobal(Offset.zero) & box.size;
+}
+
+/// The shop's own ways of being reached, or nothing at all.
+///
+/// The page is built here rather than at the tap, so the row can ask it
+/// whether it has anything to show. A row that opened an empty page would be
+/// exactly the dead end the contact screen refuses to draw a row for, and a
+/// shop that published no links and gave no permission has nothing.
+StoreContactPage? visitorContactPage(BusinessDetailApiModel? detail) {
+  if (detail == null) return null;
+
+  final StoreContactPage page = StoreContactPage.forVisitor(
+    storeName: detail.name,
+    category: detail.category,
+    logoUrl: detail.logoUrl,
+    socialLinks: detail.socialLinks,
+    contact: detail.contact,
+  );
+
+  return page.isEmpty ? null : page;
+}
+
+/// The way into a shop's contact screen.
+///
+/// It began as a tile inside the About tab and did not belong there: a light
+/// panel on a white page reads as a patch of a different screen. As a circle
+/// it is the same kind of thing as the two above it - something you do about
+/// a shop rather than inside it - and it borrows their shape instead of
+/// introducing a third one.
+class StoreContactButton extends StatelessWidget {
+  final VoidCallback onPressed;
+
+  const StoreContactButton({required this.onPressed, super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton.filled(
+      key: const ValueKey<String>('storefront.contact'),
+      onPressed: onPressed,
+      tooltip: 'businessShell.contactUs'.tr(),
+      style: IconButton.styleFrom(
+        backgroundColor: MerzoxColors.kColor98C1D9,
+        foregroundColor: Colors.white,
+        fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
+      ),
+      icon: const Icon(Icons.phone_outlined, size: 19),
+    );
+  }
 }
 
 /// Tell somebody about this shop.

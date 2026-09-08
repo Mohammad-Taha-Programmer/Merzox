@@ -36,6 +36,7 @@ import 'package:merzox/features/about_us/pages/about_us_page.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/pages/login_page.dart';
 import 'package:merzox/features/authentication/pages/signup_page.dart';
+import 'package:merzox/features/business/contact/store_contact_page.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/preview/store_preview_page.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
@@ -1477,6 +1478,19 @@ final class _SeedStorefrontApi extends ApiService {
       viewCount: 99,
       discount: null,
       colorValue: 0xffdeeef8,
+      // What this shop published about reaching it. The links were typed into
+      // store settings to be shown; the number is here because this owner
+      // turned that permission on, and a shop that had not would carry an
+      // empty `contact` and no way in to draw a row for.
+      socialLinks: const BusinessSocialLinks(
+        whatsapp: '+970599123456',
+        instagram: 'yasmin.store',
+      ),
+      contact: const StorePublicContact(
+        phones: <ContactPhone>[
+          ContactPhone(value: '+970599123456', label: 'mobile'),
+        ],
+      ),
     );
   }
 
@@ -1971,21 +1985,79 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
         expect(find.text('متجر الياسمين'), findsOneWidget);
 
-        // The two floating controls hang from one column, so the circle that
-        // shares the shop stands exactly as far from the frame as the one that
-        // opens a chat. Pinned to `end: 12` separately they did not: a button
-        // keeps a tap target wider than the circle it draws, which left them
-        // 12px and 16px out.
+        // This shop published a way to be reached, so the storefront offers
+        // the circle that opens it. A shop that published nothing draws no
+        // circle at all rather than one that opens an empty page - the case
+        // the widget tests hold, since a seed that showed it would have
+        // nothing to show.
+        expect(
+          find.byKey(const ValueKey<String>('storefront.contact')),
+          findsOneWidget,
+        );
+
+        // The three floating controls hang from one column, so each circle
+        // stands exactly as far from the frame as the others. Pinned to
+        // `end: 12` separately they did not: a button keeps a tap target
+        // wider than the circle it draws, which left them 12px and 16px out.
         final Rect shareBox = tester.getRect(
           find.byKey(const ValueKey<String>('storefront.share')),
         );
         final Rect chatBox = tester.getRect(
           find.widgetWithIcon(IconButton, Icons.chat_bubble_outline_rounded),
         );
-        expect(shareBox.left, chatBox.left);
-        expect(shareBox.right, chatBox.right);
+        final Rect contactBox = tester.getRect(
+          find.byKey(const ValueKey<String>('storefront.contact')),
+        );
+        for (final Rect box in <Rect>[chatBox, contactBox]) {
+          expect(box.left, shareBox.left);
+          expect(box.right, shareBox.right);
+        }
+
+        // And in the order they were asked for: the contact circle sits under
+        // the one that opens a chat.
+        expect(shareBox.bottom, lessThanOrEqualTo(chatBox.top));
+        expect(chatBox.bottom, lessThanOrEqualTo(contactBox.top));
 
         await expectMerzoxSeedGolden('store_details_customer_ar_375x812.png');
+      });
+
+      // -- 10b. What that row opens ---------------------------------------
+      //
+      // The merchant's own contact screen and this one are the same widget
+      // from two sources: the merchant reads the account they are signed in
+      // as, a customer reads what the shop published. Seeded from the same
+      // shop as the storefront above, so the two can be read together.
+      testWidgets('store contact renders its Arabic customer baseline', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(
+          tester,
+          withMerzoxGoldenDeviceInsets(
+            StoreContactPage.forVisitor(
+              storeName: 'متجر الياسمين',
+              category: 'أفضل المتاجر',
+              logoUrl: '',
+              socialLinks: const BusinessSocialLinks(
+                whatsapp: '+970599123456',
+                instagram: 'yasmin.store',
+              ),
+              contact: const StorePublicContact(
+                phones: <ContactPhone>[
+                  ContactPhone(value: '+970599123456', label: 'mobile'),
+                ],
+              ),
+              // A golden must not hand a URL to the machine running it.
+              open: (Uri _) async => true,
+            ),
+          ),
+        );
+
+        // The number is here because this shop's owner turned the permission
+        // on. Nothing else of that account travels with it.
+        expect(find.text('+970599123456'), findsNWidgets(2));
+        expect(find.text('yasmin.store'), findsOneWidget);
+
+        await expectMerzoxSeedGolden('store_contact_customer_ar_375x812.png');
       });
 
       // -- 11/12. The storefront's other two tabs -------------------------

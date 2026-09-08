@@ -1,4 +1,5 @@
 import { Business } from '../models/Business.js';
+import { User } from '../models/User.js';
 import { BusinessReview } from '../models/BusinessReview.js';
 import { Favorite } from '../models/Favorite.js';
 import { ProductReview } from '../models/ProductReview.js';
@@ -371,8 +372,25 @@ export const getBusiness = asyncHandler(async (req, res) => {
   await Business.updateOne({ _id: business._id }, { $inc: { viewCount: 1 } });
   business.viewCount += 1;
 
-  res.json({ success: true, data: { business: business.toDetailJSON() } });
+  res.json({
+    success: true,
+    data: { business: business.toDetailJSON(await publishedOwner(business)) }
+  });
 });
+
+/**
+ * The account behind a shop, and only when the shop publishes it.
+ *
+ * A shop that has not turned the permission on is never looked up, so the
+ * extra read is paid for by the shops that chose to be reachable rather than
+ * by every storefront anybody opens. The selection is narrow for the same
+ * reason: nothing else on that account has any business leaving the server.
+ */
+async function publishedOwner(business) {
+  if (business.showOwnerContact !== true || !business.owner) return null;
+
+  return User.findById(business.owner).select('phones emails phone email');
+}
 
 export const listBusinessProducts = asyncHandler(async (req, res) => {
   rejectPollutedQueryParams(

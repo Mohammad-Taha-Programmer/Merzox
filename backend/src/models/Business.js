@@ -221,6 +221,16 @@ const businessSchema = new mongoose.Schema(
     owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     logoUrl: { type: String, trim: true, maxlength: 1000, default: '' },
     socialLinks: { type: socialLinksSchema, default: () => ({}) },
+    /**
+     * Whether the owner's own number and address may be shown to a customer.
+     *
+     * The social links above were typed into store settings to be published,
+     * so they need no permission. A phone and an email were not: they were
+     * given at sign-up to open an account, and reaching them from a public
+     * storefront is a second use of them the owner never agreed to. So the
+     * default is off, and only the owner can turn it on.
+     */
+    showOwnerContact: { type: Boolean, default: false },
     publicId: { type: String, required: true, unique: true, index: true },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     englishName: { type: String, trim: true, maxlength: 120, default: '' },
@@ -319,7 +329,15 @@ businessSchema.methods.toListJSON = function toListJSON() {
   };
 };
 
-businessSchema.methods.toDetailJSON = function toDetailJSON() {
+/**
+ * The shop as a customer sees it.
+ *
+ * `owner` is the account document behind the shop, and it is a parameter
+ * rather than something read off `this` on purpose: a caller that did not
+ * load it gets no contact block at all. Forgetting to pass it therefore
+ * publishes nothing, which is the direction a mistake here should fail in.
+ */
+businessSchema.methods.toDetailJSON = function toDetailJSON(owner = null) {
   return {
     ...this.toListJSON(),
     description: this.description,
@@ -328,6 +346,7 @@ businessSchema.methods.toDetailJSON = function toDetailJSON() {
       whatsapp: this.socialLinks?.whatsapp ?? '',
       facebook: this.socialLinks?.facebook ?? ''
     },
+    contact: this.publicContactJSON(owner),
     location: this.location ?? null,
     products: this.products
       .filter((product) => product.isActive)
@@ -335,9 +354,56 @@ businessSchema.methods.toDetailJSON = function toDetailJSON() {
   };
 };
 
+/**
+ * The owner's own ways of being reached, but only if they said so.
+ *
+ * Nothing is derived here that the account does not already hold: these are
+ * read, never stored on the shop, so a number corrected in the personal
+ * profile is corrected on the storefront in the same moment.
+ */
+businessSchema.methods.publicContactJSON = function publicContactJSON(owner) {
+  if (!this.showOwnerContact || !owner) {
+    return { phones: [], emails: [] };
+  }
+
+  return {
+    phones: contactEntries(owner.phones, owner.phone, 'mobile'),
+    emails: contactEntries(owner.emails, owner.email, 'personal')
+  };
+};
+
+/**
+ * A list of contact entries, falling back to the single value older accounts
+ * carry - one created before the lists existed holds only `phone` and
+ * `email`, and reading the lists alone would publish nothing for it.
+ *
+ * `isPrimary` is deliberately not among the fields that travel: which of a
+ * merchant's numbers they marked first is theirs to know, and a customer only
+ * needs the ones they can call.
+ */
+function contactEntries(list, single, fallbackLabel) {
+  const entries = Array.isArray(list) ? list : [];
+
+  if (entries.length > 0) {
+    return entries
+      .filter((entry) => String(entry?.value ?? '').trim() !== '')
+      .map((entry) => ({
+        value: String(entry.value).trim(),
+        label: String(entry.label ?? fallbackLabel)
+      }));
+  }
+
+  const only = String(single ?? '').trim();
+  return only === '' ? [] : [{ value: only, label: fallbackLabel }];
+}
+
 businessSchema.methods.toOwnerJSON = function toOwnerJSON() {
   return {
     ...this.toDetailJSON(),
+    // No owner is passed, so `contact` above is empty. That is the right
+    // answer here: this screen edits the permission, and the numbers behind
+    // it are read from the account the merchant is already signed in as.
+    showOwnerContact: this.showOwnerContact === true,
     attachmentUrl: this.attachmentUrl
   };
 };

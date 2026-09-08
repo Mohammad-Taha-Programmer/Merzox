@@ -331,7 +331,9 @@
     "aboutStore": "About the store",
     "addressLabel": "Add the store address",
     "categoryLabel": "What kind of products do you sell",
-    "logoChangeHint": "Hold to change the logo"
+    "logoChangeHint": "Hold to change the logo",
+    "showOwnerContact": "Show my number and email to customers",
+    "showOwnerContactHint": "Your account number and email appear on your Contact us page for anyone who opens your store. The store links above are always shown."
   },
   "merchantProduct": {
     "addTitle": "Add products",
@@ -834,7 +836,8 @@
     "conversationBlocked": "This conversation is closed.",
     "cannotBlockSelf": "An account cannot block itself.",
     "invalidReport": "Choose a reason for the report first.",
-    "cannotReportSelf": "An account cannot report itself."
+    "cannotReportSelf": "An account cannot report itself.",
+    "invalidOwnerContactPermission": "That permission could not be saved. Please try again."
   },
   "courierLocation": {
     "loginEntry": "Share courier location",
@@ -919,7 +922,9 @@
     "emails": "Email",
     "empty": "You have not added any way to be reached yet.\nAdd your store links in store settings, and your numbers and email in your personal profile.",
     "emptyAction": "Store settings",
-    "couldNotOpen": "That could not be opened on your device."
+    "couldNotOpen": "That could not be opened on your device.",
+    "emptyForVisitor": "This store has not added a way to be reached yet.",
+    "accountUnreadable": "Your numbers and email could not be read from your account, so this list may be incomplete. Reopen this screen to try again."
   },
   "storefront": {
     "shareStore": "Share this store"

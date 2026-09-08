@@ -16,28 +16,119 @@ import 'store_contact_channels.dart';
 /// alone at the far one - under the same section labels the settings screen
 /// uses. Nothing here is new to look at, which is the point.
 ///
-/// It shows nothing it was not given. The social links are the ones the
-/// merchant entered in store settings, the numbers and addresses are the
-/// account's own, and a channel that was never filled in has no row at all -
-/// a row that led nowhere would be worse than a shorter page.
+/// It shows nothing it was not given. A channel that was never filled in has
+/// no row at all - a row that led nowhere would be worse than a shorter page.
+///
+/// Two people arrive here and see the same screen. The merchant reads their
+/// own shop out of the account they are signed in as; a customer reads what
+/// the server published about somebody else's. So the page is given channels
+/// rather than either of those, and neither reader's way in knows how the
+/// other one's rows were gathered.
 class StoreContactPage extends StatelessWidget {
-  final OwnerBusiness business;
-  final AuthApiUser? account;
+  /// Whose channels these are.
+  final String storeName;
+  final String category;
+  final String logoUrl;
+
+  final List<StoreContactChannel> social;
+  final List<StoreContactChannel> phones;
+  final List<StoreContactChannel> emails;
 
   /// Opens a channel. The default hands it to the system; a test watches
   /// instead of launching a browser.
   final Future<bool> Function(Uri uri)? open;
 
-  /// Where the merchant goes to fill in what is missing.
+  /// Where the merchant goes to fill in what is missing. A customer has
+  /// nowhere to be sent, so for them this is absent rather than disabled.
   final VoidCallback? onEditSettings;
 
-  const StoreContactPage({
-    required this.business,
-    required this.account,
+  /// What an empty page says. The merchant is told what to add; a customer is
+  /// told the shop has not said - the same absence, but only one of them can
+  /// do anything about it.
+  final String emptyMessage;
+
+  /// Whether the account these numbers live on could not be read at all.
+  ///
+  /// The shell fetches it on an arm that is allowed to fail, because it was
+  /// once read only for a portrait and a shop that would not open over a
+  /// missing picture is the worse screen. This page then gave that failure
+  /// the same shape as an answer: a merchant with two numbers and three
+  /// addresses saw a page with only their store links on it, and nothing
+  /// saying why. So the two are told apart here.
+  final bool accountUnavailable;
+
+  const StoreContactPage._({
+    required this.storeName,
+    required this.category,
+    required this.logoUrl,
+    required this.social,
+    required this.phones,
+    required this.emails,
+    required this.emptyMessage,
+    this.accountUnavailable = false,
     this.open,
     this.onEditSettings,
     super.key,
   });
+
+  /// The merchant's own shop, gathered from what they are signed in as.
+  factory StoreContactPage({
+    required OwnerBusiness business,
+    required AuthApiUser? account,
+    Future<bool> Function(Uri uri)? open,
+    VoidCallback? onEditSettings,
+    Key? key,
+  }) {
+    return StoreContactPage._(
+      key: key,
+      storeName: business.name,
+      category: business.category,
+      logoUrl: business.logoUrl,
+      social: storeSocialChannels(business.socialLinks),
+      phones: storePhoneChannels(account),
+      emails: storeEmailChannels(account),
+      emptyMessage: 'storeContact.empty',
+      // The shell always asks for the account; absent means the asking
+      // failed, never that the merchant has no numbers.
+      accountUnavailable: account == null,
+      open: open,
+      onEditSettings: onEditSettings,
+    );
+  }
+
+  /// Somebody else's shop, gathered from what its public detail published.
+  ///
+  /// The numbers and addresses are here only if the owner turned that on, so
+  /// an absent one is a decision rather than a gap - which is why nothing on
+  /// this side offers to go and fill it in.
+  factory StoreContactPage.forVisitor({
+    required String storeName,
+    required String category,
+    required String logoUrl,
+    required BusinessSocialLinks socialLinks,
+    required StorePublicContact contact,
+    Future<bool> Function(Uri uri)? open,
+    Key? key,
+  }) {
+    return StoreContactPage._(
+      key: key,
+      storeName: storeName,
+      category: category,
+      logoUrl: logoUrl,
+      social: storeSocialChannels(socialLinks),
+      phones: contactPhoneChannels(contact.phones),
+      emails: contactEmailChannels(contact.emails),
+      emptyMessage: 'storeContact.emptyForVisitor',
+      open: open,
+    );
+  }
+
+  /// Whether there is anything at all to show.
+  ///
+  /// Read from outside as well: the storefront hides its way in here when
+  /// this is true, because a row that opens an empty page is the dead end
+  /// this screen refuses to draw one of.
+  bool get isEmpty => social.isEmpty && phones.isEmpty && emails.isEmpty;
 
   Future<void> _open(BuildContext context, Uri uri) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
@@ -66,14 +157,6 @@ class StoreContactPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final List<StoreContactChannel> social = storeSocialChannels(
-      business.socialLinks,
-    );
-    final List<StoreContactChannel> phones = storePhoneChannels(account);
-    final List<StoreContactChannel> emails = storeEmailChannels(account);
-    final bool empty =
-        social.isEmpty && phones.isEmpty && emails.isEmpty;
-
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -101,10 +184,18 @@ class StoreContactPage extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
           children: <Widget>[
-            _Identity(business: business),
+            _Identity(
+              storeName: storeName,
+              category: category,
+              logoUrl: logoUrl,
+            ),
             const SizedBox(height: 20),
-            if (empty)
-              _NothingYet(onEditSettings: onEditSettings)
+            if (accountUnavailable) const _AccountUnreadable(),
+            if (isEmpty && !accountUnavailable)
+              _NothingYet(
+                message: emptyMessage,
+                onEditSettings: onEditSettings,
+              )
             else ...<Widget>[
               if (social.isNotEmpty)
                 _Section(
@@ -134,16 +225,22 @@ class StoreContactPage extends StatelessWidget {
 
 /// Whose channels these are.
 class _Identity extends StatelessWidget {
-  final OwnerBusiness business;
+  final String storeName;
+  final String category;
+  final String logoUrl;
 
-  const _Identity({required this.business});
+  const _Identity({
+    required this.storeName,
+    required this.category,
+    required this.logoUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: <Widget>[
         RemoteCircleAvatar(
-          url: business.logoUrl,
+          url: logoUrl,
           radius: 23,
           backgroundColor: MerzoxColors.kColorDEEEF8,
           fallback: const Icon(
@@ -159,7 +256,7 @@ class _Identity extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Text(
-                business.name,
+                storeName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -168,10 +265,10 @@ class _Identity extends StatelessWidget {
                   color: MerzoxColors.kColor2B2B2B,
                 ),
               ),
-              if (business.category.trim().isNotEmpty) ...<Widget>[
+              if (category.trim().isNotEmpty) ...<Widget>[
                 const SizedBox(height: 2),
                 Text(
-                  business.category,
+                  category,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -307,11 +404,58 @@ class _ChannelRow extends StatelessWidget {
   }
 }
 
+/// The account could not be read, so its numbers are missing rather than
+/// absent.
+///
+/// Said out loud instead of drawn as a shorter page: a merchant looking at
+/// their own contact screen knows what they filled in, and a page quietly
+/// missing half of it is a page that appears to have lost it.
+class _AccountUnreadable extends StatelessWidget {
+  const _AccountUnreadable();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: MerzoxColors.kColorF5F9FC,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Icon(
+              Icons.info_outline_rounded,
+              size: 18,
+              color: MerzoxColors.kColor8D99AE,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'storeContact.accountUnreadable'.tr(),
+                key: const ValueKey<String>('storeContact.accountUnreadable'),
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.5,
+                  color: MerzoxColors.kColor8D99AE,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// A shop that has given no way to reach it.
 class _NothingYet extends StatelessWidget {
+  final String message;
   final VoidCallback? onEditSettings;
 
-  const _NothingYet({this.onEditSettings});
+  const _NothingYet({required this.message, this.onEditSettings});
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +469,7 @@ class _NothingYet extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'storeContact.empty'.tr(),
+          message.tr(),
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 13,
