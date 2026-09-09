@@ -1,12 +1,35 @@
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:merzox/core/widgets/merzox_nav_icons.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/widgets/merzox_notched_nav_bar.dart';
 import 'package:merzox/core/widgets/merzox_notched_shape.dart';
 
+import 'golden/merzox_golden_harness.dart';
 import 'localization_test_harness.dart';
+
+/// The five places each bar draws, in the order the bar draws them.
+///
+/// Written out rather than read off the two bar widgets: those need a
+/// `BuildContext` and translations to build, and what is being asked here is
+/// about the icons themselves.
+const List<IconData> _customerNavIcons = <IconData>[
+  MerzoxIcons.customerNavHome,
+  MerzoxIcons.customerNavCart,
+  MerzoxIcons.customerNavStores,
+  MerzoxIcons.customerNavMessages,
+  MerzoxIcons.customerNavProfile,
+];
+
+const List<IconData> _merchantNavIcons = <IconData>[
+  MerzoxIcons.merchantNavHome,
+  MerzoxIcons.merchantNavOrders,
+  MerzoxIcons.merchantNavAddProduct,
+  MerzoxIcons.merchantNavProducts,
+  MerzoxIcons.merchantNavProfile,
+];
 
 /// The bar with a bite in its top edge, and the button floating in the bite.
 ///
@@ -141,34 +164,81 @@ void main() {
   });
 
   group('the glyphs', () {
-    test('every one is drawn, and stays on its grid', () {
-      for (final MerzoxNavGlyph glyph in MerzoxNavGlyph.values) {
-        final Path path = pathFor(glyph);
-        final Rect bounds = path.getBounds();
+    // The bar used to draw hand-written paths, and what was held here was
+    // their geometry. They come from the designer's own fonts now, so the
+    // questions change: not "is this path on its grid" but "does this icon
+    // reach a font at all, and is it the same picture as its neighbour".
 
-        expect(bounds.isEmpty, isFalse, reason: '$glyph drew nothing');
-        // Inside the 24-unit box they are all written on. One glyph drawn on
-        // a different grid is one glyph a size heavier than its neighbours,
-        // which is the whole of what makes a set look borrowed.
-        expect(bounds.left, greaterThanOrEqualTo(0), reason: '$glyph');
-        expect(bounds.top, greaterThanOrEqualTo(0), reason: '$glyph');
-        expect(bounds.right, lessThanOrEqualTo(24), reason: '$glyph');
-        expect(bounds.bottom, lessThanOrEqualTo(24), reason: '$glyph');
+    test('no two places in a bar wear the same picture', () {
+      for (final MapEntry<String, List<IconData>> bar
+          in <String, List<IconData>>{
+            'customer': _customerNavIcons,
+            'merchant': _merchantNavIcons,
+          }.entries) {
+        final Set<String> seen = <String>{};
+
+        for (final IconData icon in bar.value) {
+          expect(
+            seen.add('${icon.fontFamily}:${icon.codePoint}'),
+            isTrue,
+            reason:
+                '${bar.key}: two places draw '
+                '${icon.fontFamily} U+${icon.codePoint.toRadixString(16)}',
+          );
+        }
       }
     });
 
-    test('and each one is its own drawing', () {
-      // A switch that fell through would give two destinations the same
-      // picture, which is the kind of thing a golden of a whole screen hides.
-      final Set<String> seen = <String>{};
+    test('every family is declared where both readers look for it', () {
+      // A family can be forgotten in two places, and the two fail differently:
+      // missing from `pubspec.yaml` and the running app draws an empty box;
+      // missing from the golden harness and only the captures do, which reads
+      // as an icon that was never drawn rather than a font never loaded.
+      // Line endings normalised first: the file is CRLF on this machine, and
+      // matching a family name up to a bare newline finds nothing there while
+      // reading as though the family were missing.
+      final String pubspec = File(
+        'pubspec.yaml',
+      ).readAsStringSync().replaceAll('\r\n', '\n');
 
-      for (final MerzoxNavGlyph glyph in MerzoxNavGlyph.values) {
-        final Rect bounds = pathFor(glyph).getBounds();
+      for (final IconData icon in <IconData>[
+        ..._customerNavIcons,
+        ..._merchantNavIcons,
+      ]) {
+        final String family = icon.fontFamily!;
+
         expect(
-          seen.add('${bounds.left},${bounds.top},${bounds.right},${bounds.bottom}'),
+          pubspec.contains('- family: $family\n'),
           isTrue,
-          reason: '$glyph is drawn exactly like another glyph',
+          reason: '$family is not declared in pubspec.yaml',
         );
+        expect(
+          merzoxGoldenFontAssets.containsKey(family),
+          isTrue,
+          reason: '$family is not loaded by the golden harness',
+        );
+      }
+    });
+
+    test('every font the bars name is a file that exists', () {
+      // Whether the code point inside each one is right is not asked here: a
+      // wrong one draws the engine's empty box, which moves pixels, and both
+      // bars are in the seed goldens - so that failure is already caught by a
+      // picture. Reading a `cmap` in Dart to catch it twice would be a font
+      // parser living in a test.
+      for (final IconData icon in <IconData>[
+        ..._customerNavIcons,
+        ..._merchantNavIcons,
+      ]) {
+        final List<String> assets = merzoxGoldenFontAssets[icon.fontFamily]!;
+
+        for (final String asset in assets) {
+          expect(
+            File(asset).existsSync(),
+            isTrue,
+            reason: '${icon.fontFamily} points at a missing $asset',
+          );
+        }
       }
     });
   });
@@ -185,13 +255,13 @@ void main() {
           bottomNavigationBar: MerzoxNotchedNavBar(
             leading: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxNavGlyph.home,
+                glyph: MerzoxIcons.customerNavHome,
                 label: 'home',
                 selected: true,
                 onTap: () => pressed.add('home'),
               ),
               MerzoxNavDestination(
-                glyph: MerzoxNavGlyph.cart,
+                glyph: MerzoxIcons.customerNavCart,
                 label: 'cart',
                 selected: false,
                 onTap: () => pressed.add('cart'),
@@ -199,19 +269,19 @@ void main() {
             ],
             trailing: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxNavGlyph.messages,
+                glyph: MerzoxIcons.customerNavMessages,
                 label: 'messages',
                 selected: false,
                 onTap: () => pressed.add('messages'),
               ),
               MerzoxNavDestination(
-                glyph: MerzoxNavGlyph.profile,
+                glyph: MerzoxIcons.customerNavProfile,
                 label: 'profile',
                 selected: false,
                 onTap: () => pressed.add('profile'),
               ),
             ],
-            buttonGlyph: MerzoxNavGlyph.storefront,
+            buttonGlyph: MerzoxIcons.customerNavStores,
             buttonLabel: 'stores',
             onButtonPressed: () => pressed.add('button'),
           ),
@@ -249,7 +319,7 @@ void main() {
           bottomNavigationBar: MerzoxNotchedNavBar(
             leading: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxNavGlyph.home,
+                glyph: MerzoxIcons.customerNavHome,
                 label: 'home',
                 selected: false,
                 onTap: () {},
@@ -257,13 +327,13 @@ void main() {
             ],
             trailing: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxNavGlyph.profile,
+                glyph: MerzoxIcons.customerNavProfile,
                 label: 'profile',
                 selected: true,
                 onTap: () {},
               ),
             ],
-            buttonGlyph: MerzoxNavGlyph.add,
+            buttonGlyph: MerzoxIcons.merchantNavAddProduct,
             buttonLabel: 'add',
             onButtonPressed: () {},
           ),
@@ -287,7 +357,7 @@ void main() {
           bottomNavigationBar: MerzoxNotchedNavBar(
             leading: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxNavGlyph.home,
+                glyph: MerzoxIcons.customerNavHome,
                 label: 'home',
                 selected: false,
                 onTap: () {},
@@ -295,7 +365,7 @@ void main() {
             ],
             trailing: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxNavGlyph.messages,
+                glyph: MerzoxIcons.customerNavMessages,
                 label: 'messages',
                 selected: false,
                 onTap: () {},
@@ -313,7 +383,7 @@ void main() {
                 ),
               ),
             ],
-            buttonGlyph: MerzoxNavGlyph.storefront,
+            buttonGlyph: MerzoxIcons.customerNavStores,
             buttonLabel: 'stores',
             onButtonPressed: () {},
           ),

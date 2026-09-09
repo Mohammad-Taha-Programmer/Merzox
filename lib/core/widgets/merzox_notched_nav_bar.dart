@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:merzox/core/constants/colors.dart';
-import 'package:merzox/core/widgets/merzox_nav_icons.dart';
 import 'package:merzox/core/widgets/merzox_notched_shape.dart';
 
 /// The active-tab marker every Merzox bottom bar draws.
@@ -59,7 +58,7 @@ class MerzoxNavIndicator extends StatelessWidget {
 
 /// One place a bar can send you.
 class MerzoxNavDestination {
-  final MerzoxNavGlyph glyph;
+  final IconData glyph;
 
   /// Read out loud. Nothing draws it: the artboards label none of these.
   final String label;
@@ -102,13 +101,17 @@ class MerzoxNotchedNavBar extends StatelessWidget {
   final List<MerzoxNavDestination> trailing;
 
   /// The raised button's glyph, what it is called, and what it does.
-  final MerzoxNavGlyph buttonGlyph;
+  final IconData buttonGlyph;
   final String buttonLabel;
   final bool buttonSelected;
   final VoidCallback onButtonPressed;
 
-  /// Names the raised button for a test, since its glyph is a drawing rather
-  /// than an [IconData] anybody could search for.
+  /// Names the raised button for a test.
+  ///
+  /// It was needed when the glyph was a hand-drawn path nothing could search
+  /// for. The glyph is an [IconData] now and `find.byIcon` would reach it, but
+  /// the key says *which button* rather than which picture is on it, and the
+  /// picture is the half that changes.
   static const ValueKey<String> buttonKey = ValueKey<String>('merzoxNav.button');
 
   const MerzoxNotchedNavBar({
@@ -186,7 +189,7 @@ class MerzoxNotchedNavBar extends StatelessWidget {
 /// actually has, and on anything but a white background it read as a white
 /// ring - which is what it was.
 class MerzoxNavRaisedButton extends StatelessWidget {
-  final MerzoxNavGlyph glyph;
+  final IconData glyph;
   final String label;
   final bool selected;
   final VoidCallback onPressed;
@@ -234,12 +237,7 @@ class MerzoxNavRaisedButton extends StatelessWidget {
             ],
           ),
           child: Center(
-            child: MerzoxNavIcon(
-              glyph: glyph,
-              size: 26,
-              color: Colors.white,
-              weight: 1.9,
-            ),
+            child: Icon(glyph, size: 26, color: Colors.white),
           ),
         ),
       ),
@@ -271,8 +269,8 @@ class _NavItem extends StatelessWidget {
               MerzoxNavIndicator(selected: destination.selected),
               const SizedBox(height: kMerzoxNavIndicatorGap),
               _decorated(
-                MerzoxNavIcon(
-                  glyph: destination.glyph,
+                Icon(
+                  destination.glyph,
                   size: 25,
                   color: destination.selected
                       ? MerzoxColors.kColorEE6C4D

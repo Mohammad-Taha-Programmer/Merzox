@@ -74,4 +74,64 @@ abstract final class MerzoxIcons {
     0xe80a,
     fontFamily: 'CampaignsProductsNotifications',
   );
+
+  // -- The customer's bottom bar --------------------------------------------
+  //
+  // Five places, the middle one raised out of the bar. Home and the account
+  // are the same drawings the merchant's bar uses, kept in their own folder
+  // and under their own family for the reason the file header gives.
+
+  static const IconData customerNavHome = IconData(
+    0xe807,
+    fontFamily: 'CustomerNavHome',
+  );
+
+  static const IconData customerNavCart = IconData(
+    0xe806,
+    fontFamily: 'CustomerNavCart',
+  );
+
+  /// The raised button: `المتاجر`, drawn as a shop awning.
+  static const IconData customerNavStores = IconData(
+    0xe808,
+    fontFamily: 'CustomerNavStores',
+  );
+
+  static const IconData customerNavMessages = IconData(
+    0xe805,
+    fontFamily: 'CustomerNavMessages',
+  );
+
+  static const IconData customerNavProfile = IconData(
+    0xe804,
+    fontFamily: 'CustomerNavProfile',
+  );
+
+  // -- The merchant's bottom bar --------------------------------------------
+
+  static const IconData merchantNavHome = IconData(
+    0xe807,
+    fontFamily: 'MerchantNavHome',
+  );
+
+  static const IconData merchantNavOrders = IconData(
+    0xe80a,
+    fontFamily: 'MerchantNavOrders',
+  );
+
+  /// The raised button: `إضافة منتجات`, a cross in a rounded square.
+  static const IconData merchantNavAddProduct = IconData(
+    0xe814,
+    fontFamily: 'MerchantNavAddProduct',
+  );
+
+  static const IconData merchantNavProducts = IconData(
+    0xe813,
+    fontFamily: 'MerchantNavProducts',
+  );
+
+  static const IconData merchantNavProfile = IconData(
+    0xe804,
+    fontFamily: 'MerchantNavProfile',
+  );
 }
