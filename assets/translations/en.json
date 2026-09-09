@@ -606,7 +606,9 @@
     "avatarFromCamera": "Take a photo",
     "avatarFromGallery": "Choose from gallery",
     "avatarUpdated": "Account picture updated",
-    "holdToChangeAvatar": "Hold to change the picture"
+    "holdToChangeAvatar": "Hold to change the picture",
+    "addresses": "Delivery addresses",
+    "addAddress": "Add another address"
   },
   "search": {
     "noResults": "No results",
