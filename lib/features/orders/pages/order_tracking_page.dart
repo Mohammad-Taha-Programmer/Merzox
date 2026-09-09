@@ -17,6 +17,7 @@ import 'package:merzox/core/localization/api_error_localizer.dart';
 import '../bloc/order_tracking_bloc.dart';
 import '../bloc/order_tracking_event.dart';
 import '../bloc/order_tracking_state.dart';
+import '../widgets/order_text_prompt.dart';
 
 class OrderTrackingPage extends StatefulWidget {
   const OrderTrackingPage({super.key});
@@ -681,36 +682,15 @@ class _TrackingActions extends StatelessWidget {
 
   Future<void> _changeAddress(BuildContext context) async {
     final bloc = context.read<OrderTrackingBloc>();
-    final controller = TextEditingController(text: order.deliveryAddress);
 
-    final address = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('tracking.changeAddress'.tr()),
-        content: TextField(
-          controller: controller,
-          maxLength: 250,
-          maxLines: 3,
-          decoration: InputDecoration(
-            hintText: 'tracking.addressHint'.tr(),
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: Text('common.cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () =>
-                Navigator.of(dialogContext).pop(controller.text.trim()),
-            child: Text('common.save'.tr()),
-          ),
-        ],
-      ),
+    final String? address = await askForOrderText(
+      context,
+      title: 'tracking.changeAddress'.tr(),
+      hint: 'tracking.addressHint'.tr(),
+      confirmLabel: 'common.save'.tr(),
+      initialText: order.deliveryAddress,
     );
 
-    controller.dispose();
     if (address == null || address.isEmpty) return;
     bloc.add(OrderTrackingAddressChanged(address));
   }
@@ -741,37 +721,15 @@ class _TrackingActions extends StatelessWidget {
 
   Future<void> _cancelOrder(BuildContext context) async {
     final bloc = context.read<OrderTrackingBloc>();
-    final controller = TextEditingController();
 
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('orders.cancelTitle'.tr()),
-        content: TextField(
-          controller: controller,
-          maxLength: 250,
-          maxLines: 3,
-          decoration: InputDecoration(
-            hintText: 'orders.cancelReason'.tr(),
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text('common.cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text('orders.cancelOrder'.tr()),
-          ),
-        ],
-      ),
+    final String? reason = await askForOrderText(
+      context,
+      title: 'orders.cancelTitle'.tr(),
+      hint: 'orders.cancelReason'.tr(),
+      confirmLabel: 'orders.cancelOrder'.tr(),
     );
 
-    final reason = controller.text.trim();
-    controller.dispose();
-    if (confirmed != true) return;
+    if (reason == null) return;
     bloc.add(OrderTrackingCancelRequested(reason: reason));
   }
 
