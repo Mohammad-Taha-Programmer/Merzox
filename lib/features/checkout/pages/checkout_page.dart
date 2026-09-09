@@ -22,18 +22,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// for - server-derived pricing, the reservation fence, the monotonic
 /// finalize/release decision - applies unchanged.
 ///
-/// Two things the artboards show are NOT built, because the system has no truth
-/// behind them and drawing them would be a lie:
+/// One thing the artboards show is NOT built, because the system has no truth
+/// behind it and drawing it would be a lie:
 ///
-///   * `تفاصيل المتجر – 16` offers a LIST of previously used addresses. A user
-///     document holds a single `address` string, so this step shows that one
-///     address and lets the customer replace it.
 ///   * `تفاصيل المتجر – 24` offers two delivery speeds at ₪10 and ₪30. The
 ///     server computes one flat fee (`deliveryFeeFor`), and the fee shown to a
 ///     customer must be the fee the server will charge, so only that one is
-///     offered.
+///     offered. That needs backend work before its UI can be honest.
 ///
-/// Both need backend work before their UI can be honest.
+/// The address list on `تفاصيل المتجر – 16` used to be listed here too, on the
+/// grounds that an account held a single `address` string. It has not been
+/// true since accounts grew an `addresses` book: the step reads that book and
+/// draws one radio per entry.
+///
+/// What survives of the old shape is the fallback below - an account whose
+/// book is empty is shown its profile's single `address` instead, as one card
+/// that cannot be chosen because there is nothing to choose between. That is
+/// also why an account with a profile address and an empty book sees exactly
+/// one address here and cannot select it, which reads as the list not being
+/// built at all. It is the data that is in the old place, not the screen.
 class CheckoutPage extends StatefulWidget {
   /// Where a completed checkout returns to.
   final VoidCallback? onCompleted;
