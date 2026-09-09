@@ -50,8 +50,21 @@ export const merchantSelectableStatuses = [
  * Customer-driven cancellation. `preparing` is intentionally included: it
  * matches the tracking screen's cancel affordance and the behaviour that was
  * already approved, so it is preserved rather than quietly narrowed here.
+ *
+ * Status is only half the rule - see [ORDER_CANCELLATION_WINDOW_MS]. Read this
+ * list on its own and an order placed a week ago still looks cancellable.
  */
 export const customerCancellableStatuses = ['pending', 'confirmed', 'preparing'];
+
+/**
+ * How long after it was placed a customer may still call an order off.
+ *
+ * The checkout screen has promised this window to every customer who ever
+ * ordered, while the server enforced status alone - so an order could be
+ * refused an hour after it was placed, against a written promise of a day.
+ * The promise is the rule now.
+ */
+export const ORDER_CANCELLATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /**
  * The delivery address may only change before the merchant starts preparing -
@@ -84,8 +97,46 @@ export function statusGroupFor(status) {
   return 'current';
 }
 
-export function canCustomerCancel(status) {
-  return customerCancellableStatuses.includes(status);
+/**
+ * Why this customer may not call this order off, or `null` if they may.
+ *
+ * It answers with a code rather than a boolean so the refusal can say which
+ * of the two gates closed - a reader told only "no" reasonably concludes the
+ * app is broken, especially when the button was offered to them.
+ *
+ * It takes the order rather than its status because the rule needs both
+ * halves. A `canCustomerCancel(status)` that read the status alone was exactly
+ * how the window could be added to one caller and silently left out of the
+ * next, which is the failure this whole module exists to prevent.
+ */
+export function customerCancellationRefusal({ status, createdAt }, now = Date.now()) {
+  if (status === 'outForDelivery') return 'ORDER_ALREADY_DISPATCHED';
+  if (!customerCancellableStatuses.includes(status)) return 'ORDER_NOT_CANCELLABLE';
+
+  // An order that has not been saved has no timestamp yet, and no elapsed time
+  // either - nothing about it is outside the window.
+  const placedAt =
+    createdAt instanceof Date ? createdAt.getTime() : Date.parse(createdAt ?? '');
+
+  if (Number.isFinite(placedAt) && now - placedAt >= ORDER_CANCELLATION_WINDOW_MS) {
+    return 'ORDER_CANCELLATION_WINDOW_CLOSED';
+  }
+
+  return null;
+}
+
+export function canCustomerCancel(order, now = Date.now()) {
+  return customerCancellationRefusal(order, now) === null;
+}
+
+/**
+ * The earliest an order can have been placed and still be cancellable now.
+ *
+ * Handed to a query so the window is enforced in the same atomic write that
+ * checks the status, rather than being read and then acted on.
+ */
+export function earliestCancellableOrderDate(now = Date.now()) {
+  return new Date(now - ORDER_CANCELLATION_WINDOW_MS);
 }
 
 export function canChangeDeliveryAddress(status) {

@@ -774,6 +774,8 @@
     "invalidQuantity": "That quantity is invalid.",
     "orderNotFound": "This order was not found.",
     "orderNotCancellable": "This order can no longer be cancelled.",
+    "orderAlreadyDispatched": "Your order is out for delivery, so it can no longer be cancelled. You can message the store.",
+    "orderCancellationWindowClosed": "More than 24 hours have passed since the order was placed, so it can no longer be cancelled. You can message the store.",
     "orderAddressLocked": "The delivery address can no longer be changed.",
     "orderCourierLocked": "A courier can no longer be assigned to this order.",
     "orderNotifyCooldown": "This order was notified moments ago. Wait a minute and try again.",
@@ -889,7 +891,7 @@
     "totalPending": "{} + delivery",
     "confirm": "Confirm order",
     "cancel": "Cancel order",
-    "cancellationWindow": "An order can be cancelled within 24 hours",
+    "cancellationWindow": "An order can be cancelled within 24 hours of being placed, unless it has gone out for delivery",
     "deliveryOptions": {
       "standard": "Estimated delivery in one to three days",
       "express": "Estimated delivery: immediate"

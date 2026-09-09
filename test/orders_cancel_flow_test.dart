@@ -17,7 +17,8 @@ import 'localization_test_harness.dart';
 /// Pressing `إلغاء الطلب` asks for a reason, and answering the question threw
 /// a framework assertion onto the screen instead of cancelling anything.
 
-Map<String, dynamic> _order(int index) => <String, dynamic>{
+Map<String, dynamic> _order(int index, {bool canCancel = true}) =>
+    <String, dynamic>{
   'id': '64d00000000000000000010$index',
   'publicId': '22232$index',
   'business': <String, dynamic>{
@@ -54,16 +55,21 @@ Map<String, dynamic> _order(int index) => <String, dynamic>{
     'steps': const <Map<String, dynamic>>[],
     'courier': const <String, dynamic>{},
     'courierLocation': null,
-    'canCancel': true,
+    'canCancel': canCancel,
     'canChangeAddress': true,
     'canReview': false,
   },
 };
 
 class _OrdersApi extends ApiService {
+  /// Whether the server says these orders may still be called off.
+  final bool canCancel;
+
   /// What the screen asked to have cancelled, and why.
   String cancelledId = '';
   String cancelledReason = '';
+
+  _OrdersApi({this.canCancel = true});
 
   @override
   Future<OrderListApiResponse> orders({
@@ -73,7 +79,10 @@ class _OrdersApi extends ApiService {
     int limit = 20,
   }) async => OrderListApiResponse.fromJson(<String, dynamic>{
     'orders': status == 'current'
-        ? <Map<String, dynamic>>[_order(0), _order(1)]
+        ? <Map<String, dynamic>>[
+            _order(0, canCancel: canCancel),
+            _order(1, canCancel: canCancel),
+          ]
         : <Map<String, dynamic>>[],
     'pagination': <String, dynamic>{
       'page': 1,
@@ -96,14 +105,17 @@ class _OrdersApi extends ApiService {
   }
 }
 
-Future<_OrdersApi> _pumpOrders(WidgetTester tester) async {
+Future<_OrdersApi> _pumpOrders(
+  WidgetTester tester, {
+  bool canCancel = true,
+}) async {
   SharedPreferences.setMockInitialValues(<String, Object>{
     AuthBloc.sessionKey: true,
     AuthBloc.tokenKey: 'orders-cancel-token',
     AuthBloc.userTypeKey: 'customer',
   });
 
-  final _OrdersApi api = _OrdersApi();
+  final _OrdersApi api = _OrdersApi(canCancel: canCancel);
   final OrdersBloc bloc = OrdersBloc(apiService: api);
   addTearDown(bloc.close);
   bloc.add(const OrdersStarted());
@@ -184,6 +196,22 @@ void main() {
     );
     expect(api.cancelledId, '64d000000000000000000100');
     expect(api.cancelledReason, 'غيرت رأيي');
+  });
+
+  testWidgets('an order the server will not cancel is not offered the swipe', (
+    tester,
+  ) async {
+    // The board used to offer this to anything in `الحالية`, so an order out
+    // for delivery got a button and then a refusal - which reads as a broken
+    // app, not as a changed order.
+    await _pumpOrders(tester, canCancel: false);
+
+    // The card is still there and still draggable; there is simply nothing
+    // underneath it to uncover.
+    expect(find.text('أساس فت مي'), findsWidgets);
+    await _revealCancel(tester);
+
+    expect(find.text('orders.cancelOrder'.tr()), findsNothing);
   });
 
   testWidgets('backing out of the box cancels nothing', (tester) async {

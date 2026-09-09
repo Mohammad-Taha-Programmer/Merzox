@@ -2343,8 +2343,11 @@ void main() {
         await settleMerzoxGoldenFrames(tester);
 
         expect(find.text('هل أنت متأكد من عملية إلغاء الطلب؟'), findsNothing);
+        // The whole sentence, because the half of it that is new is the half
+        // that matters: the window has always been promised here and never
+        // enforced, and what limits it is not time alone.
         expect(
-          find.text('يمكن إلغاء الطلب خلال 24 ساعة من تأكيده'),
+          find.text('يمكن إلغاء الطلب خلال 24 ساعة من إنشائه، ما لم يخرج للتوصيل'),
           findsOneWidget,
         );
 

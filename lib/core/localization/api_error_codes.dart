@@ -125,6 +125,8 @@ const Map<String, String> apiErrorMessageKeys = <String, String>{
   'ORDER_NOT_FOUND': 'apiErrors.orderNotFound',
   'INVALID_ORDER_ID': 'apiErrors.orderNotFound',
   'ORDER_NOT_CANCELLABLE': 'apiErrors.orderNotCancellable',
+  'ORDER_ALREADY_DISPATCHED': 'apiErrors.orderAlreadyDispatched',
+  'ORDER_CANCELLATION_WINDOW_CLOSED': 'apiErrors.orderCancellationWindowClosed',
   'ORDER_ADDRESS_LOCKED': 'apiErrors.orderAddressLocked',
   'ORDER_COURIER_LOCKED': 'apiErrors.orderCourierLocked',
   'ORDER_NOTIFY_COOLDOWN': 'apiErrors.orderNotifyCooldown',
