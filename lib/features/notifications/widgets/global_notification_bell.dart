@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/auth/auth_session_service.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/merzox_icons.dart';
 import '../bloc/notification_badge_bloc.dart';
 import '../bloc/notification_badge_event.dart';
 import '../bloc/notification_badge_state.dart';
@@ -133,9 +134,10 @@ class GlobalNotificationBell extends StatelessWidget {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: <Widget>[
+                      // 24 / 0.835, the bell's ink filling less of its em box.
                       const Icon(
-                        Icons.notifications_none_rounded,
-                        size: 24,
+                        MerzoxIcons.notifications,
+                        size: 29,
                         color: MerzoxColors.kColor98C1D9,
                       ),
                       if (state.unreadCount > 0)

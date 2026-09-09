@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/messages/bloc/chat_bloc.dart';
 import 'package:merzox/features/messages/bloc/chat_event.dart';
 import 'package:merzox/features/messages/bloc/chat_state.dart';
@@ -323,7 +324,7 @@ void main() {
           _expectDirection(tester, find.text(label), direction);
 
           final iconX = tester
-              .getCenter(find.byIcon(Icons.notifications_none_rounded))
+              .getCenter(find.byIcon(MerzoxIcons.notifications))
               .dx;
 
           final switchX = tester.getCenter(find.byType(Switch)).dx;
@@ -351,7 +352,7 @@ void main() {
         expect(find.byType(Switch), findsNothing);
 
         final iconX = tester
-            .getCenter(find.byIcon(Icons.notifications_none_rounded))
+            .getCenter(find.byIcon(MerzoxIcons.notifications))
             .dx;
 
         final retryX = tester.getCenter(find.text(retry)).dx;

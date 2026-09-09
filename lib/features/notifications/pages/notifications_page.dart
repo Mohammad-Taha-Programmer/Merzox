@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
@@ -153,9 +154,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(top: 120),
         children: [
+          // 56 / 0.835, the bell's ink filling less of its em box.
           const Icon(
-            Icons.notifications_none_rounded,
-            size: 56,
+            MerzoxIcons.notifications,
+            size: 67,
             color: MerzoxColors.kColorBEBEBE,
           ),
           const SizedBox(height: 18),

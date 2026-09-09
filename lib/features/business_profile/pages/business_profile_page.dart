@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/auth/auth_gate.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
@@ -452,9 +453,10 @@ class _TopBar extends StatelessWidget {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
+                // 22 / 0.835, the bell's ink filling less of its em box.
                 Icon(
-                  Icons.notifications_none_rounded,
-                  size: 22,
+                  MerzoxIcons.notifications,
+                  size: 26,
                   color: MerzoxColors.kColor98C1D9,
                 ),
                 PositionedDirectional(

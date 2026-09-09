@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_bloc.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_event.dart';
 import 'package:merzox/features/notification_preferences/bloc/notification_preference_state.dart';
@@ -41,8 +42,12 @@ class NotificationPreferenceControl extends StatelessWidget {
   const NotificationPreferenceControl({
     super.key,
     this.labelKey = 'notificationPreferences.productOffers',
-    this.icon = Icons.notifications_none_rounded,
-    this.iconSize = 18,
+    this.icon = MerzoxIcons.notifications,
+    // 18 / 0.835. The bell's ink fills less of its em box than the Material
+    // one this replaced, so the number rises to keep the mark the size it was.
+    // It is not raised further to match the 20 the rows beside it draw at -
+    // that gap predates this and is a question about the row, not the glyph.
+    this.iconSize = 22,
     this.labelSize = 12,
     this.height = 38,
     this.cornerRadius = 4,

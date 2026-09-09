@@ -3,6 +3,7 @@ import '../../../core/constants/dates.dart';
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/widgets/merzox_back_chevron.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/constants/money.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/orders/merchant_order_invoice_page.dart';
@@ -190,11 +191,9 @@ SnackBar merchantOrderNoticeSnackBar(String message, {bool isNotice = true}) {
     behavior: SnackBarBehavior.fixed,
     content: Row(
       children: <Widget>[
-        const Icon(
-          Icons.notifications_none_rounded,
-          size: 20,
-          color: Colors.white,
-        ),
+        // 20 / 0.835: the bell's ink fills less of its em box than Material's
+        // did, so the number rises to keep the mark the size it was.
+        const Icon(MerzoxIcons.notifications, size: 24, color: Colors.white),
         const SizedBox(width: 10),
         Expanded(
           child: Text(

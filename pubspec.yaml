@@ -149,6 +149,16 @@ flutter:
     # CampaignsProductsNotifications exists beside the library's own
     # Notifications: the two are the same drawing today, and the day the
     # offers row wants its own, one screen changes and no other does.
+    # The one glyph that is deliberately not copied into a screen's folder.
+    # A bell is not a section's mark - it is the same bell on the home bar, the
+    # notifications board, the storefront, a merchant's order and two
+    # preference switches, and it is meant to stay the same on all of them. So
+    # it is declared where the library keeps it. The offers row's
+    # CampaignsProductsNotifications below stays its own copy for the reason
+    # written beside it.
+    - family: Notifications
+      fonts:
+        - asset: assets/fonts/icons_fonts/Notifications.ttf
     - family: EditProfileIcon
       fonts:
         - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf
