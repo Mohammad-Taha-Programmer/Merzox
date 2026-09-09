@@ -2217,7 +2217,6 @@ void main() {
           AuthBloc.tokenKey: 'seed-golden-token',
           AuthBloc.userTypeKey: 'customer',
           AuthBloc.nameKey: 'ياسمين عماد',
-          AuthBloc.addressKey: 'أريحا',
           CartStorageKeys.items: <String>[
             // The stored line is JSON, and the bloc REVALIDATES it against the
             // public product contract on load, so the seed serves that product

@@ -748,9 +748,11 @@ export const createOrder = asyncHandler(async (req, res) => {
   }
 
   let { lines } = resolved;
-  const deliveryAddress = String(
-    req.body.deliveryAddress ?? req.user.address ?? ''
-  ).trim();
+  // Only what the request carried. The account used to hold a single address
+  // string that an order fell back to, which meant a customer who chose one
+  // address in the app could have the order placed against another - the one
+  // they typed into a form months earlier and had forgotten.
+  const deliveryAddress = String(req.body.deliveryAddress ?? '').trim();
 
   // Validated before any durable state exists, so a missing address can never
   // leave an intent or a reservation behind.

@@ -2,7 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
-import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/cart/cart_item_integrity.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/services/product_share_service.dart';
@@ -576,8 +575,24 @@ class ProductDetailsBloc
 
     try {
       final token = await _token();
-      final prefs = await SharedPreferences.getInstance();
-      final address = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
+
+      // Buy-now used to read the profile's single address string. That field
+      // is gone - it could not hold a governorate, a city, or the name and
+      // number a driver needs - so the delivery address comes from the
+      // account's book, taking the one marked default.
+      final String address = await _defaultDeliveryAddress(token);
+
+      if (address.isEmpty) {
+        // Said here rather than left to the server's refusal, which would
+        // arrive as a failure the reader could do nothing with.
+        emit(
+          state.copyWith(
+            status: ProductDetailsStatus.failure,
+            errorMessage: 'checkout.noSavedAddress',
+          ),
+        );
+        return;
+      }
 
       await _apiService.createOrder(
         token: token,
@@ -627,6 +642,25 @@ class ProductDetailsBloc
   bool _hasRealCommerceIds(String productId) {
     return isMongoBackedEntityId(state.businessId) &&
         isMongoBackedEntityId(productId);
+  }
+
+  /// The address an order goes to when the reader was not asked.
+  ///
+  /// The one they marked default, or the first they saved. An empty book is
+  /// not an error here - it is a question the caller has to put to them - so
+  /// this answers with an empty string rather than throwing.
+  Future<String> _defaultDeliveryAddress(String token) async {
+    final List<SavedAddressApiModel> book = await _apiService.myAddresses(
+      token: token,
+    );
+
+    if (book.isEmpty) return '';
+
+    for (final SavedAddressApiModel entry in book) {
+      if (entry.isDefault) return entry.line;
+    }
+
+    return book.first.line;
   }
 
   Future<String> _token() async {

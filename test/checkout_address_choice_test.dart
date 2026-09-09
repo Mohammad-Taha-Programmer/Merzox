@@ -16,11 +16,12 @@ import 'localization_test_harness.dart';
 /// Choosing where an order goes.
 ///
 /// The step draws one radio per saved address and the order takes the chosen
-/// one. What confuses a reader is the fallback beside it: an account whose
-/// `addresses` book is empty is shown its profile's single `address` string
-/// instead, as one card that cannot be chosen - and that reads exactly like a
-/// screen that only ever offers one address. Both paths are held here so the
-/// difference is a fact rather than an impression.
+/// one. It used to have a fallback beside it: an account whose `addresses`
+/// book was empty was shown its profile's single `address` string instead, as
+/// one card that could not be chosen - which read exactly like a screen that
+/// only ever offers one address, and is what sent us looking. The account has
+/// no single address any more, so an empty book is an empty book, and that is
+/// the last case below.
 
 class _AddressApi extends ApiService {
   final List<SavedAddressApiModel> book;
@@ -53,12 +54,10 @@ SavedAddressApiModel _saved({
 Future<void> _pumpCheckout(
   WidgetTester tester, {
   required List<SavedAddressApiModel> book,
-  String profileAddress = '',
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{
     AuthBloc.sessionKey: true,
     AuthBloc.nameKey: 'ياسمين خالد',
-    AuthBloc.addressKey: profileAddress,
   });
   FlutterSecureStorage.setMockInitialValues(<String, String>{
     SecureTokenStore.key: 'token',
@@ -151,25 +150,17 @@ void main() {
     expect(_unchosen(), findsOneWidget);
   });
 
-  testWidgets('an empty book falls back to the profile address, unchoosable', (
+  testWidgets('an empty book is said plainly, not filled from elsewhere', (
     tester,
   ) async {
-    // This is the case that reads as "the screen only ever shows one
-    // address". The screen is not at fault: the account's addresses live in
-    // the old single field, and one address is not a choice.
-    await _pumpCheckout(
-      tester,
-      book: const <SavedAddressApiModel>[],
-      profileAddress: 'رام الله، شارع الإرسال',
-    );
-
-    expect(find.text('ياسمين خالد، رام الله، شارع الإرسال'), findsOneWidget);
-    expect(_unchosen(), findsNothing);
-  });
-
-  testWidgets('an account with neither is told so plainly', (tester) async {
+    // An empty book used to fall back to the profile's single address string,
+    // drawn as one card that could not be chosen - which is what read as "the
+    // screen only ever shows one address". That field is gone from the
+    // account, so an empty book is now an empty book.
     await _pumpCheckout(tester, book: const <SavedAddressApiModel>[]);
 
     expect(find.text('checkout.noSavedAddress'.tr()), findsOneWidget);
+    expect(_chosen(), findsNothing);
+    expect(_unchosen(), findsNothing);
   });
 }

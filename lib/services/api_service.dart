@@ -261,7 +261,6 @@ class ApiService {
     required String token,
     String? name,
     String? gender,
-    String? address,
     String? birthDate,
     List<ContactEmail>? emails,
     List<ContactPhone>? phones,
@@ -271,7 +270,6 @@ class ApiService {
       data: {
         'name': ?name,
         'gender': ?gender,
-        'address': ?address,
         'birthDate': ?birthDate,
         if (emails != null)
           'emails': emails.map((email) => email.toJson()).toList(),
@@ -3100,7 +3098,6 @@ class AuthApiUser {
   final List<ContactEmail> emails;
   final String? phone;
   final List<ContactPhone> phones;
-  final String address;
   final String userType;
   final String gender;
 
@@ -3121,7 +3118,6 @@ class AuthApiUser {
     required this.emails,
     required this.phone,
     required this.phones,
-    required this.address,
     required this.userType,
     required this.gender,
     required this.canChangeName,
@@ -3151,7 +3147,6 @@ class AuthApiUser {
           .map(ContactPhone.fromJson)
           .where((phone) => phone.value.isNotEmpty)
           .toList(),
-      address: json['address'] as String? ?? '',
       userType: json['userType'] as String? ?? 'normal',
       gender: json['gender'] as String? ?? 'unspecified',
       birthDate: canonicalBirthDate(json['birthDate']),

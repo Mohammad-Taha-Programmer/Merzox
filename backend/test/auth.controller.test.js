@@ -230,6 +230,9 @@ test('a verified link creates the account the signup withheld', async () => {
         name: 'ياسمين خالد',
         email: 'yasmine@example.com',
         password: 'correct-horse',
+        // Signup used to carry this through to the account. The app never
+        // collected one - it posted an empty string - and an account keeps a
+        // book of delivery addresses now, which a free-text line cannot join.
         address: 'رام الله'
       }
     });
@@ -251,7 +254,11 @@ test('a verified link creates the account the signup withheld', async () => {
     assert.equal(saved.email, 'yasmine@example.com');
     assert.equal(saved.emailVerified, true);
     assert.equal(saved.emails[0].verified, true);
-    assert.equal(saved.address, 'رام الله');
+    // And it is dropped rather than stored: an address a driver is sent to
+    // needs a name, a number, a governorate and a city, and this has none of
+    // them.
+    assert.equal(saved.address, undefined);
+    assert.deepEqual(saved.addresses ?? [], []);
     // The hash made at signup is carried across, so the password the user
     // chose then is the password that works now.
     assert.ok(saved.passwordHash.startsWith('$2'));

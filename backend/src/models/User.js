@@ -115,15 +115,20 @@ const userSchema = new mongoose.Schema(
       match: [/^\+?[0-9]{7,15}$/, 'Phone number must be international format']
     },
     phones: { type: [phoneSchema], default: [] },
-    // The profile's single free-text address. Kept as it was: an account that
-    // never opens the address book still has exactly this, and every existing
-    // order was placed against it.
-    address: {
-      type: String,
-      trim: true,
-      maxlength: 250,
-      default: ''
-    },
+    /**
+     * Every place this account has asked for a delivery to.
+     *
+     * There was a single free-text `address` string beside this, and the two
+     * disagreed by design: an order fell back to the string when the book was
+     * empty, so a customer with both could not tell which one an order would
+     * use. One of them had to go, and the string is the one that cannot hold
+     * a governorate, a city, or the name and number a driver needs.
+     *
+     * Nothing migrates. A string like "Jericho" carries none of the four
+     * fields an entry requires, so the only ways to keep it were to discard
+     * the four requirements or to invent values for them - and an invented
+     * address is one a driver is sent to.
+     */
     addresses: { type: [addressSchema], default: [] },
     // Where the account's picture is hosted. A URL, not the image: the bytes
     // live with the image host, and this document keeps only the pointer.
@@ -234,7 +239,6 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     emails: this.emails,
     phone: this.phone ?? null,
     phones: this.phones,
-    address: this.address,
     addresses: this.addresses.map((entry) => ({
       id: entry._id.toString(),
       label: entry.label,

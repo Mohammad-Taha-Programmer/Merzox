@@ -32,6 +32,7 @@ const String _productId = '64c000000000000000000001';
 /// Refuses every order with [code], and refuses to re-read the cart line so
 /// the stored snapshot survives into checkout.
 class _RefusingApi extends ApiService {
+
   final String code;
 
   _RefusingApi(this.code);
@@ -47,12 +48,25 @@ class _RefusingApi extends ApiService {
     );
   }
 
+  /// One saved address, so the step has something to choose and the order has
+  /// somewhere to go. This used to throw: the step fell back to the profile's
+  /// single stored line, and these tests leaned on that. The account keeps no
+  /// such line now, so the book is the only answer and an empty one would
+  /// stop the walk before it reached the refusal being tested.
   @override
-  Future<List<SavedAddressApiModel>> myAddresses({required String token}) {
-    // No address book: the step falls back to the profile's stored line, which
-    // is the shape most of these accounts are in.
-    throw StateError('no address book');
-  }
+  Future<List<SavedAddressApiModel>> myAddresses({
+    required String token,
+  }) async => <SavedAddressApiModel>[
+    SavedAddressApiModel.fromJson(const <String, dynamic>{
+      'id': 'address-1',
+      'fullName': 'ياسمين خالد',
+      'phone': '0599000000',
+      'governorate': 'رام الله',
+      'city': 'رام الله',
+      'details': 'شارع الإرسال',
+      'isDefault': true,
+    }),
+  ];
 
   @override
   Future<BusinessProductApiModel> businessProduct({
@@ -90,7 +104,6 @@ void _installBasket() {
   SharedPreferences.setMockInitialValues(<String, Object>{
     AuthBloc.sessionKey: true,
     AuthBloc.userTypeKey: 'normal',
-    AuthBloc.addressKey: 'رام الله',
     CartStorageKeys.items: <String>[
       jsonEncode(<String, dynamic>{
         'businessId': _businessId,

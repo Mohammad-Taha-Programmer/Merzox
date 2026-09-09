@@ -72,7 +72,6 @@ void _installSession({bool withBasket = true}) {
   SharedPreferences.setMockInitialValues(<String, Object>{
     AuthBloc.sessionKey: true,
     AuthBloc.userTypeKey: 'normal',
-    AuthBloc.addressKey: 'رام الله',
     if (withBasket)
       CartStorageKeys.items: <String>[
         jsonEncode(<String, dynamic>{

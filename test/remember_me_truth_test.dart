@@ -29,7 +29,6 @@ class _SuccessfulLoginApi extends ApiService {
         emails: const [],
         phone: null,
         phones: const [],
-        address: 'Ramallah',
         userType: userType,
         gender: 'unspecified',
         canChangeName: true,
@@ -170,7 +169,6 @@ void main() {
       expect(await const SecureTokenStore().read(), isNull);
       expect(prefs.getString(AuthBloc.userIdKey), isNull);
       expect(prefs.getString(AuthBloc.nameKey), isNull);
-      expect(prefs.getString(AuthBloc.addressKey), isNull);
       expect(prefs.getString(AuthBloc.userTypeKey), isNull);
       expect(prefs.getString(AuthBloc.emailKey), isNull);
       expect(prefs.getString(AuthBloc.phoneKey), isNull);
