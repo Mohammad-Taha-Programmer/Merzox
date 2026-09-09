@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/orders/bloc/orders_bloc.dart';
 import 'package:merzox/features/orders/bloc/orders_event.dart';
@@ -17,8 +18,11 @@ import 'localization_test_harness.dart';
 /// Pressing `إلغاء الطلب` asks for a reason, and answering the question threw
 /// a framework assertion onto the screen instead of cancelling anything.
 
-Map<String, dynamic> _order(int index, {bool canCancel = true}) =>
-    <String, dynamic>{
+Map<String, dynamic> _order(
+  int index, {
+  bool canCancel = true,
+  String blockedReason = '',
+}) => <String, dynamic>{
   'id': '64d00000000000000000010$index',
   'publicId': '22232$index',
   'business': <String, dynamic>{
@@ -56,20 +60,23 @@ Map<String, dynamic> _order(int index, {bool canCancel = true}) =>
     'courier': const <String, dynamic>{},
     'courierLocation': null,
     'canCancel': canCancel,
+    'cancelBlockedReason': blockedReason,
     'canChangeAddress': true,
     'canReview': false,
   },
 };
 
 class _OrdersApi extends ApiService {
-  /// Whether the server says these orders may still be called off.
+  /// Whether the server says these orders may still be called off, and if not,
+  /// the code it would refuse with.
   final bool canCancel;
+  final String blockedReason;
 
   /// What the screen asked to have cancelled, and why.
   String cancelledId = '';
   String cancelledReason = '';
 
-  _OrdersApi({this.canCancel = true});
+  _OrdersApi({this.canCancel = true, this.blockedReason = ''});
 
   @override
   Future<OrderListApiResponse> orders({
@@ -80,8 +87,8 @@ class _OrdersApi extends ApiService {
   }) async => OrderListApiResponse.fromJson(<String, dynamic>{
     'orders': status == 'current'
         ? <Map<String, dynamic>>[
-            _order(0, canCancel: canCancel),
-            _order(1, canCancel: canCancel),
+            _order(0, canCancel: canCancel, blockedReason: blockedReason),
+            _order(1, canCancel: canCancel, blockedReason: blockedReason),
           ]
         : <Map<String, dynamic>>[],
     'pagination': <String, dynamic>{
@@ -108,6 +115,7 @@ class _OrdersApi extends ApiService {
 Future<_OrdersApi> _pumpOrders(
   WidgetTester tester, {
   bool canCancel = true,
+  String blockedReason = '',
 }) async {
   SharedPreferences.setMockInitialValues(<String, Object>{
     AuthBloc.sessionKey: true,
@@ -115,7 +123,10 @@ Future<_OrdersApi> _pumpOrders(
     AuthBloc.userTypeKey: 'customer',
   });
 
-  final _OrdersApi api = _OrdersApi(canCancel: canCancel);
+  final _OrdersApi api = _OrdersApi(
+    canCancel: canCancel,
+    blockedReason: blockedReason,
+  );
   final OrdersBloc bloc = OrdersBloc(apiService: api);
   addTearDown(bloc.close);
   bloc.add(const OrdersStarted());
@@ -198,20 +209,74 @@ void main() {
     expect(api.cancelledReason, 'غيرت رأيي');
   });
 
-  testWidgets('an order the server will not cancel is not offered the swipe', (
-    tester,
-  ) async {
-    // The board used to offer this to anything in `الحالية`, so an order out
-    // for delivery got a button and then a refusal - which reads as a broken
-    // app, not as a changed order.
+  testWidgets('a shut cancel action stays on the card, faded', (tester) async {
+    // Taking it away was tried and is worse: a customer who came to call an
+    // order off finds nothing at all, and nothing to read is the same "this is
+    // broken" as an unexplained refusal, with less to go on.
     await _pumpOrders(tester, canCancel: false);
-
-    // The card is still there and still draggable; there is simply nothing
-    // underneath it to uncover.
-    expect(find.text('أساس فت مي'), findsWidgets);
     await _revealCancel(tester);
 
-    expect(find.text('orders.cancelOrder'.tr()), findsNothing);
+    expect(find.text('orders.cancelOrder'.tr()), findsWidgets);
+
+    final FilledButton button = tester.widget<FilledButton>(
+      find.ancestor(
+        of: find.text('orders.cancelOrder'.tr()).first,
+        matching: find.byType(FilledButton),
+      ),
+    );
+    const Set<WidgetState> resting = <WidgetState>{};
+
+    expect(
+      button.style?.backgroundColor?.resolve(resting),
+      MerzoxColors.kColorFEE3DC,
+      reason: 'the pale ground is what says it is shut',
+    );
+    expect(
+      button.style?.foregroundColor?.resolve(resting),
+      MerzoxColors.kColorEE6C4D,
+      reason: 'white on the pale ground would not be readable',
+    );
+    expect(
+      button.onPressed,
+      isNotNull,
+      reason: 'the tap is how the reason is reached',
+    );
+  });
+
+  testWidgets('pressing the shut action says why, and cancels nothing', (
+    tester,
+  ) async {
+    final _OrdersApi api = await _pumpOrders(
+      tester,
+      canCancel: false,
+      blockedReason: 'ORDER_ALREADY_DISPATCHED',
+    );
+    await _revealCancel(tester);
+
+    await tester.tap(find.text('orders.cancelOrder'.tr()).first);
+    await settleFrames(tester);
+
+    expect(
+      find.text('apiErrors.orderAlreadyDispatched'.tr()),
+      findsOneWidget,
+      reason: 'the same sentence the cancel route would have refused with',
+    );
+    expect(find.text('orders.cancelTitle'.tr()), findsNothing);
+    expect(api.cancelledId, isEmpty);
+  });
+
+  testWidgets('a reason the app does not know still says something true', (
+    tester,
+  ) async {
+    // A server that grows a fourth reason must not leave the reader with a
+    // blank; the general sentence holds whatever the particular one is.
+    await _pumpOrders(tester, canCancel: false, blockedReason: 'SOMETHING_NEW');
+    await _revealCancel(tester);
+
+    await tester.tap(find.text('orders.cancelOrder'.tr()).first);
+    await settleFrames(tester);
+
+    expect(find.text('apiErrors.orderNotCancellable'.tr()), findsOneWidget);
   });
 
   testWidgets('backing out of the box cancels nothing', (tester) async {
