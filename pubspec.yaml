@@ -104,7 +104,11 @@ flutter_native_splash:
 flutter:
   assets:
     - assets/images/
+    # Each of these is named on its own because the entry above is not
+    # recursive: a folder left out here is a picture that resolves in the IDE
+    # and throws at runtime.
     - assets/images/Onboarding/
+    - assets/images/HomeScreen/
     - assets/translations/
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

@@ -609,6 +609,24 @@ class _HomeTopBar extends StatelessWidget {
   }
 }
 
+/// The blue panel's own height. Extra vertical room prevents the enrollment
+/// content from overflowing on physical 375px devices.
+const double kEnrollmentCardHeight = 154;
+
+/// How far the illustration rises above the panel's top edge.
+///
+/// The artboard has it break the card rather than sit inside it, which is what
+/// makes it read as a picture standing there and not as an icon in a box. The
+/// room is added to this widget's own height rather than let the drawing
+/// overflow: the card lives in a sliver, and what a sliver paints outside its
+/// extent is at the viewport's mercy.
+const double kEnrollmentArtOverhang = 20;
+
+/// The drawing's height and its width at the source file's own proportions,
+/// so nothing here has to be recalculated if it is ever re-exported.
+const double kEnrollmentArtHeight = kEnrollmentCardHeight + 16;
+const double kEnrollmentArtWidth = kEnrollmentArtHeight * 222 / 334;
+
 class _MerchantEnrollmentCard extends StatelessWidget {
   final VoidCallback onPressed;
 
@@ -616,10 +634,40 @@ class _MerchantEnrollmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return SizedBox(
+      height: kEnrollmentCardHeight + kEnrollmentArtOverhang,
+      child: Stack(
+        children: <Widget>[
+          PositionedDirectional(
+            start: 0,
+            end: 0,
+            bottom: 0,
+            height: kEnrollmentCardHeight,
+            child: _panel(),
+          ),
+          // Drawn after the panel, so it stands in front of it, and pinned to
+          // the panel's foot so the overhang is all at the top.
+          PositionedDirectional(
+            end: 6,
+            bottom: 0,
+            child: Image.asset(
+              'assets/images/HomeScreen/home_pic.png',
+              height: kEnrollmentArtHeight,
+              fit: BoxFit.contain,
+              // A missing picture must not take the invitation down with it.
+              errorBuilder: (_, _, _) => const SizedBox(
+                width: kEnrollmentArtWidth,
+                height: kEnrollmentArtHeight,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _panel() {
     return Container(
-      // Extra vertical room prevents the enrollment content from
-      // overflowing on physical 375px devices.
-      height: 154,
       decoration: BoxDecoration(
         color: MerzoxColors.kColor3D5A80,
         borderRadius: BorderRadius.circular(8),
@@ -678,20 +726,11 @@ class _MerchantEnrollmentCard extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(width: 14),
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.16),
-              shape: BoxShape.circle,
-            ),
-            child: const Icon(
-              Icons.storefront_rounded,
-              color: Colors.white,
-              size: 38,
-            ),
-          ),
+          const SizedBox(width: 10),
+          // The drawing itself is not in this row - it stands in front of the
+          // panel and reaches above it. What is here is the room it needs, so
+          // the wording never runs under it.
+          const SizedBox(width: kEnrollmentArtWidth),
         ],
       ),
     );
