@@ -129,8 +129,14 @@ void main() {
       // looked at: a point just under the flat edge, out past where a sharp
       // corner would have been, is bar when the corner is sharp and gap when
       // it is turned - because turning it pulls the edge away earlier.
+      //
+      // The probe is placed off the bite's own edge rather than at a number:
+      // it was written as a literal 36, which sat just outside a bite of 34,
+      // and stopped meaning anything the day the bite grew past it - it was
+      // then inside the bite, where there is no bar to find whatever the
+      // corner does.
       const Offset probe = Offset(
-        _centre - 36,
+        _centre - kMerzoxNavNotchRadius - 2,
         kMerzoxNavOverhang + 1,
       );
 

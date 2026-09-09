@@ -14,8 +14,16 @@ const double kMerzoxNavIndicatorGap = 13;
 /// The bar's own height, below its top edge.
 const double kMerzoxNavBarHeight = 62;
 
+/// How far the bar's shadow reaches out from its edge.
+///
+/// The shadow is painted from the bar's own path rather than as a box shadow,
+/// so it follows the bite round instead of running straight across it - which
+/// means this thickens the shadow under the button's cradle too, not only
+/// along the flat edge.
+const double kMerzoxNavBarShadowBlur = 10;
+
 /// The raised button, and the room kept around it.
-const double kMerzoxNavButtonDiameter = 56;
+const double kMerzoxNavButtonDiameter = 54;
 
 /// The mark on each of the bar's own places, as a font size.
 ///
@@ -32,10 +40,14 @@ const double kMerzoxNavButtonGlyphSize = 22;
 
 /// How far the bite is cut past the button on every side. This is the gap the
 /// artboard shows: the button floats in the bite rather than filling it.
-const double kMerzoxNavButtonGap = 6;
+///
+/// It is what is tuned when the *bite* is asked to change, since the bite's
+/// radius is this plus the button's own - so shrinking the button by two and
+/// widening the bite by two is a change of three here, not of two.
+const double kMerzoxNavButtonGap = 14;
 
 /// How far above the bar's top edge the button's centre sits.
-const double kMerzoxNavButtonLift = 8;
+const double kMerzoxNavButtonLift = 10;
 
 /// The radius of the bite itself.
 const double kMerzoxNavNotchRadius =
@@ -362,7 +374,10 @@ class _NotchedBarPainter extends CustomPainter {
         path,
         Paint()
           ..color = Colors.black.withValues(alpha: 0.07)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
+          ..maskFilter = const MaskFilter.blur(
+            BlurStyle.normal,
+            kMerzoxNavBarShadowBlur,
+          ),
       )
       ..drawPath(path, Paint()..color = Colors.white);
   }
