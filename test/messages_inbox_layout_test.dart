@@ -7,7 +7,7 @@ import 'package:merzox/features/messages/bloc/messages_bloc.dart';
 import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/bloc/messages_search_bloc.dart';
 import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
-import 'package:merzox/features/messages/widgets/messages_back_chevron.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/features/messages/widgets/messages_search_icon.dart';
 import 'package:merzox/services/api_service.dart';
 
@@ -248,10 +248,10 @@ void main() {
       WidgetTester tester,
     ) async {
       await _pumpInbox(tester);
-      expect(find.byType(MessagesBackChevron), findsNothing);
+      expect(find.byType(MerzoxBackChevron), findsNothing);
 
       await _pumpInbox(tester, showBack: true);
-      expect(find.byType(MessagesBackChevron), findsOneWidget);
+      expect(find.byType(MerzoxBackChevron), findsOneWidget);
     });
 
     testWidgets('the magnifier stands clear of the notification bell', (

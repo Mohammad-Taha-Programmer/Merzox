@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart';
 import 'package:merzox/features/orders/bloc/orders_bloc.dart';
@@ -230,22 +231,36 @@ class _OrdersHeader extends StatelessWidget {
       height: _ordersHeaderHeight,
       child: Stack(
         children: [
-          const PositionedDirectional(
-            start: 5,
-            top: 1,
-            child: BackButton(color: MerzoxColors.kColor5E5E5E),
+          // The 40-square target centres the 24-square mark at (29, 25), which
+          // is where the eye already found the arrow this replaced.
+          PositionedDirectional(
+            start: 9,
+            top: 5,
+            child: MerzoxBackChevronButton(
+              valueKey: const ValueKey<String>('orders.back'),
+              semanticsLabel: 'common.back'.tr(),
+              color: MerzoxColors.kColor5E5E5E,
+              onTap: () => Navigator.of(context).maybePop(),
+            ),
           ),
+          // The title spans the whole band so it can be centred in it, which
+          // lays a full-width paragraph over the chevron - and a paragraph
+          // answers every hit test put to it, so it swallowed the presses
+          // meant for the way back. It is lettering, not a control, and says
+          // so here.
           Positioned(
             top: 14,
             left: 0,
             right: 0,
-            child: Text(
-              'orders.title'.tr(),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: MerzoxColors.kColor2B2B2B,
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
+            child: IgnorePointer(
+              child: Text(
+                'orders.title'.tr(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: MerzoxColors.kColor2B2B2B,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
           ),

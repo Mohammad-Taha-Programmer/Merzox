@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/merzox_back_chevron.dart';
 import '../../notifications/widgets/global_notification_bell.dart';
 import '../bloc/messages_search_bloc.dart';
 import '../bloc/messages_search_event.dart';
 import '../bloc/messages_search_state.dart';
-import 'messages_back_chevron.dart';
 import 'messages_search_icon.dart';
 
 /// The bar over the inbox: a way back, the screen's name, and a way to search.
@@ -92,7 +92,7 @@ class _MessagesHeaderState extends State<MessagesHeader> {
               semanticsLabel: 'common.back'.tr(),
               valueKey: 'merzox.messages.back',
               onTap: () => Navigator.of(context).maybePop(),
-              child: const MessagesBackChevron(),
+              child: const MerzoxBackChevron(),
             ),
           ),
         PositionedDirectional(
