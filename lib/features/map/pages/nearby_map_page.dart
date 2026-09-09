@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/merzox_back_chevron.dart';
 import '../../../services/api_service.dart';
 import '../../business_profile/pages/business_profile_page.dart';
 import '../../home/presentation/bloc/home_state_.dart';
@@ -360,9 +361,16 @@ class _MapHeader extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
+          // The 40-square target centres the 24-square mark where the eye
+          // already found the arrow it replaces.
           PositionedDirectional(
-            start: 8,
-            child: const BackButton(color: MerzoxColors.kColor5E5E5E),
+            start: 12,
+            child: MerzoxBackChevronButton(
+              valueKey: const ValueKey<String>('nearbyMap.back'),
+              semanticsLabel: 'common.back'.tr(),
+              color: MerzoxColors.kColor5E5E5E,
+              onTap: () => Navigator.of(context).maybePop(),
+            ),
           ),
         ],
       ),

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import '../../../core/constants/dates.dart';
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/core/constants/money.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 
@@ -37,12 +38,21 @@ class MerchantOrderInvoicePage extends StatelessWidget {
               height: 48,
               child: Stack(
                 children: <Widget>[
-                  const PositionedDirectional(
-                    start: 4,
+                  // The 40-square target centres the 24-square mark where the
+                  // eye already found the arrow it replaces.
+                  PositionedDirectional(
+                    start: 8,
                     top: 0,
                     bottom: 0,
                     child: Center(
-                      child: BackButton(color: MerzoxColors.kColor5E5E5E),
+                      child: MerzoxBackChevronButton(
+                        valueKey: const ValueKey<String>(
+                          'merchantOrderInvoice.back',
+                        ),
+                        semanticsLabel: 'common.back'.tr(),
+                        color: MerzoxColors.kColor5E5E5E,
+                        onTap: () => Navigator.of(context).maybePop(),
+                      ),
                     ),
                   ),
                   PositionedDirectional(

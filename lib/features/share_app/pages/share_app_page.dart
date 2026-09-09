@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/merzox_back_chevron.dart';
 import '../../../services/share_app_service.dart';
 import '../bloc/share_app_bloc.dart';
 import '../bloc/share_app_event.dart';
@@ -84,9 +85,16 @@ class _ShareAppHeader extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const PositionedDirectional(
-            start: 8,
-            child: BackButton(color: MerzoxColors.kColor5E5E5E),
+          // The 40-square target centres the 24-square mark where the eye
+          // already found the arrow it replaces.
+          PositionedDirectional(
+            start: 12,
+            child: MerzoxBackChevronButton(
+              valueKey: const ValueKey<String>('shareApp.back'),
+              semanticsLabel: 'common.back'.tr(),
+              color: MerzoxColors.kColor5E5E5E,
+              onTap: () => Navigator.of(context).maybePop(),
+            ),
           ),
         ],
       ),

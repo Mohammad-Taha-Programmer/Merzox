@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart';
@@ -116,9 +117,16 @@ class _PreviewScaffold extends StatelessWidget {
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  const PositionedDirectional(
-                    start: 8,
-                    child: BackButton(color: MerzoxColors.kColor5E5E5E),
+                  // The 40-square target centres the 24-square mark where the
+                  // eye already found the arrow it replaces.
+                  PositionedDirectional(
+                    start: 12,
+                    child: MerzoxBackChevronButton(
+                      valueKey: const ValueKey<String>('storePreview.back'),
+                      semanticsLabel: 'common.back'.tr(),
+                      color: MerzoxColors.kColor5E5E5E,
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
                   ),
                 ],
               ),
