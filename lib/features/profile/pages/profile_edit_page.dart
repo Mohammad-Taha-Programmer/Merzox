@@ -7,11 +7,19 @@ import 'package:merzox/core/localization/language_toggle_button.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_bloc.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_event.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_state.dart';
+import 'package:merzox/core/auth/auth_session_service.dart';
+import 'package:merzox/features/checkout/pages/address_form_page.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
 class ProfileEditPage extends StatefulWidget {
-  const ProfileEditPage({super.key});
+  /// Reads and edits the account's address book. Injectable because the book
+  /// is fetched by this screen rather than by the bloc behind it - the form
+  /// saves the account, and an address is its own resource with its own
+  /// routes.
+  final ApiService? apiService;
+
+  const ProfileEditPage({super.key, this.apiService});
 
   @override
   State<ProfileEditPage> createState() => _ProfileEditPageState();
@@ -22,6 +30,15 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   final _nameController = TextEditingController();
   final List<_EmailFieldData> _emails = [];
   final List<_PhoneFieldData> _phones = [];
+
+  /// The account's saved delivery addresses.
+  ///
+  /// Not part of the form's own save. An address is a resource of its own -
+  /// created, corrected and removed through its own routes - and each of
+  /// those answers with the whole book, so this holds whatever came back
+  /// last rather than a copy the screen keeps in step by hand.
+  List<SavedAddressApiModel> _addresses = const <SavedAddressApiModel>[];
+  bool _addressesBusy = false;
   String _gender = 'female';
   bool _initialized = false;
   bool _canChangeName = true;
@@ -61,6 +78,74 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
 
     _initialized = true;
     _adopt(user);
+    _loadAddresses();
+  }
+
+  ApiService get _api => widget.apiService ?? ApiService();
+
+  Future<String> _token() async =>
+      (await const AuthSessionService().read()).token ?? '';
+
+  Future<void> _loadAddresses() async {
+    final String token = await _token();
+    if (token.isEmpty) return;
+
+    try {
+      final List<SavedAddressApiModel> book = await _api.myAddresses(
+        token: token,
+      );
+      if (mounted) setState(() => _addresses = book);
+    } catch (_) {
+      // The rest of the form is still editable without the book, so a failure
+      // here leaves the section empty rather than taking the screen down.
+    }
+  }
+
+  /// Opens the full address form.
+  ///
+  /// Not an inline line like the emails and the phones beside it: an address
+  /// needs a name, a number, a governorate and a city, all four required, and
+  /// a single text box could not collect them. What comes back is the whole
+  /// book, and the row then shows the one line it reduces to.
+  Future<void> _addAddress() async {
+    final String token = await _token();
+    if (token.isEmpty || !mounted) return;
+
+    final List<SavedAddressApiModel>? updated =
+        await Navigator.of(context).push<List<SavedAddressApiModel>>(
+          MaterialPageRoute<List<SavedAddressApiModel>>(
+            builder: (_) =>
+                AddressFormPage(token: token, apiService: widget.apiService),
+          ),
+        );
+
+    if (updated != null && mounted) setState(() => _addresses = updated);
+  }
+
+  Future<void> _removeAddress(SavedAddressApiModel entry) async {
+    if (_addressesBusy) return;
+
+    final String token = await _token();
+    if (token.isEmpty || !mounted) return;
+
+    setState(() => _addressesBusy = true);
+    try {
+      final List<SavedAddressApiModel> book = await _api.deleteAddress(
+        token: token,
+        addressId: entry.id,
+      );
+      if (mounted) setState(() => _addresses = book);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(content: Text(ApiService.messageFromError(error).tr())),
+          );
+      }
+    } finally {
+      if (mounted) setState(() => _addressesBusy = false);
+    }
   }
 
   /// Takes the account as the server now holds it.
@@ -433,6 +518,19 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           _AddLineButton(
                             text: 'profileEdit.addPhone'.tr(),
                             onTap: _addPhone,
+                          ),
+                          const SizedBox(height: 18),
+                          _ProfileLabel(text: 'profileEdit.addresses'.tr()),
+                          ..._addresses.map(
+                            (entry) => _AddressLineRow(
+                              line: entry.line,
+                              enabled: !isBusy && !_addressesBusy,
+                              onRemove: () => _removeAddress(entry),
+                            ),
+                          ),
+                          _AddLineButton(
+                            text: 'profileEdit.addAddress'.tr(),
+                            onTap: _addAddress,
                           ),
                           const SizedBox(height: 18),
                           _ProfileLabel(text: 'profileEdit.gender'.tr()),
@@ -822,12 +920,75 @@ class _LabeledContactRow extends StatelessWidget {
                 ? IconButton(
                     tooltip: 'common.delete'.tr(),
                     onPressed: enabled ? onRemove : null,
-                    icon: Icon(
-                      Icons.remove_circle_outline_rounded,
+                    // A bin, not a red minus in a circle. The minus read as
+                    // a subtraction from a number rather than as removing the
+                    // line it sits beside.
+                    icon: const Icon(
+                      Icons.delete_outline_rounded,
                       color: MerzoxColors.kColorE40909,
                     ),
                   )
                 : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One saved address, in the shape the email and phone rows have.
+///
+/// It shows the line rather than the six fields behind it: a saved address is
+/// read here, not edited here, and the form that made it is where it is
+/// changed.
+class _AddressLineRow extends StatelessWidget {
+  final String line;
+  final bool enabled;
+  final VoidCallback onRemove;
+
+  const _AddressLineRow({
+    required this.line,
+    required this.enabled,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              alignment: AlignmentDirectional.centerStart,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: MerzoxColors.kColorB9DDF3),
+              ),
+              child: Text(
+                line,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: MerzoxColors.kColor2B2B2B,
+                ),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 42,
+            child: IconButton(
+              tooltip: 'common.delete'.tr(),
+              onPressed: enabled ? onRemove : null,
+              icon: const Icon(
+                Icons.delete_outline_rounded,
+                color: MerzoxColors.kColorE40909,
+              ),
+            ),
           ),
         ],
       ),

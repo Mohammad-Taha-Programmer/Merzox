@@ -606,7 +606,9 @@
     "avatarFromCamera": "التقاط صورة",
     "avatarFromGallery": "اختيار من المعرض",
     "avatarUpdated": "تم تحديث صورة الحساب",
-    "holdToChangeAvatar": "اضغط بشكل مستمر لتغيير الصورة"
+    "holdToChangeAvatar": "اضغط بشكل مستمر لتغيير الصورة",
+    "addresses": "عناوين التوصيل",
+    "addAddress": "إضافة عنوان آخر"
   },
   "search": {
     "noResults": "لا توجد نتائج",

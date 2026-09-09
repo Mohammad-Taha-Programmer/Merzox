@@ -498,6 +498,22 @@ class ApiService {
     return _addressesFrom(response.data);
   }
 
+  /// Removes one saved address and answers with the book that remains.
+  ///
+  /// The route has existed since the book did; nothing in the app called it,
+  /// so an address could be added and corrected but never taken away.
+  Future<List<SavedAddressApiModel>> deleteAddress({
+    required String token,
+    required String addressId,
+  }) async {
+    final response = await _dio.delete<Map<String, dynamic>>(
+      '/users/me/addresses/$addressId',
+      options: _authOptions(token),
+    );
+
+    return _addressesFrom(response.data);
+  }
+
   static List<SavedAddressApiModel> _addressesFrom(Map<String, dynamic>? body) {
     final data = body?['data'] as Map<String, dynamic>? ?? const {};
     final List<dynamic> raw = data['addresses'] as List<dynamic>? ?? const [];

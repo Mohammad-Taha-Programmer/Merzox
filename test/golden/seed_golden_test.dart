@@ -1162,6 +1162,26 @@ final class _SeedProfileApi extends ApiService {
 
   _SeedProfileApi({this.filled = true});
 
+  /// The account's delivery addresses, which the form now lists beside the
+  /// emails and the phones. An account that has not been filled in has none,
+  /// so the section shows only its way in.
+  @override
+  Future<List<SavedAddressApiModel>> myAddresses({
+    required String token,
+  }) async => filled
+      ? <SavedAddressApiModel>[
+          SavedAddressApiModel.fromJson(const <String, dynamic>{
+            'id': '64e000000000000000000001',
+            'fullName': 'ياسمين خالد',
+            'phone': '0592029316',
+            'governorate': 'أريحا',
+            'city': 'أريحا',
+            'details': 'شارع القدس',
+            'isDefault': true,
+          }),
+        ]
+      : const <SavedAddressApiModel>[];
+
   @override
   Future<AuthApiUser> me({required String token}) async {
     return AuthApiUser.fromJson(<String, dynamic>{
@@ -2626,9 +2646,8 @@ void main() {
       ) async {
         _useAuthenticatedCustomerSession();
 
-        final ProfileEditBloc bloc = ProfileEditBloc(
-          apiService: _SeedProfileApi(),
-        );
+        final _SeedProfileApi api = _SeedProfileApi();
+        final ProfileEditBloc bloc = ProfileEditBloc(apiService: api);
         _closeOnTearDown(bloc);
 
         final Future<ProfileEditState> ready = bloc.stream.firstWhere(
@@ -2648,7 +2667,9 @@ void main() {
           tester,
           BlocProvider<ProfileEditBloc>.value(
             value: bloc,
-            child: withMerzoxGoldenDeviceInsets(const ProfileEditPage()),
+            child: withMerzoxGoldenDeviceInsets(
+              ProfileEditPage(apiService: api),
+            ),
           ),
         );
 
@@ -2660,9 +2681,8 @@ void main() {
       ) async {
         _useAuthenticatedCustomerSession();
 
-        final ProfileEditBloc bloc = ProfileEditBloc(
-          apiService: _SeedProfileApi(filled: false),
-        );
+        final _SeedProfileApi api = _SeedProfileApi(filled: false);
+        final ProfileEditBloc bloc = ProfileEditBloc(apiService: api);
         _closeOnTearDown(bloc);
 
         final Future<ProfileEditState> ready = bloc.stream.firstWhere(
@@ -2682,7 +2702,9 @@ void main() {
           tester,
           BlocProvider<ProfileEditBloc>.value(
             value: bloc,
-            child: withMerzoxGoldenDeviceInsets(const ProfileEditPage()),
+            child: withMerzoxGoldenDeviceInsets(
+              ProfileEditPage(apiService: api),
+            ),
           ),
         );
 
