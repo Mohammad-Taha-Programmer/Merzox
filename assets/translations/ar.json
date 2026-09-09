@@ -608,7 +608,8 @@
     "avatarUpdated": "تم تحديث صورة الحساب",
     "holdToChangeAvatar": "اضغط بشكل مستمر لتغيير الصورة",
     "addresses": "عناوين التوصيل",
-    "addAddress": "إضافة عنوان آخر"
+    "addAddress": "إضافة عنوان آخر",
+    "saveChangesTitle": "حفظ التعديلات؟"
   },
   "search": {
     "noResults": "لا توجد نتائج",
