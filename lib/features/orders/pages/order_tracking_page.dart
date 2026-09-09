@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/services/api_service.dart';
@@ -128,9 +129,16 @@ class _TrackingHeader extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const PositionedDirectional(
-            start: 8,
-            child: BackButton(color: MerzoxColors.kColor5E5E5E),
+          // The 40-square target centres the 24-square mark where the eye
+          // already found the arrow it replaces.
+          PositionedDirectional(
+            start: 12,
+            child: MerzoxBackChevronButton(
+              valueKey: const ValueKey<String>('orderTracking.back'),
+              semanticsLabel: 'common.back'.tr(),
+              color: MerzoxColors.kColor5E5E5E,
+              onTap: () => Navigator.of(context).maybePop(),
+            ),
           ),
         ],
       ),
