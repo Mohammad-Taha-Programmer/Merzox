@@ -7,7 +7,31 @@ import 'package:merzox/features/recommendation_preferences/bloc/recommendation_p
 import 'package:merzox/features/recommendation_preferences/bloc/recommendation_preference_state.dart';
 
 class RecommendationPreferenceControl extends StatelessWidget {
-  const RecommendationPreferenceControl({super.key});
+  /// The two profile screens draw their rows to different boards, and this
+  /// row has to sit in a line with the ones beside it on either - the same
+  /// reason its neighbour, the notification row, already takes these.
+  final double minHeight;
+  final double cornerRadius;
+  final double gap;
+
+  /// How large to draw the glyph, which is not the same question as how large
+  /// it looks: Material's sparkle fills 0.918 of its em box while the rows
+  /// beside it on the customer profile fill all of theirs, so matching them
+  /// takes a larger number rather than the same one.
+  final double iconSize;
+
+  /// The size of the first line. The second stays a caption whatever this is:
+  /// no other row on either board carries one, so it has nothing to match.
+  final double labelSize;
+
+  const RecommendationPreferenceControl({
+    super.key,
+    this.minHeight = 48,
+    this.cornerRadius = 4,
+    this.gap = 10,
+    this.iconSize = 18,
+    this.labelSize = 12,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -26,11 +50,11 @@ class RecommendationPreferenceControl extends StatelessWidget {
       },
       builder: (context, state) {
         return Container(
-          constraints: const BoxConstraints(minHeight: 48),
-          margin: const EdgeInsets.only(bottom: 10),
+          constraints: BoxConstraints(minHeight: minHeight),
+          margin: EdgeInsets.only(bottom: gap),
           decoration: BoxDecoration(
             color: MerzoxColors.kColorF5F9FC,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(cornerRadius),
           ),
           child: Padding(
             padding: const EdgeInsetsDirectional.only(
@@ -41,10 +65,10 @@ class RecommendationPreferenceControl extends StatelessWidget {
             ),
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.auto_awesome_outlined,
                   color: MerzoxColors.kColor3D5A80,
-                  size: 18,
+                  size: iconSize,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -56,9 +80,9 @@ class RecommendationPreferenceControl extends StatelessWidget {
                         'recommendationPreferences.personalization'.tr(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF2B2B2B),
+                        style: TextStyle(
+                          fontSize: labelSize,
+                          color: const Color(0xFF2B2B2B),
                         ),
                       ),
                       Text(

@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/core/constants/colors.dart';
-import 'package:merzox/features/business/shell/business_shell_page.dart';
+import 'package:merzox/core/widgets/merzox_profile.dart';
 
 import 'golden/merzox_golden_harness.dart';
 
@@ -74,7 +74,7 @@ void main() {
             backgroundColor: Colors.white,
             body: Padding(
               padding: const EdgeInsets.only(top: 100),
-              child: MerchantProfileMenuRow(
+              child: MerzoxProfileMenuRow(
                 icon: Icons.person_outline_rounded,
                 label: 'الملف الشخصي',
                 showChevron: true,
@@ -121,7 +121,7 @@ void main() {
           Scaffold(
             body: Padding(
               padding: const EdgeInsets.only(top: 100),
-              child: MerchantProfileMenuRow(
+              child: MerzoxProfileMenuRow(
                 icon: Icons.phone_outlined,
                 label: 'تواصل معنا',
                 onTap: () {},
@@ -150,7 +150,7 @@ void main() {
               textScaler: TextScaler.linear(scale),
             ),
             child: Scaffold(
-              body: MerchantProfileMenuRow(
+              body: MerzoxProfileMenuRow(
                 icon: Icons.phone_outlined,
                 label: label,
                 onTap: () {},
@@ -159,7 +159,7 @@ void main() {
           ),
         );
         expect(tester.takeException(), isNull);
-        return tester.getSize(find.byType(MerchantProfileMenuRow)).height;
+        return tester.getSize(find.byType(MerzoxProfileMenuRow)).height;
       }
 
       // The card on the products screen overflowed for exactly this reason;
@@ -193,7 +193,7 @@ void main() {
           Scaffold(
             body: Padding(
               padding: const EdgeInsets.only(top: 100),
-              child: MerchantProfileMenuRow(
+              child: MerzoxProfileMenuRow(
                 icon: Icons.phone_outlined,
                 label: 'تواصل معنا',
                 onTap: () {},
@@ -206,13 +206,36 @@ void main() {
       final Material row = tester.widget<Material>(
         find
             .descendant(
-              of: find.byType(MerchantProfileMenuRow),
+              of: find.byType(MerzoxProfileMenuRow),
               matching: find.byType(Material),
             )
             .first,
       );
 
       expect(row.color, MerzoxColors.kColorF5F9FC);
+    });
+
+    testWidgets('the sheet keeps no room for a bar that is already kept', (
+      WidgetTester tester,
+    ) async {
+      // A `Scaffold` with a `bottomNavigationBar` ends its body above the bar
+      // - the raised button's overhang included, because the bar reports that
+      // as part of its own height. Room reserved here as well is room
+      // reserved twice: it showed as 150px of nothing under the last control
+      // on the customer's profile, measured, of which 122 were this.
+      await pumpMerzoxGoldenPage(
+        tester,
+        withMerzoxGoldenDeviceInsets(
+          const MerzoxProfileScaffold(
+            title: 'الملف الشخصي',
+            children: <Widget>[SizedBox(height: 40)],
+          ),
+        ),
+      );
+
+      final ListView sheet = tester.widget<ListView>(find.byType(ListView));
+
+      expect(sheet.padding, EdgeInsets.zero);
     });
   }, skip: merzoxGoldenPlatformSkip);
 }

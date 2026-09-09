@@ -1,5 +1,6 @@
 import '../../../core/auth/role_switch_service.dart';
 import '../../../core/widgets/remote_circle_avatar.dart';
+import '../../../core/widgets/merzox_profile.dart';
 import '../../messages/widgets/message_badge.dart';
 import '../../notifications/widgets/global_notification_bell.dart';
 import 'dart:async';
@@ -836,20 +837,10 @@ class _Profile extends StatelessWidget {
     // everything below the name lives on that sheet. Drawn as one scrolling
     // list so a taller font or a shorter phone moves the sheet rather than
     // clipping it.
-    return Stack(
+    return MerzoxProfileScaffold(
+      title: 'businessShell.profileTitle'.tr(),
       children: <Widget>[
-        Container(
-          height: kProfileFieldHeight,
-          width: double.infinity,
-          color: MerzoxColors.kColor98C1D9,
-        ),
-        ListView(
-          padding: EdgeInsets.zero,
-          children: <Widget>[
-            const _ProfileHeader(),
-            _ProfileSheet(
-              children: <Widget>[
-                _ProfileIdentity(
+        _ProfileIdentity(
                   business: business,
                   onRegisterAsCustomer: () async {
                     // The same account, used the other way round: a shopkeeper
@@ -858,191 +849,78 @@ class _Profile extends StatelessWidget {
                     if (context.mounted) context.go('/home');
                   },
                 ),
-                MerchantProfileMenuRow(
-                  icon: Icons.person_outline_rounded,
-                  label: 'businessShell.personalProfile'.tr(),
-                  showChevron: true,
-                  onTap: () => context.push('/profile/edit'),
-                ),
-                MerchantProfileMenuRow(
-                  icon: Icons.settings_outlined,
-                  label: 'storeSettings.title'.tr(),
-                  showChevron: true,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => BlocProvider<BusinessBloc>.value(
-                        value: context.read<BusinessBloc>(),
-                        child: StoreSettingsPage(business: business),
-                      ),
-                    ),
-                  ),
-                ),
-                MerchantProfileMenuRow(
-                  icon: Icons.chat_bubble_outline_rounded,
-                  label: 'messages.title'.tr(),
-                  showChevron: true,
-                  onTap: () => context.push('/business/messages'),
-                ),
-                // The board drops the chevron from here down: these three do
-                // not open a screen with more of the same behind it.
-                MerchantProfileMenuRow(
-                  icon: Icons.phone_outlined,
-                  label: 'businessShell.contactUs'.tr(),
-                  showChevron: true,
-                  // It used to push `/about`, which is not a route - the one
-                  // that exists is `/about-us` - so the row opened an error
-                  // screen. It opens the shop's own ways of being reached
-                  // now: the links from store settings and the numbers and
-                  // addresses on the account, gathered in one place.
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => StoreContactPage(
-                        business: business,
-                        account: state.account,
-                        onEditSettings: () {
-                          Navigator.of(context).pop();
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => BlocProvider<BusinessBloc>.value(
-                                value: context.read<BusinessBloc>(),
-                                child: StoreSettingsPage(business: business),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-                MerchantProfileMenuRow(
-                  icon: Icons.visibility_outlined,
-                  label: 'businessShell.previewStore'.tr(),
-                  onTap: () => context.push('/business/preview'),
-                ),
-                _OrderNotificationsRow(
-                  gateway: notificationPreferenceGateway,
-                  sessionReader: notificationPreferenceSessionReader,
-                ),
-                const SizedBox(height: kProfileRowGap),
-                _ProfileLogoutButton(onPressed: onLogout),
-                const SizedBox(height: 28),
-              ],
+            MerzoxProfileMenuRow(
+              icon: Icons.person_outline_rounded,
+              label: 'businessShell.personalProfile'.tr(),
+              showChevron: true,
+              onTap: () => context.push('/profile/edit'),
             ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-/// The board's own measurements for this screen.
-const double kProfileFieldHeight = 290;
-const double kProfileSheetTop = 113;
-const double kProfileSheetRadius = 20;
-const double kProfileGutter = 16;
-const double kProfileRowHeight = 48;
-const double kProfileRowRadius = 6;
-const double kProfileRowGap = 16;
-const double kProfileAvatarDiameter = 37;
-const double kProfileAvatarRing = 5;
-
-/// The white sheet the menu sits on, lifted onto the blue field.
-class _ProfileSheet extends StatelessWidget {
-  final List<Widget> children;
-
-  const _ProfileSheet({required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(kProfileSheetRadius),
-        ),
-      ),
-      child: Column(children: children),
-    );
-  }
-}
-
-/// `تسجيل خروج`, which the board draws as a narrow pill rather than a row.
-class _ProfileLogoutButton extends StatelessWidget {
-  final VoidCallback onPressed;
-
-  const _ProfileLogoutButton({required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Material(
-        color: MerzoxColors.kColorF5F9FC,
-        borderRadius: BorderRadius.circular(kProfileRowRadius),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(kProfileRowRadius),
-          child: Container(
-            width: 162,
-            constraints: const BoxConstraints(minHeight: kProfileRowHeight),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                const Icon(
-                  Icons.logout_rounded,
-                  size: 20,
-                  color: MerzoxColors.kColor3D5A80,
-                ),
-                const SizedBox(width: 10),
-                Flexible(
-                  child: Text(
-                    'businessShell.logout'.tr(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF292828),
-                    ),
+            MerzoxProfileMenuRow(
+              icon: Icons.settings_outlined,
+              label: 'storeSettings.title'.tr(),
+              showChevron: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => BlocProvider<BusinessBloc>.value(
+                    value: context.read<BusinessBloc>(),
+                    child: StoreSettingsPage(business: business),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// The band, the logo and the store's name.
-/// The blue field's title, and the strip of blue under it that the sheet is
-/// lifted onto.
-class _ProfileHeader extends StatelessWidget {
-  const _ProfileHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        // The blue field runs behind the status bar on the board, so the title
-        // sits under whatever the device reserves there rather than at a fixed
-        // offset from the top of the app.
-        SizedBox(
-          height: kProfileTitleBand,
-          width: double.infinity,
-          child: Center(
-            child: Text(
-              'businessShell.profileTitle'.tr(),
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
               ),
             ),
-          ),
+            MerzoxProfileMenuRow(
+              icon: Icons.chat_bubble_outline_rounded,
+              label: 'messages.title'.tr(),
+              showChevron: true,
+              onTap: () => context.push('/business/messages'),
+            ),
+            // The board drops the chevron from here down: these three do
+            // not open a screen with more of the same behind it.
+            MerzoxProfileMenuRow(
+              icon: Icons.phone_outlined,
+              label: 'businessShell.contactUs'.tr(),
+              showChevron: true,
+              // It used to push `/about`, which is not a route - the one
+              // that exists is `/about-us` - so the row opened an error
+              // screen. It opens the shop's own ways of being reached
+              // now: the links from store settings and the numbers and
+              // addresses on the account, gathered in one place.
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => StoreContactPage(
+                    business: business,
+                    account: state.account,
+                    onEditSettings: () {
+                      Navigator.of(context).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => BlocProvider<BusinessBloc>.value(
+                            value: context.read<BusinessBloc>(),
+                            child: StoreSettingsPage(business: business),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            MerzoxProfileMenuRow(
+              icon: Icons.visibility_outlined,
+              label: 'businessShell.previewStore'.tr(),
+              onTap: () => context.push('/business/preview'),
+            ),
+            _OrderNotificationsRow(
+              gateway: notificationPreferenceGateway,
+              sessionReader: notificationPreferenceSessionReader,
+            ),
+        const SizedBox(height: kProfileRowGap),
+        MerzoxProfilePill(
+          icon: Icons.logout_rounded,
+          label: 'businessShell.logout'.tr(),
+          onPressed: onLogout,
         ),
-        const SizedBox(height: kProfileSheetGap),
+        const SizedBox(height: 28),
       ],
     );
   }
@@ -1065,12 +943,7 @@ class _ProfileIdentity extends StatelessWidget {
         const SizedBox(height: 30),
         // A ring of the field's own blue, which is what sets the picture off
         // from the white it sits on.
-        Container(
-          padding: const EdgeInsets.all(kProfileAvatarRing),
-          decoration: const BoxDecoration(
-            color: MerzoxColors.kColor98C1D9,
-            shape: BoxShape.circle,
-          ),
+        MerzoxProfileAvatar(
           child: RemoteCircleAvatar(
             url: business.logoUrl,
             radius: kProfileAvatarDiameter / 2,
@@ -1102,17 +975,6 @@ class _ProfileIdentity extends StatelessWidget {
   }
 }
 
-/// The band the title sits in, under the status bar.
-const double kProfileTitleBand = 44;
-
-/// The strip of blue between the title and the sheet.
-///
-/// The board leaves 25 here, which put the sheet's edge at 113. Widened on the
-/// reader's eye: they wanted more blue above the picture than the board gives,
-/// and the numbers below it keep the board's own spacing rather than being
-/// squeezed to hold the rows at their original marks.
-const double kProfileSheetGap = 45;
-
 /// `التسجيل كزبون`, the mirror of the customer profile's `التسجيل كتاجر`.
 /// The button that turns the shopkeeper into a customer.
 ///
@@ -1126,122 +988,12 @@ class RegisterAsCustomerButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: MerzoxColors.kColor3D5A80,
-      borderRadius: BorderRadius.circular(kProfileRowRadius),
-      child: InkWell(
-        onTap: () => onPressed(),
-        borderRadius: BorderRadius.circular(kProfileRowRadius),
-        child: Container(
-          width: 182,
-          constraints: const BoxConstraints(minHeight: kProfileRowHeight),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              const Icon(
-                Icons.person_outline_rounded,
-                size: 20,
-                color: Colors.white,
-              ),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Text(
-                  'businessShell.registerAsCustomer'.tr(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// One menu row: an icon at the trailing edge, a chevron at the leading one.
-/// One row of the merchant profile menu.
-///
-/// Public so its two board rules can be stated in a test: the icon stands at
-/// the reading edge with the words beside it, and the chevron is kept for the
-/// rows that open a screen with more of the same behind them.
-class MerchantProfileMenuRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  /// The board keeps the chevron for the rows that open a screen with more of
-  /// the same behind it, and drops it from the ones that do a single thing.
-  final bool showChevron;
-
-  const MerchantProfileMenuRow({
-    super.key,
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.showChevron = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        kProfileGutter,
-        0,
-        kProfileGutter,
-        kProfileRowGap,
-      ),
-      child: Material(
-        color: MerzoxColors.kColorF5F9FC,
-        borderRadius: BorderRadius.circular(kProfileRowRadius),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(kProfileRowRadius),
-          child: Container(
-            // A floor, not a fixed height: a reader who turns the system font
-            // up needs the row to grow rather than clip.
-            constraints: const BoxConstraints(minHeight: kProfileRowHeight),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: Row(
-              children: <Widget>[
-                // The board sets the icon at the reading edge with the words
-                // beside it, and the chevron alone at the far end.
-                Icon(icon, size: 20, color: MerzoxColors.kColor3D5A80),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: MerzoxColors.kColor2B2B2B,
-                    ),
-                  ),
-                ),
-                if (showChevron)
-                  // Named for where the row goes, not for where the glyph
-                  // points. This icon carries `matchTextDirection`, so
-                  // Material turns it for the reading: it leans left in
-                  // Arabic, as the board draws it, and right in English.
-                  // Naming the left one instead turned it a second time and
-                  // left the board's chevron pointing back at the words.
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    size: 20,
-                    color: MerzoxColors.kColor3D5A80,
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return MerzoxProfilePill(
+      icon: Icons.person_outline_rounded,
+      label: 'businessShell.registerAsCustomer'.tr(),
+      onPressed: () => onPressed(),
+      width: 182,
+      prominent: true,
     );
   }
 }

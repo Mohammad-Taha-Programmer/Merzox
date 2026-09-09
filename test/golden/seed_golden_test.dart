@@ -1,4 +1,4 @@
-// MERZOX-UI-GOLDEN-I4-I1 - the five deterministic seed goldens.
+﻿// MERZOX-UI-GOLDEN-I4-I1 - the five deterministic seed goldens.
 //
 // These are Flutter rendering baselines captured on the canonical Windows
 // golden environment. They are NOT evidence of Adobe XD parity: nothing here
@@ -36,6 +36,8 @@ import 'package:merzox/features/about_us/pages/about_us_page.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/pages/login_page.dart';
 import 'package:merzox/features/authentication/pages/signup_page.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
+import 'package:merzox/core/widgets/merzox_profile.dart';
 import 'package:merzox/features/business/contact/store_contact_page.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/preview/store_preview_page.dart';
@@ -2516,6 +2518,67 @@ void main() {
         expect(find.byType(CircularProgressIndicator), findsNothing);
 
         await expectMerzoxSeedGolden('profile_guest_ar_375x812.png');
+      });
+
+      // The signed-in menu had no baseline at all, and that is how it came to
+      // be drawn back to front: laid out by hand rather than by the reading,
+      // its icon and its chevron stood on the wrong sides of every row in
+      // Arabic, and the chevron pointed back at the words it was meant to
+      // lead away from. Nothing rendered it, so nothing said so.
+      testWidgets('customer profile renders its Arabic signed-in baseline', (
+        WidgetTester tester,
+      ) async {
+        SharedPreferences.setMockInitialValues(const <String, Object>{
+          AuthBloc.nameKey: 'ياسمين خالد',
+        });
+
+        final HomeBloc bloc = HomeBloc(
+          apiService: _SeedHomeApi(),
+          deviceLocationService: _SeedNoDeviceLocation(),
+          locationPermissionService: _SeedDeniedLocation(),
+        );
+        _closeOnTearDown(bloc);
+
+        final Future<HomeState> ready = bloc.stream.firstWhere(
+          (HomeState state) =>
+              state.newBusinessesStatus == HomeSectionStatus.ready,
+        );
+        bloc.add(const HomeStarted(isGuest: false));
+        await ready;
+        bloc.add(const HomeTabChanged(4));
+        await bloc.stream.firstWhere(
+          (HomeState state) => state.selectedTab == 4,
+        );
+
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<HomeBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              const HomeScreen(isGuest: false),
+            ),
+          ),
+        );
+
+        expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.text('طلباتي'), findsOneWidget);
+
+        // Read right to left: the glyph at the reading edge, the words beside
+        // it, the chevron alone at the far end. This is the rule the merchant
+        // screen already held itself to and this one did not.
+        final Rect icon = tester.getRect(
+          find.byIcon(MerzoxIcons.myOrders),
+        );
+        final Rect label = tester.getRect(find.text('طلباتي'));
+
+        expect(icon.center.dx, greaterThan(label.center.dx));
+        expect(icon.right, closeTo(375 - kProfileGutter - 14, 2));
+
+        // And the chevron leans the way the board draws it. Naming the left
+        // one turns it twice, which is what this screen used to do.
+        expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+
+        await expectMerzoxSeedGolden('profile_customer_ar_375x812.png');
       });
 
       testWidgets('merchant profile renders its Arabic baseline', (

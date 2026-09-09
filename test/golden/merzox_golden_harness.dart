@@ -39,11 +39,53 @@ const String merzoxSeedGoldenDirectory = '../goldens/seed/';
 ///
 /// Read through [rootBundle] rather than the filesystem so the harness stays
 /// tied to the same asset bundle the app ships.
+///
+/// A font declared in `pubspec.yaml` is not loaded in a widget test unless a
+/// [FontLoader] asks for it, so every family the screens draw with has to be
+/// named here too. A family left out does not fail: it renders as the empty
+/// box the engine falls back to, which in a golden looks like an icon that
+/// was never drawn rather than a font that was never loaded.
 const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   'MaterialIcons': <String>['fonts/MaterialIcons-Regular.otf'],
   'Tajawal': <String>['assets/fonts/Tajawal-Regular.ttf'],
   'Concept': <String>['assets/fonts/Concept Medium.ttf'],
   'Minion': <String>['assets/fonts/MINIONVARIABLECONCEPT-ROMAN.OTF'],
+  // The designer's glyphs, one family per icon as they were exported.
+  'EditProfileIcon': <String>[
+    'assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf',
+  ],
+  'MyOrdersIcon': <String>[
+    'assets/fonts/icons_fonts/customer_profile/MyOrdersIcon.ttf',
+  ],
+  'MapIcon': <String>['assets/fonts/icons_fonts/customer_profile/MapIcon.ttf'],
+  'Favorites': <String>[
+    'assets/fonts/icons_fonts/customer_profile/Favorites.ttf',
+  ],
+  'WhoWeAreIcon': <String>[
+    'assets/fonts/icons_fonts/customer_profile/WhoWeAreIcon.ttf',
+  ],
+  'ShareAppIcon': <String>[
+    'assets/fonts/icons_fonts/customer_profile/ShareAppIcon.ttf',
+  ],
+  'SignOutIcon': <String>[
+    'assets/fonts/icons_fonts/customer_profile/SignOutIcon.ttf',
+  ],
+  'BusinessesIcon': <String>[
+    'assets/fonts/icons_fonts/customer_profile/BusinessesIcon.ttf',
+  ],
+  'ProfileIcon': <String>[
+    'assets/fonts/icons_fonts/customer_profile/ProfileIcon.ttf',
+  ],
+  'FacebookLogoIcon': <String>[
+    'assets/fonts/icons_fonts/customer_profile/FacebookLogoIcon.ttf',
+  ],
+  'InstagramLogoIcon': <String>[
+    'assets/fonts/icons_fonts/customer_profile/InstagramLogoIcon.ttf',
+  ],
+  'CampaignsProductsNotifications': <String>[
+    'assets/fonts/icons_fonts/customer_profile/'
+        'CampaignsProductsNotifications.ttf',
+  ],
 };
 
 /// Exact-pixel goldens are renderer and platform dependent.
