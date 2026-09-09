@@ -17,6 +17,19 @@ const double kMerzoxNavBarHeight = 62;
 /// The raised button, and the room kept around it.
 const double kMerzoxNavButtonDiameter = 56;
 
+/// The mark on each of the bar's own places, as a font size.
+///
+/// The ink of these glyphs fills its em box, so this is the mark's height too.
+const double kMerzoxNavItemGlyphSize = 23;
+
+/// The mark inside the raised button, as a font size.
+///
+/// The ink of every one of these glyphs fills its em box top to bottom, so
+/// this is also the mark's height: a little under two fifths of the button,
+/// which leaves the orange reading as a disc the mark sits in rather than as
+/// a ring around a mark that has outgrown it.
+const double kMerzoxNavButtonGlyphSize = 22;
+
 /// How far the bite is cut past the button on every side. This is the gap the
 /// artboard shows: the button floats in the bite rather than filling it.
 const double kMerzoxNavButtonGap = 6;
@@ -236,9 +249,45 @@ class MerzoxNavRaisedButton extends StatelessWidget {
               ),
             ],
           ),
-          child: Center(
-            child: Icon(glyph, size: 26, color: Colors.white),
-          ),
+          child: Center(child: _RaisedButtonGlyph(glyph: glyph)),
+        ),
+      ),
+    );
+  }
+}
+
+/// The mark inside the raised button.
+///
+/// Drawn as text rather than with [Icon], which clamps its glyph into a
+/// `size`-by-`size` box. One of these two - the customer's shop awning - has
+/// an advance of 1.25em, so it did not fit that box, and the paragraph laid
+/// what would not fit against the reading edge instead. The mark ended up
+/// 3.3px off the button's centre, half its own overflow, and no amount of
+/// centring outside [Icon] could reach the clamp inside it.
+///
+/// With nothing narrower than the button constraining it, the glyph lays out
+/// at its own advance and that is what gets centred - which is what centred
+/// means for a mark that is wider than it is tall.
+class _RaisedButtonGlyph extends StatelessWidget {
+  final IconData glyph;
+
+  const _RaisedButtonGlyph({required this.glyph});
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Text(
+        String.fromCharCode(glyph.codePoint),
+        softWrap: false,
+        style: TextStyle(
+          fontFamily: glyph.fontFamily,
+          fontSize: kMerzoxNavButtonGlyphSize,
+          // The ink fills the em box top to bottom in every one of these
+          // fonts, so a line box of exactly the font size is the glyph and
+          // nothing else - which is what makes the vertical centring exact.
+          height: 1,
+          leadingDistribution: TextLeadingDistribution.even,
+          color: Colors.white,
         ),
       ),
     );
@@ -271,7 +320,7 @@ class _NavItem extends StatelessWidget {
               _decorated(
                 Icon(
                   destination.glyph,
-                  size: 25,
+                  size: kMerzoxNavItemGlyphSize,
                   color: destination.selected
                       ? MerzoxColors.kColorEE6C4D
                       : MerzoxColors.kColor8D99AE,
