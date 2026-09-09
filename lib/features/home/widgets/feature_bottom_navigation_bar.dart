@@ -1,7 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
-import 'package:merzox/core/widgets/merzox_nav_icons.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/widgets/merzox_notched_nav_bar.dart';
 
 /// The marker and its measurements live in core now, beside the bar that
@@ -39,13 +39,13 @@ class FeatureBottomNavigationBar extends StatelessWidget {
     return MerzoxNotchedNavBar(
       leading: <MerzoxNavDestination>[
         MerzoxNavDestination(
-          glyph: MerzoxNavGlyph.home,
+          glyph: MerzoxIcons.customerNavHome,
           label: 'nav.home'.tr(),
           selected: selectedIndex == 0,
           onTap: () => onChanged(0),
         ),
         MerzoxNavDestination(
-          glyph: MerzoxNavGlyph.cart,
+          glyph: MerzoxIcons.customerNavCart,
           label: 'nav.cart'.tr(),
           selected: selectedIndex == 1,
           onTap: () => onChanged(1),
@@ -53,20 +53,20 @@ class FeatureBottomNavigationBar extends StatelessWidget {
       ],
       trailing: <MerzoxNavDestination>[
         MerzoxNavDestination(
-          glyph: MerzoxNavGlyph.messages,
+          glyph: MerzoxIcons.customerNavMessages,
           label: 'nav.messages'.tr(),
           selected: selectedIndex == 3,
           onTap: () => onChanged(3),
           decorate: decorateMessages,
         ),
         MerzoxNavDestination(
-          glyph: MerzoxNavGlyph.profile,
+          glyph: MerzoxIcons.customerNavProfile,
           label: 'nav.profile'.tr(),
           selected: selectedIndex == 4,
           onTap: () => onChanged(4),
         ),
       ],
-      buttonGlyph: MerzoxNavGlyph.storefront,
+      buttonGlyph: MerzoxIcons.customerNavStores,
       buttonLabel: 'nav.stores'.tr(),
       buttonSelected: selectedIndex == 2,
       onButtonPressed: () => onChanged(2),

@@ -1,7 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
-import 'package:merzox/core/widgets/merzox_nav_icons.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/widgets/merzox_notched_nav_bar.dart';
 
 /// The merchant's bottom bar, with the add-a-product button raised out of it.
@@ -29,13 +29,13 @@ class BusinessNavigationBar extends StatelessWidget {
     return MerzoxNotchedNavBar(
       leading: <MerzoxNavDestination>[
         MerzoxNavDestination(
-          glyph: MerzoxNavGlyph.home,
+          glyph: MerzoxIcons.merchantNavHome,
           label: 'nav.home'.tr(),
           selected: selectedIndex == 0,
           onTap: () => onChanged(0),
         ),
         MerzoxNavDestination(
-          glyph: MerzoxNavGlyph.orders,
+          glyph: MerzoxIcons.merchantNavOrders,
           label: 'businessShell.orders'.tr(),
           selected: selectedIndex == 1,
           onTap: () => onChanged(1),
@@ -43,19 +43,19 @@ class BusinessNavigationBar extends StatelessWidget {
       ],
       trailing: <MerzoxNavDestination>[
         MerzoxNavDestination(
-          glyph: MerzoxNavGlyph.products,
+          glyph: MerzoxIcons.merchantNavProducts,
           label: 'businessShell.productsHeading'.tr(),
           selected: selectedIndex == 3,
           onTap: () => onChanged(3),
         ),
         MerzoxNavDestination(
-          glyph: MerzoxNavGlyph.profile,
+          glyph: MerzoxIcons.merchantNavProfile,
           label: 'nav.profile'.tr(),
           selected: selectedIndex == 4,
           onTap: () => onChanged(4),
         ),
       ],
-      buttonGlyph: MerzoxNavGlyph.add,
+      buttonGlyph: MerzoxIcons.merchantNavAddProduct,
       buttonLabel: 'businessShell.addProduct'.tr(),
       buttonSelected: selectedIndex == 2,
       onButtonPressed: () => onChanged(2),

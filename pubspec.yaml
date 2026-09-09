@@ -182,6 +182,46 @@ flutter:
       fonts:
         - asset: >-
             assets/fonts/icons_fonts/customer_profile/CampaignsProductsNotifications.ttf
+    # The two bottom bars. Home and the profile mark are the same drawing on
+    # both, and are copied into both folders rather than shared: the customer's
+    # bar and the merchant's are two surfaces, and the day one of them wants a
+    # different home, one folder changes and the other does not.
+    - family: CustomerNavHome
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavHome.ttf
+    - family: CustomerNavCart
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavCart.ttf
+    - family: CustomerNavStores
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavStores.ttf
+    - family: CustomerNavMessages
+      fonts:
+        - asset: >-
+            assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavMessages.ttf
+    - family: CustomerNavProfile
+      fonts:
+        - asset: >-
+            assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavProfile.ttf
+    - family: MerchantNavHome
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavHome.ttf
+    - family: MerchantNavOrders
+      fonts:
+        - asset: >-
+            assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavOrders.ttf
+    - family: MerchantNavAddProduct
+      fonts:
+        - asset: >-
+            assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavAddProduct.ttf
+    - family: MerchantNavProducts
+      fonts:
+        - asset: >-
+            assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavProducts.ttf
+    - family: MerchantNavProfile
+      fonts:
+        - asset: >-
+            assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavProfile.ttf
   # fonts:
   #   - family: Schyler
   #     fonts:

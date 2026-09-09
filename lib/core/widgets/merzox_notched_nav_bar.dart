@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import 'package:merzox/core/constants/colors.dart';
-import 'package:merzox/core/widgets/merzox_nav_icons.dart';
 import 'package:merzox/core/widgets/merzox_notched_shape.dart';
 
 /// The active-tab marker every Merzox bottom bar draws.
@@ -15,15 +14,40 @@ const double kMerzoxNavIndicatorGap = 13;
 /// The bar's own height, below its top edge.
 const double kMerzoxNavBarHeight = 62;
 
+/// How far the bar's shadow reaches out from its edge.
+///
+/// The shadow is painted from the bar's own path rather than as a box shadow,
+/// so it follows the bite round instead of running straight across it - which
+/// means this thickens the shadow under the button's cradle too, not only
+/// along the flat edge.
+const double kMerzoxNavBarShadowBlur = 10;
+
 /// The raised button, and the room kept around it.
-const double kMerzoxNavButtonDiameter = 56;
+const double kMerzoxNavButtonDiameter = 54;
+
+/// The mark on each of the bar's own places, as a font size.
+///
+/// The ink of these glyphs fills its em box, so this is the mark's height too.
+const double kMerzoxNavItemGlyphSize = 23;
+
+/// The mark inside the raised button, as a font size.
+///
+/// The ink of every one of these glyphs fills its em box top to bottom, so
+/// this is also the mark's height: a little under two fifths of the button,
+/// which leaves the orange reading as a disc the mark sits in rather than as
+/// a ring around a mark that has outgrown it.
+const double kMerzoxNavButtonGlyphSize = 22;
 
 /// How far the bite is cut past the button on every side. This is the gap the
 /// artboard shows: the button floats in the bite rather than filling it.
-const double kMerzoxNavButtonGap = 6;
+///
+/// It is what is tuned when the *bite* is asked to change, since the bite's
+/// radius is this plus the button's own - so shrinking the button by two and
+/// widening the bite by two is a change of three here, not of two.
+const double kMerzoxNavButtonGap = 14;
 
 /// How far above the bar's top edge the button's centre sits.
-const double kMerzoxNavButtonLift = 8;
+const double kMerzoxNavButtonLift = 10;
 
 /// The radius of the bite itself.
 const double kMerzoxNavNotchRadius =
@@ -59,7 +83,7 @@ class MerzoxNavIndicator extends StatelessWidget {
 
 /// One place a bar can send you.
 class MerzoxNavDestination {
-  final MerzoxNavGlyph glyph;
+  final IconData glyph;
 
   /// Read out loud. Nothing draws it: the artboards label none of these.
   final String label;
@@ -102,13 +126,17 @@ class MerzoxNotchedNavBar extends StatelessWidget {
   final List<MerzoxNavDestination> trailing;
 
   /// The raised button's glyph, what it is called, and what it does.
-  final MerzoxNavGlyph buttonGlyph;
+  final IconData buttonGlyph;
   final String buttonLabel;
   final bool buttonSelected;
   final VoidCallback onButtonPressed;
 
-  /// Names the raised button for a test, since its glyph is a drawing rather
-  /// than an [IconData] anybody could search for.
+  /// Names the raised button for a test.
+  ///
+  /// It was needed when the glyph was a hand-drawn path nothing could search
+  /// for. The glyph is an [IconData] now and `find.byIcon` would reach it, but
+  /// the key says *which button* rather than which picture is on it, and the
+  /// picture is the half that changes.
   static const ValueKey<String> buttonKey = ValueKey<String>('merzoxNav.button');
 
   const MerzoxNotchedNavBar({
@@ -186,7 +214,7 @@ class MerzoxNotchedNavBar extends StatelessWidget {
 /// actually has, and on anything but a white background it read as a white
 /// ring - which is what it was.
 class MerzoxNavRaisedButton extends StatelessWidget {
-  final MerzoxNavGlyph glyph;
+  final IconData glyph;
   final String label;
   final bool selected;
   final VoidCallback onPressed;
@@ -233,14 +261,45 @@ class MerzoxNavRaisedButton extends StatelessWidget {
               ),
             ],
           ),
-          child: Center(
-            child: MerzoxNavIcon(
-              glyph: glyph,
-              size: 26,
-              color: Colors.white,
-              weight: 1.9,
-            ),
-          ),
+          child: Center(child: _RaisedButtonGlyph(glyph: glyph)),
+        ),
+      ),
+    );
+  }
+}
+
+/// The mark inside the raised button.
+///
+/// Drawn as text rather than with [Icon], which clamps its glyph into a
+/// `size`-by-`size` box. One of these two - the customer's shop awning - has
+/// an advance of 1.25em, so it did not fit that box, and the paragraph laid
+/// what would not fit against the reading edge instead. The mark ended up
+/// 3.3px off the button's centre, half its own overflow, and no amount of
+/// centring outside [Icon] could reach the clamp inside it.
+///
+/// With nothing narrower than the button constraining it, the glyph lays out
+/// at its own advance and that is what gets centred - which is what centred
+/// means for a mark that is wider than it is tall.
+class _RaisedButtonGlyph extends StatelessWidget {
+  final IconData glyph;
+
+  const _RaisedButtonGlyph({required this.glyph});
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Text(
+        String.fromCharCode(glyph.codePoint),
+        softWrap: false,
+        style: TextStyle(
+          fontFamily: glyph.fontFamily,
+          fontSize: kMerzoxNavButtonGlyphSize,
+          // The ink fills the em box top to bottom in every one of these
+          // fonts, so a line box of exactly the font size is the glyph and
+          // nothing else - which is what makes the vertical centring exact.
+          height: 1,
+          leadingDistribution: TextLeadingDistribution.even,
+          color: Colors.white,
         ),
       ),
     );
@@ -271,9 +330,9 @@ class _NavItem extends StatelessWidget {
               MerzoxNavIndicator(selected: destination.selected),
               const SizedBox(height: kMerzoxNavIndicatorGap),
               _decorated(
-                MerzoxNavIcon(
-                  glyph: destination.glyph,
-                  size: 25,
+                Icon(
+                  destination.glyph,
+                  size: kMerzoxNavItemGlyphSize,
                   color: destination.selected
                       ? MerzoxColors.kColorEE6C4D
                       : MerzoxColors.kColor8D99AE,
@@ -315,7 +374,10 @@ class _NotchedBarPainter extends CustomPainter {
         path,
         Paint()
           ..color = Colors.black.withValues(alpha: 0.07)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 9),
+          ..maskFilter = const MaskFilter.blur(
+            BlurStyle.normal,
+            kMerzoxNavBarShadowBlur,
+          ),
       )
       ..drawPath(path, Paint()..color = Colors.white);
   }

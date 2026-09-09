@@ -22,7 +22,7 @@ class MerzoxNotchedShape extends NotchedShape {
   /// the edge and make it gentler.
   final double shoulderRadius;
 
-  const MerzoxNotchedShape({this.shoulderRadius = 14});
+  const MerzoxNotchedShape({this.shoulderRadius = 16});
 
   /// The bar, minus the circle the button sits in.
   ///

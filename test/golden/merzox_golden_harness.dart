@@ -86,6 +86,39 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
     'assets/fonts/icons_fonts/customer_profile/'
         'CampaignsProductsNotifications.ttf',
   ],
+  // The two bottom bars. Every board in the seed suite draws one of them, so
+  // a family missing here empties five icons at once rather than one.
+  'CustomerNavHome': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavHome.ttf',
+  ],
+  'CustomerNavCart': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavCart.ttf',
+  ],
+  'CustomerNavStores': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavStores.ttf',
+  ],
+  'CustomerNavMessages': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavMessages.ttf',
+  ],
+  'CustomerNavProfile': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavProfile.ttf',
+  ],
+  'MerchantNavHome': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavHome.ttf',
+  ],
+  'MerchantNavOrders': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavOrders.ttf',
+  ],
+  'MerchantNavAddProduct': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/'
+        'MerchantNavAddProduct.ttf',
+  ],
+  'MerchantNavProducts': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavProducts.ttf',
+  ],
+  'MerchantNavProfile': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavProfile.ttf',
+  ],
 };
 
 /// Exact-pixel goldens are renderer and platform dependent.
