@@ -6,6 +6,7 @@ import 'package:merzox/core/localization/api_error_localizer.dart';
 import 'package:merzox/core/constants/money.dart';
 
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/merzox_back_chevron.dart';
 import '../../../services/api_service.dart';
 import '../../business_profile/pages/business_profile_page.dart';
 import '../../home/presentation/bloc/home_state_.dart';
@@ -232,9 +233,16 @@ class _FavoritesHeader extends StatelessWidget {
               fontWeight: FontWeight.w800,
             ),
           ),
-          const PositionedDirectional(
-            start: 8,
-            child: BackButton(color: MerzoxColors.kColor5E5E5E),
+          // The 40-square target centres the 24-square mark where the eye
+          // already found the arrow it replaces.
+          PositionedDirectional(
+            start: 12,
+            child: MerzoxBackChevronButton(
+              valueKey: const ValueKey<String>('favorites.back'),
+              semanticsLabel: 'common.back'.tr(),
+              color: MerzoxColors.kColor5E5E5E,
+              onTap: () => Navigator.of(context).maybePop(),
+            ),
           ),
         ],
       ),
@@ -340,26 +348,16 @@ class _FavoriteBusinessCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Expanded(
-                    child: Container(
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: Container(
+                        alignment: Alignment.center,
                         color: Color(business.colorValue),
-                        borderRadius: BorderRadius.circular(4),
+                        child: _FavoriteBusinessLogo(
+                          businessId: business.id,
+                          logoUrl: business.logoUrl,
+                        ),
                       ),
-                      child: business.name.toLowerCase().contains('yasmeen')
-                          ? Text(
-                              'Yasmeen',
-                              style: TextStyle(
-                                fontFamily: 'Minion',
-                                color: MerzoxColors.kColor3D5A80,
-                                fontSize: 22,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.storefront_outlined,
-                              color: MerzoxColors.kColor3D5A80,
-                              size: 40,
-                            ),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -563,6 +561,61 @@ class _FavoriteProductCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The shop's own mark on its favourite card.
+///
+/// The card used to draw a coloured tile with a generic storefront glyph in
+/// it, and - for any shop whose name happened to contain "yasmeen" - somebody
+/// else's wordmark, hard-coded. The shop's logo was on the model and served by
+/// the list route the whole time; it simply was never asked for.
+///
+/// `contain` rather than `cover`, which is the difference between a mark and a
+/// photograph: a wide wordmark filled to the tile loses its own ends. The
+/// coloured ground stays visible around it, which is what the artboard draws.
+class _FavoriteBusinessLogo extends StatelessWidget {
+  final String businessId;
+  final String logoUrl;
+
+  const _FavoriteBusinessLogo({
+    required this.businessId,
+    required this.logoUrl,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget fallback = Icon(
+      Icons.storefront_outlined,
+      key: ValueKey<String>('favorite-business-logo-placeholder-$businessId'),
+      color: MerzoxColors.kColor3D5A80,
+      size: 40,
+    );
+
+    final String url = logoUrl.trim();
+    if (url.isEmpty) return fallback;
+
+    return Padding(
+      padding: const EdgeInsets.all(6),
+      child: Image.network(
+        url,
+        key: ValueKey<String>('favorite-business-logo-$businessId'),
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        loadingBuilder:
+            (BuildContext context, Widget child, ImageChunkEvent? progress) {
+              if (progress == null) return child;
+              return const Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 1.6),
+                ),
+              );
+            },
+        errorBuilder: (_, _, _) => fallback,
       ),
     );
   }
