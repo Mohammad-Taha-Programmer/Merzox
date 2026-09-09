@@ -209,7 +209,6 @@ void main() {
         emails: [],
         phone: null,
         phones: [],
-        address: '',
         userType: 'normal',
         gender: 'female',
         canChangeName: true,
@@ -234,26 +233,22 @@ void main() {
 
       await api.updateProfile(
         token: 'token-1',
-        address: 'رام الله',
         birthDate: '2000-02-29',
       );
 
       expect(requests, hasLength(1));
       expect(requests.single.method, 'PATCH');
       expect(requests.single.path, '/users/me');
-      expect(requests.single.data, {
-        'address': 'رام الله',
-        'birthDate': '2000-02-29',
-      });
+      expect(requests.single.data, {'birthDate': '2000-02-29'});
     });
 
     test('an omitted birth date is absent from the patch body', () async {
       final requests = <RequestOptions>[];
       final api = ApiService(dio: _profileDio(requests, _userJson()));
 
-      await api.updateProfile(token: 'token-1', address: 'رام الله');
+      await api.updateProfile(token: 'token-1', name: 'ياسمين');
 
-      expect(requests.single.data, {'address': 'رام الله'});
+      expect(requests.single.data, {'name': 'ياسمين'});
       expect((requests.single.data as Map).containsKey('birthDate'), isFalse);
     });
   });
@@ -273,7 +268,6 @@ void main() {
         const ProfileEditSubmitted(
           name: null,
           gender: null,
-          address: 'رام الله',
           emails: [],
           phones: [],
           birthDate: '1994-11-07',
@@ -302,7 +296,6 @@ void main() {
         const ProfileEditSubmitted(
           name: null,
           gender: null,
-          address: 'رام الله',
           emails: [],
           phones: [],
         ),

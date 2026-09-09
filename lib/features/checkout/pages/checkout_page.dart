@@ -6,13 +6,11 @@ import 'package:merzox/core/auth/secure_token_store.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/constants/money.dart';
 import 'package:merzox/services/api_service.dart';
-import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/cart/bloc/cart_bloc.dart';
 import 'package:merzox/features/cart/bloc/cart_event.dart';
 import 'package:merzox/features/cart/bloc/cart_state.dart';
 import 'package:merzox/features/checkout/pages/address_form_page.dart';
 import 'package:merzox/features/checkout/widgets/checkout_step_indicator.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 /// The two customer-facing checkout steps the corpus draws.
 ///
@@ -31,16 +29,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 ///     offered. That needs backend work before its UI can be honest.
 ///
 /// The address list on `تفاصيل المتجر – 16` used to be listed here too, on the
-/// grounds that an account held a single `address` string. It has not been
-/// true since accounts grew an `addresses` book: the step reads that book and
-/// draws one radio per entry.
+/// grounds that an account held a single `address` string. The step reads the
+/// account's `addresses` book and draws one radio per entry.
 ///
-/// What survives of the old shape is the fallback below - an account whose
-/// book is empty is shown its profile's single `address` instead, as one card
-/// that cannot be chosen because there is nothing to choose between. That is
-/// also why an account with a profile address and an empty book sees exactly
-/// one address here and cannot select it, which reads as the list not being
-/// built at all. It is the data that is in the old place, not the screen.
+/// There was a fallback beside it until recently: an account whose book was
+/// empty was shown its profile's single `address` instead, as one card that
+/// could not be chosen. That is why such an account saw exactly one address
+/// and could not select it, which read as the list never having been built.
+/// The single field is gone from the account now, so the book is the only
+/// answer to where an order goes - and an account with an empty book is told
+/// it has no saved address rather than shown one it cannot change.
 class CheckoutPage extends StatefulWidget {
   /// Where a completed checkout returns to.
   final VoidCallback? onCompleted;
@@ -245,10 +243,6 @@ class _BuyerDetailsStep extends StatefulWidget {
 class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
   List<SavedAddressApiModel> _addresses = const <SavedAddressApiModel>[];
 
-  /// The profile's single free-text address, shown when the book is empty so
-  /// an account that predates the book can still check out.
-  String _legacyAddress = '';
-  String _name = '';
   String _token = '';
   bool _loaded = false;
 
@@ -261,10 +255,7 @@ class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
   }
 
   Future<void> _load() async {
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
     final String token = await const SecureTokenStore().read() ?? '';
-    final String legacy = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
-    final String name = prefs.getString(AuthBloc.nameKey)?.trim() ?? '';
 
     List<SavedAddressApiModel> addresses = const <SavedAddressApiModel>[];
     if (token.isNotEmpty) {
@@ -279,8 +270,6 @@ class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
     if (!mounted) return;
     setState(() {
       _addresses = addresses;
-      _legacyAddress = legacy;
-      _name = name;
       _token = token;
       _loaded = true;
       _selected ??= _defaultId(addresses);
@@ -307,8 +296,7 @@ class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
   }
 
   /// What the order will record, which is what the step must be showing.
-  String get _selectedLine =>
-      _selectedAddress?.line ?? (_addresses.isEmpty ? _legacyAddress : '');
+  String get _selectedLine => _selectedAddress?.line ?? '';
 
   Future<void> _addAddress() async {
     if (_token.isEmpty) return;
@@ -366,14 +354,6 @@ class _BuyerDetailsStepState extends State<_BuyerDetailsStep> {
                 onSelected: () => _select(entry.id),
               ),
             )
-        else if (_legacyAddress.isNotEmpty)
-          _AddressCard(
-            address: _legacyAddress,
-            name: _name,
-            phone: '',
-            selected: true,
-            onSelected: null,
-          )
         else
           // Honest rather than empty: there is nothing to select yet.
           Text(

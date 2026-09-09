@@ -66,6 +66,24 @@ BusinessProductApiModel _variantProduct({
 }
 
 class _SelectionApi extends ApiService {
+  /// Buy-now reads the account's address book to find where an order goes -
+  /// it used to read a single profile string, which the account no longer
+  /// keeps. One entry, marked default, so the order has somewhere to be sent.
+  @override
+  Future<List<SavedAddressApiModel>> myAddresses({
+    required String token,
+  }) async => <SavedAddressApiModel>[
+    SavedAddressApiModel.fromJson(const <String, dynamic>{
+      'id': 'address-1',
+      'fullName': 'ياسمين خالد',
+      'phone': '0599000000',
+      'governorate': 'رام الله',
+      'city': 'رام الله',
+      'details': 'شارع الإرسال',
+      'isDefault': true,
+    }),
+  ];
+
   BusinessProductApiModel product;
   int createOrderCalls = 0;
   List<OrderItemRequest> submittedItems = const [];

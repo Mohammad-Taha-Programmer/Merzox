@@ -17,10 +17,14 @@ import 'package:merzox/features/profile/pages/profile_edit_page.dart';
 /// instead of failing silently on a phone.
 
 /// The names the screen sends in its PATCH body, in the order it builds them.
+/// `address` was here until the account stopped holding one. It kept a single
+/// free-text line beside a book of delivery addresses, and an order fell back
+/// to the line when the book was empty - so a customer who chose one address
+/// could have the order placed against another. The book is reached through
+/// its own routes and is not part of this patch.
 const List<String> profilePatchFields = <String>[
   'name',
   'gender',
-  'address',
   'birthDate',
   'emails',
   'phones',

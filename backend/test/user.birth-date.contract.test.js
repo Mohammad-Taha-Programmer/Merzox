@@ -91,13 +91,23 @@ test('the profile update may clear a birth date with an explicit null', async ()
 test('updating an unrelated profile field never invents a birth date', async () => {
   const user = buildUser();
 
-  const payload = await runUpdateMe(user, {
-    address: 'رام الله ، دوار المنارة'
-  });
+  const payload = await runUpdateMe(user, { name: 'ياسمين خالد' });
 
-  assert.equal(user.address, 'رام الله ، دوار المنارة');
+  assert.equal(user.name, 'ياسمين خالد');
   assert.equal(user.birthDate, null);
   assert.equal(payload.data.user.birthDate, null);
+});
+
+test('a profile patch no longer carries a single address', async () => {
+  // The account keeps a book of delivery addresses, reached through its own
+  // routes. A free-text line here was a second answer to the same question,
+  // and an order fell back to it when the book was empty - so a customer who
+  // chose one address could have the order placed against another.
+  const user = buildUser();
+
+  await runUpdateMe(user, { address: 'رام الله ، دوار المنارة' });
+
+  assert.equal(user.address, undefined);
 });
 
 test('an omitted birth date leaves a stored one untouched', async () => {

@@ -20,7 +20,6 @@ class ProfileEditPage extends StatefulWidget {
 class _ProfileEditPageState extends State<ProfileEditPage> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _addressController = TextEditingController();
   final List<_EmailFieldData> _emails = [];
   final List<_PhoneFieldData> _phones = [];
   String _gender = 'female';
@@ -46,7 +45,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   @override
   void dispose() {
     _nameController.dispose();
-    _addressController.dispose();
     for (final email in _emails) {
       email.dispose();
     }
@@ -76,7 +74,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     _canChangeName = user.canChangeName;
     _canChangeGender = user.canChangeGender;
     _nameController.text = user.name;
-    _addressController.text = user.address;
     _gender = user.gender == 'male' ? 'male' : 'female';
 
     // A legacy account carries no birth date; the three selectors then stay
@@ -283,7 +280,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             ? _nameController.text.trim()
             : null,
         gender: _canChangeGender && _gender != user?.gender ? _gender : null,
-        address: _addressController.text.trim(),
         // An unchanged date is not resent: the PATCH carries the field only
         // when it actually differs from the stored value.
         birthDate: birthDate == _initialBirthDate ? null : birthDate,
@@ -437,13 +433,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                           _AddLineButton(
                             text: 'profileEdit.addPhone'.tr(),
                             onTap: _addPhone,
-                          ),
-                          const SizedBox(height: 18),
-                          _ProfileLabel(text: 'business.address'.tr()),
-                          _ProfileTextField(
-                            controller: _addressController,
-                            hintText: 'profileEdit.addressHint'.tr(),
-                            enabled: !isBusy,
                           ),
                           const SizedBox(height: 18),
                           _ProfileLabel(text: 'profileEdit.gender'.tr()),

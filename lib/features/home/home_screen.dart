@@ -55,7 +55,6 @@ import 'widgets/home_promo_carousel.dart';
 
 class _StoredUserProfile {
   final String name;
-  final String address;
   final String userType;
   final String email;
   final String phone;
@@ -64,7 +63,6 @@ class _StoredUserProfile {
 
   const _StoredUserProfile({
     required this.name,
-    required this.address,
     required this.userType,
     required this.email,
     required this.phone,
@@ -75,7 +73,6 @@ class _StoredUserProfile {
   static Future<_StoredUserProfile> load() async {
     final prefs = await SharedPreferences.getInstance();
     final storedName = prefs.getString(AuthBloc.nameKey)?.trim();
-    final storedAddress = prefs.getString(AuthBloc.addressKey)?.trim();
     final storedUserType = prefs.getString(AuthBloc.userTypeKey)?.trim();
     final storedEmail = prefs.getString(AuthBloc.emailKey)?.trim();
     final storedPhone = prefs.getString(AuthBloc.phoneKey)?.trim();
@@ -87,7 +84,6 @@ class _StoredUserProfile {
           ? 'home.defaultUser'.tr()
           : storedName,
       avatarUrl: storedAvatar ?? '',
-      address: storedAddress ?? '',
       userType: storedUserType == null || storedUserType.isEmpty
           ? 'normal'
           : storedUserType,

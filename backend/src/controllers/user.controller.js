@@ -51,7 +51,6 @@ export const updateMe = asyncHandler(async (req, res) => {
   const updates = pick(req.body, [
     'name',
     'gender',
-    'address',
     'birthDate',
     'emails',
     'phones',
@@ -82,10 +81,6 @@ export const updateMe = asyncHandler(async (req, res) => {
 
     req.user.gender = nextGender;
     req.user.genderChangedAt = new Date();
-  }
-
-  if (updates.address !== undefined) {
-    req.user.address = String(updates.address).trim();
   }
 
   // An omitted birthDate leaves the stored value untouched. This carries no

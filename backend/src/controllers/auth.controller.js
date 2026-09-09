@@ -89,7 +89,6 @@ export const signup = asyncHandler(async (req, res) => {
       name: String(req.body.name).trim(),
       email,
       passwordHash,
-      address: String(req.body.address ?? '').trim(),
       userType: 'normal',
       gender: normalizeGender(req.body.gender),
       permissions: req.body.permissions ?? undefined,
@@ -117,7 +116,6 @@ export const signup = asyncHandler(async (req, res) => {
     name: String(req.body.name).trim(),
     phone,
     phones: phone ? [{ value: phone, label: 'mobile', isPrimary: true }] : [],
-    address: String(req.body.address ?? '').trim(),
     userType: 'normal',
     gender: normalizeGender(req.body.gender),
     permissions: req.body.permissions ?? undefined,
@@ -191,7 +189,6 @@ export const verifyEmail = asyncHandler(async (req, res) => {
         verified: true
       }
     ],
-    address: pendingSignup.address ?? '',
     userType: 'normal',
     gender: normalizeGender(pendingSignup.gender),
     permissions: pendingSignup.permissions ?? undefined,

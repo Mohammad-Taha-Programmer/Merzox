@@ -14,7 +14,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static const String rememberSessionKey = 'auth_remember_session';
   static const String _legacyGuestKey = 'auth_guest_session';
   static const String nameKey = 'auth_user_name';
-  static const String addressKey = 'auth_user_address';
   static const String userTypeKey = 'auth_user_type';
 
   /// Which side of the app the account is being used from.
@@ -268,7 +267,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await const SecureTokenStore().clear();
     await prefs.remove(userIdKey);
     await prefs.remove(nameKey);
-    await prefs.remove(addressKey);
     await prefs.remove(userTypeKey);
     await prefs.remove(activeRoleKey);
     await prefs.remove(emailKey);
@@ -292,7 +290,6 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await const SecureTokenStore().write(auth.token);
     await prefs.setString(userIdKey, auth.user.id);
     await prefs.setString(nameKey, auth.user.name);
-    await prefs.setString(addressKey, auth.user.address);
     await prefs.setString(userTypeKey, auth.user.userType);
     // A fresh login starts on the side the account belongs to; the reader
     // turns it from there.

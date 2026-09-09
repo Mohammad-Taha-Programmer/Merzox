@@ -54,7 +54,6 @@ class ProfileEditBloc extends Bloc<ProfileEditEvent, ProfileEditState> {
         token: token,
         name: event.name,
         gender: event.gender,
-        address: event.address,
         birthDate: event.birthDate,
         emails: event.emails,
         phones: event.phones,
@@ -89,7 +88,6 @@ class ProfileEditBloc extends Bloc<ProfileEditEvent, ProfileEditState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(AuthBloc.userIdKey, user.id);
     await prefs.setString(AuthBloc.nameKey, user.name);
-    await prefs.setString(AuthBloc.addressKey, user.address);
     await prefs.setString(AuthBloc.userTypeKey, user.userType);
     await prefs.setString(AuthBloc.emailKey, user.email ?? '');
     await prefs.setString(AuthBloc.phoneKey, user.phone ?? '');

@@ -132,7 +132,9 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
     englishName: String(req.body.englishName ?? '').trim(),
     description: String(req.body.description ?? '').trim(),
     category: String(req.body.category).trim(),
-    address: String(req.body.address ?? user.address ?? '').trim(),
+    // The account has no single address to borrow any more - it keeps a book
+    // of delivery addresses, and a shop's address is not one of them.
+    address: String(req.body.address ?? '').trim(),
     attachmentUrl: String(req.body.attachmentUrl ?? '').trim()
   });
 

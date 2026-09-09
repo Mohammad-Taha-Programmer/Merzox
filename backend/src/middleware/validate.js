@@ -144,7 +144,6 @@ export function validateProfilePatch(req, _res, next) {
   const allowed = [
     'name',
     'gender',
-    'address',
     'birthDate',
     'emails',
     'phones',

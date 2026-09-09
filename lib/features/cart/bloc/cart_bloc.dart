@@ -5,7 +5,6 @@ import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../services/api_service.dart';
-import '../../authentication/bloc/auth_bloc.dart';
 import '../cart_item_integrity.dart';
 import '../cart_storage_keys.dart';
 import '../checkout_failure.dart';
@@ -121,12 +120,11 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         throw StateError('Authentication required');
       }
 
-      // The address the buyer chose wins; the profile's stored one is the
-      // fallback for an account that predates the address book.
-      final storedAddress = prefs.getString(AuthBloc.addressKey)?.trim() ?? '';
-      final address = event.deliveryAddress.trim().isEmpty
-          ? storedAddress
-          : event.deliveryAddress.trim();
+      // Only what the buyer chose. There used to be a fallback to the
+      // profile's single address string, which meant an order could go to an
+      // address the buyer had not picked and could not see on the screen that
+      // placed it.
+      final address = event.deliveryAddress.trim();
       final groups = <String, List<CartItem>>{};
       for (final item in state.items) {
         groups.putIfAbsent(item.businessId, () => []).add(item);
