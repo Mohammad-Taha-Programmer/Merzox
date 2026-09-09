@@ -1,4 +1,4 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
@@ -6,7 +6,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
-import 'package:merzox/features/business/settings/widgets/store_logo_field.dart';
+import 'package:merzox/core/widgets/merzox_picture_field.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
 import 'package:merzox/services/api_service.dart';
 
@@ -18,8 +18,8 @@ class StoreSettingsPage extends StatefulWidget {
   /// Injected by tests, which have no server, no camera and no network.
   final ApiService? apiService;
   final AuthSessionService authSessionService;
-  final StoreLogoDevicePicker? logoDevicePicker;
-  final StoreLogoLinkReader? logoLinkReader;
+  final MerzoxPictureDevicePicker? logoDevicePicker;
+  final MerzoxPictureLinkReader? logoLinkReader;
 
   const StoreSettingsPage({
     super.key,
@@ -223,8 +223,8 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                         ),
                         const SizedBox(height: 12),
                         Center(
-                          child: StoreLogoField(
-                            logoUrl: _logoUrl,
+                          child: MerzoxPictureField(
+                            url: _logoUrl,
                             onPicked: _uploadLogo,
                             devicePicker: widget.logoDevicePicker,
                             linkReader: widget.logoLinkReader,

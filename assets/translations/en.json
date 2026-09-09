@@ -571,7 +571,8 @@
     "registerAsCustomer": "Register as a customer"
   },
   "profile": {
-    "title": "Profile"
+    "title": "Profile",
+    "pictureChangeHint": "Hold to change your picture"
   },
   "profileEdit": {
     "title": "Edit profile",

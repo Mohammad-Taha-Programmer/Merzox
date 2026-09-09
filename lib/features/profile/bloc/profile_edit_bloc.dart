@@ -94,5 +94,9 @@ class ProfileEditBloc extends Bloc<ProfileEditEvent, ProfileEditState> {
     await prefs.setString(AuthBloc.emailKey, user.email ?? '');
     await prefs.setString(AuthBloc.phoneKey, user.phone ?? '');
     await prefs.setString(AuthBloc.genderKey, user.gender);
+    // Not edited on that screen, but this is where the account is read from
+    // the server, so it is where a picture changed on another device catches
+    // up with this one.
+    await prefs.setString(AuthBloc.avatarUrlKey, user.avatarUrl);
   }
 }

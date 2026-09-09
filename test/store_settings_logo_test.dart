@@ -1,11 +1,11 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/settings/store_settings_page.dart';
-import 'package:merzox/features/business/settings/widgets/store_logo_field.dart';
+import 'package:merzox/core/widgets/merzox_picture_field.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
 import 'package:merzox/services/api_service.dart';
 
@@ -53,7 +53,7 @@ OwnerBusiness _shop({String logoUrl = ''}) {
 Future<void> _openLogoSection(
   WidgetTester tester, {
   required _LogoApi api,
-  StoreLogoDevicePicker? picker,
+  MerzoxPictureDevicePicker? picker,
   String logoUrl = '',
 }) async {
   final BusinessBloc bloc = BusinessBloc(apiService: api);
@@ -89,7 +89,7 @@ void main() {
   ) async {
     await _openLogoSection(tester, api: _LogoApi());
 
-    expect(find.byType(StoreLogoField), findsOneWidget);
+    expect(find.byType(MerzoxPictureField), findsOneWidget);
     // The box that asked for a URL is gone: a link is now one of the three
     // ways in, behind the picture, rather than a field of its own.
     expect(find.text('قم بإرفاق رابط شعار المتجر'), findsNothing);
@@ -141,7 +141,7 @@ void main() {
     await _openLogoSection(
       tester,
       api: api,
-      picker: (StoreLogoSource _) async => _bytes,
+      picker: (MerzoxPictureSource _) async => _bytes,
     );
 
     await tester.tap(find.byKey(const ValueKey<String>('storeLogo.box')));
@@ -153,9 +153,9 @@ void main() {
     // merchant has one picture, and the server puts it on the shop they own.
     expect(api.uploaded, <Uint8List>[_bytes]);
 
-    final StoreLogoField field = tester.widget<StoreLogoField>(
-      find.byType(StoreLogoField),
+    final MerzoxPictureField field = tester.widget<MerzoxPictureField>(
+      find.byType(MerzoxPictureField),
     );
-    expect(field.logoUrl, 'https://images.test/stored.png');
+    expect(field.url, 'https://images.test/stored.png');
   });
 }

@@ -1,9 +1,9 @@
-import 'dart:typed_data';
+﻿import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:merzox/features/business/settings/widgets/store_logo_field.dart';
+import 'package:merzox/core/widgets/merzox_picture_field.dart';
 
 import 'localization_test_harness.dart';
 import 'network_image_harness.dart';
@@ -21,7 +21,7 @@ const String _logo = 'https://images.test/logo.png';
 
 class _Recorder {
   final List<Uint8List> uploaded = <Uint8List>[];
-  final List<StoreLogoSource> asked = <StoreLogoSource>[];
+  final List<MerzoxPictureSource> asked = <MerzoxPictureSource>[];
   final List<String> links = <String>[];
 
   String? answer = 'https://images.test/new.png';
@@ -31,7 +31,7 @@ class _Recorder {
     return answer;
   }
 
-  Future<Uint8List?> device(StoreLogoSource source) async {
+  Future<Uint8List?> device(MerzoxPictureSource source) async {
     asked.add(source);
     return _bytes;
   }
@@ -45,14 +45,14 @@ class _Recorder {
 Future<void> _pump(
   WidgetTester tester,
   _Recorder recorder, {
-  String logoUrl = '',
+  String url = '',
 }) async {
   await pumpLocalized(
     tester,
     Scaffold(
       body: Center(
-        child: StoreLogoField(
-          logoUrl: logoUrl,
+        child: MerzoxPictureField(
+          url: url,
           onPicked: recorder.onPicked,
           devicePicker: recorder.device,
           linkReader: recorder.link,
@@ -114,7 +114,7 @@ void main() {
     ) async {
       serveNetworkImage();
       final _Recorder recorder = _Recorder();
-      await _pump(tester, recorder, logoUrl: _logo);
+      await _pump(tester, recorder, url: _logo);
       await settleFrames(tester);
 
       await tester.tap(find.byKey(const ValueKey<String>('storeLogo.box')));
@@ -137,7 +137,7 @@ void main() {
       WidgetTester tester,
     ) async {
       serveNetworkImage();
-      await _pump(tester, _Recorder(), logoUrl: _logo);
+      await _pump(tester, _Recorder(), url: _logo);
       await settleFrames(tester);
 
       await tester.longPress(
@@ -160,7 +160,7 @@ void main() {
       // A broken-image box would be a worse answer than the placeholder, and
       // the merchant still needs the way in to replace it.
       serveNetworkImage(merzoxNotAnImage);
-      await _pump(tester, _Recorder(), logoUrl: _logo);
+      await _pump(tester, _Recorder(), url: _logo);
       await settleFrames(tester);
 
       final bool empty = find
@@ -174,12 +174,12 @@ void main() {
   });
 
   group('the three ways in', () {
-    for (final (String key, StoreLogoSource source) in <(
+    for (final (String key, MerzoxPictureSource source) in <(
       String,
-      StoreLogoSource,
+      MerzoxPictureSource,
     )>[
-      ('storeLogo.camera', StoreLogoSource.camera),
-      ('storeLogo.gallery', StoreLogoSource.gallery),
+      ('storeLogo.camera', MerzoxPictureSource.camera),
+      ('storeLogo.gallery', MerzoxPictureSource.gallery),
     ]) {
       testWidgets('$key reads the device and uploads what it read', (
         WidgetTester tester,
@@ -192,7 +192,7 @@ void main() {
         await tester.tap(find.byKey(ValueKey<String>(key)));
         await settleFrames(tester);
 
-        expect(recorder.asked, <StoreLogoSource>[source]);
+        expect(recorder.asked, <MerzoxPictureSource>[source]);
         expect(recorder.uploaded, <Uint8List>[_bytes]);
       });
     }
@@ -297,16 +297,16 @@ void main() {
     }
 
     test('a scheme that is not http is never fetched', () async {
-      expect(await fetchLogoBytes('javascript:alert(1)'), isNull);
-      expect(await fetchLogoBytes('ftp://host/x.png'), isNull);
-      expect(await fetchLogoBytes('/relative/x.png'), isNull);
-      expect(await fetchLogoBytes(''), isNull);
+      expect(await fetchPictureBytes('javascript:alert(1)'), isNull);
+      expect(await fetchPictureBytes('ftp://host/x.png'), isNull);
+      expect(await fetchPictureBytes('/relative/x.png'), isNull);
+      expect(await fetchPictureBytes(''), isNull);
     });
 
     test('a page that is not a picture is not a logo', () async {
       // Plenty of hosts answer 200 with an HTML error page. Uploading that
       // would put a broken image on the shop.
-      final Uint8List? bytes = await fetchLogoBytes(
+      final Uint8List? bytes = await fetchPictureBytes(
         'https://host.test/x.png',
         dio: dioAnswering(
           contentType: 'text/html',
@@ -318,11 +318,11 @@ void main() {
     });
 
     test('more than the server would take is not carried at all', () async {
-      final Uint8List? bytes = await fetchLogoBytes(
+      final Uint8List? bytes = await fetchPictureBytes(
         'https://host.test/x.png',
         dio: dioAnswering(
           contentType: 'image/png',
-          body: List<int>.filled(kStoreLogoMaxBytes + 1, 7),
+          body: List<int>.filled(kMerzoxPictureMaxBytes + 1, 7),
         ),
       );
 
@@ -330,7 +330,7 @@ void main() {
     });
 
     test('a picture comes back as its bytes', () async {
-      final Uint8List? bytes = await fetchLogoBytes(
+      final Uint8List? bytes = await fetchPictureBytes(
         'https://host.test/x.png',
         dio: dioAnswering(
           contentType: 'image/png; charset=binary',
