@@ -5,6 +5,7 @@ import mongoose from 'mongoose';
 
 import { Order } from '../src/models/Order.js';
 import {
+  ORDER_CANCELLATION_WINDOW_MS,
   addressMutableStatuses,
   allowedOwnerTransitions,
   canAssignCourier,
@@ -12,6 +13,8 @@ import {
   canCustomerCancel,
   canReviewOrder,
   canTransitionOwnerOrder,
+  customerCancellationRefusal,
+  earliestCancellableOrderDate,
   isTerminalOrderStatus,
   merchantSelectableStatuses,
   orderStatuses,
@@ -150,8 +153,16 @@ test('customer capabilities are defined for every status', () => {
     cancelled: { cancel: false, address: false, review: false }
   };
 
+  // Just placed, so the 24-hour window is wide open and status is the only
+  // thing being asserted here. The window has its own test below.
+  const justPlaced = { createdAt: new Date() };
+
   for (const status of orderStatuses) {
-    assert.equal(canCustomerCancel(status), expected[status].cancel, `cancel ${status}`);
+    assert.equal(
+      canCustomerCancel({ status, ...justPlaced }),
+      expected[status].cancel,
+      `cancel ${status}`
+    );
     assert.equal(
       canChangeDeliveryAddress(status),
       expected[status].address,
@@ -162,7 +173,7 @@ test('customer capabilities are defined for every status', () => {
 
   // Address mutation must be a strict subset of cancellation.
   for (const status of addressMutableStatuses) {
-    assert.equal(canCustomerCancel(status), true, status);
+    assert.equal(canCustomerCancel({ status, ...justPlaced }), true, status);
   }
 });
 
@@ -187,7 +198,11 @@ test('the model projection agrees with the policy for every status', () => {
   for (const status of orderStatuses) {
     const tracking = buildOrder({ status }).trackingJSON();
 
-    assert.equal(tracking.canCancel, canCustomerCancel(status), `cancel ${status}`);
+    assert.equal(
+      tracking.canCancel,
+      canCustomerCancel({ status, createdAt: undefined }),
+      `cancel ${status}`
+    );
     assert.equal(
       tracking.canChangeAddress,
       canChangeDeliveryAddress(status),
@@ -195,6 +210,80 @@ test('the model projection agrees with the policy for every status', () => {
     );
     assert.equal(tracking.canReview, canReviewOrder(status), `review ${status}`);
   }
+});
+
+test('cancellation closes 24 hours after the order was placed', () => {
+  // The checkout screen promises a day, so a day is what the rule gives -
+  // measured from when the order was created, not from any later moment.
+  const now = Date.UTC(2026, 0, 30, 12, 0, 0);
+  const at = (msAgo) => ({ status: 'confirmed', createdAt: new Date(now - msAgo) });
+
+  assert.equal(canCustomerCancel(at(0), now), true, 'just placed');
+  assert.equal(
+    canCustomerCancel(at(ORDER_CANCELLATION_WINDOW_MS - 1000), now),
+    true,
+    'a second inside the window'
+  );
+  assert.equal(
+    canCustomerCancel(at(ORDER_CANCELLATION_WINDOW_MS), now),
+    false,
+    'exactly a day old'
+  );
+  assert.equal(
+    canCustomerCancel(at(ORDER_CANCELLATION_WINDOW_MS + 1000), now),
+    false,
+    'a second past the window'
+  );
+
+  // The query bound and the decision have to close at the same instant, or an
+  // order can be refused by one and accepted by the other.
+  assert.equal(
+    earliestCancellableOrderDate(now).getTime(),
+    now - ORDER_CANCELLATION_WINDOW_MS
+  );
+});
+
+test('a refusal says which gate closed', () => {
+  // A reader told only "no" concludes the app is broken, so each refusal
+  // carries its own reason - and the two reasons are never confused.
+  const now = Date.UTC(2026, 0, 30, 12, 0, 0);
+  const fresh = new Date(now - 1000);
+  const stale = new Date(now - ORDER_CANCELLATION_WINDOW_MS - 1000);
+
+  assert.equal(
+    customerCancellationRefusal({ status: 'confirmed', createdAt: fresh }, now),
+    null
+  );
+  assert.equal(
+    customerCancellationRefusal(
+      { status: 'outForDelivery', createdAt: fresh },
+      now
+    ),
+    'ORDER_ALREADY_DISPATCHED'
+  );
+  assert.equal(
+    customerCancellationRefusal({ status: 'confirmed', createdAt: stale }, now),
+    'ORDER_CANCELLATION_WINDOW_CLOSED'
+  );
+
+  // Already closed, by either road.
+  for (const status of ['delivered', 'cancelled']) {
+    assert.equal(
+      customerCancellationRefusal({ status, createdAt: fresh }, now),
+      'ORDER_NOT_CANCELLABLE',
+      status
+    );
+  }
+
+  // Out for delivery *and* stale still reads as dispatched: that is the fact
+  // the reader can act on, and the one they will recognise.
+  assert.equal(
+    customerCancellationRefusal(
+      { status: 'outForDelivery', createdAt: stale },
+      now
+    ),
+    'ORDER_ALREADY_DISPATCHED'
+  );
 });
 
 test('a refused transition leaves the stored order untouched', () => {

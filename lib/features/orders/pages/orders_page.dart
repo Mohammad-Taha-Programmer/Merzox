@@ -378,7 +378,16 @@ class _OrderListItemState extends State<_OrderListItem> {
   @override
   Widget build(BuildContext context) {
     final card = _OrderCard(order: widget.order, group: widget.group);
-    if (widget.group != OrdersGroup.current) return card;
+
+    // What may be cancelled is the server's answer, and it is already on every
+    // order. The board used to offer the swipe to anything in `الحالية`,
+    // including an order out for delivery, and the refusal that came back read
+    // as a broken app rather than a changed order - the button had been
+    // offered, after all. The tracking screen has always asked; this asks too.
+    if (widget.group != OrdersGroup.current ||
+        !widget.order.tracking.canCancel) {
+      return card;
+    }
 
     final TextDirection direction = Directionality.of(context);
     final double signed = direction == TextDirection.rtl ? _offset : -_offset;

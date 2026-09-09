@@ -8,6 +8,8 @@ import { Order } from '../models/Order.js';
 import {
   addressMutableStatuses,
   customerCancellableStatuses,
+  customerCancellationRefusal,
+  earliestCancellableOrderDate,
   orderStatusGroups as policyStatusGroups
 } from '../policies/order-status.policy.js';
 
@@ -58,6 +60,20 @@ import { asyncHandler } from '../utils/asyncHandler.js';
 
 const validGroups = new Set(policyStatusGroups);
 const cancellableStatuses = new Set(customerCancellableStatuses);
+
+/**
+ * The English behind each cancellation refusal.
+ *
+ * The app shows the translated sentence for the code; this is what reaches
+ * anything reading the API directly, and it is kept beside the codes so the
+ * two cannot drift.
+ */
+const refusalSentences = {
+  ORDER_ALREADY_DISPATCHED: 'This order is already out for delivery',
+  ORDER_CANCELLATION_WINDOW_CLOSED:
+    'The window for cancelling this order has passed',
+  ORDER_NOT_CANCELLABLE: 'This order can no longer be cancelled'
+};
 
 /**
  * Rejects a malformed order id before any query runs.
@@ -1035,7 +1051,11 @@ export const cancelMyOrder = asyncHandler(async (req, res) => {
     {
       _id: orderId,
       user: req.user._id,
-      status: { $in: [...cancellableStatuses] }
+      status: { $in: [...cancellableStatuses] },
+      // The window is part of the same query rather than a read followed by a
+      // write: an order that ages past it between the two would otherwise be
+      // cancelled by a check that had already passed.
+      createdAt: { $gt: earliestCancellableOrderDate(cancelledAt.getTime()) }
     },
     {
       $set: {
@@ -1056,15 +1076,22 @@ export const cancelMyOrder = asyncHandler(async (req, res) => {
   );
 
   if (!order) {
-    const exists = await Order.exists({ _id: orderId, user: req.user._id });
-    if (!exists) {
+    // Which gate closed is the whole of what the reader needs, so the refused
+    // order is read back to say so rather than answering "no" and leaving them
+    // to guess whether the app is broken.
+    const refused = await Order.findOne({ _id: orderId, user: req.user._id })
+      .select('status createdAt')
+      .lean();
+
+    if (!refused) {
       throw new AppError('Order was not found', 404, 'ORDER_NOT_FOUND');
     }
-    throw new AppError(
-      'This order can no longer be cancelled',
-      409,
-      'ORDER_NOT_CANCELLABLE'
-    );
+
+    const code =
+      customerCancellationRefusal(refused, cancelledAt.getTime()) ??
+      'ORDER_NOT_CANCELLABLE';
+
+    throw new AppError(refusalSentences[code], 409, code);
   }
 
   publishOrderTrackingChanged({

@@ -305,7 +305,10 @@ orderSchema.methods.trackingJSON = function trackingJSON() {
     })),
     courier: this.courierJSON(),
     courierLocation: this.courierLocationJSON(),
-    canCancel: canCustomerCancel(this.status),
+    canCancel: canCustomerCancel({
+      status: this.status,
+      createdAt: this.createdAt
+    }),
     canChangeAddress: canChangeDeliveryAddress(this.status),
     canReview: canReviewOrder(this.status)
   };
