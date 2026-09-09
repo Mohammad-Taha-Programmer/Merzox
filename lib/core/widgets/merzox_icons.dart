@@ -75,6 +75,27 @@ abstract final class MerzoxIcons {
     fontFamily: 'CampaignsProductsNotifications',
   );
 
+  /// The bell, wherever one is drawn.
+  ///
+  /// The one glyph here that is not a section's own. It is the same bell on
+  /// the home bar, the notifications board, a storefront, a merchant's order
+  /// and the preference switches, and it is meant to stay the same on all of
+  /// them - so it is read from the library's own file rather than copied per
+  /// screen the way the rest are.
+  ///
+  /// Its ink fills 0.835 of the em box where Material's fills nearly all of
+  /// one, so a site swapping from `Icons.notifications_none_rounded` divides
+  /// its old size by that to keep the mark the size it was.
+  static const IconData notifications = IconData(
+    0xe80a,
+    fontFamily: 'Notifications',
+  );
+
+  /// What to multiply a Material bell's size by to get [notifications] at the
+  /// same apparent size. Written once so the eight sites do not each carry a
+  /// number nobody can check.
+  static const double notificationsSizeFactor = 1 / 0.835;
+
   // -- The customer's bottom bar --------------------------------------------
   //
   // Five places, the middle one raised out of the bar. Home and the account

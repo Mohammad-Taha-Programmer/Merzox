@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/notifications/bloc/notification_badge_bloc.dart';
 import 'package:merzox/features/notifications/bloc/notification_badge_state.dart';
 import 'package:merzox/features/notifications/widgets/global_notification_bell.dart';
@@ -123,7 +124,7 @@ void main() {
     await _pumpBell(tester, 1);
 
     final Icon bell = tester.widget<Icon>(
-      find.byIcon(Icons.notifications_none_rounded),
+      find.byIcon(MerzoxIcons.notifications),
     );
     expect(bell.color, MerzoxColors.kColor98C1D9);
   });

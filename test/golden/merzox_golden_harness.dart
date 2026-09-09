@@ -51,6 +51,9 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   'Concept': <String>['assets/fonts/Concept Medium.ttf'],
   'Minion': <String>['assets/fonts/MINIONVARIABLECONCEPT-ROMAN.OTF'],
   // The designer's glyphs, one family per icon as they were exported.
+  // The bell, read from the library rather than copied per screen: it is the
+  // same mark on six boards and is meant to stay so.
+  'Notifications': <String>['assets/fonts/icons_fonts/Notifications.ttf'],
   'EditProfileIcon': <String>[
     'assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf',
   ],
