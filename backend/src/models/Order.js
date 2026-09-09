@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 
 import {
   canChangeDeliveryAddress,
-  canCustomerCancel,
+  customerCancellationRefusal,
   canReviewOrder
 } from '../policies/order-status.policy.js';
 import { PRODUCT_LIMITS } from '../policies/product.policy.js';
@@ -294,6 +294,14 @@ orderSchema.methods.trackingJSON = function trackingJSON() {
   const currentStep = statusToStep.get(this.status) ?? 'placed';
   const currentIndex = trackingSteps.indexOf(currentStep);
 
+  // One call answers both: whether the customer may cancel, and why not. Two
+  // separate computations could disagree, and a screen that says "you cannot"
+  // for one reason while the server refuses for another is worse than silence.
+  const cancelRefusal = customerCancellationRefusal({
+    status: this.status,
+    createdAt: this.createdAt
+  });
+
   return {
     isCancelled: this.status === 'cancelled',
     currentStep: this.status === 'cancelled' ? '' : currentStep,
@@ -305,10 +313,11 @@ orderSchema.methods.trackingJSON = function trackingJSON() {
     })),
     courier: this.courierJSON(),
     courierLocation: this.courierLocationJSON(),
-    canCancel: canCustomerCancel({
-      status: this.status,
-      createdAt: this.createdAt
-    }),
+    canCancel: cancelRefusal === null,
+    // The same code the cancel route would refuse with, carried up front so a
+    // customer who wants to call an order off is told why they cannot before
+    // they try, rather than after.
+    cancelBlockedReason: cancelRefusal ?? '',
     canChangeAddress: canChangeDeliveryAddress(this.status),
     canReview: canReviewOrder(this.status)
   };

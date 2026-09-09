@@ -2810,6 +2810,13 @@ class OrderTrackingApiModel {
   final bool canChangeAddress;
   final bool canReview;
 
+  /// The server's code for why cancelling is closed, empty when it is open.
+  ///
+  /// It maps through [apiErrorMessageKeys] to the same sentence the cancel
+  /// route would refuse with, so the screen can say why before the customer
+  /// tries rather than after.
+  final String cancelBlockedReason;
+
   const OrderTrackingApiModel({
     required this.isCancelled,
     required this.currentStep,
@@ -2820,6 +2827,7 @@ class OrderTrackingApiModel {
     required this.canCancel,
     required this.canChangeAddress,
     required this.canReview,
+    this.cancelBlockedReason = '',
   });
 
   /// Parses the server's tracking payload.
@@ -2881,6 +2889,14 @@ class OrderTrackingApiModel {
       canCancel: _field<bool>(json, 'canCancel'),
       canChangeAddress: _field<bool>(json, 'canChangeAddress'),
       canReview: _field<bool>(json, 'canReview'),
+      // This one is defaulted where the flags above are not, and the
+      // difference is the point: a missing flag would have to be guessed at,
+      // and guessing a permission is how one gets granted by accident. A
+      // missing explanation is just an explanation nobody gave, and the screen
+      // falls back to the general sentence - which is true whatever the reason.
+      cancelBlockedReason: json['cancelBlockedReason'] is String
+          ? json['cancelBlockedReason'] as String
+          : '',
     );
   }
 }

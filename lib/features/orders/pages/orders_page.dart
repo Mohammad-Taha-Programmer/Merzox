@@ -50,6 +50,23 @@ class _OrdersPageState extends State<OrdersPage> {
     }
   }
 
+  /// Says why the shut cancel action is shut.
+  ///
+  /// It reads the same sentence the cancel route would have refused with -
+  /// they come from one table keyed by the server's code - so a customer who
+  /// asks before the fact and one who is refused after it are told the same
+  /// thing. An unknown or missing code falls back to the general sentence,
+  /// which is true whatever the particular reason turns out to be.
+  void _explainBlockedCancellation(String reasonCode) {
+    final String key =
+        ApiService.localizedApiErrorCodes[reasonCode] ??
+        'apiErrors.orderNotCancellable';
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(key.tr())));
+  }
+
   Future<void> _confirmCancellation(OrderApiModel order) async {
     final String? reason = await askForOrderText(
       context,
@@ -188,6 +205,7 @@ class _OrdersPageState extends State<OrdersPage> {
             group: state.selectedGroup,
             cancelling: state.cancellingOrderId == order.id,
             onCancel: () => _confirmCancellation(order),
+            onCancelBlocked: _explainBlockedCancellation,
           );
         },
       ),
@@ -344,12 +362,16 @@ class _OrderListItem extends StatefulWidget {
   final bool cancelling;
   final VoidCallback onCancel;
 
+  /// Told the server's reason code when the shut action is pressed.
+  final void Function(String reasonCode) onCancelBlocked;
+
   const _OrderListItem({
     super.key,
     required this.order,
     required this.group,
     required this.cancelling,
     required this.onCancel,
+    required this.onCancelBlocked,
   });
 
   @override
@@ -379,15 +401,15 @@ class _OrderListItemState extends State<_OrderListItem> {
   Widget build(BuildContext context) {
     final card = _OrderCard(order: widget.order, group: widget.group);
 
-    // What may be cancelled is the server's answer, and it is already on every
-    // order. The board used to offer the swipe to anything in `الحالية`,
-    // including an order out for delivery, and the refusal that came back read
-    // as a broken app rather than a changed order - the button had been
-    // offered, after all. The tracking screen has always asked; this asks too.
-    if (widget.group != OrdersGroup.current ||
-        !widget.order.tracking.canCancel) {
-      return card;
-    }
+    if (widget.group != OrdersGroup.current) return card;
+
+    // Whether cancelling is still open is the server's answer, and it rides on
+    // every order. What is done with a "no" is the whole question here: the
+    // action stays on the card, faded, and says why when it is pressed. Taking
+    // it away instead was tried and is worse - a customer who came to call an
+    // order off finds nothing at all, and nothing to read is the same "this is
+    // broken" as an unexplained refusal, with less to go on.
+    final bool blocked = !widget.order.tracking.canCancel;
 
     final TextDirection direction = Directionality.of(context);
     final double signed = direction == TextDirection.rtl ? _offset : -_offset;
@@ -409,8 +431,15 @@ class _OrderListItemState extends State<_OrderListItem> {
                 height: 48,
                 child: _CancelOrderButton(
                   cancelling: widget.cancelling,
+                  blocked: blocked,
                   onPressed: () {
                     setState(() => _offset = 0);
+                    if (blocked) {
+                      widget.onCancelBlocked(
+                        widget.order.tracking.cancelBlockedReason,
+                      );
+                      return;
+                    }
                     widget.onCancel();
                   },
                 ),
@@ -729,18 +758,39 @@ class _OrderProductImage extends StatelessWidget {
 
 class _CancelOrderButton extends StatelessWidget {
   final bool cancelling;
+
+  /// Whether the server has already closed cancellation for this order.
+  ///
+  /// The button stays on the card when it has. Taking it away was quieter and
+  /// worse: a customer who came to call an order off found the action simply
+  /// gone, with nothing to read - which is the same "this is broken" the
+  /// unexplained refusal used to produce, only with less to go on. Faded says
+  /// it is shut; pressing it says why.
+  final bool blocked;
+
   final VoidCallback onPressed;
 
-  const _CancelOrderButton({required this.cancelling, required this.onPressed});
+  const _CancelOrderButton({
+    required this.cancelling,
+    required this.blocked,
+    required this.onPressed,
+  });
 
   @override
   Widget build(BuildContext context) {
     return FilledButton(
+      // Not `onPressed: null`, which is what a shut button usually gets: that
+      // would take the tap as well as the colour, and the tap is the whole way
+      // the reason is reached.
       onPressed: cancelling ? null : onPressed,
       style: FilledButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        backgroundColor: MerzoxColors.kColorEE6C4D,
-        foregroundColor: Colors.white,
+        backgroundColor: blocked
+            ? MerzoxColors.kColorFEE3DC
+            : MerzoxColors.kColorEE6C4D,
+        // The orange carries over as lettering: white on the pale ground is
+        // not readable, and a shut button still has to be legible to be read.
+        foregroundColor: blocked ? MerzoxColors.kColorEE6C4D : Colors.white,
         disabledBackgroundColor: MerzoxColors.kColorFEE3DC,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
       ),
