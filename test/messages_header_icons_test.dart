@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:merzox/features/messages/widgets/messages_back_chevron.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/features/messages/widgets/messages_search_icon.dart';
 
 /// The two marks in the inbox bar.
@@ -47,7 +47,7 @@ class _Recorder implements Canvas {
 
 _Recorder _paintChevron({required bool rightward, double box = 24}) {
   final _Recorder canvas = _Recorder();
-  MessagesBackChevronPainter(
+  MerzoxBackChevronPainter(
     color: const Color(0xFF707070),
     rightward: rightward,
   ).paint(canvas, Size(box, box));
@@ -66,7 +66,7 @@ void main() {
     expect(canvas.paints.single.strokeJoin, StrokeJoin.round);
     expect(
       canvas.paints.single.strokeWidth,
-      closeTo(kMessagesChevronStroke, 0.001),
+      closeTo(kMerzoxChevronStroke, 0.001),
     );
   });
 
@@ -74,8 +74,8 @@ void main() {
     final Rect drawn = _paintChevron(rightward: true).paths.single.getBounds();
 
     // The point is the far side of the mark from its arms.
-    expect(drawn.right, closeTo(kMessagesChevronTipX, 0.01));
-    expect(drawn.left, closeTo(kMessagesChevronArmX, 0.01));
+    expect(drawn.right, closeTo(kMerzoxChevronTipX, 0.01));
+    expect(drawn.left, closeTo(kMerzoxChevronArmX, 0.01));
   });
 
   test('it mirrors for a left-to-right reader rather than pointing away', () {
@@ -84,19 +84,19 @@ void main() {
     // Mirrored about the 24-square: the arms are now on the right.
     expect(
       drawn.left,
-      closeTo(kMessagesChevronBox - kMessagesChevronTipX, 0.01),
+      closeTo(kMerzoxChevronBox - kMerzoxChevronTipX, 0.01),
     );
     expect(
       drawn.right,
-      closeTo(kMessagesChevronBox - kMessagesChevronArmX, 0.01),
+      closeTo(kMerzoxChevronBox - kMerzoxChevronArmX, 0.01),
     );
   });
 
   test('its arms reach the artboard height, and it stays in its square', () {
     final Rect drawn = _paintChevron(rightward: true).paths.single.getBounds();
 
-    expect(drawn.top, closeTo(kMessagesChevronTopY, 0.01));
-    expect(drawn.bottom, closeTo(kMessagesChevronBottomY, 0.01));
+    expect(drawn.top, closeTo(kMerzoxChevronTopY, 0.01));
+    expect(drawn.bottom, closeTo(kMerzoxChevronBottomY, 0.01));
     expect(drawn.height, closeTo(14.8, 0.01));
   });
 
@@ -116,20 +116,20 @@ void main() {
       await tester.pumpWidget(
         Directionality(
           textDirection: direction,
-          child: const Center(child: MessagesBackChevron()),
+          child: const Center(child: MerzoxBackChevron()),
         ),
       );
 
-      final MessagesBackChevronPainter painter =
+      final MerzoxBackChevronPainter painter =
           tester
                   .widget<CustomPaint>(
                     find.descendant(
-                      of: find.byType(MessagesBackChevron),
+                      of: find.byType(MerzoxBackChevron),
                       matching: find.byType(CustomPaint),
                     ),
                   )
                   .painter!
-              as MessagesBackChevronPainter;
+              as MerzoxBackChevronPainter;
 
       expect(painter.rightward, direction == TextDirection.rtl);
     }
