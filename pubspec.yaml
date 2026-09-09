@@ -137,6 +137,51 @@ flutter:
     - family: Tajawal
       fonts:
         - asset: assets/fonts/Tajawal-Regular.ttf
+    # The designer's own glyphs, one font per icon as they were exported.
+    #
+    # assets/fonts/icons_fonts is the library as it was delivered; each screen
+    # then has a folder holding the ones it draws, named for the section each
+    # one serves rather than for the picture it happens to be. That is why
+    # CampaignsProductsNotifications exists beside the library's own
+    # Notifications: the two are the same drawing today, and the day the
+    # offers row wants its own, one screen changes and no other does.
+    - family: EditProfileIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf
+    - family: MyOrdersIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/MyOrdersIcon.ttf
+    - family: MapIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/MapIcon.ttf
+    - family: Favorites
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/Favorites.ttf
+    - family: WhoWeAreIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/WhoWeAreIcon.ttf
+    - family: ShareAppIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/ShareAppIcon.ttf
+    - family: SignOutIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/SignOutIcon.ttf
+    - family: BusinessesIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/BusinessesIcon.ttf
+    - family: ProfileIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/ProfileIcon.ttf
+    - family: FacebookLogoIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/FacebookLogoIcon.ttf
+    - family: InstagramLogoIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/customer_profile/InstagramLogoIcon.ttf
+    - family: CampaignsProductsNotifications
+      fonts:
+        - asset: >-
+            assets/fonts/icons_fonts/customer_profile/CampaignsProductsNotifications.ttf
   # fonts:
   #   - family: Schyler
   #     fonts:

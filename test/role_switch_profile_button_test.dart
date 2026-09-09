@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/core/auth/role_switch_service.dart';
+import 'package:merzox/core/widgets/merzox_profile.dart';
 import 'package:merzox/features/business/shell/business_shell_page.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/home/home_screen.dart';
@@ -60,8 +61,11 @@ void main() {
     await loadAppTranslations();
   });
 
+  // It is the board's pill now, the same one the merchant profile turns the
+  // other way with - not a `FilledButton` of this screen's own, which is what
+  // made the two screens draw the same control at two different sizes.
   Finder merchantButton() => find.widgetWithText(
-    FilledButton,
+    MerzoxProfilePill,
     'التسجيل كتاجر',
   );
 

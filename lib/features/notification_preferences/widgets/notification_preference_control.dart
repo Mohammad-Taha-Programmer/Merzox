@@ -16,9 +16,34 @@ class NotificationPreferenceControl extends StatelessWidget {
   final double cornerRadius;
   final double gap;
 
+  /// The glyph beside the words.
+  ///
+  /// A parameter because the two screens that draw this row are being moved
+  /// onto the designer's own set one at a time, and the one still on
+  /// Material's must not change under a conversion of the other. The default
+  /// is what both drew before either moved.
+  final IconData icon;
+
+  /// How large to draw it, which is not the same question as how large it
+  /// looks. A glyph fills as much of its em box as its designer chose to
+  /// fill: the row icons on the customer profile fill all of theirs, this
+  /// bell fills 0.834 of its, and Material's fills 0.75. Set to the same
+  /// number they would all draw at different sizes, so the caller passes what
+  /// makes this one match the rows beside it rather than what matches on
+  /// paper.
+  final double iconSize;
+
+  /// The size of the words, which the screen sets for the same reason it sets
+  /// the row's height: this row stands in a column of others and has to be
+  /// set in the same type as they are.
+  final double labelSize;
+
   const NotificationPreferenceControl({
     super.key,
     this.labelKey = 'notificationPreferences.productOffers',
+    this.icon = Icons.notifications_none_rounded,
+    this.iconSize = 18,
+    this.labelSize = 12,
     this.height = 38,
     this.cornerRadius = 4,
     this.gap = 10,
@@ -51,20 +76,16 @@ class NotificationPreferenceControl extends StatelessWidget {
             padding: const EdgeInsetsDirectional.only(start: 10, end: 12),
             child: Row(
               children: [
-                const Icon(
-                  Icons.notifications_none_rounded,
-                  color: MerzoxColors.kColor3D5A80,
-                  size: 18,
-                ),
+                Icon(icon, color: MerzoxColors.kColor3D5A80, size: iconSize),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     labelKey.tr(),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF2B2B2B),
+                    style: TextStyle(
+                      fontSize: labelSize,
+                      color: const Color(0xFF2B2B2B),
                     ),
                   ),
                 ),

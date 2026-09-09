@@ -44,6 +44,8 @@ import 'widgets/business_id_badge.dart';
 import 'widgets/business_rating_stars.dart';
 import 'widgets/discount_ribbon.dart';
 import 'widgets/plain_tab_title.dart';
+import '../../core/widgets/merzox_icons.dart';
+import '../../core/widgets/merzox_profile.dart';
 import 'widgets/feature_bottom_navigation_bar.dart';
 import 'widgets/home_promo_carousel.dart';
 
@@ -1945,146 +1947,131 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        Container(height: 126, color: MerzoxColors.kColor95BDD5),
-        Positioned(
-          top: 28,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Text(
-              'profile.title'.tr(),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+    return MerzoxProfileScaffold(
+      title: 'profile.title'.tr(),
+      children: <Widget>[
+        const SizedBox(height: 30),
+        const _ProfileXdAvatar(),
+        const SizedBox(height: 12),
+        FutureBuilder<_StoredUserProfile>(
+          future: _profileFuture,
+          builder: (context, snapshot) {
+            final name = snapshot.data?.name ?? 'home.defaultUser'.tr();
+
+            return Text(
+              'home.profileGreeting'.tr(args: [name]),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: MerzoxColors.kColor2B2B2B,
               ),
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+        FutureBuilder<_StoredUserProfile>(
+          future: _profileFuture,
+          builder: (context, snapshot) {
+            // Offered only to an account that owns a shop. For everyone else
+            // the way to a shop is the enrolment card on the home tab, and a
+            // button here that looked like a second way in would make that
+            // one optional.
+            if (!accountOwnsBusiness(snapshot.data?.userType)) {
+              return const SizedBox.shrink();
+            }
+
+            return _ProfileMerchantButton(onPressed: widget.onActAsMerchant);
+          },
+        ),
+        const SizedBox(height: 25),
+        MerzoxProfileMenuRow(
+          icon: MerzoxIcons.editProfile,
+          label: 'profileEdit.title'.tr(),
+          showChevron: true,
+          onTap: widget.onEditProfile,
+        ),
+        MerzoxProfileMenuRow(
+          icon: MerzoxIcons.myOrders,
+          label: 'orders.title'.tr(),
+          showChevron: true,
+          onTap: widget.onOrders,
+        ),
+        MerzoxProfileMenuRow(
+          icon: MerzoxIcons.map,
+          label: 'map.title'.tr(),
+          showChevron: true,
+          onTap: widget.onMap,
+        ),
+        MerzoxProfileMenuRow(
+          icon: MerzoxIcons.favorites,
+          label: 'favorites.title'.tr(),
+          showChevron: true,
+          onTap: widget.onFavorites,
+        ),
+        MerzoxProfileMenuRow(
+          icon: MerzoxIcons.whoWeAre,
+          label: 'aboutUs.title'.tr(),
+          showChevron: true,
+          onTap: widget.onAboutUs,
+        ),
+        // The board drops the chevron from here down: a switch and a share
+        // sheet do not open a screen with more of the same behind them.
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: kProfileGutter),
+          child: NotificationPreferenceControl(
+            icon: MerzoxIcons.campaignsProductsNotifications,
+            // The rows above draw at 20 and fill their whole em box; this
+            // bell fills 0.834 of its, so 20 / 0.834 is what makes the two
+            // the same size to the eye.
+            iconSize: 24,
+            labelSize: kProfileRowLabelSize,
+            height: kProfileRowHeight,
+            cornerRadius: kProfileRowRadius,
+            gap: kProfileRowGap,
+          ),
+        ),
+        BlocListener<
+          RecommendationPreferenceBloc,
+          RecommendationPreferenceState
+        >(
+          listenWhen: (previous, current) =>
+              previous.status == RecommendationPreferenceStatus.saving &&
+              current.status == RecommendationPreferenceStatus.ready &&
+              previous.enabled != current.enabled,
+          listener: (context, state) {
+            context.read<HomeBloc>().add(
+              const HomeRecommendationsRefreshRequested(),
+            );
+          },
+          child: const Padding(
+            padding: EdgeInsets.symmetric(horizontal: kProfileGutter),
+            child: RecommendationPreferenceControl(
+              // Material's sparkle fills 0.918 of its em box against the
+              // rows' whole one, so 20 / 0.918 to stand level with them.
+              iconSize: 22,
+              labelSize: kProfileRowLabelSize,
+              cornerRadius: kProfileRowRadius,
+              gap: kProfileRowGap,
             ),
           ),
         ),
-        ListView(
-          padding: const EdgeInsets.fromLTRB(4, 78, 4, 118),
-          children: [
-            Container(
-              padding: const EdgeInsets.fromLTRB(12, 18, 12, 34),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
-              ),
-              child: Column(
-                children: [
-                  const _ProfileXdAvatar(),
-                  const SizedBox(height: 5),
-                  FutureBuilder<_StoredUserProfile>(
-                    future: _profileFuture,
-                    builder: (context, snapshot) {
-                      final name =
-                          snapshot.data?.name ?? 'home.defaultUser'.tr();
-
-                      return Text(
-                        'home.profileGreeting'.tr(args: [name]),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF2B2B2B),
-                        ),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 18),
-                  FutureBuilder<_StoredUserProfile>(
-                    future: _profileFuture,
-                    builder: (context, snapshot) {
-                      // Offered only to an account that owns a shop. For
-                      // everyone else the way to a shop is the enrolment card
-                      // on the home tab, and a button here that looked like a
-                      // second way in would make that one optional.
-                      if (!accountOwnsBusiness(snapshot.data?.userType)) {
-                        return const SizedBox.shrink();
-                      }
-
-                      return Column(
-                        children: [
-                          _ProfileMerchantButton(
-                            onPressed: widget.onActAsMerchant,
-                          ),
-                          const SizedBox(height: 18),
-                        ],
-                      );
-                    },
-                  ),
-                  _ProfileXdMenuTile(
-                    title: 'profileEdit.title'.tr(),
-                    icon: Icons.edit_outlined,
-                    onTap: widget.onEditProfile,
-                  ),
-                  _ProfileXdMenuTile(
-                    title: 'orders.title'.tr(),
-                    icon: Icons.article_outlined,
-                    onTap: widget.onOrders,
-                  ),
-                  _ProfileXdMenuTile(
-                    title: 'map.title'.tr(),
-                    icon: Icons.location_on_outlined,
-                    onTap: widget.onMap,
-                  ),
-                  _ProfileXdMenuTile(
-                    title: 'favorites.title'.tr(),
-                    icon: Icons.favorite_border_rounded,
-                    onTap: widget.onFavorites,
-                  ),
-                  _ProfileXdMenuTile(
-                    title: 'aboutUs.title'.tr(),
-                    icon: Icons.info_outline_rounded,
-                    onTap: widget.onAboutUs,
-                  ),
-                  const NotificationPreferenceControl(),
-                  BlocListener<
-                    RecommendationPreferenceBloc,
-                    RecommendationPreferenceState
-                  >(
-                    listenWhen: (previous, current) =>
-                        previous.status ==
-                            RecommendationPreferenceStatus.saving &&
-                        current.status ==
-                            RecommendationPreferenceStatus.ready &&
-                        previous.enabled != current.enabled,
-                    listener: (context, state) {
-                      context.read<HomeBloc>().add(
-                        const HomeRecommendationsRefreshRequested(),
-                      );
-                    },
-                    child: const RecommendationPreferenceControl(),
-                  ),
-                  _ProfileXdMenuTile(
-                    title: 'shareApp.profileTitle'.tr(),
-                    icon: Icons.ios_share_rounded,
-                    onTap: widget.onShareApp,
-                  ),
-                  const SizedBox(height: 44),
-                  const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _ProfileSocialButton(
-                        icon: Icons.camera_alt_outlined,
-                        label: 'Instagram',
-                      ),
-                      SizedBox(width: 10),
-                      _ProfileSocialButton(
-                        icon: Icons.facebook_rounded,
-                        label: 'Facebook',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  _ProfileXdLogoutButton(onPressed: widget.onLogout),
-                ],
-              ),
-            ),
-          ],
+        MerzoxProfileMenuRow(
+          icon: MerzoxIcons.shareApp,
+          label: 'shareApp.profileTitle'.tr(),
+          onTap: widget.onShareApp,
         ),
+        const SizedBox(height: 28),
+        const _ProfileSocialRow(),
+        const SizedBox(height: 18),
+        MerzoxProfilePill(
+          icon: MerzoxIcons.signOut,
+          label: 'common.logout'.tr(),
+          onPressed: widget.onLogout,
+        ),
+        const SizedBox(height: 28),
       ],
     );
   }
@@ -2095,15 +2082,19 @@ class _ProfileXdAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 46,
-      height: 46,
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: MerzoxColors.kColorD8D8D8),
+    // No picture is stored for an account, so this is the ring and the space
+    // a picture would fill. It used to be a grey circle inside a grey hairline
+    // - a different element from the merchant's, on the same board.
+    return const MerzoxProfileAvatar(
+      child: CircleAvatar(
+        radius: kProfileAvatarDiameter / 2,
+        backgroundColor: Colors.white,
+        child: Icon(
+          MerzoxIcons.profile,
+          size: 20,
+          color: MerzoxColors.kColor3D5A80,
+        ),
       ),
-      child: CircleAvatar(backgroundColor: MerzoxColors.kColorBEBEBE),
     );
   }
 }
@@ -2115,122 +2106,47 @@ class _ProfileMerchantButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 120,
-      height: 42,
-      child: FilledButton.icon(
-        onPressed: () => onPressed(),
-        icon: const Icon(Icons.storefront_outlined, size: 16),
-        label: Text(
-          'home.registerAsMerchant'.tr(),
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-        ),
-        style: FilledButton.styleFrom(
-          backgroundColor: MerzoxColors.kColor3D5A80,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        ),
-      ),
+    return MerzoxProfilePill(
+      icon: MerzoxIcons.stores,
+      label: 'home.registerAsMerchant'.tr(),
+      onPressed: () => onPressed(),
+      width: 182,
+      prominent: true,
     );
   }
 }
 
-class _ProfileXdMenuTile extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final VoidCallback onTap;
+class _ProfileSocialRow extends StatelessWidget {
+  const _ProfileSocialRow();
 
-  const _ProfileXdMenuTile({
-    required this.title,
-    required this.icon,
-    required this.onTap,
-  });
+  @override
+  Widget build(BuildContext context) {
+    return const Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: <Widget>[
+        _ProfileSocialMark(icon: MerzoxIcons.instagram),
+        SizedBox(width: 10),
+        _ProfileSocialMark(icon: MerzoxIcons.facebook),
+      ],
+    );
+  }
+}
+
+class _ProfileSocialMark extends StatelessWidget {
+  final IconData icon;
+
+  const _ProfileSocialMark({required this.icon});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 38,
-      margin: const EdgeInsets.only(bottom: 10),
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
-        color: MerzoxColors.kColorF5F9FC,
-        borderRadius: BorderRadius.circular(4),
+        color: MerzoxColors.kColor3D5A80,
+        borderRadius: BorderRadius.circular(kProfileRowRadius),
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              Icon(
-                Icons.chevron_left_rounded,
-                color: MerzoxColors.kColor3D5A80,
-                size: 18,
-              ),
-              const Spacer(),
-              Text(
-                title,
-                style: const TextStyle(fontSize: 12, color: Color(0xFF2B2B2B)),
-              ),
-              const SizedBox(width: 12),
-              Icon(icon, color: MerzoxColors.kColor3D5A80, size: 18),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProfileSocialButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _ProfileSocialButton({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: label,
-      button: true,
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: MerzoxColors.kColor3D5A80,
-          borderRadius: BorderRadius.circular(4),
-        ),
-        child: Icon(icon, color: Colors.white, size: 20),
-      ),
-    );
-  }
-}
-
-class _ProfileXdLogoutButton extends StatelessWidget {
-  final VoidCallback onPressed;
-
-  const _ProfileXdLogoutButton({required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 36,
-      child: TextButton.icon(
-        onPressed: onPressed,
-        icon: Icon(
-          Icons.logout_rounded,
-          color: MerzoxColors.kColor3D5A80,
-          size: 18,
-        ),
-        label: Text('common.logout'.tr(), style: const TextStyle(fontSize: 12)),
-        style: TextButton.styleFrom(
-          foregroundColor: const Color(0xFF2B2B2B),
-          backgroundColor: MerzoxColors.kColorF5F9FC,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-        ),
-      ),
+      child: Icon(icon, color: Colors.white, size: 20),
     );
   }
 }
