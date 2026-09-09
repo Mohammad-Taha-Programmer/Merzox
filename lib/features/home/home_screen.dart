@@ -44,7 +44,11 @@ import 'widgets/business_id_badge.dart';
 import 'widgets/business_rating_stars.dart';
 import 'widgets/discount_ribbon.dart';
 import 'widgets/plain_tab_title.dart';
+import 'dart:typed_data';
+
+import '../../core/auth/auth_session_service.dart';
 import '../../core/widgets/merzox_icons.dart';
+import '../../core/widgets/merzox_picture_field.dart';
 import '../../core/widgets/merzox_profile.dart';
 import 'widgets/feature_bottom_navigation_bar.dart';
 import 'widgets/home_promo_carousel.dart';
@@ -56,6 +60,7 @@ class _StoredUserProfile {
   final String email;
   final String phone;
   final String gender;
+  final String avatarUrl;
 
   const _StoredUserProfile({
     required this.name,
@@ -64,6 +69,7 @@ class _StoredUserProfile {
     required this.email,
     required this.phone,
     required this.gender,
+    this.avatarUrl = '',
   });
 
   static Future<_StoredUserProfile> load() async {
@@ -74,11 +80,13 @@ class _StoredUserProfile {
     final storedEmail = prefs.getString(AuthBloc.emailKey)?.trim();
     final storedPhone = prefs.getString(AuthBloc.phoneKey)?.trim();
     final storedGender = prefs.getString(AuthBloc.genderKey)?.trim();
+    final storedAvatar = prefs.getString(AuthBloc.avatarUrlKey)?.trim();
 
     return _StoredUserProfile(
       name: storedName == null || storedName.isEmpty
           ? 'home.defaultUser'.tr()
           : storedName,
+      avatarUrl: storedAvatar ?? '',
       address: storedAddress ?? '',
       userType: storedUserType == null || storedUserType.isEmpty
           ? 'normal'
@@ -1939,10 +1947,45 @@ class _ProfileXdContent extends StatefulWidget {
 class _ProfileXdContentState extends State<_ProfileXdContent> {
   late final Future<_StoredUserProfile> _profileFuture;
 
+  /// The picture as it stands, which starts as whatever was stored and moves
+  /// when the reader replaces it. Held here rather than read from the future
+  /// each build, because a future does not change when an upload succeeds.
+  String? _avatarUrl;
+
   @override
   void initState() {
     super.initState();
     _profileFuture = _StoredUserProfile.load();
+  }
+
+  /// Uploads the chosen bytes and answers with where the picture now lives.
+  ///
+  /// The bytes go to the server, not to the image host: the host's key is a
+  /// secret and an app cannot keep one. The server stores the file, puts the
+  /// URL on the account, carries it onto any shop the account owns and onto
+  /// the threads it is a party to, and deletes the picture it replaced - so
+  /// all of that follows from this one call.
+  Future<String?> _uploadAvatar(Uint8List bytes) async {
+    final AuthSessionSnapshot session = await const AuthSessionService()
+        .read();
+    final String? token = session.token;
+    if (token == null) throw StateError('Authentication required');
+
+    final AuthApiUser account = await ApiService().uploadMyAvatar(
+      token: token,
+      bytes: bytes,
+    );
+
+    final String url = account.avatarUrl.trim();
+    if (url.isEmpty) return null;
+
+    // Written back so the next open paints it without asking anybody.
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString(AuthBloc.avatarUrlKey, url);
+
+    if (mounted) setState(() => _avatarUrl = url);
+
+    return url;
   }
 
   @override
@@ -1951,7 +1994,15 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
       title: 'profile.title'.tr(),
       children: <Widget>[
         const SizedBox(height: 30),
-        const _ProfileXdAvatar(),
+        FutureBuilder<_StoredUserProfile>(
+          future: _profileFuture,
+          builder: (context, snapshot) {
+            return _ProfileXdAvatar(
+              url: _avatarUrl ?? snapshot.data?.avatarUrl ?? '',
+              onPicked: _uploadAvatar,
+            );
+          },
+        ),
         const SizedBox(height: 12),
         FutureBuilder<_StoredUserProfile>(
           future: _profileFuture,
@@ -2077,19 +2128,30 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
   }
 }
 
+/// The account's own picture, in the ring the board draws round it.
+///
+/// A tap opens it large and a press replaces it, which is the shop logo's
+/// behaviour on the settings screen - the same widget, in fact, drawn round
+/// instead of square. There was no way to set this picture from the app at
+/// all before: the column existed on the account and the endpoint existed on
+/// the server, and only the customer's side of it was missing.
 class _ProfileXdAvatar extends StatelessWidget {
-  const _ProfileXdAvatar();
+  final String url;
+  final Future<String?> Function(Uint8List bytes) onPicked;
+
+  const _ProfileXdAvatar({required this.url, required this.onPicked});
 
   @override
   Widget build(BuildContext context) {
-    // No picture is stored for an account, so this is the ring and the space
-    // a picture would fill. It used to be a grey circle inside a grey hairline
-    // - a different element from the merchant's, on the same board.
-    return const MerzoxProfileAvatar(
-      child: CircleAvatar(
-        radius: kProfileAvatarDiameter / 2,
-        backgroundColor: Colors.white,
-        child: Icon(
+    return MerzoxProfileAvatar(
+      child: MerzoxPictureField(
+        url: url,
+        onPicked: onPicked,
+        shape: BoxShape.circle,
+        size: kProfileAvatarDiameter,
+        hintKey: 'profile.pictureChangeHint',
+        keyPrefix: 'profileAvatar',
+        placeholder: const Icon(
           MerzoxIcons.profile,
           size: 20,
           color: MerzoxColors.kColor3D5A80,

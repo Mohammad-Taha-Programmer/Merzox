@@ -7,30 +7,30 @@ import 'package:image_picker/image_picker.dart';
 
 import 'package:merzox/core/constants/colors.dart';
 
-/// Where a store logo comes from.
+/// Where a picture comes from.
 ///
-/// The same three the product images screen offers, because a merchant who
+/// The same three the product images screen offers, because somebody who
 /// already hosts their artwork elsewhere should not have to re-upload it, and
-/// one who has it on their phone should not have to host it first.
-enum StoreLogoSource { camera, gallery, link }
+/// somebody who has it on their phone should not have to host it first.
+enum MerzoxPictureSource { camera, gallery, link }
 
 /// Reads an image off the device. A test hands over bytes instead of standing
 /// up a camera.
-typedef StoreLogoDevicePicker =
-    Future<Uint8List?> Function(StoreLogoSource source);
+typedef MerzoxPictureDevicePicker =
+    Future<Uint8List?> Function(MerzoxPictureSource source);
 
 /// Fetches the bytes behind a pasted link.
-typedef StoreLogoLinkReader = Future<Uint8List?> Function(String url);
+typedef MerzoxPictureLinkReader = Future<Uint8List?> Function(String url);
 
-/// The side of the box the artboard draws.
+/// The side of the box the store-settings artboard draws.
 const double kStoreLogoBox = 96;
 
 /// As much of a pasted image as is worth downloading.
 ///
 /// The server refuses more than five megabytes, so anything past that would be
-/// carried across the merchant's connection only to be turned away at the end
+/// carried across the reader's connection only to be turned away at the end
 /// of it.
-const int kStoreLogoMaxBytes = 5 * 1024 * 1024;
+const int kMerzoxPictureMaxBytes = 5 * 1024 * 1024;
 
 /// Downloads a pasted image, or gives up quietly.
 ///
@@ -40,7 +40,7 @@ const int kStoreLogoMaxBytes = 5 * 1024 * 1024;
 /// picture that can be replaced and deleted like any other. A link kept as a
 /// link would be none of those - it could not be resized, it could not be
 /// removed, and it would go dark the day its host did.
-Future<Uint8List?> fetchLogoBytes(String url, {Dio? dio}) async {
+Future<Uint8List?> fetchPictureBytes(String url, {Dio? dio}) async {
   final Uri? parsed = Uri.tryParse(url.trim());
 
   if (parsed == null ||
@@ -66,64 +66,89 @@ Future<Uint8List?> fetchLogoBytes(String url, {Dio? dio}) async {
   if (!type.startsWith('image/')) return null;
 
   final List<int>? body = response.data;
-  if (body == null || body.isEmpty || body.length > kStoreLogoMaxBytes) {
+  if (body == null || body.isEmpty || body.length > kMerzoxPictureMaxBytes) {
     return null;
   }
 
   return Uint8List.fromList(body);
 }
 
-/// The shop's logo, and the three ways to change it.
+/// A picture, and the three ways to change it.
 ///
-/// A tap opens it large, because looking at it is the common thing and
-/// ninety-six pixels is not enough to judge artwork by. Replacing it is rarer
-/// and cannot be undone once the old file is deleted, so it takes a deliberate
-/// press - except when there is no logo yet, where a tap opens the picker,
-/// since there is nothing to enlarge and the empty box is an invitation.
-class StoreLogoField extends StatefulWidget {
-  final String logoUrl;
+/// A tap opens it large, because looking at it is the common thing and the
+/// space a screen gives it is not enough to judge artwork by. Replacing it is
+/// rarer and cannot be undone once the old file is deleted, so it takes a
+/// deliberate press - except when there is no picture yet, where a tap opens
+/// the picker, since there is nothing to enlarge and the empty frame is an
+/// invitation.
+///
+/// Two screens draw this: the shop's logo, as a square the settings board
+/// sets, and the account's own picture, as the circle the profile board sets.
+/// Only the frame differs, so only the frame is a parameter.
+class MerzoxPictureField extends StatefulWidget {
+  final String url;
 
-  /// Uploads the chosen bytes and answers with the URL the logo now lives at,
-  /// or null if it could not be stored.
+  /// Uploads the chosen bytes and answers with the URL the picture now lives
+  /// at, or null if it could not be stored.
   final Future<String?> Function(Uint8List bytes) onPicked;
 
-  final StoreLogoDevicePicker? devicePicker;
-  final StoreLogoLinkReader? linkReader;
+  final MerzoxPictureDevicePicker? devicePicker;
+  final MerzoxPictureLinkReader? linkReader;
 
-  const StoreLogoField({
-    required this.logoUrl,
+  /// How the frame is drawn, and how large.
+  final BoxShape shape;
+  final double size;
+
+  /// What stands in the frame before there is a picture.
+  final Widget? placeholder;
+
+  /// Read out loud, and shown on a long press.
+  final String hintKey;
+
+  /// Names this instance's parts for a test. The sheet and the dialog are
+  /// routes and only one is ever open, so they keep one set of names; the
+  /// frame and the picture belong to whichever screen drew them.
+  final String keyPrefix;
+
+  const MerzoxPictureField({
+    required this.url,
     required this.onPicked,
     this.devicePicker,
     this.linkReader,
+    this.shape = BoxShape.rectangle,
+    this.size = kStoreLogoBox,
+    this.placeholder,
+    this.hintKey = 'storeSettings.logoChangeHint',
+    this.keyPrefix = 'storeLogo',
     super.key,
   });
 
   @override
-  State<StoreLogoField> createState() => _StoreLogoFieldState();
+  State<MerzoxPictureField> createState() => _MerzoxPictureFieldState();
 }
 
-class _StoreLogoFieldState extends State<StoreLogoField> {
+class _MerzoxPictureFieldState extends State<MerzoxPictureField> {
   bool _busy = false;
 
-  /// True once the picture has failed to load, so the empty box is drawn
+  /// True once the picture has failed to load, so the empty frame is drawn
   /// rather than a broken one.
   bool _unloadable = false;
 
   @override
-  void didUpdateWidget(StoreLogoField oldWidget) {
+  void didUpdateWidget(MerzoxPictureField oldWidget) {
     super.didUpdateWidget(oldWidget);
     // A new URL deserves a fresh attempt: the old one failing says nothing
     // about this one.
-    if (oldWidget.logoUrl != widget.logoUrl) _unloadable = false;
+    if (oldWidget.url != widget.url) _unloadable = false;
   }
 
-  Future<Uint8List?> _pickFromDevice(StoreLogoSource source) async {
+  Future<Uint8List?> _pickFromDevice(MerzoxPictureSource source) async {
     final XFile? file = await ImagePicker().pickImage(
-      source: source == StoreLogoSource.camera
+      source: source == MerzoxPictureSource.camera
           ? ImageSource.camera
           : ImageSource.gallery,
-      // Brought down before it leaves the phone, so the merchant does not
-      // spend their data on detail a logo has no use for. The host trims it
+      // Brought down before it leaves the phone, so the reader does not spend
+      // their data on detail a small picture has no use for. The host trims it
       // again on the way in; this is the part that saves the upload.
       maxWidth: 1024,
       maxHeight: 1024,
@@ -133,8 +158,8 @@ class _StoreLogoFieldState extends State<StoreLogoField> {
     return file?.readAsBytes();
   }
 
-  Future<StoreLogoSource?> _askSource() {
-    return showModalBottomSheet<StoreLogoSource>(
+  Future<MerzoxPictureSource?> _askSource() {
+    return showModalBottomSheet<MerzoxPictureSource>(
       context: context,
       builder: (BuildContext sheetContext) => SafeArea(
         child: Column(
@@ -154,20 +179,21 @@ class _StoreLogoFieldState extends State<StoreLogoField> {
               leading: const Icon(Icons.photo_camera_outlined),
               title: Text('merchantImages.sourceCamera'.tr()),
               onTap: () =>
-                  Navigator.of(sheetContext).pop(StoreLogoSource.camera),
+                  Navigator.of(sheetContext).pop(MerzoxPictureSource.camera),
             ),
             ListTile(
               key: const ValueKey<String>('storeLogo.gallery'),
               leading: const Icon(Icons.photo_library_outlined),
               title: Text('merchantImages.sourceGallery'.tr()),
               onTap: () =>
-                  Navigator.of(sheetContext).pop(StoreLogoSource.gallery),
+                  Navigator.of(sheetContext).pop(MerzoxPictureSource.gallery),
             ),
             ListTile(
               key: const ValueKey<String>('storeLogo.link'),
               leading: const Icon(Icons.link_rounded),
               title: Text('merchantImages.sourceLink'.tr()),
-              onTap: () => Navigator.of(sheetContext).pop(StoreLogoSource.link),
+              onTap: () =>
+                  Navigator.of(sheetContext).pop(MerzoxPictureSource.link),
             ),
             const SizedBox(height: 8),
           ],
@@ -179,11 +205,11 @@ class _StoreLogoFieldState extends State<StoreLogoField> {
   Future<String?> _askLink() {
     return showDialog<String>(
       context: context,
-      builder: (BuildContext dialogContext) => const _LogoLinkDialog(),
+      builder: (BuildContext dialogContext) => const _PictureLinkDialog(),
     );
   }
 
-  /// Opens the logo at a size the artwork can be judged at.
+  /// Opens the picture at a size the artwork can be judged at.
   Future<void> _enlarge() {
     return showDialog<void>(
       context: context,
@@ -196,7 +222,7 @@ class _StoreLogoFieldState extends State<StoreLogoField> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: Image.network(
-              widget.logoUrl,
+              widget.url,
               key: const ValueKey<String>('storeLogo.enlarged'),
               fit: BoxFit.contain,
               errorBuilder: (_, _, _) => const ColoredBox(
@@ -222,19 +248,19 @@ class _StoreLogoFieldState extends State<StoreLogoField> {
     // pictures and race over which one lands.
     if (_busy) return;
 
-    final StoreLogoSource? source = await _askSource();
+    final MerzoxPictureSource? source = await _askSource();
     if (source == null || !mounted) return;
 
     String? link;
-    if (source == StoreLogoSource.link) {
+    if (source == MerzoxPictureSource.link) {
       link = await _askLink();
       if (link == null || link.trim().isEmpty || !mounted) return;
     }
 
     setState(() => _busy = true);
     try {
-      final Uint8List? bytes = source == StoreLogoSource.link
-          ? await (widget.linkReader ?? fetchLogoBytes)(link!)
+      final Uint8List? bytes = source == MerzoxPictureSource.link
+          ? await (widget.linkReader ?? fetchPictureBytes)(link!)
           : await (widget.devicePicker ?? _pickFromDevice)(source);
 
       if (!mounted) return;
@@ -242,7 +268,7 @@ class _StoreLogoFieldState extends State<StoreLogoField> {
       // Backing out of the picker is not a failure and says nothing. A link
       // that gave nothing back is a failure, and does.
       if (bytes == null) {
-        if (source == StoreLogoSource.link) {
+        if (source == MerzoxPictureSource.link) {
           _report('merchantImages.uploadFailed'.tr());
         }
         return;
@@ -267,34 +293,40 @@ class _StoreLogoFieldState extends State<StoreLogoField> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  bool get _round => widget.shape == BoxShape.circle;
+
+  BorderRadius? get _radius =>
+      _round ? null : BorderRadius.circular(8);
+
   @override
   Widget build(BuildContext context) {
-    final String url = widget.logoUrl.trim();
+    final String url = widget.url.trim();
     final bool showPicture = url.isNotEmpty && !_unloadable;
 
     return Semantics(
       button: true,
-      label: 'storeSettings.logoChangeHint'.tr(),
+      label: widget.hintKey.tr(),
       child: Tooltip(
-        message: 'storeSettings.logoChangeHint'.tr(),
+        message: widget.hintKey.tr(),
         child: InkWell(
-          key: const ValueKey<String>('storeLogo.box'),
-          // With no logo there is nothing to enlarge, and an empty box that
-          // did nothing when tapped would be a dead end.
+          key: ValueKey<String>('${widget.keyPrefix}.box'),
+          // With no picture there is nothing to enlarge, and an empty frame
+          // that did nothing when tapped would be a dead end.
           onTap: showPicture ? _enlarge : _replace,
           onLongPress: _replace,
-          borderRadius: BorderRadius.circular(8),
+          customBorder: _round ? const CircleBorder() : null,
+          borderRadius: _radius,
           child: Container(
-            width: kStoreLogoBox,
-            height: kStoreLogoBox,
+            width: widget.size,
+            height: widget.size,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: MerzoxColors.kColorF3F7FA,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: MerzoxColors.kColorDEEEF8,
-                width: 2,
-              ),
+              shape: widget.shape,
+              borderRadius: _radius,
+              border: _round
+                  ? null
+                  : Border.all(color: MerzoxColors.kColorDEEEF8, width: 2),
             ),
             child: Stack(
               fit: StackFit.expand,
@@ -302,7 +334,7 @@ class _StoreLogoFieldState extends State<StoreLogoField> {
                 if (showPicture)
                   Image.network(
                     url,
-                    key: const ValueKey<String>('storeLogo.image'),
+                    key: ValueKey<String>('${widget.keyPrefix}.image'),
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) {
                       // Rebuilding during a build is not allowed, so the
@@ -337,26 +369,28 @@ class _StoreLogoFieldState extends State<StoreLogoField> {
     );
   }
 
-  /// The box as the board draws it before a shop has a logo.
-  Widget _empty() => const Center(
-    child: Icon(
-      Icons.file_upload_outlined,
-      key: ValueKey<String>('storeLogo.placeholder'),
-      size: 32,
-      color: MerzoxColors.kColor98C1D9,
-    ),
+  /// The frame as the board draws it before there is a picture.
+  Widget _empty() => Center(
+    key: ValueKey<String>('${widget.keyPrefix}.placeholder'),
+    child:
+        widget.placeholder ??
+        const Icon(
+          Icons.file_upload_outlined,
+          size: 32,
+          color: MerzoxColors.kColor98C1D9,
+        ),
   );
 }
 
 /// Asks for the link, and refuses anything that is not one.
-class _LogoLinkDialog extends StatefulWidget {
-  const _LogoLinkDialog();
+class _PictureLinkDialog extends StatefulWidget {
+  const _PictureLinkDialog();
 
   @override
-  State<_LogoLinkDialog> createState() => _LogoLinkDialogState();
+  State<_PictureLinkDialog> createState() => _PictureLinkDialogState();
 }
 
-class _LogoLinkDialogState extends State<_LogoLinkDialog> {
+class _PictureLinkDialogState extends State<_PictureLinkDialog> {
   final TextEditingController _url = TextEditingController();
   final GlobalKey<FormState> _form = GlobalKey<FormState>();
 
@@ -367,7 +401,7 @@ class _LogoLinkDialogState extends State<_LogoLinkDialog> {
   }
 
   /// Only an absolute http(s) URL. A relative path or a `javascript:` string
-  /// would be fetched by nothing and stored as a logo by mistake.
+  /// would be fetched by nothing and stored as a picture by mistake.
   String? _validate(String? value) {
     final Uri? parsed = Uri.tryParse((value ?? '').trim());
     final bool usable =

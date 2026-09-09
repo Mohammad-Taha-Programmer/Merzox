@@ -28,6 +28,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   static const String phoneKey = 'auth_user_phone';
   static const String genderKey = 'auth_user_gender';
 
+  /// Where the account's picture lives.
+  ///
+  /// Kept beside the other account facts rather than fetched when a screen
+  /// wants it: the profile tab already paints from what was stored at sign-in,
+  /// and a picture that arrived one request later than the name it sits under
+  /// would flicker into place on every open.
+  static const String avatarUrlKey = 'auth_user_avatar_url';
+
   /// Where the token used to be kept. It is written nowhere now - only
   /// [SecureTokenStore] holds one - and the name survives so migration and the
   /// tests that pin it can still name the old place.
@@ -292,6 +300,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await prefs.setString(emailKey, auth.user.email ?? '');
     await prefs.setString(phoneKey, auth.user.phone ?? '');
     await prefs.setString(genderKey, auth.user.gender);
+    await prefs.setString(avatarUrlKey, auth.user.avatarUrl);
     await prefs.setBool(
       locationPermissionGrantedKey,
       auth.user.permissions.location,

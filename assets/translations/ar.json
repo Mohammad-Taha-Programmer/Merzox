@@ -571,7 +571,8 @@
     "registerAsCustomer": "التسجيل كزبون"
   },
   "profile": {
-    "title": "الملف الشخصي"
+    "title": "الملف الشخصي",
+    "pictureChangeHint": "اضغط مطولًا لتغيير صورتك"
   },
   "profileEdit": {
     "title": "تعديل الملف الشخصي",
