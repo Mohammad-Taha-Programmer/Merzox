@@ -10,6 +10,7 @@ import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart'
 import 'package:merzox/features/orders/bloc/orders_bloc.dart';
 import 'package:merzox/features/orders/bloc/orders_event.dart';
 import 'package:merzox/features/orders/bloc/orders_state.dart';
+import 'package:merzox/features/orders/widgets/order_text_prompt.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 import 'package:merzox/core/constants/money.dart';
 
@@ -50,39 +51,15 @@ class _OrdersPageState extends State<OrdersPage> {
   }
 
   Future<void> _confirmCancellation(OrderApiModel order) async {
-    final controller = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text('orders.cancelTitle'.tr()),
-        content: TextField(
-          controller: controller,
-          maxLength: 250,
-          maxLines: 3,
-          decoration: InputDecoration(
-            hintText: 'orders.cancelReason'.tr(),
-            border: const OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text('common.cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: MerzoxColors.kColorEE6C4D,
-            ),
-            child: Text('common.confirm'.tr()),
-          ),
-        ],
-      ),
+    final String? reason = await askForOrderText(
+      context,
+      title: 'orders.cancelTitle'.tr(),
+      hint: 'orders.cancelReason'.tr(),
+      confirmLabel: 'common.confirm'.tr(),
+      confirmColor: MerzoxColors.kColorEE6C4D,
     );
-    final reason = controller.text.trim();
-    controller.dispose();
 
-    if (confirmed == true && mounted) {
+    if (reason != null && mounted) {
       context.read<OrdersBloc>().add(
         OrderCancellationRequested(orderId: order.id, reason: reason),
       );
