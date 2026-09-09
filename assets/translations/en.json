@@ -608,7 +608,8 @@
     "avatarUpdated": "Account picture updated",
     "holdToChangeAvatar": "Hold to change the picture",
     "addresses": "Delivery addresses",
-    "addAddress": "Add another address"
+    "addAddress": "Add another address",
+    "saveChangesTitle": "Save your changes?"
   },
   "search": {
     "noResults": "No results",

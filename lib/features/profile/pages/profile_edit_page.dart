@@ -53,6 +53,25 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   String? _initialBirthDate;
   String? _birthDateError;
 
+  /// Drives the form, so the screen can carry the reader to its foot.
+  ///
+  /// A controller rather than a key on the save button, which was the first
+  /// attempt: a `ListView` only attaches the children near the viewport, so
+  /// on a phone - the very case this exists for - the button is not built and
+  /// has no context to scroll to. The end of the list is where it sits, and
+  /// the end of the list is always reachable.
+  final ScrollController _formScroll = ScrollController();
+
+  /// The form as it stood when it last agreed with the account: on opening,
+  /// and again after a save. Anything that differs from this is an edit the
+  /// reader has made and not yet stored.
+  ///
+  /// Held as one string rather than a field-by-field comparison because the
+  /// question being asked is only ever "the same or not", and a comparison
+  /// spread over eight fields is one somebody forgets to extend when a ninth
+  /// arrives.
+  String _savedShape = '';
+
   /// The start of the Gregorian calendar, and the only floor the year list
   /// has. It is a calendar-domain bound, not an age bound: this product has no
   /// minimum-age, adult-only or maximum-age rule, so the selector must never
@@ -62,6 +81,7 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   @override
   void dispose() {
     _nameController.dispose();
+    _formScroll.dispose();
     for (final email in _emails) {
       email.dispose();
     }
@@ -218,6 +238,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                     _PhoneFieldData(value: phone.value, label: phone.label),
               ),
       );
+
+    // Taken after the fields are filled, so what is recorded is the form as
+    // the account left it rather than as it was a moment earlier.
+    _savedShape = _formShape();
   }
 
   /// Today, as a calendar day, read in UTC.
@@ -324,6 +348,103 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     return '${year.toString().padLeft(4, '0')}'
         '-${month.toString().padLeft(2, '0')}'
         '-${day.toString().padLeft(2, '0')}';
+  }
+
+  /// Everything on the form that a save would send, in one line.
+  ///
+  /// The addresses are deliberately absent: they are saved the moment they
+  /// are added or removed, through their own routes, so they are never among
+  /// the unsaved edits this screen is guarding.
+  String _formShape() {
+    return <String>[
+      _nameController.text.trim(),
+      _gender,
+      _birthYear?.toString() ?? '',
+      _birthMonth?.toString() ?? '',
+      _birthDay?.toString() ?? '',
+      for (final _EmailFieldData email in _emails)
+        '${email.controller.text.trim().toLowerCase()}|${email.label}',
+      for (final _PhoneFieldData phone in _phones)
+        '${phone.controller.text.trim()}|${phone.label}',
+    ].join('\u0000');
+  }
+
+  bool get _hasUnsavedEdits => _formShape() != _savedShape;
+
+  /// Leaves, unless there is something unsaved to ask about first.
+  ///
+  /// Only no leaves. Yes is how a reader says they did not mean to go, and it
+  /// hands them back the form with their edits on it and the save button
+  /// where it always was.
+  Future<void> _leave() async {
+    if (!_hasUnsavedEdits) {
+      if (mounted) context.pop();
+      return;
+    }
+
+    final bool? save = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        key: const ValueKey<String>('profileEdit.unsavedDialog'),
+        backgroundColor: Colors.white,
+        title: Text(
+          'profileEdit.saveChangesTitle'.tr(),
+          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+        ),
+        actions: <Widget>[
+          TextButton(
+            key: const ValueKey<String>('profileEdit.unsavedNo'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text('common.no'.tr()),
+          ),
+          FilledButton(
+            key: const ValueKey<String>('profileEdit.unsavedYes'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: MerzoxColors.kColorEE6C4D,
+            ),
+            child: Text('common.yes'.tr()),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+
+    // Yes leaves the form standing with the edits still on it, so the reader
+    // saves it themselves with the button at the foot of the page. It does
+    // not save on their behalf: a save is a request that can fail, and one
+    // made from a dialog that has already closed would report its failure to
+    // somebody who thought they had finished.
+    //
+    // Dismissing the dialog - a tap outside, or the system back - is neither
+    // answer, and does the same thing for the same reason: nothing. It is not
+    // carried down the page though: that would be the screen acting on an
+    // answer nobody gave.
+    if (save == null) return;
+
+    if (save) {
+      _showSaveButton();
+      return;
+    }
+
+    context.pop();
+  }
+
+  /// Brings the save button into view.
+  ///
+  /// Yes means "I did not mean to leave", and the thing to do next is press
+  /// save - which may be a screen below where the reader is standing. Without
+  /// this the form comes back looking exactly as it did, and being told to
+  /// press a button one cannot see is not being told anything.
+  void _showSaveButton() {
+    if (!_formScroll.hasClients) return;
+
+    _formScroll.animateTo(
+      _formScroll.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOut,
+    );
   }
 
   void _submit() {
@@ -457,9 +578,10 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
                   : Form(
                       key: _formKey,
                       child: ListView(
+                        controller: _formScroll,
                         padding: const EdgeInsets.fromLTRB(21, 18, 21, 32),
                         children: [
-                          ProfileEditHeader(onBack: () => context.pop()),
+                          ProfileEditHeader(onBack: _leave),
                           const SizedBox(height: 34),
                           _ProfileLabel(text: 'auth.fullNameLabel'.tr()),
                           _ProfileTextField(
