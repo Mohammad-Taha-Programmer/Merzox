@@ -154,10 +154,10 @@ class _NotificationsPageState extends State<NotificationsPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.only(top: 120),
         children: [
-          // 56 / 0.835, the bell's ink filling less of its em box.
-          const Icon(
+          // The size it drew at as a Material bell, converted.
+          Icon(
             MerzoxIcons.notifications,
-            size: 67,
+            size: 56 * MerzoxIcons.notificationsSizeFactor,
             color: MerzoxColors.kColorBEBEBE,
           ),
           const SizedBox(height: 18),

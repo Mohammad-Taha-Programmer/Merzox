@@ -92,9 +92,19 @@ abstract final class MerzoxIcons {
   );
 
   /// What to multiply a Material bell's size by to get [notifications] at the
-  /// same apparent size. Written once so the eight sites do not each carry a
-  /// number nobody can check.
-  static const double notificationsSizeFactor = 1 / 0.835;
+  /// same apparent size.
+  ///
+  /// Material's bell stands 0.812 of its em box tall and this one 0.834 of
+  /// its, so the swap is very nearly a wash - which is worth saying, because
+  /// the first version of this number was 1/0.835 and grew every bell by a
+  /// fifth. That came from a comment on the offers row, where the bell sits
+  /// beside *other glyphs from this library* and those fill their whole em
+  /// box: a true statement about a different comparison. The reference is
+  /// Material here, and it had to be measured rather than borrowed.
+  ///
+  /// Height, not width: icons in a row line up by how tall they stand, and
+  /// this bell is drawn slightly wider for its height than Material's.
+  static const double notificationsSizeFactor = 0.812 / 0.834;
 
   // -- Rating stars ---------------------------------------------------------
   //

@@ -453,10 +453,10 @@ class _TopBar extends StatelessWidget {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                // 22 / 0.835, the bell's ink filling less of its em box.
+                // The size it drew at as a Material bell, converted.
                 Icon(
                   MerzoxIcons.notifications,
-                  size: 26,
+                  size: 22 * MerzoxIcons.notificationsSizeFactor,
                   color: MerzoxColors.kColor98C1D9,
                 ),
                 PositionedDirectional(

@@ -134,10 +134,10 @@ class GlobalNotificationBell extends StatelessWidget {
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: <Widget>[
-                      // 24 / 0.835, the bell's ink filling less of its em box.
-                      const Icon(
+                      // The size it drew at as a Material bell, converted.
+                      Icon(
                         MerzoxIcons.notifications,
-                        size: 29,
+                        size: 24 * MerzoxIcons.notificationsSizeFactor,
                         color: MerzoxColors.kColor98C1D9,
                       ),
                       if (state.unreadCount > 0)

@@ -566,8 +566,11 @@ class _HomeTopBar extends StatelessWidget {
                       minWidth: 40,
                       minHeight: 40,
                     ),
-                    // 24 / 0.835, the bell's ink filling less of its em box.
-                    icon: const Icon(MerzoxIcons.notifications, size: 29),
+                    // The size it drew at as a Material bell, converted.
+                    icon: Icon(
+                      MerzoxIcons.notifications,
+                      size: 24 * MerzoxIcons.notificationsSizeFactor,
+                    ),
                   ),
                 // Offered to guests too: a visitor who cannot read the
                 // interface has no way to sign in and reach the profile screen
@@ -1766,11 +1769,11 @@ class _AllBusinessesTopBar extends StatelessWidget {
                       minWidth: 36,
                       minHeight: 34,
                     ),
-                    // 20 / 0.835, the bell's ink filling less of its em box.
+                    // The size it drew at as a Material bell, converted.
                     icon: Icon(
                       MerzoxIcons.notifications,
                       color: MerzoxColors.kColor3D5A80,
-                      size: 24,
+                      size: 20 * MerzoxIcons.notificationsSizeFactor,
                     ),
                   )
                 : const SizedBox.shrink(),
@@ -2345,10 +2348,10 @@ class _BusinessProfileTopBar extends StatelessWidget {
             child: Stack(
               clipBehavior: Clip.none,
               children: [
-                // 22 / 0.835, the bell's ink filling less of its em box.
+                // The size it drew at as a Material bell, converted.
                 Icon(
                   MerzoxIcons.notifications,
-                  size: 26,
+                  size: 22 * MerzoxIcons.notificationsSizeFactor,
                   color: MerzoxColors.kColor98C1D9,
                 ),
                 PositionedDirectional(
