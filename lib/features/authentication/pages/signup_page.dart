@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/bloc/auth_event.dart';
 import 'package:merzox/features/authentication/bloc/auth_state.dart';
@@ -214,11 +215,17 @@ class _SignupPageState extends State<SignupPage> {
                                   _obscurePassword = !_obscurePassword;
                                 });
                               },
+                              // The pair was the other way round here than on
+                              // the sign-in screen: the same field, on two
+                              // boards, offering opposite marks for the same
+                              // state. The font names settle it - hidden gets
+                              // the eye that shows.
                               icon: Icon(
                                 _obscurePassword
-                                    ? Icons.visibility_off_outlined
-                                    : Icons.visibility_outlined,
+                                    ? MerzoxIcons.showPassword
+                                    : MerzoxIcons.hidePassword,
                                 color: MerzoxColors.kColor98C1D9,
+                                size: 24 * MerzoxIcons.passwordEyeSizeFactor,
                               ),
                             ),
                           ),

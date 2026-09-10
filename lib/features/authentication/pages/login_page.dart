@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/bloc/auth_event.dart';
 import 'package:merzox/features/authentication/bloc/auth_state.dart';
@@ -329,12 +330,16 @@ class _LoginPageState extends State<LoginPage> {
                                       _obscurePassword = !_obscurePassword;
                                     });
                                   },
+                                  // Hidden, so the eye offered is the one that
+                                  // reveals it. The size it drew at as a
+                                  // Material eye, converted.
                                   icon: Icon(
                                     _obscurePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
+                                        ? MerzoxIcons.showPassword
+                                        : MerzoxIcons.hidePassword,
                                     color: MerzoxColors.kColor98C1D9,
-                                    size: 20,
+                                    size:
+                                        20 * MerzoxIcons.passwordEyeSizeFactor,
                                   ),
                                 ),
                                 validator: (value) {
