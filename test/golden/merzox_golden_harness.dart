@@ -54,6 +54,17 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   // The bell, read from the library rather than copied per screen: it is the
   // same mark on six boards and is meant to stay so.
   'Notifications': <String>['assets/fonts/icons_fonts/Notifications.ttf'],
+  // The rating stars, read from the library for the same reason.
+  'FullRoundedRatingStar': <String>[
+    'assets/fonts/icons_fonts/FullRoundedRatingStar.ttf',
+  ],
+  'HalfRoundedRatingStar': <String>[
+    'assets/fonts/icons_fonts/HalfRoundedRatingStar.ttf',
+  ],
+  'OutlinedRatingStar': <String>[
+    'assets/fonts/icons_fonts/OutlinedRatingStar.ttf',
+  ],
+  'RatingBarStar': <String>['assets/fonts/icons_fonts/RatingBarStar.ttf'],
   'EditProfileIcon': <String>[
     'assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf',
   ],

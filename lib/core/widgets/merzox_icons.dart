@@ -96,6 +96,55 @@ abstract final class MerzoxIcons {
   /// number nobody can check.
   static const double notificationsSizeFactor = 1 / 0.835;
 
+  // -- Rating stars ---------------------------------------------------------
+  //
+  // Four drawings, read from the library rather than copied per screen: a
+  // rating looks the same wherever one is shown, and that is the point.
+  //
+  // The first three are the display set. The fourth is the star of the bar a
+  // reader taps to leave a rating - it is a different outline from
+  // [ratingStarFull], not a copy of it, which was checked rather than assumed.
+  //
+  // Their code points are the only ones in this set that are not in the
+  // private-use range the rest of the library uses: the generator left three
+  // of its own glyphs in each file, and in three of the four the real star is
+  // not the last entry in the `cmap`. They were rendered and looked at.
+
+  /// A whole star, in a rating that is being read.
+  static const IconData ratingStarFull = IconData(
+    0xf005,
+    fontFamily: 'FullRoundedRatingStar',
+  );
+
+  /// Half a star, for an average that lands between two.
+  static const IconData ratingStarHalf = IconData(
+    0xf5c0,
+    fontFamily: 'HalfRoundedRatingStar',
+  );
+
+  /// A star not reached.
+  static const IconData ratingStarEmpty = IconData(
+    0xe801,
+    fontFamily: 'OutlinedRatingStar',
+  );
+
+  /// The star of the bar a reader taps to leave a rating.
+  static const IconData ratingBarStar = IconData(
+    0xe816,
+    fontFamily: 'RatingBarStar',
+  );
+
+  /// What to multiply a Material star's size by to get these at the same
+  /// apparent size.
+  ///
+  /// Material's star fills 0.712 of its em box; these fill 1.086 of theirs, so
+  /// a straight swap would have grown every star by half again and pushed the
+  /// rows they sit in out of shape. One factor serves all four: they were
+  /// rendered at the size it gives and measured, and their ink came out within
+  /// a pixel of each other and of Material's - the designer drew them to
+  /// match, so scaling each to its own ink would have pulled them apart.
+  static const double ratingStarSizeFactor = 0.712 / 1.086;
+
   // -- The customer's bottom bar --------------------------------------------
   //
   // Five places, the middle one raised out of the bar. Home and the account

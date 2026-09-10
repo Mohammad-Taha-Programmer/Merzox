@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/auth/auth_gate.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/product_details/bloc/product_details_bloc.dart';
@@ -1258,10 +1259,14 @@ class _InteractiveStars extends StatelessWidget {
         final rating = index + 1;
         return IconButton(
           onPressed: () => onChanged(rating),
+          // The bar a reader taps has its own star, which is not the one a
+          // read rating shows - the designer drew the two separately.
           icon: Icon(
-            rating <= value ? Icons.star_rounded : Icons.star_border_rounded,
+            rating <= value
+                ? MerzoxIcons.ratingBarStar
+                : MerzoxIcons.ratingStarEmpty,
             color: MerzoxColors.kColorF2CB06,
-            size: 29,
+            size: 29 * MerzoxIcons.ratingStarSizeFactor,
           ),
         );
       }),
@@ -1282,10 +1287,12 @@ class _StarRating extends StatelessWidget {
       children: List.generate(5, (index) {
         return Icon(
           index < value.round()
-              ? Icons.star_rounded
-              : Icons.star_border_rounded,
+              ? MerzoxIcons.ratingStarFull
+              : MerzoxIcons.ratingStarEmpty,
           color: MerzoxColors.kColorF2CB06,
-          size: size,
+          // [size] is what the star looks like; the factor turns that into a
+          // font size, since these fill more of their em box than Material's.
+          size: size * MerzoxIcons.ratingStarSizeFactor,
         );
       }),
     );

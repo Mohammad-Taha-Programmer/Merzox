@@ -159,6 +159,22 @@ flutter:
     - family: Notifications
       fonts:
         - asset: assets/fonts/icons_fonts/Notifications.ttf
+    # The rating stars, for the same reason: one set of stars on every board
+    # that shows or asks for a rating, so they are read from the library
+    # rather than copied per screen. Three of them are the display set - full,
+    # half, empty - and the fourth is the star of the bar a reader taps.
+    - family: FullRoundedRatingStar
+      fonts:
+        - asset: assets/fonts/icons_fonts/FullRoundedRatingStar.ttf
+    - family: HalfRoundedRatingStar
+      fonts:
+        - asset: assets/fonts/icons_fonts/HalfRoundedRatingStar.ttf
+    - family: OutlinedRatingStar
+      fonts:
+        - asset: assets/fonts/icons_fonts/OutlinedRatingStar.ttf
+    - family: RatingBarStar
+      fonts:
+        - asset: assets/fonts/icons_fonts/RatingBarStar.ttf
     - family: EditProfileIcon
       fonts:
         - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf

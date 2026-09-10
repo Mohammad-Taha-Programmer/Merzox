@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/widgets/merzox_icons.dart';
+
 /// Renders the cached average of authoritative business-review documents.
 ///
 /// A business with no reviewers always displays five empty stars, even if a
@@ -49,17 +51,24 @@ class BusinessRatingStars extends StatelessWidget {
               final Color color;
 
               if (displayRating >= starStart + 1) {
-                icon = Icons.star_rounded;
+                icon = MerzoxIcons.ratingStarFull;
                 color = const Color(0xFFF2CB06);
               } else if (displayRating >= starStart + 0.5) {
-                icon = Icons.star_half_rounded;
+                icon = MerzoxIcons.ratingStarHalf;
                 color = const Color(0xFFF2CB06);
               } else {
-                icon = Icons.star_outline_rounded;
+                icon = MerzoxIcons.ratingStarEmpty;
                 color = const Color(0xFFD8D8D8);
               }
 
-              return Icon(icon, size: size, color: color);
+              // [size] stays what a caller means by it - how big the star
+              // looks - and the conversion to a font size happens here, once,
+              // rather than at every place that asks for stars.
+              return Icon(
+                icon,
+                size: size * MerzoxIcons.ratingStarSizeFactor,
+                color: color,
+              );
             }),
           ),
         ),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/constants/money.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
@@ -658,10 +659,15 @@ class _ProductResultTile extends StatelessWidget {
                               Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: <Widget>[
-                                  const Icon(
-                                    Icons.star_rounded,
-                                    size: 16,
-                                    color: Color(0xFFFFB703),
+                                  // One star beside a figure, so it is a
+                                  // rating being read rather than one asked
+                                  // for: the display star, sized like the 16
+                                  // it replaces.
+                                  Icon(
+                                    MerzoxIcons.ratingStarFull,
+                                    size:
+                                        16 * MerzoxIcons.ratingStarSizeFactor,
+                                    color: const Color(0xFFFFB703),
                                   ),
                                   const SizedBox(width: 3),
                                   Text(
