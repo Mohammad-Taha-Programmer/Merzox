@@ -191,9 +191,12 @@ SnackBar merchantOrderNoticeSnackBar(String message, {bool isNotice = true}) {
     behavior: SnackBarBehavior.fixed,
     content: Row(
       children: <Widget>[
-        // 20 / 0.835: the bell's ink fills less of its em box than Material's
-        // did, so the number rises to keep the mark the size it was.
-        const Icon(MerzoxIcons.notifications, size: 24, color: Colors.white),
+        // The size it drew at as a Material bell, converted.
+        Icon(
+          MerzoxIcons.notifications,
+          size: 20 * MerzoxIcons.notificationsSizeFactor,
+          color: Colors.white,
+        ),
         const SizedBox(width: 10),
         Expanded(
           child: Text(

@@ -43,11 +43,10 @@ class NotificationPreferenceControl extends StatelessWidget {
     super.key,
     this.labelKey = 'notificationPreferences.productOffers',
     this.icon = MerzoxIcons.notifications,
-    // 18 / 0.835. The bell's ink fills less of its em box than the Material
-    // one this replaced, so the number rises to keep the mark the size it was.
-    // It is not raised further to match the 20 the rows beside it draw at -
-    // that gap predates this and is a question about the row, not the glyph.
-    this.iconSize = 22,
+    // The size it drew at as a Material bell, converted. It is not raised
+    // further to match the 20 the rows beside it draw at - that gap
+    // predates this and is a question about the row, not the glyph.
+    this.iconSize = 18 * MerzoxIcons.notificationsSizeFactor,
     this.labelSize = 12,
     this.height = 38,
     this.cornerRadius = 4,
