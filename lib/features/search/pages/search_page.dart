@@ -264,10 +264,11 @@ class _SearchField extends StatelessWidget {
                   ),
                 )
               : null,
+          // The size it drew at as a Material magnifier, converted.
           suffixIcon: Icon(
-            Icons.search_rounded,
+            MerzoxIcons.search,
             color: MerzoxColors.kColor707070,
-            size: 28,
+            size: 28 * MerzoxIcons.searchSizeFactor,
           ),
           filled: true,
           fillColor: MerzoxColors.kColorF9F9F9,

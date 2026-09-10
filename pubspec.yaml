@@ -175,6 +175,10 @@ flutter:
     - family: RatingBarStar
       fonts:
         - asset: assets/fonts/icons_fonts/RatingBarStar.ttf
+    # The magnifier, on every field that searches something.
+    - family: SearchIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/SearchIcon.ttf
     - family: EditProfileIcon
       fonts:
         - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf

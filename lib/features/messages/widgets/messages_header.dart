@@ -4,11 +4,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/widgets/merzox_back_chevron.dart';
+import '../../../core/widgets/merzox_icons.dart';
 import '../../notifications/widgets/global_notification_bell.dart';
 import '../bloc/messages_search_bloc.dart';
 import '../bloc/messages_search_event.dart';
 import '../bloc/messages_search_state.dart';
-import 'messages_search_icon.dart';
 
 /// The bar over the inbox: a way back, the screen's name, and a way to search.
 ///
@@ -104,7 +104,11 @@ class _MessagesHeaderState extends State<MessagesHeader> {
             semanticsLabel: 'messages.searchOpen'.tr(),
             valueKey: 'merzox.messages.searchOpen',
             onTap: _open,
-            child: const MessagesSearchIcon(),
+            child: Icon(
+              MerzoxIcons.search,
+              size: 24 * MerzoxIcons.searchSizeFactor,
+              color: MerzoxColors.kColor353535,
+            ),
           ),
         ),
       ],
@@ -160,7 +164,11 @@ class _MessagesHeaderState extends State<MessagesHeader> {
             ),
           ),
           const SizedBox(width: 6),
-          const MessagesSearchIcon(size: 20),
+          Icon(
+            MerzoxIcons.search,
+            size: 20 * MerzoxIcons.searchSizeFactor,
+            color: MerzoxColors.kColor353535,
+          ),
         ],
       ),
     );

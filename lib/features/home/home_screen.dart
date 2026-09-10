@@ -754,8 +754,10 @@ class _SearchBox extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'home.searchHint'.tr(),
           hintStyle: TextStyle(color: MerzoxColors.kColor9F9F9F, fontSize: 14),
+          // Material's own default was 24; the factor converts it.
           prefixIcon: Icon(
-            Icons.search_rounded,
+            MerzoxIcons.search,
+            size: 24 * MerzoxIcons.searchSizeFactor,
             color: MerzoxColors.kColor98C1D9,
           ),
           filled: true,
@@ -795,8 +797,10 @@ class _StoresSearchField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'home.businesses.searchHint'.tr(),
           hintStyle: TextStyle(color: MerzoxColors.kColor9F9F9F, fontSize: 14),
+          // Material's own default was 24; the factor converts it.
           prefixIcon: Icon(
-            Icons.search_rounded,
+            MerzoxIcons.search,
+            size: 24 * MerzoxIcons.searchSizeFactor,
             color: MerzoxColors.kColor98C1D9,
           ),
           filled: true,
