@@ -65,6 +65,7 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
     'assets/fonts/icons_fonts/OutlinedRatingStar.ttf',
   ],
   'RatingBarStar': <String>['assets/fonts/icons_fonts/RatingBarStar.ttf'],
+  'SearchIcon': <String>['assets/fonts/icons_fonts/SearchIcon.ttf'],
   'EditProfileIcon': <String>[
     'assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf',
   ],

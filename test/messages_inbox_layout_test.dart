@@ -8,7 +8,6 @@ import 'package:merzox/features/messages/bloc/messages_event.dart';
 import 'package:merzox/features/messages/bloc/messages_search_bloc.dart';
 import 'package:merzox/features/messages/pages/messages_inbox_view.dart';
 import 'package:merzox/core/widgets/merzox_back_chevron.dart';
-import 'package:merzox/features/messages/widgets/messages_search_icon.dart';
 import 'package:merzox/services/api_service.dart';
 
 import 'golden/merzox_golden_harness.dart';
@@ -259,7 +258,11 @@ void main() {
     ) async {
       await _pumpInbox(tester);
 
-      final Rect glass = tester.getRect(find.byType(MessagesSearchIcon));
+      // Found by the key on its button rather than by the mark: the mark is a
+      // shared icon now and the field's own copy would match a search for it.
+      final Rect glass = tester.getRect(
+        find.byKey(const ValueKey<String>('merzox.messages.searchOpen')),
+      );
 
       // The bell floats over this corner on every screen and cannot be moved
       // per screen, so the magnifier stands inboard of it.

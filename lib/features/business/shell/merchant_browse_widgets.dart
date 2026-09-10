@@ -13,6 +13,7 @@ import '../../notifications/widgets/global_notification_bell.dart';
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/constants/money.dart';
 
 import '../models/business_models.dart';
@@ -158,9 +159,10 @@ class MerchantSearchRow extends StatelessWidget {
                       18,
                       0,
                     ),
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      size: 20,
+                    // The size it drew at as a Material magnifier, converted.
+                    prefixIcon: Icon(
+                      MerzoxIcons.search,
+                      size: 20 * MerzoxIcons.searchSizeFactor,
                       color: MerzoxColors.kColor2B2B2B,
                     ),
                     prefixIconConstraints: const BoxConstraints(

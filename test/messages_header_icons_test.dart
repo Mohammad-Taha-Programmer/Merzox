@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/core/widgets/merzox_back_chevron.dart';
-import 'package:merzox/features/messages/widgets/messages_search_icon.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 
 /// The two marks in the inbox bar.
 ///
@@ -135,41 +135,27 @@ void main() {
     }
   });
 
-  test('the magnifier is a thin ring with a handle on the outside', () {
-    final _Recorder canvas = _Recorder();
-    const MessagesSearchIconPainter(
-      color: Color(0xFF353535),
-    ).paint(canvas, const Size(24, 24));
-
+  test('the magnifier is the shared one, at the chevron\'s own height', () {
+    // What used to be held here was the geometry of a drawn ring: its radius,
+    // its stroke, where the handle left the rim. The mark comes from the
+    // designer's font now, so the question that remains is whether this bar
+    // draws the same magnifier every other field draws, at a size that stands
+    // beside the chevron rather than over or under it.
+    //
+    // Both marks are given the artboard's 24-square. The chevron fills it and
+    // the magnifier's glyph fills its own em box, so the magnifier's font size
+    // is 24 converted - and the two come out the same height, which is the
+    // whole reason the drawn one existed.
+    expect(MerzoxIcons.search.fontFamily, 'SearchIcon');
     expect(
-      canvas.circles.single.radius,
-      closeTo(kMessagesSearchRingRadius, 0.001),
+      24 * MerzoxIcons.searchSizeFactor,
+      closeTo(24 * 0.711, 0.001),
+      reason: 'the conversion is the one measured against Material',
     );
-    expect(canvas.circles.single.centre.dx, kMessagesSearchRingCentre);
-    expect(canvas.paints.first.style, PaintingStyle.stroke);
     expect(
-      canvas.paints.first.strokeWidth,
-      closeTo(kMessagesSearchStroke, 0.001),
-    );
-
-    // The handle leaves the ring rather than crossing it: its near end sits on
-    // the rim, not inside the glass.
-    final double rim =
-        kMessagesSearchRingCentre + kMessagesSearchRingRadius * 0.7071;
-    expect(canvas.lines.single.from.dx, closeTo(rim, 0.05));
-    expect(canvas.lines.single.to.dx, greaterThan(canvas.lines.single.from.dx));
-  });
-
-  test('the whole magnifier stays inside its square', () {
-    const double outer =
-        kMessagesSearchRingCentre +
-        kMessagesSearchRingRadius +
-        kMessagesSearchStroke / 2;
-
-    expect(outer, lessThanOrEqualTo(kMessagesSearchBox));
-    expect(
-      kMessagesSearchHandleEnd + kMessagesSearchStroke / 2,
-      lessThanOrEqualTo(kMessagesSearchBox),
+      kMerzoxChevronBox,
+      24,
+      reason: 'both marks are drawn on the same square',
     );
   });
 }

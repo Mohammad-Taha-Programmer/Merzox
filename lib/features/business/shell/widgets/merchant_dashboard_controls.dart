@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/colors.dart';
 import '../../../../core/constants/dates.dart';
+import '../../../../core/widgets/merzox_icons.dart';
 import '../../models/dashboard_period.dart';
 
 /// The dashboard's search field.
@@ -79,7 +80,11 @@ class _MerchantOrderSearchFieldState extends State<MerchantOrderSearchField> {
         },
         decoration: InputDecoration(
           hintText: 'businessShell.orderSearchHint'.tr(),
-          prefixIcon: const Icon(Icons.search_rounded),
+          // Material's own default was 24; the factor converts it.
+          prefixIcon: Icon(
+            MerzoxIcons.search,
+            size: 24 * MerzoxIcons.searchSizeFactor,
+          ),
           suffixIcon: _controller.text.isEmpty
               ? null
               : IconButton(

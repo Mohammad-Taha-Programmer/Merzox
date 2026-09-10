@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/merzox_icons.dart';
 import '../../../core/widgets/merzox_back_chevron.dart';
 import '../../../services/api_service.dart';
 import '../../business_profile/pages/business_profile_page.dart';
@@ -406,8 +407,10 @@ class _MapSearchField extends StatelessWidget {
             prefixIcon: IconButton(
               tooltip: 'common.search'.tr(),
               onPressed: onSubmitted,
-              icon: const Icon(
-                Icons.search_rounded,
+              // Material's own default was 24; the factor converts it.
+              icon: Icon(
+                MerzoxIcons.search,
+                size: 24 * MerzoxIcons.searchSizeFactor,
                 color: MerzoxColors.kColor3D5A80,
               ),
             ),

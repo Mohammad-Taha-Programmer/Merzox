@@ -144,6 +144,24 @@ abstract final class MerzoxIcons {
     fontFamily: 'RatingBarStar',
   );
 
+  // -- Search ---------------------------------------------------------------
+
+  /// The magnifier, on every field that searches something.
+  ///
+  /// There is no companion for Material's `search_off_rounded` - the crossed
+  /// magnifier a screen shows when a search found nothing - so those keep
+  /// theirs. The set has nothing that draws an absence.
+  static const IconData search = IconData(0xe815, fontFamily: 'SearchIcon');
+
+  /// What to multiply a Material magnifier's size by to get [search] at the
+  /// same apparent size.
+  ///
+  /// Material's fills 0.711 of its em box and this one fills all of its, so
+  /// the number comes down by nearly a third. Measured, not borrowed - the
+  /// bells were sized from a factor taken off another comparison and came out
+  /// a fifth too big.
+  static const double searchSizeFactor = 0.711 / 1.0;
+
   /// What to multiply a Material star's size by to get these at the same
   /// apparent size.
   ///
