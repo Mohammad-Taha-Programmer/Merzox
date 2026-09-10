@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/auth/auth_route_guard.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/core/widgets/merzox_notched_nav_bar.dart';
@@ -703,8 +704,8 @@ void main() {
 
         // The artboard draws five EMPTY stars: nothing is rated yet. Opening
         // at five would submit a rating the customer never chose.
-        expect(find.byIcon(Icons.star_rounded), findsNothing);
-        expect(find.byIcon(Icons.star_border_rounded), findsNWidgets(5));
+        expect(find.byIcon(MerzoxIcons.ratingBarStar), findsNothing);
+        expect(find.byIcon(MerzoxIcons.ratingStarEmpty), findsNWidgets(5));
 
         // And an unrated composer cannot publish. `BusinessReview.rating` is
         // `min: 1`, so a zero would be refused by the server with an error the
@@ -715,9 +716,9 @@ void main() {
         expect(publish.onPressed, isNull);
 
         // Picking a star both fills it and unlocks publishing.
-        await _tapVisible(tester, find.byIcon(Icons.star_border_rounded).at(3));
+        await _tapVisible(tester, find.byIcon(MerzoxIcons.ratingStarEmpty).at(3));
 
-        expect(find.byIcon(Icons.star_rounded), findsNWidgets(4));
+        expect(find.byIcon(MerzoxIcons.ratingBarStar), findsNWidgets(4));
         expect(
           tester
               .widget<FilledButton>(find.widgetWithText(FilledButton, 'نشر'))

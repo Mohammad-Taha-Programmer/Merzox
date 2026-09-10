@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/home/widgets/business_rating_stars.dart';
 
 Widget _testApp({
@@ -32,11 +33,11 @@ void main() {
   ) async {
     await tester.pumpWidget(_testApp(rating: 0, ratingCount: 0));
 
-    expect(find.byIcon(Icons.star_outline_rounded), findsNWidgets(5));
+    expect(find.byIcon(MerzoxIcons.ratingStarEmpty), findsNWidgets(5));
 
-    expect(find.byIcon(Icons.star_rounded), findsNothing);
+    expect(find.byIcon(MerzoxIcons.ratingStarFull), findsNothing);
 
-    expect(find.byIcon(Icons.star_half_rounded), findsNothing);
+    expect(find.byIcon(MerzoxIcons.ratingStarHalf), findsNothing);
 
     expect(tester.takeException(), isNull);
   });
@@ -46,9 +47,9 @@ void main() {
   ) async {
     await tester.pumpWidget(_testApp(rating: 5, ratingCount: 0));
 
-    expect(find.byIcon(Icons.star_outline_rounded), findsNWidgets(5));
+    expect(find.byIcon(MerzoxIcons.ratingStarEmpty), findsNWidgets(5));
 
-    expect(find.byIcon(Icons.star_rounded), findsNothing);
+    expect(find.byIcon(MerzoxIcons.ratingStarFull), findsNothing);
 
     expect(tester.takeException(), isNull);
   });
@@ -58,11 +59,11 @@ void main() {
     (WidgetTester tester) async {
       await tester.pumpWidget(_testApp(rating: 3.5, ratingCount: 8));
 
-      expect(find.byIcon(Icons.star_rounded), findsNWidgets(3));
+      expect(find.byIcon(MerzoxIcons.ratingStarFull), findsNWidgets(3));
 
-      expect(find.byIcon(Icons.star_half_rounded), findsOneWidget);
+      expect(find.byIcon(MerzoxIcons.ratingStarHalf), findsOneWidget);
 
-      expect(find.byIcon(Icons.star_outline_rounded), findsOneWidget);
+      expect(find.byIcon(MerzoxIcons.ratingStarEmpty), findsOneWidget);
 
       expect(tester.takeException(), isNull);
     },

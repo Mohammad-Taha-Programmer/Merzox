@@ -1395,9 +1395,14 @@ class _InteractiveStars extends StatelessWidget {
         final rating = index + 1;
         return IconButton(
           onPressed: () => onChanged(rating),
+          // The bar a reader taps has its own star, which is not the one a
+          // read rating shows - the designer drew the two separately.
           icon: Icon(
-            rating <= value ? Icons.star_rounded : Icons.star_border_rounded,
+            rating <= value
+                ? MerzoxIcons.ratingBarStar
+                : MerzoxIcons.ratingStarEmpty,
             color: const Color(0xFFFFC400),
+            size: 24 * MerzoxIcons.ratingStarSizeFactor,
           ),
         );
       }),
@@ -1418,10 +1423,12 @@ class _StarRating extends StatelessWidget {
       children: List.generate(5, (index) {
         return Icon(
           index < value.round()
-              ? Icons.star_rounded
-              : Icons.star_border_rounded,
+              ? MerzoxIcons.ratingStarFull
+              : MerzoxIcons.ratingStarEmpty,
           color: const Color(0xFFFFC400),
-          size: size,
+          // [size] is what the star looks like; the factor turns that into a
+          // font size, since these fill more of their em box than Material's.
+          size: size * MerzoxIcons.ratingStarSizeFactor,
         );
       }),
     );

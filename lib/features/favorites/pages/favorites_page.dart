@@ -7,6 +7,7 @@ import 'package:merzox/core/constants/money.dart';
 
 import '../../../core/constants/colors.dart';
 import '../../../core/widgets/merzox_back_chevron.dart';
+import '../../../core/widgets/merzox_icons.dart';
 import '../../../services/api_service.dart';
 import '../../business_profile/pages/business_profile_page.dart';
 import '../../home/presentation/bloc/home_state_.dart';
@@ -669,8 +670,12 @@ class _StarRating extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (index) {
         return Icon(
-          index < rounded ? Icons.star_rounded : Icons.star_border_rounded,
-          size: size,
+          index < rounded
+              ? MerzoxIcons.ratingStarFull
+              : MerzoxIcons.ratingStarEmpty,
+          // [size] is what the star looks like; the factor turns that into a
+          // font size, since these fill more of their em box than Material's.
+          size: size * MerzoxIcons.ratingStarSizeFactor,
           color: index < rounded
               ? MerzoxColors.kColorF2CB06
               : MerzoxColors.kColorC7C7C7,

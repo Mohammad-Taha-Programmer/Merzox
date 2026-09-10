@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
@@ -914,12 +915,14 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
                 onPressed: () => setState(() => _rating = star),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 38, minHeight: 38),
+                // The bar a reader taps has its own star, which is not the one
+                // a read rating shows - the designer drew the two separately.
                 icon: Icon(
                   star <= _rating
-                      ? Icons.star_rounded
-                      : Icons.star_border_rounded,
+                      ? MerzoxIcons.ratingBarStar
+                      : MerzoxIcons.ratingStarEmpty,
                   color: MerzoxColors.kColorFBB300,
-                  size: 28,
+                  size: 28 * MerzoxIcons.ratingStarSizeFactor,
                 ),
               ),
           ],
