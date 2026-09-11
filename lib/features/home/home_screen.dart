@@ -371,18 +371,31 @@ class _HomeTab extends StatelessWidget {
             ),
           ),
         ),
-        SliverToBoxAdapter(
-          child: Padding(
-            // The carousel bleeds past the gutter on the leading side, so the
-            // next card can peek the way the artboard shows it.
-            padding: const EdgeInsets.fromLTRB(0, 29, 17, 0),
-            child: HomePromoCarousel(
-              businesses: discountedBusinesses,
-              onOpen: (HomeBusiness business) =>
-                  _openBusinessProfile(context, business),
+        // The advertising space, and there is no advertising.
+        //
+        // The board draws a promotional card here and the carousel was fed
+        // the shops the catalogue marks as discounted, because that was the
+        // nearest real list to hand. It is not the same thing: a shop having
+        // a sale is not a shop that paid to be shown, and the band was
+        // presenting one as the other. This place waits for the staff
+        // dashboard to say what is advertised and by whom.
+        //
+        // The padding goes with it. An empty carousel already shrank to
+        // nothing, but the 29 above it did not, so hiding the card alone
+        // would have left a gap nothing explains.
+        if (kHomePromoSpaceHasSource)
+          SliverToBoxAdapter(
+            child: Padding(
+              // The carousel bleeds past the gutter on the leading side, so
+              // the next card can peek the way the artboard shows it.
+              padding: const EdgeInsets.fromLTRB(0, 29, 17, 0),
+              child: HomePromoCarousel(
+                businesses: discountedBusinesses,
+                onOpen: (HomeBusiness business) =>
+                    _openBusinessProfile(context, business),
+              ),
             ),
           ),
-        ),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 25, 16, 25),
@@ -494,10 +507,19 @@ class _HomeTopBar extends StatelessWidget {
                 CircleAvatar(
                   radius: 14,
                   backgroundColor: MerzoxColors.kColorDEEEF8,
+                  // The same mark the profile row carries, so the bar and the
+                  // screen it leads to name the account the same way. One
+                  // drawing for both states: the designer's set has a single
+                  // account mark, and a guest is already told apart by the
+                  // words beside it rather than by a hollower figure.
+                  //
+                  // The size it drew at as a Material figure, converted on
+                  // width: this one is taller than it is wide where Material's
+                  // is square, and matching its height left it small enough to
+                  // float in the circle.
                   child: Icon(
-                    isGuest
-                        ? Icons.person_outline_rounded
-                        : Icons.person_rounded,
+                    MerzoxIcons.homeScreenProfile,
+                    size: 24 * MerzoxIcons.accountFigureSizeFactor,
                     color: MerzoxColors.kColor3D5A80,
                   ),
                 ),
@@ -532,15 +554,18 @@ class _HomeTopBar extends StatelessWidget {
                           );
                         },
                       ),
-                    Text(
-                      isGuest
-                          ? 'home.browseOnly'.tr()
-                          : 'home.welcomeToMerzox'.tr(),
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: MerzoxColors.kColor8D99AE,
+                    // A guest is told what they can and cannot do here. A
+                    // signed-in reader was told they are welcome in Merzox,
+                    // which is a line they have already read once and which
+                    // says nothing about the account it sits under.
+                    if (isGuest)
+                      Text(
+                        'home.browseOnly'.tr(),
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: MerzoxColors.kColor8D99AE,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],
@@ -566,10 +591,15 @@ class _HomeTopBar extends StatelessWidget {
                       minWidth: 40,
                       minHeight: 40,
                     ),
-                    // The size it drew at as a Material bell, converted.
+                    // The size it drew at as a Material bell, converted, and
+                    // the colour the floating bell carries. It had no colour
+                    // of its own and took Material's near-black default, which
+                    // made the one mark in this bar that is also a bell the
+                    // darkest thing in it.
                     icon: Icon(
                       MerzoxIcons.homeScreenNotifications,
                       size: 24 * MerzoxIcons.notificationsSizeFactor,
+                      color: kHomeBarControlColour,
                     ),
                   ),
                 // Offered to guests too: a visitor who cannot read the
@@ -577,6 +607,7 @@ class _HomeTopBar extends StatelessWidget {
                 // where this used to be the only copy.
                 const LanguageToggleButton(
                   iconSize: 24,
+                  color: kHomeBarControlColour,
                   padding: EdgeInsets.zero,
                   constraints: BoxConstraints(minWidth: 40, minHeight: 40),
                 ),
@@ -598,7 +629,7 @@ class _HomeTopBar extends StatelessWidget {
                     icon: Icon(
                       MerzoxIcons.homeScreenSignOut,
                       size: 24 * MerzoxIcons.signOutSizeFactor,
-                      color: MerzoxColors.kColor8D99AE,
+                      color: kHomeBarControlColour,
                     ),
                   ),
                 // The floating bell owns this corner on every screen, so
@@ -1002,11 +1033,17 @@ class _BusinessCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (business.discount case final discount?)
+                      // The shop's own discount string still decides whether
+                      // the band appears; it no longer decides what it says.
+                      // A band fourteen across at eight point cannot hold
+                      // `خصم حتى 15%` without trimming it, and the figure it
+                      // was trimming is on the card anyway. One word, always
+                      // the same one, is what a corner banner is for.
+                      if (business.discount != null)
                         PositionedDirectional(
                           top: 0,
                           end: 0,
-                          child: DiscountRibbon(label: discount),
+                          child: DiscountRibbon(label: 'home.offerRibbon'.tr()),
                         ),
                       PositionedDirectional(
                         top: logoHeight + 6,
@@ -1176,6 +1213,31 @@ class _BusinessInteractionCorner extends StatelessWidget {
     );
   }
 }
+
+/// The one colour every control in the customer home bar is drawn in.
+///
+/// The bell that floats over every screen already used it, and the bar's three
+/// controls each had their own answer: the language globe took the toggle's
+/// navy default, the sign-out a mid grey, and the guest's bell no colour at
+/// all - which meant Material's near-black, making the one mark in the bar
+/// that is also a bell the darkest thing in it.
+///
+/// A constant rather than the colour written three times, so the row cannot
+/// drift apart again one control at a time.
+const Color kHomeBarControlColour = MerzoxColors.kColor98C1D9;
+
+/// Whether anything can be advertised in the band under the top bar.
+///
+/// False, and deliberately a named constant rather than a deleted widget. The
+/// space, its carousel and its measurements are all still here and still
+/// tested; what is missing is a source. Nothing in this app knows what an
+/// advertisement is - who bought one, for how long, or which shop it points
+/// at - and the staff dashboard is where that will be decided.
+///
+/// Until then the band is hidden rather than filled with the nearest list to
+/// hand. It used to carry the shops the catalogue marks as discounted, which
+/// showed a sale as though it were a paid placement.
+const bool kHomePromoSpaceHasSource = false;
 
 /// The face on the follow button.
 ///

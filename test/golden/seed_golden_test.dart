@@ -3080,7 +3080,12 @@ void main() {
           ),
         );
 
-        expect(find.text('اشتري الآن'), findsWidgets);
+        // The advertising band is hidden while nothing can be advertised, so
+        // its chip is absent rather than present. This asserts the absence
+        // instead of dropping the line: the board did carry a `اشتري الآن`
+        // chip, and the day the dashboard supplies advertisements it should
+        // carry one again.
+        expect(find.text('اشتري الآن'), findsNothing);
         expect(find.byType(CircularProgressIndicator), findsNothing);
 
         await expectMerzoxSeedGolden('home_guest_ar_375x812.png');
