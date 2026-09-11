@@ -972,10 +972,10 @@ class _Composer extends StatelessWidget {
               // decoration next to it.
               Material(
                 color: MerzoxColors.kColor98C1D9,
-                shape: const CircleBorder(),
+                shape: kChatComposerButtonShape,
                 child: InkWell(
                   key: const ValueKey<String>('chat.shareProduct'),
-                  customBorder: const CircleBorder(),
+                  customBorder: kChatComposerButtonShape,
                   onTap: enabled ? onShareProduct : null,
                   child: Tooltip(
                     message: 'messages.shareProductTooltip'.tr(),
@@ -994,9 +994,9 @@ class _Composer extends StatelessWidget {
               const SizedBox(width: 8),
               Material(
                 color: MerzoxColors.kColorEE6C4D,
-                shape: const CircleBorder(),
+                shape: kChatComposerButtonShape,
                 child: InkWell(
-                  customBorder: const CircleBorder(),
+                  customBorder: kChatComposerButtonShape,
                   onTap: enabled ? onSend : null,
                   child: SizedBox(
                     width: kChatComposerButton,
@@ -1369,10 +1369,24 @@ class _ReportSheetState extends State<_ReportSheet> {
   }
 }
 
-/// The round buttons at the end of the composer row.
+/// The buttons at the end of the composer row.
 ///
 /// One size for both: sending, and reaching for something to send.
 const double kChatComposerButton = 46;
+
+/// And one shape for both.
+///
+/// Squares with a small round on the corners, where they were circles. The
+/// send button's own artwork is a 48-square with about four and a half of
+/// rounding, which is a hair under a tenth of its side; at 46 that is four.
+///
+/// Both buttons take it, because the pair is read as a pair: two things a
+/// reader does when they have finished composing, told apart by colour. One
+/// square beside one circle would have made them look like a control and a
+/// decoration rather than two of the same kind.
+const RoundedRectangleBorder kChatComposerButtonShape = RoundedRectangleBorder(
+  borderRadius: BorderRadius.all(Radius.circular(4)),
+);
 
 /// How tall the picture is on the card being written.
 ///
