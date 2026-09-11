@@ -1177,14 +1177,20 @@ class _BusinessInteractionCorner extends StatelessWidget {
   }
 }
 
-/// The face on the follow button, at the size the emoji it replaces drew at.
+/// The face on the follow button.
 ///
-/// 21, not the 19 the `TextStyle` said. An emoji glyph overflows its nominal
-/// em box - both of these ink 21 square at a 19-point size in the system
-/// emoji font - so 19 here would have quietly shrunk the button's mark by a
-/// tenth while looking like a faithful swap. Measured rather than copied off
-/// the line it replaced.
-const double kFollowFaceSize = 21;
+/// Larger than the emoji it replaces, deliberately. The swap was made at 21 -
+/// which is what those emoji actually inked at the 19-point size the old
+/// `TextStyle` asked for, an emoji glyph overflowing its nominal em box - and
+/// a faithful size turned out to be the wrong size: against the artboard the
+/// face read as a speck in a 56x46 corner, with more blue around it than mark
+/// in it.
+///
+/// 27 is a little over half the corner's width and height. It was chosen by
+/// drawing the corner at 21, 24, 27 and 30: below this the expression stops
+/// being readable at a glance, and above it the face crowds the box it sits
+/// in, leaving eight pixels above and below.
+const double kFollowFaceSize = 27;
 
 const String _followedFace =
     'assets/images/follow_business_emoji_pics/'
