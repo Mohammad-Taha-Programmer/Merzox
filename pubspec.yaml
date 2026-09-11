@@ -109,6 +109,7 @@ flutter:
     # and throws at runtime.
     - assets/images/Onboarding/
     - assets/images/HomeScreen/
+    - assets/images/follow_business_emoji_pics/
     - assets/translations/
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in

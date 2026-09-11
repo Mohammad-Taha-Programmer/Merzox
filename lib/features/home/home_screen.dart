@@ -1177,6 +1177,22 @@ class _BusinessInteractionCorner extends StatelessWidget {
   }
 }
 
+/// The face on the follow button, at the size the emoji it replaces drew at.
+///
+/// 21, not the 19 the `TextStyle` said. An emoji glyph overflows its nominal
+/// em box - both of these ink 21 square at a 19-point size in the system
+/// emoji font - so 19 here would have quietly shrunk the button's mark by a
+/// tenth while looking like a faithful swap. Measured rather than copied off
+/// the line it replaced.
+const double kFollowFaceSize = 21;
+
+const String _followedFace =
+    'assets/images/follow_business_emoji_pics/'
+    'happy.png';
+const String _unfollowedFace =
+    'assets/images/follow_business_emoji_pics/'
+    'sad.png';
+
 class _FollowButton extends StatelessWidget {
   final bool followed;
   final VoidCallback onPressed;
@@ -1204,9 +1220,25 @@ class _FollowButton extends StatelessWidget {
               // ones, so the card looked equally pleased whether or not the
               // shop was followed. Following is the warm face; not following
               // is the flat one waiting to be won over.
-              child: Text(
-                followed ? '😍' : '😒',
-                style: const TextStyle(fontSize: 19),
+              //
+              // Drawn from the project's own pictures rather than from the
+              // emoji characters they replace. An emoji is whatever font the
+              // device happens to carry, which is why this button rendered as
+              // an empty box in every golden: nothing in the test bundle had
+              // a glyph for it. These two are in the bundle, so the button
+              // now draws the same faces everywhere.
+              child: Image.asset(
+                followed ? _followedFace : _unfollowedFace,
+                width: kFollowFaceSize,
+                height: kFollowFaceSize,
+                // The files are 76 and 72 square and land on a 19-point box,
+                // so they are always being scaled down; without this the
+                // downscale is a straight sample and the faces come out
+                // ragged at the edges.
+                filterQuality: FilterQuality.medium,
+                // The Semantics above already names the action. A second node
+                // here would read the picture out as well as the button.
+                excludeFromSemantics: true,
               ),
             ),
           ),
