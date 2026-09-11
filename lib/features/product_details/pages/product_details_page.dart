@@ -759,7 +759,7 @@ class _SellerDetails extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             _IconSquare(
-              icon: MerzoxIcons.chat,
+              icon: MerzoxIcons.productDetailsChat,
               iconSize: 24 * MerzoxIcons.chatSizeFactor,
               onPressed: () => AuthGate.run(
                 context,
@@ -1264,8 +1264,8 @@ class _InteractiveStars extends StatelessWidget {
           // read rating shows - the designer drew the two separately.
           icon: Icon(
             rating <= value
-                ? MerzoxIcons.ratingBarStar
-                : MerzoxIcons.ratingStarEmpty,
+                ? MerzoxIcons.productDetailsRatingBarStar
+                : MerzoxIcons.productDetailsRatingStarEmpty,
             color: MerzoxColors.kColorF2CB06,
             size: 29 * MerzoxIcons.ratingStarSizeFactor,
           ),
@@ -1288,8 +1288,8 @@ class _StarRating extends StatelessWidget {
       children: List.generate(5, (index) {
         return Icon(
           index < value.round()
-              ? MerzoxIcons.ratingStarFull
-              : MerzoxIcons.ratingStarEmpty,
+              ? MerzoxIcons.productDetailsRatingStarFull
+              : MerzoxIcons.productDetailsRatingStarEmpty,
           color: MerzoxColors.kColorF2CB06,
           // [size] is what the star looks like; the factor turns that into a
           // font size, since these fill more of their em box than Material's.

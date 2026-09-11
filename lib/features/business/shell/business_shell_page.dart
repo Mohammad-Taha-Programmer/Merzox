@@ -294,7 +294,7 @@ class _PageHeader extends StatelessWidget {
           icon: MessageBadge(
             businessAudience: true,
             child: Icon(
-              MerzoxIcons.chat,
+              MerzoxIcons.merchantProfileChat,
               size: 24 * MerzoxIcons.chatSizeFactor,
             ),
           ),
@@ -740,7 +740,7 @@ class _ProductsState extends State<_Products> {
             tooltip: 'businessShell.addNewProduct'.tr(),
             onPressed: () => _showProductEditor(context),
             icon: Icon(
-              MerzoxIcons.addProduct,
+              MerzoxIcons.merchantProfileAddProduct,
               size: 24 * MerzoxIcons.addProductSizeFactor,
               color: MerzoxColors.kColor98C1D9,
             ),
@@ -861,7 +861,7 @@ class _Profile extends StatelessWidget {
           onTap: () => context.push('/profile/edit'),
         ),
         MerzoxProfileMenuRow(
-          icon: MerzoxIcons.businessSettings,
+          icon: MerzoxIcons.merchantProfileBusinessSettings,
           iconSize: 20 * MerzoxIcons.businessSettingsSizeFactor,
           label: 'storeSettings.title'.tr(),
           showChevron: true,
@@ -875,7 +875,7 @@ class _Profile extends StatelessWidget {
           ),
         ),
         MerzoxProfileMenuRow(
-          icon: MerzoxIcons.chat,
+          icon: MerzoxIcons.merchantProfileChat,
           // Level with the rows above it, which are still Material's and
           // fill less of their em box than this does.
           iconSize: 20 * MerzoxIcons.chatSizeFactor,
@@ -888,7 +888,7 @@ class _Profile extends StatelessWidget {
         MerzoxProfileMenuRow(
           // The bare handset: this row reaches somebody rather than
           // showing a number.
-          icon: MerzoxIcons.contactUs,
+          icon: MerzoxIcons.merchantProfileContactUs,
           iconSize: 20 * MerzoxIcons.contactUsSizeFactor,
           label: 'businessShell.contactUs'.tr(),
           showChevron: true,
@@ -918,7 +918,7 @@ class _Profile extends StatelessWidget {
           ),
         ),
         MerzoxProfileMenuRow(
-          icon: MerzoxIcons.previewProduct,
+          icon: MerzoxIcons.merchantProfilePreviewProduct,
           iconSize: 20 * MerzoxIcons.previewProductSizeFactor,
           label: 'businessShell.previewStore'.tr(),
           onTap: () => context.push('/business/preview'),

@@ -330,10 +330,10 @@ class _ChannelRow extends StatelessWidget {
     // it, and a number gets the handset with signal waves. The three that are
     // still Material's are the social marks and the envelope, which the
     // library has no answer for yet.
-    StoreContactKind.whatsapp => MerzoxIcons.whatsapp,
+    StoreContactKind.whatsapp => MerzoxIcons.storeContactWhatsapp,
     StoreContactKind.instagram => Icons.camera_alt_outlined,
     StoreContactKind.facebook => Icons.facebook_outlined,
-    StoreContactKind.phone => MerzoxIcons.phoneNumber,
+    StoreContactKind.phone => MerzoxIcons.storeContactPhoneNumber,
     StoreContactKind.email => Icons.mail_outline_rounded,
   };
 
@@ -476,7 +476,7 @@ class _NothingYet extends StatelessWidget {
         // the `contact_support_outlined` that stood here - a headset with a
         // question mark, which is not what the page is about.
         Icon(
-          MerzoxIcons.contactUs,
+          MerzoxIcons.storeContactContactUs,
           size: 40 * MerzoxIcons.contactUsSizeFactor,
           color: MerzoxColors.kColor98C1D9,
         ),

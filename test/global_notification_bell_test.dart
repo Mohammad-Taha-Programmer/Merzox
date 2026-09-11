@@ -124,7 +124,7 @@ void main() {
     await _pumpBell(tester, 1);
 
     final Icon bell = tester.widget<Icon>(
-      find.byIcon(MerzoxIcons.notifications),
+      find.byIcon(MerzoxIcons.globalBellNotifications),
     );
     expect(bell.color, MerzoxColors.kColor98C1D9);
   });

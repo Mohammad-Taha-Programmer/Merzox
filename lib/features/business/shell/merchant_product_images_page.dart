@@ -332,7 +332,7 @@ class _DropTarget extends StatelessWidget {
                 )
               else
                 Icon(
-                  MerzoxIcons.uploadProductImage,
+                  MerzoxIcons.merchantProductImagesUploadProductImage,
                   size: 44 * MerzoxIcons.uploadProductImageSizeFactor,
                   color: MerzoxColors.kColor98C1D9,
                 ),
@@ -438,7 +438,9 @@ class _ImageEntry extends StatelessWidget {
                 onPressed: onRemove,
                 iconSize: 18 * MerzoxIcons.deleteProductSizeFactor,
                 color: MerzoxColors.kColor3B3B3B,
-                icon: const Icon(MerzoxIcons.deleteProductForever),
+                icon: const Icon(
+                  MerzoxIcons.merchantProductImagesDeleteProductForever,
+                ),
               ),
               const Spacer(),
               Text(

@@ -33,11 +33,20 @@ void main() {
   ) async {
     await tester.pumpWidget(_testApp(rating: 0, ratingCount: 0));
 
-    expect(find.byIcon(MerzoxIcons.ratingStarEmpty), findsNWidgets(5));
+    expect(
+      find.byIcon(MerzoxIcons.businessRatingStarsRatingStarEmpty),
+      findsNWidgets(5),
+    );
 
-    expect(find.byIcon(MerzoxIcons.ratingStarFull), findsNothing);
+    expect(
+      find.byIcon(MerzoxIcons.businessRatingStarsRatingStarFull),
+      findsNothing,
+    );
 
-    expect(find.byIcon(MerzoxIcons.ratingStarHalf), findsNothing);
+    expect(
+      find.byIcon(MerzoxIcons.businessRatingStarsRatingStarHalf),
+      findsNothing,
+    );
 
     expect(tester.takeException(), isNull);
   });
@@ -47,9 +56,15 @@ void main() {
   ) async {
     await tester.pumpWidget(_testApp(rating: 5, ratingCount: 0));
 
-    expect(find.byIcon(MerzoxIcons.ratingStarEmpty), findsNWidgets(5));
+    expect(
+      find.byIcon(MerzoxIcons.businessRatingStarsRatingStarEmpty),
+      findsNWidgets(5),
+    );
 
-    expect(find.byIcon(MerzoxIcons.ratingStarFull), findsNothing);
+    expect(
+      find.byIcon(MerzoxIcons.businessRatingStarsRatingStarFull),
+      findsNothing,
+    );
 
     expect(tester.takeException(), isNull);
   });
@@ -59,11 +74,20 @@ void main() {
     (WidgetTester tester) async {
       await tester.pumpWidget(_testApp(rating: 3.5, ratingCount: 8));
 
-      expect(find.byIcon(MerzoxIcons.ratingStarFull), findsNWidgets(3));
+      expect(
+        find.byIcon(MerzoxIcons.businessRatingStarsRatingStarFull),
+        findsNWidgets(3),
+      );
 
-      expect(find.byIcon(MerzoxIcons.ratingStarHalf), findsOneWidget);
+      expect(
+        find.byIcon(MerzoxIcons.businessRatingStarsRatingStarHalf),
+        findsOneWidget,
+      );
 
-      expect(find.byIcon(MerzoxIcons.ratingStarEmpty), findsOneWidget);
+      expect(
+        find.byIcon(MerzoxIcons.businessRatingStarsRatingStarEmpty),
+        findsOneWidget,
+      );
 
       expect(tester.takeException(), isNull);
     },

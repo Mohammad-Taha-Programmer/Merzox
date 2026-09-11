@@ -480,7 +480,7 @@ class _FavoriteProductCard extends StatelessWidget {
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
-                            MerzoxIcons.favoriteProduct,
+                            MerzoxIcons.favoritesFavoriteProduct,
                             color: MerzoxColors.kColor3D5A80,
                             size: 18 * MerzoxIcons.favoriteHeartSizeFactor,
                           ),
@@ -633,7 +633,7 @@ class _FavoriteProductImage extends StatelessWidget {
       color: MerzoxColors.kColorF4F8FB,
       alignment: Alignment.center,
       child: Icon(
-        MerzoxIcons.products,
+        MerzoxIcons.favoritesProducts,
         color: MerzoxColors.kColor3D5A80,
         size: 38 * MerzoxIcons.productsSizeFactor,
       ),
@@ -671,8 +671,8 @@ class _StarRating extends StatelessWidget {
       children: List.generate(5, (index) {
         return Icon(
           index < rounded
-              ? MerzoxIcons.ratingStarFull
-              : MerzoxIcons.ratingStarEmpty,
+              ? MerzoxIcons.favoritesRatingStarFull
+              : MerzoxIcons.favoritesRatingStarEmpty,
           // [size] is what the star looks like; the factor turns that into a
           // font size, since these fill more of their em box than Material's.
           size: size * MerzoxIcons.ratingStarSizeFactor,
@@ -700,7 +700,7 @@ class _EmptyFavoritesState extends StatelessWidget {
           Icon(
             // The outlined twin of the heart on a favourite's badge, so an
             // empty list and a full one are drawn by the same hand.
-            MerzoxIcons.favorites,
+            MerzoxIcons.favoritesFavoriteOutline,
             size: 96 * MerzoxIcons.favoriteHeartSizeFactor,
             color: MerzoxColors.kColor3D5A80,
           ),

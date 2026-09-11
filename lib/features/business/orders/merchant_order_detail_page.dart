@@ -193,7 +193,7 @@ SnackBar merchantOrderNoticeSnackBar(String message, {bool isNotice = true}) {
       children: <Widget>[
         // The size it drew at as a Material bell, converted.
         Icon(
-          MerzoxIcons.notifications,
+          MerzoxIcons.merchantOrderDetailNotifications,
           size: 20 * MerzoxIcons.notificationsSizeFactor,
           color: Colors.white,
         ),
@@ -534,7 +534,7 @@ class _ItemRow extends StatelessWidget {
                   ? Container(
                       color: MerzoxColors.kColorF3F7FA,
                       child: Icon(
-                        MerzoxIcons.products,
+                        MerzoxIcons.merchantOrderDetailProducts,
                         color: MerzoxColors.kColor98C1D9,
                         size: 28 * MerzoxIcons.productsSizeFactor,
                       ),
@@ -545,7 +545,7 @@ class _ItemRow extends StatelessWidget {
                       errorBuilder: (_, _, _) => Container(
                         color: MerzoxColors.kColorF3F7FA,
                         child: Icon(
-                          MerzoxIcons.products,
+                          MerzoxIcons.merchantOrderDetailProducts,
                           color: MerzoxColors.kColor98C1D9,
                           size: 28 * MerzoxIcons.productsSizeFactor,
                         ),

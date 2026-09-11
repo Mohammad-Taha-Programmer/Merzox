@@ -36,11 +36,11 @@ class CheckoutStepIndicator extends StatelessWidget {
   static const List<({IconData icon, double size})> _steps =
       <({IconData icon, double size})>[
         (
-          icon: MerzoxIcons.orderData,
+          icon: MerzoxIcons.checkoutStepsOrderData,
           size: _glyphSize * MerzoxIcons.orderDataSizeFactor,
         ),
         (
-          icon: MerzoxIcons.orderPayment,
+          icon: MerzoxIcons.checkoutStepsOrderPayment,
           size: _glyphSize * MerzoxIcons.orderPaymentSizeFactor,
         ),
         (icon: Icons.check_circle_outline_rounded, size: _glyphSize),

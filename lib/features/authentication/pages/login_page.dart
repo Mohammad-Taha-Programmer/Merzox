@@ -335,8 +335,8 @@ class _LoginPageState extends State<LoginPage> {
                                   // Material eye, converted.
                                   icon: Icon(
                                     _obscurePassword
-                                        ? MerzoxIcons.showPassword
-                                        : MerzoxIcons.hidePassword,
+                                        ? MerzoxIcons.loginShowPassword
+                                        : MerzoxIcons.loginHidePassword,
                                     color: MerzoxColors.kColor98C1D9,
                                     size:
                                         20 * MerzoxIcons.passwordEyeSizeFactor,

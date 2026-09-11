@@ -729,7 +729,7 @@ class _OrderProductImage extends StatelessWidget {
       color: Colors.white,
       alignment: Alignment.center,
       child: Icon(
-        MerzoxIcons.products,
+        MerzoxIcons.ordersProducts,
         color: MerzoxColors.kColor98C1D9,
         size: 28 * MerzoxIcons.productsSizeFactor,
       ),

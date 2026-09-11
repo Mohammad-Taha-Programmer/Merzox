@@ -390,7 +390,7 @@ class StoreContactButton extends StatelessWidget {
       // The bare handset: this button reaches the shop rather than showing
       // its number. The size it drew at as a Material handset, converted.
       icon: Icon(
-        MerzoxIcons.contactUs,
+        MerzoxIcons.businessProfileContactUs,
         size: 19 * MerzoxIcons.contactUsSizeFactor,
       ),
     );
@@ -460,7 +460,7 @@ class _TopBar extends StatelessWidget {
               children: [
                 // The size it drew at as a Material bell, converted.
                 Icon(
-                  MerzoxIcons.notifications,
+                  MerzoxIcons.businessProfileNotifications,
                   size: 22 * MerzoxIcons.notificationsSizeFactor,
                   color: MerzoxColors.kColor98C1D9,
                 ),
@@ -608,7 +608,7 @@ class _Stats extends StatelessWidget {
         _Stat(
           value: '$productCount',
           label: 'businessProfile.products'.tr(),
-          icon: MerzoxIcons.productsCount,
+          icon: MerzoxIcons.businessProfileProductsCount,
           iconSize: 23 * MerzoxIcons.productsCountSizeFactor,
         ),
       ],
@@ -1012,8 +1012,8 @@ class _ProductCard extends StatelessWidget {
                             // fill and nothing else. Their ink is identical,
                             // which is why one factor serves both.
                             liked
-                                ? MerzoxIcons.favoriteProduct
-                                : MerzoxIcons.favorites,
+                                ? MerzoxIcons.businessProfileFavoriteProduct
+                                : MerzoxIcons.businessProfileFavoriteOutline,
                             color: liked
                                 ? MerzoxColors.kColor3D5A80
                                 : MerzoxColors.kColor98C1D9,
@@ -1420,8 +1420,8 @@ class _InteractiveStars extends StatelessWidget {
           // read rating shows - the designer drew the two separately.
           icon: Icon(
             rating <= value
-                ? MerzoxIcons.ratingBarStar
-                : MerzoxIcons.ratingStarEmpty,
+                ? MerzoxIcons.businessProfileRatingBarStar
+                : MerzoxIcons.businessProfileRatingStarEmpty,
             color: const Color(0xFFFFC400),
             size: 24 * MerzoxIcons.ratingStarSizeFactor,
           ),
@@ -1444,8 +1444,8 @@ class _StarRating extends StatelessWidget {
       children: List.generate(5, (index) {
         return Icon(
           index < value.round()
-              ? MerzoxIcons.ratingStarFull
-              : MerzoxIcons.ratingStarEmpty,
+              ? MerzoxIcons.businessProfileRatingStarFull
+              : MerzoxIcons.businessProfileRatingStarEmpty,
           color: const Color(0xFFFFC400),
           // [size] is what the star looks like; the factor turns that into a
           // font size, since these fill more of their em box than Material's.
@@ -1471,7 +1471,10 @@ class _ChatButton extends StatelessWidget {
         fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
       ),
       // The size it drew at as a Material bubble, converted.
-      icon: Icon(MerzoxIcons.chat, size: 22 * MerzoxIcons.chatSizeFactor),
+      icon: Icon(
+        MerzoxIcons.businessProfileChat,
+        size: 22 * MerzoxIcons.chatSizeFactor,
+      ),
     );
   }
 }

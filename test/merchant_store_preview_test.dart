@@ -704,8 +704,14 @@ void main() {
 
         // The artboard draws five EMPTY stars: nothing is rated yet. Opening
         // at five would submit a rating the customer never chose.
-        expect(find.byIcon(MerzoxIcons.ratingBarStar), findsNothing);
-        expect(find.byIcon(MerzoxIcons.ratingStarEmpty), findsNWidgets(5));
+        expect(
+          find.byIcon(MerzoxIcons.businessProfileRatingBarStar),
+          findsNothing,
+        );
+        expect(
+          find.byIcon(MerzoxIcons.businessProfileRatingStarEmpty),
+          findsNWidgets(5),
+        );
 
         // And an unrated composer cannot publish. `BusinessReview.rating` is
         // `min: 1`, so a zero would be refused by the server with an error the
@@ -718,10 +724,13 @@ void main() {
         // Picking a star both fills it and unlocks publishing.
         await _tapVisible(
           tester,
-          find.byIcon(MerzoxIcons.ratingStarEmpty).at(3),
+          find.byIcon(MerzoxIcons.businessProfileRatingStarEmpty).at(3),
         );
 
-        expect(find.byIcon(MerzoxIcons.ratingBarStar), findsNWidgets(4));
+        expect(
+          find.byIcon(MerzoxIcons.businessProfileRatingBarStar),
+          findsNWidgets(4),
+        );
         expect(
           tester
               .widget<FilledButton>(find.widgetWithText(FilledButton, 'نشر'))
@@ -847,7 +856,7 @@ void main() {
       );
 
       expect(
-        find.widgetWithIcon(IconButton, MerzoxIcons.chat),
+        find.widgetWithIcon(IconButton, MerzoxIcons.businessProfileChat),
         findsNothing,
         reason: 'the preview must not offer a chat with its own store',
       );
@@ -924,14 +933,14 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(GridView),
-          matching: find.byIcon(MerzoxIcons.favorites),
+          matching: find.byIcon(MerzoxIcons.businessProfileFavoriteOutline),
         ),
         findsNothing,
       );
       expect(
         find.descendant(
           of: find.byType(GridView),
-          matching: find.byIcon(MerzoxIcons.favoriteProduct),
+          matching: find.byIcon(MerzoxIcons.businessProfileFavoriteProduct),
         ),
         findsNothing,
       );
@@ -960,7 +969,10 @@ void main() {
 
       // Scoped to the button: the customer bottom navigation carries a chat
       // glyph of its own, which is not the affordance under test.
-      expect(find.widgetWithIcon(IconButton, MerzoxIcons.chat), findsOneWidget);
+      expect(
+        find.widgetWithIcon(IconButton, MerzoxIcons.businessProfileChat),
+        findsOneWidget,
+      );
 
       await _openProductsTab(tester);
       // Scoped to the grid: the customer bottom navigation carries a favourite
@@ -968,7 +980,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(GridView),
-          matching: find.byIcon(MerzoxIcons.favorites),
+          matching: find.byIcon(MerzoxIcons.businessProfileFavoriteOutline),
         ),
         findsOneWidget,
       );
@@ -1061,14 +1073,23 @@ void main() {
 
         // The designer's eye, since the merchant's marks moved onto their own
         // set; the row itself is what this asserts, not which font drew it.
-        expect(find.byIcon(MerzoxIcons.previewProduct), findsOneWidget);
+        expect(
+          find.byIcon(MerzoxIcons.merchantProfilePreviewProduct),
+          findsOneWidget,
+        );
         // Nothing existing was displaced to make room for it: editing the
         // business is the settings row, and logging out is still there.
-        expect(find.byIcon(MerzoxIcons.businessSettings), findsOneWidget);
+        expect(
+          find.byIcon(MerzoxIcons.merchantProfileBusinessSettings),
+          findsOneWidget,
+        );
         expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
         // Two the menu added, which the card had no room for at all.
-        expect(find.byIcon(MerzoxIcons.chat), findsWidgets);
-        expect(find.byIcon(MerzoxIcons.contactUs), findsOneWidget);
+        expect(find.byIcon(MerzoxIcons.merchantProfileChat), findsWidgets);
+        expect(
+          find.byIcon(MerzoxIcons.merchantProfileContactUs),
+          findsOneWidget,
+        );
       },
     );
   });
@@ -1243,7 +1264,10 @@ void main() {
       // so it stays on screen while the detail request resolves.
       expect(find.text('اسم من القائمة العامة'), findsOneWidget);
       expect(find.text('المنتجات'), findsOneWidget);
-      expect(find.widgetWithIcon(IconButton, MerzoxIcons.chat), findsOneWidget);
+      expect(
+        find.widgetWithIcon(IconButton, MerzoxIcons.businessProfileChat),
+        findsOneWidget,
+      );
 
       // And it is replaced by the detail the moment that resolves.
       api.pendingDetails!.complete(
@@ -1428,7 +1452,9 @@ void main() {
         bloc.add(const BusinessTabChanged(4));
         await settleFrames(tester);
 
-        final settingsRow = find.byIcon(MerzoxIcons.businessSettings);
+        final settingsRow = find.byIcon(
+          MerzoxIcons.merchantProfileBusinessSettings,
+        );
         expect(settingsRow, findsOneWidget);
 
         await tester.tap(settingsRow);

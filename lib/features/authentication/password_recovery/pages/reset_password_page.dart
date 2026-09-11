@@ -151,8 +151,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                             // converts it.
                             icon: Icon(
                               _obscurePassword
-                                  ? MerzoxIcons.showPassword
-                                  : MerzoxIcons.hidePassword,
+                                  ? MerzoxIcons.resetPasswordShowPassword
+                                  : MerzoxIcons.resetPasswordHidePassword,
                               size: 24 * MerzoxIcons.passwordEyeSizeFactor,
                             ),
                           ),
@@ -180,8 +180,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                             // converts it.
                             icon: Icon(
                               _obscureConfirmation
-                                  ? MerzoxIcons.showPassword
-                                  : MerzoxIcons.hidePassword,
+                                  ? MerzoxIcons.resetPasswordShowPassword
+                                  : MerzoxIcons.resetPasswordHidePassword,
                               size: 24 * MerzoxIcons.passwordEyeSizeFactor,
                             ),
                           ),

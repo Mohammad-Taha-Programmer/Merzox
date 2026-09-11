@@ -39,13 +39,13 @@ class FeatureBottomNavigationBar extends StatelessWidget {
     return MerzoxNotchedNavBar(
       leading: <MerzoxNavDestination>[
         MerzoxNavDestination(
-          glyph: MerzoxIcons.customerNavHome,
+          glyph: MerzoxIcons.customerNavigationBarHome,
           label: 'nav.home'.tr(),
           selected: selectedIndex == 0,
           onTap: () => onChanged(0),
         ),
         MerzoxNavDestination(
-          glyph: MerzoxIcons.customerNavCart,
+          glyph: MerzoxIcons.customerNavigationBarCart,
           label: 'nav.cart'.tr(),
           selected: selectedIndex == 1,
           onTap: () => onChanged(1),
@@ -53,20 +53,20 @@ class FeatureBottomNavigationBar extends StatelessWidget {
       ],
       trailing: <MerzoxNavDestination>[
         MerzoxNavDestination(
-          glyph: MerzoxIcons.customerNavMessages,
+          glyph: MerzoxIcons.customerNavigationBarMessages,
           label: 'nav.messages'.tr(),
           selected: selectedIndex == 3,
           onTap: () => onChanged(3),
           decorate: decorateMessages,
         ),
         MerzoxNavDestination(
-          glyph: MerzoxIcons.customerNavProfile,
+          glyph: MerzoxIcons.customerNavigationBarProfile,
           label: 'nav.profile'.tr(),
           selected: selectedIndex == 4,
           onTap: () => onChanged(4),
         ),
       ],
-      buttonGlyph: MerzoxIcons.customerNavStores,
+      buttonGlyph: MerzoxIcons.customerNavigationBarStores,
       buttonLabel: 'nav.stores'.tr(),
       buttonSelected: selectedIndex == 2,
       onButtonPressed: () => onChanged(2),

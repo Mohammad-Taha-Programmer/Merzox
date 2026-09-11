@@ -62,7 +62,7 @@ class MerchantOrderInvoicePage extends StatelessWidget {
                     bottom: 0,
                     child: Center(
                       child: Icon(
-                        MerzoxIcons.printInvoice,
+                        MerzoxIcons.merchantOrderInvoicePrintInvoice,
                         size: 22 * MerzoxIcons.printInvoiceSizeFactor,
                         color: MerzoxColors.kColor5E5E5E,
                       ),

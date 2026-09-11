@@ -617,7 +617,9 @@ void main() {
         final Icon cloud = tester.widget<Icon>(
           find.byWidgetPredicate(
             (Widget widget) =>
-                widget is Icon && widget.icon == MerzoxIcons.uploadProductImage,
+                widget is Icon &&
+                widget.icon ==
+                    MerzoxIcons.merchantProductEditorUploadProductImage,
           ),
         );
 
@@ -642,7 +644,8 @@ void main() {
         final Icon eye = tester.widget<Icon>(
           find.byWidgetPredicate(
             (Widget widget) =>
-                widget is Icon && widget.icon == MerzoxIcons.previewProduct,
+                widget is Icon &&
+                widget.icon == MerzoxIcons.merchantProductEditorPreviewProduct,
           ),
         );
 
@@ -679,7 +682,8 @@ void main() {
           find.byWidgetPredicate(
             (Widget widget) =>
                 widget is Icon &&
-                widget.icon == MerzoxIcons.deleteProductForever,
+                widget.icon ==
+                    MerzoxIcons.merchantProductOptionsDeleteProductForever,
           ),
         );
 

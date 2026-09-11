@@ -29,13 +29,13 @@ class BusinessNavigationBar extends StatelessWidget {
     return MerzoxNotchedNavBar(
       leading: <MerzoxNavDestination>[
         MerzoxNavDestination(
-          glyph: MerzoxIcons.merchantNavHome,
+          glyph: MerzoxIcons.merchantNavigationBarHome,
           label: 'nav.home'.tr(),
           selected: selectedIndex == 0,
           onTap: () => onChanged(0),
         ),
         MerzoxNavDestination(
-          glyph: MerzoxIcons.merchantNavOrders,
+          glyph: MerzoxIcons.merchantNavigationBarOrders,
           label: 'businessShell.orders'.tr(),
           selected: selectedIndex == 1,
           onTap: () => onChanged(1),
@@ -43,19 +43,19 @@ class BusinessNavigationBar extends StatelessWidget {
       ],
       trailing: <MerzoxNavDestination>[
         MerzoxNavDestination(
-          glyph: MerzoxIcons.merchantNavProducts,
+          glyph: MerzoxIcons.merchantNavigationBarProducts,
           label: 'businessShell.productsHeading'.tr(),
           selected: selectedIndex == 3,
           onTap: () => onChanged(3),
         ),
         MerzoxNavDestination(
-          glyph: MerzoxIcons.merchantNavProfile,
+          glyph: MerzoxIcons.merchantNavigationBarProfile,
           label: 'nav.profile'.tr(),
           selected: selectedIndex == 4,
           onTap: () => onChanged(4),
         ),
       ],
-      buttonGlyph: MerzoxIcons.merchantNavAddProduct,
+      buttonGlyph: MerzoxIcons.merchantNavigationBarAddProduct,
       buttonLabel: 'businessShell.addProduct'.tr(),
       buttonSelected: selectedIndex == 2,
       onButtonPressed: () => onChanged(2),

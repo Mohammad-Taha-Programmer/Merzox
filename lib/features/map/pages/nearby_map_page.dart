@@ -409,7 +409,7 @@ class _MapSearchField extends StatelessWidget {
               onPressed: onSubmitted,
               // Material's own default was 24; the factor converts it.
               icon: Icon(
-                MerzoxIcons.search,
+                MerzoxIcons.nearbyMapSearch,
                 size: 24 * MerzoxIcons.searchSizeFactor,
                 color: MerzoxColors.kColor3D5A80,
               ),

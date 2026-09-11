@@ -389,7 +389,7 @@ const _targetStyles = [
     labelKey: 'shareApp.whatsapp',
     // WhatsApp's own mark. A bubble in WhatsApp's green was the app naming a
     // service it would not draw.
-    icon: MerzoxIcons.whatsapp,
+    icon: MerzoxIcons.shareAppWhatsapp,
     iconSize: 25 * MerzoxIcons.whatsappSizeFactor,
     color: Color(0xFF25A85A),
   ),
