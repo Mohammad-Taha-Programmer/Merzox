@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
-import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
@@ -42,6 +41,14 @@ class MessagesInboxView extends StatefulWidget {
   @override
   State<MessagesInboxView> createState() => _MessagesInboxViewState();
 }
+
+/// How wide the drawing on an empty inbox is.
+///
+/// The file is 215 by 276 and is drawn at its own width, so the board's
+/// proportions are the picture's rather than a number chosen here. On the 375
+/// the boards are captured at that is a little over half the screen, which is
+/// where the artboard puts it.
+const double kEmptyMessagesArtWidth = 215;
 
 class _MessagesInboxViewState extends State<MessagesInboxView> {
   final ScrollController _scrollController = ScrollController();
@@ -215,13 +222,18 @@ class _MessagesInboxViewState extends State<MessagesInboxView> {
           padding: const EdgeInsets.only(top: 90),
           child: Column(
             children: [
-              // The library has one bubble where Material had two, and one is
-              // what an empty inbox is about. Converted against the bubble
-              // rather than against `forum_outlined`, which is a wider mark.
-              Icon(
-                MerzoxIcons.messagesInboxChat,
-                size: 56 * MerzoxIcons.chatSizeFactor,
-                color: MerzoxColors.kColorBEBEBE,
+              // The board's own drawing, where a grey bubble stood in for it.
+              //
+              // It is used for the unread filter's empty state as well as for
+              // an inbox with nothing in it. The two say different things in
+              // words - one is a new account, the other is everything read -
+              // but they are one block with one mark, and a full illustration
+              // beside a 56 icon would have read as two different screens.
+              Image.asset(
+                'assets/images/Messages/empty_messages_theme.png',
+                width: kEmptyMessagesArtWidth,
+                filterQuality: FilterQuality.medium,
+                excludeFromSemantics: true,
               ),
               const SizedBox(height: 18),
               Text(

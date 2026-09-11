@@ -110,6 +110,7 @@ flutter:
     - assets/images/Onboarding/
     - assets/images/HomeScreen/
     - assets/images/Cart/
+    - assets/images/Messages/
     - assets/images/follow_business_emoji_pics/
     - assets/translations/
   # The following line ensures that the Material Icons font is
@@ -368,10 +369,6 @@ flutter:
     - family: MessagesHeaderSearch
       fonts:
         - asset: assets/fonts/icons_fonts/messages_header/MessagesHeaderSearch.ttf
-    # messages_inbox/
-    - family: MessagesInboxChat
-      fonts:
-        - asset: assets/fonts/icons_fonts/messages_inbox/MessagesInboxChat.ttf
     # nearby_map/
     - family: NearbyMapSearch
       fonts:

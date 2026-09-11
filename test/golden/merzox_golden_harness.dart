@@ -253,9 +253,6 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   'MessagesHeaderSearch': <String>[
     'assets/fonts/icons_fonts/messages_header/MessagesHeaderSearch.ttf',
   ],
-  'MessagesInboxChat': <String>[
-    'assets/fonts/icons_fonts/messages_inbox/MessagesInboxChat.ttf',
-  ],
   'NearbyMapSearch': <String>[
     'assets/fonts/icons_fonts/nearby_map/NearbyMapSearch.ttf',
   ],
