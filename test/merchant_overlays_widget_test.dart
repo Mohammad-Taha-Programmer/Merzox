@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
 import 'package:merzox/features/business/shell/business_shell_page.dart';
@@ -193,7 +194,7 @@ void main() {
     testWidgets('the orange button raises it', (WidgetTester tester) async {
       await pumpProducts(tester, <Map<String, dynamic>>[_product('p1')]);
 
-      await tester.tap(find.byIcon(Icons.tune_rounded));
+      await tester.tap(find.byIcon(MerzoxIcons.filter));
       await settleFrames(tester);
 
       expect(find.text('تصفية'), findsOneWidget);
@@ -211,7 +212,7 @@ void main() {
       ]);
       expect(find.text('أحمر شفاه'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.tune_rounded));
+      await tester.tap(find.byIcon(MerzoxIcons.filter));
       await settleFrames(tester);
       await tester.enterText(find.byType(TextField).first, 'شفاه');
       await tester.tap(find.text('بحث'));

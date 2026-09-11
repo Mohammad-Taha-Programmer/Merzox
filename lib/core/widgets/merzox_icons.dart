@@ -390,6 +390,58 @@ abstract final class MerzoxIcons {
   /// one that keeps the mark's width is the one to take.
   static const double orderPaymentSizeFactor = 0.792 / 1.002;
 
+  // -- Liking, filtering, and a shop's own settings -------------------------
+
+  /// A filled heart: a product that is liked, or one already in the list.
+  ///
+  /// [favorites] is the same heart drawn as an outline, and the two are a
+  /// matched pair - same silhouette, same highlight, same ink to three
+  /// decimal places - which is what makes them usable as the two faces of one
+  /// toggle. Material's pair matches too, but mixing one from each set would
+  /// have changed the mark's shape on a tap and not only its fill.
+  static const IconData favoriteProduct = IconData(
+    0xe80e,
+    fontFamily: 'FavoriteProduct',
+  );
+
+  /// The sliders on the button that filters a merchant's own products.
+  ///
+  /// A third file shipped with the whole Material set inside it, the mark
+  /// appended at U+EBA4. Its ink fills only 0.417 of the em box - far less
+  /// than anything else in this library - so its factor is above 1.7 where
+  /// every other one here is below 1.1. That is the glyph, not a mistake.
+  static const IconData filter = IconData(0xeba4, fontFamily: 'FilterIcon');
+
+  /// The gear on the row that opens a shop's settings.
+  static const IconData businessSettings = IconData(
+    0xe808,
+    fontFamily: 'BusinessSettings',
+  );
+
+  /// Against Material's `favorite_rounded` and `favorite_border_rounded`.
+  ///
+  /// One number for both faces, because the designer drew the pair to the
+  /// same ink and Material did too. A toggle that changed size on a tap would
+  /// be the one thing worse than a toggle that changed shape.
+  ///
+  /// Width: a heart is a wide mark. These are drawn squarer than Material's,
+  /// so anchoring on width keeps the mark's presence and lets it stand a
+  /// little taller, which is the shape the designer drew.
+  static const double favoriteHeartSizeFactor = 0.835 / 1.005;
+
+  /// Against Material's `tune_rounded`.
+  ///
+  /// Width, which is what a row of sliders is read by. The designer draws two
+  /// rows where Material draws three, so the two marks are not the same
+  /// picture; matching their widths is what keeps the button looking the same.
+  static const double filterSizeFactor = 0.750 / 0.417;
+
+  /// Against Material's `settings_outlined`.
+  ///
+  /// Both gears are square and the two anchorings differ by two parts in a
+  /// hundred, so this one is width by convention rather than by argument.
+  static const double businessSettingsSizeFactor = 0.815 / 0.955;
+
   // -- The customer's bottom bar --------------------------------------------
   //
   // Five places, the middle one raised out of the bar. Home and the account

@@ -1008,13 +1008,16 @@ class _ProductCard extends StatelessWidget {
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
+                            // Two faces of one pair, so a tap changes the
+                            // fill and nothing else. Their ink is identical,
+                            // which is why one factor serves both.
                             liked
-                                ? Icons.favorite_rounded
-                                : Icons.favorite_border_rounded,
+                                ? MerzoxIcons.favoriteProduct
+                                : MerzoxIcons.favorites,
                             color: liked
                                 ? MerzoxColors.kColor3D5A80
                                 : MerzoxColors.kColor98C1D9,
-                            size: 18,
+                            size: 18 * MerzoxIcons.favoriteHeartSizeFactor,
                           ),
                         ),
                       ),
