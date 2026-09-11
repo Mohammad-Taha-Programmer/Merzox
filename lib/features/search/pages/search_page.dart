@@ -666,8 +666,7 @@ class _ProductResultTile extends StatelessWidget {
                                   // it replaces.
                                   Icon(
                                     MerzoxIcons.ratingStarFull,
-                                    size:
-                                        16 * MerzoxIcons.ratingStarSizeFactor,
+                                    size: 16 * MerzoxIcons.ratingStarSizeFactor,
                                     color: const Color(0xFFFFB703),
                                   ),
                                   const SizedBox(width: 3),

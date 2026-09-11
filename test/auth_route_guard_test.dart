@@ -366,7 +366,11 @@ void main() {
       token: 'owner-token',
     );
 
-    for (final route in ['/business', '/business/messages', '/business/preview']) {
+    for (final route in [
+      '/business',
+      '/business/messages',
+      '/business/preview',
+    ]) {
       test('is sent home from $route, not to enrolment', () {
         expect(
           AuthRouteGuard.redirect(uri: Uri.parse(route), session: owner),

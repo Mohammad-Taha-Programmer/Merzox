@@ -335,7 +335,11 @@ class _ShareTargetButton extends StatelessWidget {
                             color: style.color,
                           ),
                         )
-                      : Icon(style.icon, color: style.color, size: style.iconSize),
+                      : Icon(
+                          style.icon,
+                          color: style.color,
+                          size: style.iconSize,
+                        ),
                 ),
               ),
               const SizedBox(width: 8),

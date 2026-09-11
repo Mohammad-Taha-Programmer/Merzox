@@ -79,9 +79,7 @@ void main() {
     expect(find.text('orders.cancelReason'.tr()), findsOneWidget);
     expect(find.text('common.confirm'.tr()), findsOneWidget);
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('orderPrompt.dismiss')),
-    );
+    await tester.tap(find.byKey(const ValueKey<String>('orderPrompt.dismiss')));
     await _letItClose(tester);
 
     expect(answers, <String?>[null]);
@@ -92,9 +90,7 @@ void main() {
 
     expect(find.text('رام الله ، المصيون'), findsOneWidget);
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('orderPrompt.dismiss')),
-    );
+    await tester.tap(find.byKey(const ValueKey<String>('orderPrompt.dismiss')));
     await _letItClose(tester);
   });
 
@@ -104,9 +100,7 @@ void main() {
     final List<String?> answers = await _open(tester);
 
     await tester.enterText(find.byType(TextField), '  غيرت رأيي  ');
-    await tester.tap(
-      find.byKey(const ValueKey<String>('orderPrompt.confirm')),
-    );
+    await tester.tap(find.byKey(const ValueKey<String>('orderPrompt.confirm')));
     await _letItClose(tester);
 
     expect(answers, <String?>['غيرت رأيي']);
@@ -118,9 +112,7 @@ void main() {
     // null against empty, so the two must not collapse into one.
     final List<String?> answers = await _open(tester);
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('orderPrompt.confirm')),
-    );
+    await tester.tap(find.byKey(const ValueKey<String>('orderPrompt.confirm')));
     await _letItClose(tester);
 
     expect(answers, <String?>['']);
@@ -133,9 +125,7 @@ void main() {
     final List<String?> answers = await _open(tester);
 
     await tester.enterText(find.byType(TextField), 'شيء ما');
-    await tester.tap(
-      find.byKey(const ValueKey<String>('orderPrompt.dismiss')),
-    );
+    await tester.tap(find.byKey(const ValueKey<String>('orderPrompt.dismiss')));
     await _letItClose(tester);
 
     expect(tester.takeException(), isNull);

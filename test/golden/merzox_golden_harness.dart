@@ -76,9 +76,7 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   'EyeIconHidePassword': <String>[
     'assets/fonts/icons_fonts/EyeIconHidePassword.ttf',
   ],
-  'EditProductIcon': <String>[
-    'assets/fonts/icons_fonts/EditProductIcon.ttf',
-  ],
+  'EditProductIcon': <String>['assets/fonts/icons_fonts/EditProductIcon.ttf'],
   'DeleteProductForever': <String>[
     'assets/fonts/icons_fonts/DeleteProductForever.ttf',
   ],

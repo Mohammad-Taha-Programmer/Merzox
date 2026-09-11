@@ -76,10 +76,7 @@ Dio _dio(
   return dio;
 }
 
-Future<GoRouter> _pumpRouted(
-  WidgetTester tester,
-  ProfileEditBloc bloc,
-) async {
+Future<GoRouter> _pumpRouted(WidgetTester tester, ProfileEditBloc bloc) async {
   // Tall enough that the Save button is on screen; a tap that lands off it
   // would silently do nothing and the assertion would pass for the wrong
   // reason.

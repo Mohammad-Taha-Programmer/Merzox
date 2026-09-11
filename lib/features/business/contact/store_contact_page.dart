@@ -135,8 +135,7 @@ class StoreContactPage extends StatelessWidget {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final Future<bool> Function(Uri) launch =
         open ??
-        (Uri target) =>
-            launchUrl(target, mode: LaunchMode.externalApplication);
+        (Uri target) => launchUrl(target, mode: LaunchMode.externalApplication);
 
     bool opened = false;
     try {
@@ -151,9 +150,7 @@ class StoreContactPage extends StatelessWidget {
 
     messenger
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text('storeContact.couldNotOpen'.tr())),
-      );
+      ..showSnackBar(SnackBar(content: Text('storeContact.couldNotOpen'.tr())));
   }
 
   @override
@@ -193,10 +190,7 @@ class StoreContactPage extends StatelessWidget {
             const SizedBox(height: 20),
             if (accountUnavailable) const _AccountUnreadable(),
             if (isEmpty && !accountUnavailable)
-              _NothingYet(
-                message: emptyMessage,
-                onEditSettings: onEditSettings,
-              )
+              _NothingYet(message: emptyMessage, onEditSettings: onEditSettings)
             else ...<Widget>[
               if (social.isNotEmpty)
                 _Section(
@@ -370,11 +364,7 @@ class _ChannelRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
               children: <Widget>[
-                Icon(
-                  _icon,
-                  size: _iconSize,
-                  color: MerzoxColors.kColor3D5A80,
-                ),
+                Icon(_icon, size: _iconSize, color: MerzoxColors.kColor3D5A80),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(

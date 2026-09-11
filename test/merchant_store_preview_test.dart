@@ -716,7 +716,10 @@ void main() {
         expect(publish.onPressed, isNull);
 
         // Picking a star both fills it and unlocks publishing.
-        await _tapVisible(tester, find.byIcon(MerzoxIcons.ratingStarEmpty).at(3));
+        await _tapVisible(
+          tester,
+          find.byIcon(MerzoxIcons.ratingStarEmpty).at(3),
+        );
 
         expect(find.byIcon(MerzoxIcons.ratingBarStar), findsNWidgets(4));
         expect(
@@ -957,10 +960,7 @@ void main() {
 
       // Scoped to the button: the customer bottom navigation carries a chat
       // glyph of its own, which is not the affordance under test.
-      expect(
-        find.widgetWithIcon(IconButton, MerzoxIcons.chat),
-        findsOneWidget,
-      );
+      expect(find.widgetWithIcon(IconButton, MerzoxIcons.chat), findsOneWidget);
 
       await _openProductsTab(tester);
       // Scoped to the grid: the customer bottom navigation carries a favourite
@@ -1243,10 +1243,7 @@ void main() {
       // so it stays on screen while the detail request resolves.
       expect(find.text('اسم من القائمة العامة'), findsOneWidget);
       expect(find.text('المنتجات'), findsOneWidget);
-      expect(
-        find.widgetWithIcon(IconButton, MerzoxIcons.chat),
-        findsOneWidget,
-      );
+      expect(find.widgetWithIcon(IconButton, MerzoxIcons.chat), findsOneWidget);
 
       // And it is replaced by the detail the moment that resolves.
       api.pendingDetails!.complete(

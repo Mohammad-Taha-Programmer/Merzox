@@ -40,6 +40,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
   late final TextEditingController _name = TextEditingController(
     text: widget.business.name,
   );
+
   /// The logo as it stands, which the picker replaces.
   ///
   /// Not a controller any more: the link box is gone, and this is set by

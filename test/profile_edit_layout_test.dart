@@ -238,7 +238,9 @@ void main() {
           matching: find.byType(InputDecorator),
         ),
       );
-      final Rect save = tester.getRect(find.widgetWithText(FilledButton, 'حفظ'));
+      final Rect save = tester.getRect(
+        find.widgetWithText(FilledButton, 'حفظ'),
+      );
 
       // The gap was 124 and the button read as belonging to nothing. It is
       // measured from the bottom of the last control, so it holds whatever

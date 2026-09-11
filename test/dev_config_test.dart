@@ -400,7 +400,10 @@ PUBLIC_BASE_URL="http://\${CURRENT_IP_ADDRESS}:\${PORT}"
 SMTP_PASS=an-app-password
 ''';
 
-      final String after = withPublicBaseUrl(before, 'http://192.168.1.99:4000');
+      final String after = withPublicBaseUrl(
+        before,
+        'http://192.168.1.99:4000',
+      );
 
       expect(after, contains('PUBLIC_BASE_URL=http://192.168.1.99:4000'));
       expect(after, isNot(contains('CURRENT_IP_ADDRESS')));
@@ -466,7 +469,10 @@ SMTP_PASS=an-app-password
         'http://192.168.1.99:4000',
       );
 
-      expect(after, 'PORT=4000\r\nPUBLIC_BASE_URL=http://192.168.1.99:4000\r\nSMTP_PASS=x\r\n');
+      expect(
+        after,
+        'PORT=4000\r\nPUBLIC_BASE_URL=http://192.168.1.99:4000\r\nSMTP_PASS=x\r\n',
+      );
     });
   });
 
@@ -493,12 +499,9 @@ SMTP_PASS=an-app-password
       ], out: _Captured());
 
       expect(code, 0);
-      expect(
-        jsonDecode(File(out).readAsStringSync()),
-        <String, dynamic>{
-          'MERZOX_API_BASE_URL': 'http://192.168.1.99:4000/api/v1',
-        },
-      );
+      expect(jsonDecode(File(out).readAsStringSync()), <String, dynamic>{
+        'MERZOX_API_BASE_URL': 'http://192.168.1.99:4000/api/v1',
+      });
       expect(
         File(env).readAsStringSync(),
         contains('PUBLIC_BASE_URL=http://192.168.1.99:4000'),

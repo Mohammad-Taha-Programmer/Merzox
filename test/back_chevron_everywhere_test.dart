@@ -76,9 +76,7 @@ void main() {
     final RegExp key = RegExp(r"ValueKey<String>\(\s*'([\w.]+\.back)'");
 
     for (final File file in _dartFiles()) {
-      for (final RegExpMatch match in key.allMatches(
-        file.readAsStringSync(),
-      )) {
+      for (final RegExpMatch match in key.allMatches(file.readAsStringSync())) {
         expect(
           seen.add(match.group(1)!),
           isTrue,

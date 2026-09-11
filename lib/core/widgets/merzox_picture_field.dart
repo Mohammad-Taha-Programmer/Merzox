@@ -295,8 +295,7 @@ class _MerzoxPictureFieldState extends State<MerzoxPictureField> {
 
   bool get _round => widget.shape == BoxShape.circle;
 
-  BorderRadius? get _radius =>
-      _round ? null : BorderRadius.circular(8);
+  BorderRadius? get _radius => _round ? null : BorderRadius.circular(8);
 
   @override
   Widget build(BuildContext context) {

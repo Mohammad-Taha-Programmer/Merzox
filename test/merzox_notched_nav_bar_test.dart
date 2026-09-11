@@ -46,10 +46,7 @@ Rect get _host =>
     const Rect.fromLTWH(0, kMerzoxNavOverhang, _width, kMerzoxNavBarHeight);
 
 Rect get _notch => Rect.fromCircle(
-  center: const Offset(
-    _centre,
-    kMerzoxNavOverhang - kMerzoxNavButtonLift,
-  ),
+  center: const Offset(_centre, kMerzoxNavOverhang - kMerzoxNavButtonLift),
   radius: kMerzoxNavNotchRadius,
 );
 
@@ -159,13 +156,19 @@ void main() {
         Rect.fromCircle(center: const Offset(_centre, 0), radius: _width),
       );
 
-      expect(bar.contains(const Offset(_centre, kMerzoxNavOverhang + 4)), isTrue);
+      expect(
+        bar.contains(const Offset(_centre, kMerzoxNavOverhang + 4)),
+        isTrue,
+      );
     });
 
     test('no bite at all is just the bar', () {
       final Path bar = const MerzoxNotchedShape().getOuterPath(_host, null);
 
-      expect(bar.contains(const Offset(_centre, kMerzoxNavOverhang + 4)), isTrue);
+      expect(
+        bar.contains(const Offset(_centre, kMerzoxNavOverhang + 4)),
+        isTrue,
+      );
     });
   });
 

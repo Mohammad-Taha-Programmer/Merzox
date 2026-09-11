@@ -112,9 +112,7 @@ void main() {
 
     test('links alone are enough, with no permission given', () {
       final StoreContactPage? page = visitorContactPage(
-        _detail(
-          socialLinks: const <String, dynamic>{'instagram': 'albatoul'},
-        ),
+        _detail(socialLinks: const <String, dynamic>{'instagram': 'albatoul'}),
       );
 
       expect(page, isNotNull);
@@ -274,9 +272,7 @@ void main() {
   });
 
   group('the circle that leads there', () {
-    testWidgets('is a control, and answers a tap', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('is a control, and answers a tap', (WidgetTester tester) async {
       // The storefront itself is not pumped: it does not settle in a widget
       // test, which is why its share button is exercised on its own too.
       int taps = 0;
@@ -284,9 +280,7 @@ void main() {
       await pumpLocalized(
         tester,
         Scaffold(
-          body: Center(
-            child: StoreContactButton(onPressed: () => taps += 1),
-          ),
+          body: Center(child: StoreContactButton(onPressed: () => taps += 1)),
         ),
       );
 

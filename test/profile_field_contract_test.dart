@@ -38,10 +38,9 @@ Set<String> _jsSetLiteral(String source, String name) {
 
   expect(match, isNotNull, reason: '$name is not declared in the controller');
 
-  return RegExp("'([^']+)'")
-      .allMatches(match!.group(1)!)
-      .map((RegExpMatch m) => m.group(1)!)
-      .toSet();
+  return RegExp(
+    "'([^']+)'",
+  ).allMatches(match!.group(1)!).map((RegExpMatch m) => m.group(1)!).toSet();
 }
 
 void main() {
@@ -56,7 +55,9 @@ void main() {
   test('the screen has a route to send its fields to', () {
     // The app patches `/users/me`, authenticated and validated.
     expect(
-      routes.contains("router.patch('/me', requireAuth, validateProfilePatch, updateMe)"),
+      routes.contains(
+        "router.patch('/me', requireAuth, validateProfilePatch, updateMe)",
+      ),
       isTrue,
       reason: 'the profile PATCH route is not mounted as the app calls it',
     );
@@ -102,10 +103,9 @@ void main() {
 
     expect(picked, isNotNull);
 
-    final Set<String> accepted = RegExp("'([^']+)'")
-        .allMatches(picked!.group(1)!)
-        .map((RegExpMatch m) => m.group(1)!)
-        .toSet();
+    final Set<String> accepted = RegExp(
+      "'([^']+)'",
+    ).allMatches(picked!.group(1)!).map((RegExpMatch m) => m.group(1)!).toSet();
 
     for (final String field in profilePatchFields) {
       expect(

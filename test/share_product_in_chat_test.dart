@@ -81,7 +81,10 @@ class _ChatApi extends ApiService {
   final List<String> sentBodies = <String>[];
   final List<String?> sentProductIds = <String?>[];
 
-  _ChatApi({this.messages = const <MessageApiModel>[], this.shelves = const []});
+  _ChatApi({
+    this.messages = const <MessageApiModel>[],
+    this.shelves = const [],
+  });
 
   @override
   Future<ConversationMessagesApiResponse> conversationMessages({
@@ -117,7 +120,7 @@ class _ChatApi extends ApiService {
     required String conversationId,
     required String body,
     String? productId,
-      String? replyToId,
+    String? replyToId,
   }) async {
     sentBodies.add(body);
     sentProductIds.add(productId);
@@ -403,10 +406,7 @@ void main() {
     test('and an ordinary customer keeps every button', () {
       expect(
         viewerOwnsSharedProduct(
-          const AuthSessionSnapshot(
-            type: AuthSessionType.customer,
-            token: 't',
-          ),
+          const AuthSessionSnapshot(type: AuthSessionType.customer, token: 't'),
         ),
         isFalse,
       );

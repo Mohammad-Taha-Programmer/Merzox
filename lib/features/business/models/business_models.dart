@@ -16,8 +16,7 @@ final class BusinessSocialLinks {
     this.facebook = '',
   });
 
-  bool get isEmpty =>
-      instagram.isEmpty && whatsapp.isEmpty && facebook.isEmpty;
+  bool get isEmpty => instagram.isEmpty && whatsapp.isEmpty && facebook.isEmpty;
 
   factory BusinessSocialLinks.fromJson(Map<String, dynamic> json) =>
       BusinessSocialLinks(

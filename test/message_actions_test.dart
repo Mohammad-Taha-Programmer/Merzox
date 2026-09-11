@@ -61,8 +61,7 @@ class _ChatApi extends ApiService {
 
   final List<String?> sentReplyIds = <String?>[];
   final List<String> sentBodies = <String>[];
-  final List<(String messageId, bool bookmarked)> marks =
-      <(String, bool)>[];
+  final List<(String messageId, bool bookmarked)> marks = <(String, bool)>[];
 
   _ChatApi({this.messages = const <MessageApiModel>[]});
 
@@ -117,8 +116,8 @@ class _BookmarkApi extends ApiService {
   final List<BookmarkApiModel> rows;
 
   /// What was asked to be unmarked, and from which thread.
-  final List<(String conversationId, String messageId, bool bookmarked)>
-  marks = <(String, String, bool)>[];
+  final List<(String conversationId, String messageId, bool bookmarked)> marks =
+      <(String, String, bool)>[];
 
   _BookmarkApi(this.rows);
 
@@ -259,9 +258,7 @@ void main() {
     testWidgets('sending carries the answered message, and only its id', (
       WidgetTester tester,
     ) async {
-      final _ChatApi api = _ChatApi(
-        messages: <MessageApiModel>[_message()],
-      );
+      final _ChatApi api = _ChatApi(messages: <MessageApiModel>[_message()]);
       await _openChat(tester, api);
 
       await _longPressFirstMessage(tester, 'عندي استفسار');
@@ -378,9 +375,7 @@ void main() {
     testWidgets('marking asks the server, and keeps what it answered', (
       WidgetTester tester,
     ) async {
-      final _ChatApi api = _ChatApi(
-        messages: <MessageApiModel>[_message()],
-      );
+      final _ChatApi api = _ChatApi(messages: <MessageApiModel>[_message()]);
       final ChatBloc bloc = await _openChat(tester, api);
 
       await _longPressFirstMessage(tester, 'عندي استفسار');
@@ -439,10 +434,7 @@ void main() {
 
       expect(find.text('البتول كوزماتيكس'), findsOneWidget);
       expect(find.text('عندي استفسار'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey<String>('bookmark.m1')),
-        findsOneWidget,
-      );
+      expect(find.byKey(const ValueKey<String>('bookmark.m1')), findsOneWidget);
     });
 
     testWidgets('the bin takes a mark off, and the row goes with it', (
@@ -458,10 +450,7 @@ void main() {
 
       await pumpLocalized(
         tester,
-        BookmarksPage(
-          apiService: api,
-          authSessionService: const _Session(),
-        ),
+        BookmarksPage(apiService: api, authSessionService: const _Session()),
       );
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 30)),
@@ -480,10 +469,7 @@ void main() {
       expect(api.marks, <(String, String, bool)>[('c1', 'm1', false)]);
 
       // And the list is what is left, without a reload.
-      expect(
-        find.byKey(const ValueKey<String>('bookmark.m1')),
-        findsNothing,
-      );
+      expect(find.byKey(const ValueKey<String>('bookmark.m1')), findsNothing);
       expect(find.text('لم تضع علامة على أي رسالة بعد.'), findsOneWidget);
     });
 

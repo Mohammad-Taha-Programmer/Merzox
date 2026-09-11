@@ -110,20 +110,23 @@ void main() {
       expect(await storedRole(), 'merchant');
     });
 
-    test('a customer who never enrolled is refused, and nothing is written', () async {
-      useAuthenticatedSession(token: 'customer-token');
+    test(
+      'a customer who never enrolled is refused, and nothing is written',
+      () async {
+        useAuthenticatedSession(token: 'customer-token');
 
-      expect(await service.actAsMerchant(), isFalse);
+        expect(await service.actAsMerchant(), isFalse);
 
-      // The refusal is the whole point: were this to write the role, the
-      // enrolment on the home screen would become optional.
-      expect(await storedRole(), isNull);
+        // The refusal is the whole point: were this to write the role, the
+        // enrolment on the home screen would become optional.
+        expect(await storedRole(), isNull);
 
-      final AuthSessionSnapshot after = await session.read();
+        final AuthSessionSnapshot after = await session.read();
 
-      expect(after.type, AuthSessionType.customer);
-      expect(after.ownsBusiness, isFalse);
-    });
+        expect(after.type, AuthSessionType.customer);
+        expect(after.ownsBusiness, isFalse);
+      },
+    );
 
     test('a signed-out reader is refused', () async {
       useStaleTokenWithoutSession();

@@ -64,10 +64,8 @@ void main() {
   // It is the board's pill now, the same one the merchant profile turns the
   // other way with - not a `FilledButton` of this screen's own, which is what
   // made the two screens draw the same control at two different sizes.
-  Finder merchantButton() => find.widgetWithText(
-    MerzoxProfilePill,
-    'التسجيل كتاجر',
-  );
+  Finder merchantButton() =>
+      find.widgetWithText(MerzoxProfilePill, 'التسجيل كتاجر');
 
   testWidgets('an account that owns a shop is offered the merchant side', (
     tester,
