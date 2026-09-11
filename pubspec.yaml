@@ -179,6 +179,13 @@ flutter:
     - family: SearchIcon
       fonts:
         - asset: assets/fonts/icons_fonts/SearchIcon.ttf
+    # The pair on a password field.
+    - family: EyeIconShowPassword
+      fonts:
+        - asset: assets/fonts/icons_fonts/EyeIconShowPassword.ttf
+    - family: EyeIconHidePassword
+      fonts:
+        - asset: assets/fonts/icons_fonts/EyeIconHidePassword.ttf
     - family: EditProfileIcon
       fonts:
         - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf

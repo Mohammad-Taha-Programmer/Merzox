@@ -4,6 +4,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 
 import '../bloc/password_recovery_bloc.dart';
 import '../bloc/password_recovery_event.dart';
@@ -146,10 +147,13 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                 _obscurePassword = !_obscurePassword;
                               });
                             },
+                            // Material's own default was 24; the factor
+                            // converts it.
                             icon: Icon(
                               _obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+                                  ? MerzoxIcons.showPassword
+                                  : MerzoxIcons.hidePassword,
+                              size: 24 * MerzoxIcons.passwordEyeSizeFactor,
                             ),
                           ),
                         ),
@@ -172,10 +176,13 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                                 _obscureConfirmation = !_obscureConfirmation;
                               });
                             },
+                            // Material's own default was 24; the factor
+                            // converts it.
                             icon: Icon(
                               _obscureConfirmation
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
+                                  ? MerzoxIcons.showPassword
+                                  : MerzoxIcons.hidePassword,
+                              size: 24 * MerzoxIcons.passwordEyeSizeFactor,
                             ),
                           ),
                         ),

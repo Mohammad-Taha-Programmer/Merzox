@@ -144,6 +144,39 @@ abstract final class MerzoxIcons {
     fontFamily: 'RatingBarStar',
   );
 
+  // -- The eye on a password field ------------------------------------------
+  //
+  // The names are the designer's and they settle a question the app was of two
+  // minds about: which eye stands beside a password that is hidden. This one -
+  // "show password" - is what a reader presses to reveal it, so it is the one
+  // drawn while the field is obscured. The crossed eye is what they press to
+  // put it back.
+  //
+  // `EyeIconHidePassword` also carries a stray box glyph the generator left
+  // behind, so the code points here were read out of each `cmap` and the
+  // glyphs rendered before either went on a field.
+
+  /// The open eye: press it to reveal a hidden password.
+  static const IconData showPassword = IconData(
+    0xe803,
+    fontFamily: 'EyeIconShowPassword',
+  );
+
+  /// The crossed eye: press it to hide a revealed one.
+  static const IconData hidePassword = IconData(
+    0xe802,
+    fontFamily: 'EyeIconHidePassword',
+  );
+
+  /// What to multiply a Material eye's size by to get these at the same
+  /// apparent size.
+  ///
+  /// Width, not height: an eye is wide and short, and Material's two differ in
+  /// height from each other - the crossed one is taller for its slash - while
+  /// these two are the same height. Anchoring on width is what keeps the pair
+  /// the same size as each other when a press swaps one for the other.
+  static const double passwordEyeSizeFactor = 0.918 / 1.24;
+
   // -- Search ---------------------------------------------------------------
 
   /// The magnifier, on every field that searches something.
