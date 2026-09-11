@@ -591,10 +591,15 @@ class _HomeTopBar extends StatelessWidget {
                       minWidth: 40,
                       minHeight: 40,
                     ),
-                    // The size it drew at as a Material bell, converted.
+                    // The size it drew at as a Material bell, converted, and
+                    // the colour the floating bell carries. It had no colour
+                    // of its own and took Material's near-black default, which
+                    // made the one mark in this bar that is also a bell the
+                    // darkest thing in it.
                     icon: Icon(
                       MerzoxIcons.homeScreenNotifications,
                       size: 24 * MerzoxIcons.notificationsSizeFactor,
+                      color: kHomeBarControlColour,
                     ),
                   ),
                 // Offered to guests too: a visitor who cannot read the
@@ -602,13 +607,7 @@ class _HomeTopBar extends StatelessWidget {
                 // where this used to be the only copy.
                 const LanguageToggleButton(
                   iconSize: 24,
-                  // The bar's own grey, not the control's navy default. Drawn
-                  // in the darker colour it was the one solid mark in a row of
-                  // light outlines and read as the loudest thing in the bar,
-                  // which changing the language is not. This is the sign-out
-                  // beside it; the floating bell is a shade lighter again
-                  // (#98C1D9), so there is no one colour that matches both.
-                  color: MerzoxColors.kColor8D99AE,
+                  color: kHomeBarControlColour,
                   padding: EdgeInsets.zero,
                   constraints: BoxConstraints(minWidth: 40, minHeight: 40),
                 ),
@@ -630,7 +629,7 @@ class _HomeTopBar extends StatelessWidget {
                     icon: Icon(
                       MerzoxIcons.homeScreenSignOut,
                       size: 24 * MerzoxIcons.signOutSizeFactor,
-                      color: MerzoxColors.kColor8D99AE,
+                      color: kHomeBarControlColour,
                     ),
                   ),
                 // The floating bell owns this corner on every screen, so
@@ -1214,6 +1213,18 @@ class _BusinessInteractionCorner extends StatelessWidget {
     );
   }
 }
+
+/// The one colour every control in the customer home bar is drawn in.
+///
+/// The bell that floats over every screen already used it, and the bar's three
+/// controls each had their own answer: the language globe took the toggle's
+/// navy default, the sign-out a mid grey, and the guest's bell no colour at
+/// all - which meant Material's near-black, making the one mark in the bar
+/// that is also a bell the darkest thing in it.
+///
+/// A constant rather than the colour written three times, so the row cannot
+/// drift apart again one control at a time.
+const Color kHomeBarControlColour = MerzoxColors.kColor98C1D9;
 
 /// Whether anything can be advertised in the band under the top bar.
 ///
