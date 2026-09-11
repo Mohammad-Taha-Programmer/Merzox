@@ -1059,7 +1059,9 @@ void main() {
         bloc.add(const BusinessTabChanged(4));
         await settleFrames(tester);
 
-        expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+        // The designer's eye, since the merchant's marks moved onto their own
+        // set; the row itself is what this asserts, not which font drew it.
+        expect(find.byIcon(MerzoxIcons.previewProduct), findsOneWidget);
         // Nothing existing was displaced to make room for it: editing the
         // business is the settings row, and logging out is still there.
         expect(find.byIcon(Icons.settings_outlined), findsOneWidget);

@@ -254,6 +254,89 @@ abstract final class MerzoxIcons {
   /// match, so scaling each to its own ink would have pulled them apart.
   static const double ratingStarSizeFactor = 0.712 / 1.086;
 
+  // -- Keeping a product -----------------------------------------------------
+  //
+  // What a merchant does to one of their own products: edit it, delete it,
+  // look at it the way a customer will, and put pictures on it. The count of
+  // them is here too, because it is the same drawing and it is read off the
+  // same idea of a product.
+  //
+  // `EditProductIcon.ttf` is not like the others in this set: the generator
+  // shipped it with the whole Material library inside it and the designer's
+  // own mark appended at the very end, at U+EBA4. Taking the last entry in a
+  // `cmap` is a habit that would have been right here and wrong three times
+  // already, so this one was rendered and looked at like the rest.
+  //
+  // `CropProductPic.ttf` has no constant. Nothing in the app crops a picture
+  // yet - the image manager says so in its own header - and a mark for an
+  // action that does not exist is not an icon, it is a promise.
+
+  /// The pencil on a product's row: opens the editor.
+  static const IconData editProduct = IconData(
+    0xeba4,
+    fontFamily: 'EditProductIcon',
+  );
+
+  /// The bin: removes a product, one of its variants, or one of its pictures.
+  static const IconData deleteProductForever = IconData(
+    0xe805,
+    fontFamily: 'DeleteProductForever',
+  );
+
+  /// The eye: shows a merchant what a customer would see.
+  static const IconData previewProduct = IconData(
+    0xe801,
+    fontFamily: 'PreviewProductIcon',
+  );
+
+  /// The cloud with an arrow, on the panel that takes pictures.
+  static const IconData uploadProductImage = IconData(
+    0xe800,
+    fontFamily: 'UploadProductImage',
+  );
+
+  /// A parcel, beside a number of products.
+  static const IconData productsCount = IconData(
+    0xe802,
+    fontFamily: 'ProductsCount',
+  );
+
+  /// Against Material's `edit_outlined`.
+  ///
+  /// Both marks are square and both fill their box the same way, so this swap
+  /// is the one place in the set where the arithmetic barely matters - which
+  /// is worth saying only because it is the exception.
+  static const double editProductSizeFactor = 0.750 / 1.000;
+
+  /// Against Material's `delete_outline_rounded`.
+  ///
+  /// Height, not width: a bin is read by how tall it stands, and this one is
+  /// drawn wider for its height than Material's. Anchoring on width instead
+  /// made it visibly the smaller mark of the two on the board.
+  static const double deleteProductSizeFactor = 0.750 / 1.000;
+
+  /// Against Material's `visibility_outlined`.
+  ///
+  /// Width, for the reason [passwordEyeSizeFactor] gives: an eye is wide and
+  /// short, and its width is what the reader registers. Anchored on height it
+  /// came out plainly smaller than the eye it replaces.
+  static const double previewProductSizeFactor = 0.920 / 0.835;
+
+  /// Against Material's `cloud_upload_outlined`.
+  ///
+  /// Width. The two clouds are drawn to different proportions - this one is
+  /// taller for its width - and the drop panel it stands in is sized by its
+  /// own box, so the width is what has to stay put.
+  static const double uploadProductImageSizeFactor = 1.000 / 1.288;
+
+  /// Against Material's `inventory_2_outlined` and `shopping_bag_outlined`,
+  /// the two different marks the two places counting products were drawing.
+  ///
+  /// Height, which is what makes one number serve both: the parcel is square,
+  /// the bag is tall and narrow, and no single factor can match both in width.
+  /// Matching their height is what puts the two counts on the same footing.
+  static const double productsCountSizeFactor = 0.835 / 0.990;
+
   // -- The customer's bottom bar --------------------------------------------
   //
   // Five places, the middle one raised out of the bar. Home and the account

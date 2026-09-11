@@ -875,8 +875,10 @@ class _BusinessResultTile extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: <Widget>[
                                   Icon(
-                                    Icons.shopping_bag_outlined,
-                                    size: 14,
+                                    MerzoxIcons.productsCount,
+                                    size:
+                                        14 *
+                                        MerzoxIcons.productsCountSizeFactor,
                                     color: MerzoxColors.kColor3D5A80,
                                   ),
                                   const SizedBox(width: 4),

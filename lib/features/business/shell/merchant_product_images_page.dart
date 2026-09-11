@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/services/api_service.dart';
 
 /// The product image manager of `الرئيسية – 14`.
@@ -330,9 +331,9 @@ class _DropTarget extends StatelessWidget {
                   child: CircularProgressIndicator(strokeWidth: 3),
                 )
               else
-                const Icon(
-                  Icons.cloud_upload_outlined,
-                  size: 44,
+                Icon(
+                  MerzoxIcons.uploadProductImage,
+                  size: 44 * MerzoxIcons.uploadProductImageSizeFactor,
                   color: MerzoxColors.kColor98C1D9,
                 ),
               const SizedBox(height: 14),
@@ -435,9 +436,9 @@ class _ImageEntry extends StatelessWidget {
               IconButton(
                 tooltip: 'common.delete'.tr(),
                 onPressed: onRemove,
-                iconSize: 18,
+                iconSize: 18 * MerzoxIcons.deleteProductSizeFactor,
                 color: MerzoxColors.kColor3B3B3B,
-                icon: const Icon(Icons.delete_outline_rounded),
+                icon: const Icon(MerzoxIcons.deleteProductForever),
               ),
               const Spacer(),
               Text(

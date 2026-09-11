@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/constants/money.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/products/merchant_product_options_dialog.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
@@ -946,9 +947,9 @@ class _ImagesDropZone extends StatelessWidget {
               ? Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
-                    const Icon(
-                      Icons.cloud_upload_outlined,
-                      size: 42,
+                    Icon(
+                      MerzoxIcons.uploadProductImage,
+                      size: 42 * MerzoxIcons.uploadProductImageSizeFactor,
                       color: MerzoxColors.kColor98C1D9,
                     ),
                     const SizedBox(height: 10),
@@ -1062,9 +1063,9 @@ class _PublishRow extends StatelessWidget {
             ),
           ),
           const Spacer(),
-          const Icon(
-            Icons.visibility_outlined,
-            size: 18,
+          Icon(
+            MerzoxIcons.previewProduct,
+            size: 18 * MerzoxIcons.previewProductSizeFactor,
             color: MerzoxColors.kColor8D99AE,
           ),
           const SizedBox(width: 8),

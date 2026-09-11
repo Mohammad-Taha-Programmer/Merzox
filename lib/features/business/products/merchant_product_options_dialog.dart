@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/constants/money.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/products/merchant_product_editor_page.dart';
 
@@ -479,7 +480,10 @@ class _OptionDetailsSheetState extends State<_OptionDetailsSheet> {
               style: OutlinedButton.styleFrom(
                 foregroundColor: MerzoxColors.kColorEE6C4D,
               ),
-              icon: const Icon(Icons.delete_outline_rounded, size: 18),
+              icon: Icon(
+                MerzoxIcons.deleteProductForever,
+                size: 18 * MerzoxIcons.deleteProductSizeFactor,
+              ),
               label: Text('merchantProduct.removeVariant'.tr()),
             ),
             const SizedBox(height: 10),

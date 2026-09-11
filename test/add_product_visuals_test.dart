@@ -3,12 +3,15 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/business/products/merchant_product_editor_page.dart';
 import 'package:merzox/features/business/products/merchant_product_options_dialog.dart';
+import 'package:merzox/features/business/shell/business_bloc.dart';
 import 'package:merzox/features/business/shell/merchant_product_images_page.dart';
 import 'package:merzox/services/api_service.dart';
 
@@ -567,6 +570,116 @@ void main() {
 
       expect(api.uploaded, isEmpty);
       expect(find.byType(SnackBar), findsNothing);
+    });
+  }, skip: merzoxGoldenPlatformSkip);
+
+  /// Three marks on this screen that no golden can see.
+  ///
+  /// `الصور` and the preview row sit below the product form's fold, and the
+  /// lazy list never builds them for a capture; the variant sheet opens from a
+  /// chip inside a dialog that is itself a capture. So the conversion of those
+  /// three is asserted here, against the widgets the app ships, rather than
+  /// left to a board that would never have shown it either way.
+  group('the designer marks a merchant cannot see on a board', () {
+    Future<void> pumpEditor(WidgetTester tester) async {
+      final BusinessBloc bloc = BusinessBloc(apiService: _NoProducts());
+      addTearDown(bloc.close);
+
+      await pumpMerzoxGoldenPage(
+        tester,
+        BlocProvider<BusinessBloc>.value(
+          value: bloc,
+          child: withMerzoxGoldenDeviceInsets(const MerchantProductEditorPage()),
+        ),
+      );
+    }
+
+    testWidgets('the panel that takes pictures carries the designer cloud', (
+      WidgetTester tester,
+    ) async {
+      await pumpEditor(tester);
+
+      // The editor's own wording, which is not quite the image manager's:
+      // `واسقط` here against `وأسقط` there, the same sentence spelled two ways
+      // on two screens. Left as it is - it is a copy question, not this
+      // branch's.
+      await tester.scrollUntilVisible(
+        find.text('اسحب واسقط الصور هنا'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await settleMerzoxGoldenFrames(tester);
+
+      final Icon cloud = tester.widget<Icon>(
+        find.byWidgetPredicate(
+          (Widget widget) =>
+              widget is Icon && widget.icon == MerzoxIcons.uploadProductImage,
+        ),
+      );
+
+      // The number written on the screen is `42 * factor`, not the product of
+      // the two: a reader of that line has to be able to see both the size the
+      // board asks for and why it is not the size passed.
+      expect(cloud.size, 42 * MerzoxIcons.uploadProductImageSizeFactor);
+    });
+
+    testWidgets('the preview row carries the designer eye', (
+      WidgetTester tester,
+    ) async {
+      await pumpEditor(tester);
+
+      await tester.scrollUntilVisible(
+        find.text('معاينة'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await settleMerzoxGoldenFrames(tester);
+
+      final Icon eye = tester.widget<Icon>(
+        find.byWidgetPredicate(
+          (Widget widget) =>
+              widget is Icon && widget.icon == MerzoxIcons.previewProduct,
+        ),
+      );
+
+      expect(eye.size, 18 * MerzoxIcons.previewProductSizeFactor);
+    });
+
+    testWidgets('removing a variant offers the designer bin', (
+      WidgetTester tester,
+    ) async {
+      await pumpMerzoxGoldenPage(
+        tester,
+        withMerzoxGoldenDeviceInsets(
+          Navigator(
+            onGenerateRoute: (RouteSettings settings) =>
+                MaterialPageRoute<void>(
+                  builder: (_) => ProductOptionsDialog(
+                    options: <ProductOptionDraft>[
+                      ProductOptionDraft.named('أحمر'),
+                    ],
+                    maxOptions: 12,
+                    maxLabelLength: 40,
+                  ),
+                ),
+          ),
+        ),
+      );
+
+      // The sheet is what a chip hides, so getting to the bin means opening
+      // one.
+      await tester.tap(find.text('أحمر'));
+      await settleMerzoxGoldenFrames(tester);
+
+      final Icon bin = tester.widget<Icon>(
+        find.byWidgetPredicate(
+          (Widget widget) =>
+              widget is Icon &&
+              widget.icon == MerzoxIcons.deleteProductForever,
+        ),
+      );
+
+      expect(bin.size, 18 * MerzoxIcons.deleteProductSizeFactor);
     });
   }, skip: merzoxGoldenPlatformSkip);
 }
