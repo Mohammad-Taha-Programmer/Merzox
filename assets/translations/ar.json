@@ -670,7 +670,7 @@
       "guestMessage": "لعرض محتويات السلة الخاصة بك تسجيل الدخول أولا",
       "emptyTitle": "عذراً، السلة فارغة",
       "emptyBody": "لا يوجد منتجات في السلة، استكمل التسوق\nواضف أي شيء تريده",
-      "exploreShopping": "استكشف التسوق",
+      "continueShopping": "استكمال التسوق",
       "quantity": "الكمية: {}",
       "subtotal": "المجموع الفرعي",
       "deliveryCalculatedLater": "يحسب لاحقا",

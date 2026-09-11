@@ -18,9 +18,9 @@ import 'package:merzox/features/home/widgets/plain_tab_title.dart';
 /// `orders.checkoutOutOfStock` when an order was refused, and no test could
 /// have caught it. Out here it is a widget a test can simply build.
 class CartItemsView extends StatelessWidget {
-  final VoidCallback onExplorePressed;
+  final VoidCallback onContinueShopping;
 
-  const CartItemsView({required this.onExplorePressed, super.key});
+  const CartItemsView({required this.onContinueShopping, super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -61,7 +61,7 @@ class CartItemsView extends StatelessWidget {
                 child: Center(child: CircularProgressIndicator()),
               )
             else if (state.items.isEmpty)
-              _EmptyCartState(onExplorePressed: onExplorePressed)
+              _EmptyCartState(onContinueShopping: onContinueShopping)
             else ...[
               const SizedBox(height: 20),
               ...state.items.map(
@@ -94,9 +94,9 @@ class CartItemsView extends StatelessWidget {
 }
 
 class _EmptyCartState extends StatelessWidget {
-  final VoidCallback onExplorePressed;
+  final VoidCallback onContinueShopping;
 
-  const _EmptyCartState({required this.onExplorePressed});
+  const _EmptyCartState({required this.onContinueShopping});
 
   @override
   Widget build(BuildContext context) {
@@ -105,9 +105,23 @@ class _EmptyCartState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          CustomPaint(
-            size: const Size(122, 156),
-            painter: _EmptyCartBagPainter(),
+          // The designer's own drawing, where a hand-built painter stood.
+          //
+          // The box is the one the board measures and the painter used, so
+          // the gaps under it are unchanged. The picture is a slightly
+          // narrower shape than that box - 119 by 162 against 122 by 156 -
+          // so it is fitted inside rather than stretched to fill it, and
+          // what decides its size is the height, which is what the column's
+          // rhythm is built on.
+          SizedBox(
+            width: 122,
+            height: 156,
+            child: Image.asset(
+              'assets/images/Cart/empty_cart_theme.png',
+              fit: BoxFit.contain,
+              filterQuality: FilterQuality.medium,
+              excludeFromSemantics: true,
+            ),
           ),
           const SizedBox(height: 28),
           Text(
@@ -133,7 +147,7 @@ class _EmptyCartState extends StatelessWidget {
             width: 204,
             height: 48,
             child: FilledButton(
-              onPressed: onExplorePressed,
+              onPressed: onContinueShopping,
               style: FilledButton.styleFrom(
                 backgroundColor: MerzoxColors.kColorEE6C4D,
                 foregroundColor: Colors.white,
@@ -142,7 +156,7 @@ class _EmptyCartState extends StatelessWidget {
                 ),
               ),
               child: Text(
-                'home.cart.exploreShopping'.tr(),
+                'home.cart.continueShopping'.tr(),
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
               ),
             ),
@@ -363,79 +377,6 @@ class _CartSummaryCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _EmptyCartBagPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = MerzoxColors.kColor3D5A80
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    final body = RRect.fromRectAndRadius(
-      Rect.fromLTWH(
-        size.width * 0.08,
-        size.height * 0.25,
-        size.width * 0.84,
-        size.height * 0.65,
-      ),
-      const Radius.circular(5),
-    );
-    canvas.drawRRect(body, paint);
-    canvas.drawLine(
-      Offset(size.width * 0.08, size.height * 0.32),
-      Offset(size.width * 0.92, size.height * 0.32),
-      paint,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.08, size.height * 0.82),
-      Offset(size.width * 0.92, size.height * 0.82),
-      paint,
-    );
-
-    final handle = Path()
-      ..moveTo(size.width * 0.38, size.height * 0.25)
-      ..lineTo(size.width * 0.38, size.height * 0.16)
-      ..quadraticBezierTo(
-        size.width * 0.38,
-        size.height * 0.08,
-        size.width * 0.5,
-        size.height * 0.08,
-      )
-      ..quadraticBezierTo(
-        size.width * 0.62,
-        size.height * 0.08,
-        size.width * 0.62,
-        size.height * 0.16,
-      )
-      ..lineTo(size.width * 0.62, size.height * 0.25);
-    canvas.drawPath(handle, paint);
-
-    final fillPaint = Paint()
-      ..color = MerzoxColors.kColor3D5A80
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(
-      Offset(size.width * 0.43, size.height * 0.56),
-      3.5,
-      fillPaint,
-    );
-    canvas.drawCircle(
-      Offset(size.width * 0.57, size.height * 0.56),
-      3.5,
-      fillPaint,
-    );
-    canvas.drawLine(
-      Offset(size.width * 0.42, size.height * 0.67),
-      Offset(size.width * 0.58, size.height * 0.67),
-      paint..strokeWidth = 2.2,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _QuantityStepper extends StatelessWidget {

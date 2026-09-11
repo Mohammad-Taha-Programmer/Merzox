@@ -104,7 +104,7 @@ Future<CartBloc> _pumpTab(
     tester,
     BlocProvider<CartBloc>.value(
       value: bloc,
-      child: Scaffold(body: CartItemsView(onExplorePressed: () {})),
+      child: Scaffold(body: CartItemsView(onContinueShopping: () {})),
     ),
   );
 
@@ -132,7 +132,7 @@ void main() {
 
     expect(find.text('أحمر الشفاه'), findsNothing);
     expect(find.text('home.cart.emptyTitle'.tr()), findsOneWidget);
-    expect(find.text('home.cart.exploreShopping'.tr()), findsOneWidget);
+    expect(find.text('home.cart.continueShopping'.tr()), findsOneWidget);
   });
 
   testWidgets('a refused order is told in words, not in a translation key', (

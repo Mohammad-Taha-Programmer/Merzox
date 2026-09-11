@@ -258,7 +258,7 @@ class HomeScreen extends StatelessWidget {
                 apiService: apiService,
                 onSignupPressed: () => context.go('/signup'),
                 onLoginPressed: () => context.go('/login'),
-                onExplorePressed: () {
+                onContinueShopping: () {
                   context.read<HomeBloc>().add(const HomeTabChanged(0));
                 },
               ),
@@ -1631,13 +1631,13 @@ class _CartTab extends StatelessWidget {
   final ApiService? apiService;
   final VoidCallback onSignupPressed;
   final VoidCallback onLoginPressed;
-  final VoidCallback onExplorePressed;
+  final VoidCallback onContinueShopping;
 
   const _CartTab({
     required this.isGuest,
     required this.onSignupPressed,
     required this.onLoginPressed,
-    required this.onExplorePressed,
+    required this.onContinueShopping,
     this.apiService,
   });
 
@@ -1654,7 +1654,7 @@ class _CartTab extends StatelessWidget {
 
     return BlocProvider(
       create: (_) => CartBloc(apiService: apiService)..add(const CartStarted()),
-      child: CartItemsView(onExplorePressed: onExplorePressed),
+      child: CartItemsView(onContinueShopping: onContinueShopping),
     );
   }
 }
