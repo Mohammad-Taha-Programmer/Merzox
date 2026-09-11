@@ -334,6 +334,62 @@ abstract final class MerzoxIcons {
   /// Matching their height is what puts the two counts on the same footing.
   static const double productsCountSizeFactor = 0.835 / 0.990;
 
+  // -- An order, and what is done with one ----------------------------------
+  //
+  // The checkout's three steps and the printed invoice. Two of the three steps
+  // convert; the third is a tick in a circle and the set has nothing that
+  // draws one, so it keeps Material's.
+  //
+  // `PrintInvoice.ttf` is the second file in this library shipped with the
+  // whole Material set inside it and the designer's mark appended at U+EBA4,
+  // after `EditProductIcon.ttf`. Two out of forty is enough to make rendering
+  // every glyph the rule rather than a precaution.
+  //
+  // `ILSIcon.ttf` has no constant, and the reason is worth writing down: the
+  // shekel in this app is not an icon. `merzoxPrice` builds a string - `65 ₪`
+  // - and every price on every screen is that string inside a `Text`. Putting
+  // the drawn mark there means an inline span at each of them, which changes
+  // how prices align, select and read aloud. That is a typography decision
+  // about money, not an icon swap, and it is left for its own day.
+
+  /// The printer, on the invoice a merchant sends to paper.
+  static const IconData printInvoice = IconData(
+    0xeba4,
+    fontFamily: 'PrintInvoice',
+  );
+
+  /// A written page: the checkout step where the buyer's details are given.
+  static const IconData orderData = IconData(
+    0xe80d,
+    fontFamily: 'OrderDataIcon',
+  );
+
+  /// A wallet: the checkout step where the order is paid for.
+  static const IconData orderPayment = IconData(
+    0xe80c,
+    fontFamily: 'OrderPaymentIcon',
+  );
+
+  /// Against Material's `print_outlined`.
+  ///
+  /// Width, and it happens to be exactly one: the two printers are drawn to
+  /// the same width and the designer's is the taller. A printer is a wide
+  /// machine and its width is its outline; anchored on height it came out the
+  /// plainly smaller mark.
+  static const double printInvoiceSizeFactor = 0.835 / 0.835;
+
+  /// Against Material's `description_outlined`.
+  ///
+  /// Height: a page is read by how tall it stands.
+  static const double orderDataSizeFactor = 0.835 / 1.002;
+
+  /// Against Material's `account_balance_wallet_outlined`.
+  ///
+  /// Width. The designer's wallet is square where Material's is wider than it
+  /// is tall, and at 22 the two anchorings differ by a single pixel - so the
+  /// one that keeps the mark's width is the one to take.
+  static const double orderPaymentSizeFactor = 0.792 / 1.002;
+
   // -- The customer's bottom bar --------------------------------------------
   //
   // Five places, the middle one raised out of the bar. Home and the account

@@ -3,6 +3,7 @@ import '../../../core/constants/dates.dart';
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/widgets/merzox_back_chevron.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/constants/money.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 
@@ -61,8 +62,8 @@ class MerchantOrderInvoicePage extends StatelessWidget {
                     bottom: 0,
                     child: Center(
                       child: Icon(
-                        Icons.print_outlined,
-                        size: 22,
+                        MerzoxIcons.printInvoice,
+                        size: 22 * MerzoxIcons.printInvoiceSizeFactor,
                         color: MerzoxColors.kColor5E5E5E,
                       ),
                     ),
