@@ -846,86 +846,86 @@ class _Profile extends StatelessWidget {
       title: 'businessShell.profileTitle'.tr(),
       children: <Widget>[
         _ProfileIdentity(
-                  business: business,
-                  onRegisterAsCustomer: () async {
-                    // The same account, used the other way round: a shopkeeper
-                    // buying from another shopkeeper. Nothing is signed out.
-                    await const RoleSwitchService().actAsCustomer();
-                    if (context.mounted) context.go('/home');
-                  },
-                ),
-            MerzoxProfileMenuRow(
-              icon: Icons.person_outline_rounded,
-              label: 'businessShell.personalProfile'.tr(),
-              showChevron: true,
-              onTap: () => context.push('/profile/edit'),
-            ),
-            MerzoxProfileMenuRow(
-              icon: Icons.settings_outlined,
-              label: 'storeSettings.title'.tr(),
-              showChevron: true,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => BlocProvider<BusinessBloc>.value(
-                    value: context.read<BusinessBloc>(),
-                    child: StoreSettingsPage(business: business),
-                  ),
-                ),
+          business: business,
+          onRegisterAsCustomer: () async {
+            // The same account, used the other way round: a shopkeeper
+            // buying from another shopkeeper. Nothing is signed out.
+            await const RoleSwitchService().actAsCustomer();
+            if (context.mounted) context.go('/home');
+          },
+        ),
+        MerzoxProfileMenuRow(
+          icon: Icons.person_outline_rounded,
+          label: 'businessShell.personalProfile'.tr(),
+          showChevron: true,
+          onTap: () => context.push('/profile/edit'),
+        ),
+        MerzoxProfileMenuRow(
+          icon: Icons.settings_outlined,
+          label: 'storeSettings.title'.tr(),
+          showChevron: true,
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => BlocProvider<BusinessBloc>.value(
+                value: context.read<BusinessBloc>(),
+                child: StoreSettingsPage(business: business),
               ),
             ),
-            MerzoxProfileMenuRow(
-              icon: MerzoxIcons.chat,
-              // Level with the rows above it, which are still Material's and
-              // fill less of their em box than this does.
-              iconSize: 20 * MerzoxIcons.chatSizeFactor,
-              label: 'messages.title'.tr(),
-              showChevron: true,
-              onTap: () => context.push('/business/messages'),
-            ),
-            // The board drops the chevron from here down: these three do
-            // not open a screen with more of the same behind it.
-            MerzoxProfileMenuRow(
-              // The bare handset: this row reaches somebody rather than
-              // showing a number.
-              icon: MerzoxIcons.contactUs,
-              iconSize: 20 * MerzoxIcons.contactUsSizeFactor,
-              label: 'businessShell.contactUs'.tr(),
-              showChevron: true,
-              // It used to push `/about`, which is not a route - the one
-              // that exists is `/about-us` - so the row opened an error
-              // screen. It opens the shop's own ways of being reached
-              // now: the links from store settings and the numbers and
-              // addresses on the account, gathered in one place.
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => StoreContactPage(
-                    business: business,
-                    account: state.account,
-                    onEditSettings: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => BlocProvider<BusinessBloc>.value(
-                            value: context.read<BusinessBloc>(),
-                            child: StoreSettingsPage(business: business),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+          ),
+        ),
+        MerzoxProfileMenuRow(
+          icon: MerzoxIcons.chat,
+          // Level with the rows above it, which are still Material's and
+          // fill less of their em box than this does.
+          iconSize: 20 * MerzoxIcons.chatSizeFactor,
+          label: 'messages.title'.tr(),
+          showChevron: true,
+          onTap: () => context.push('/business/messages'),
+        ),
+        // The board drops the chevron from here down: these three do
+        // not open a screen with more of the same behind it.
+        MerzoxProfileMenuRow(
+          // The bare handset: this row reaches somebody rather than
+          // showing a number.
+          icon: MerzoxIcons.contactUs,
+          iconSize: 20 * MerzoxIcons.contactUsSizeFactor,
+          label: 'businessShell.contactUs'.tr(),
+          showChevron: true,
+          // It used to push `/about`, which is not a route - the one
+          // that exists is `/about-us` - so the row opened an error
+          // screen. It opens the shop's own ways of being reached
+          // now: the links from store settings and the numbers and
+          // addresses on the account, gathered in one place.
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => StoreContactPage(
+                business: business,
+                account: state.account,
+                onEditSettings: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => BlocProvider<BusinessBloc>.value(
+                        value: context.read<BusinessBloc>(),
+                        child: StoreSettingsPage(business: business),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
-            MerzoxProfileMenuRow(
-              icon: MerzoxIcons.previewProduct,
-              iconSize: 20 * MerzoxIcons.previewProductSizeFactor,
-              label: 'businessShell.previewStore'.tr(),
-              onTap: () => context.push('/business/preview'),
-            ),
-            _OrderNotificationsRow(
-              gateway: notificationPreferenceGateway,
-              sessionReader: notificationPreferenceSessionReader,
-            ),
+          ),
+        ),
+        MerzoxProfileMenuRow(
+          icon: MerzoxIcons.previewProduct,
+          iconSize: 20 * MerzoxIcons.previewProductSizeFactor,
+          label: 'businessShell.previewStore'.tr(),
+          onTap: () => context.push('/business/preview'),
+        ),
+        _OrderNotificationsRow(
+          gateway: notificationPreferenceGateway,
+          sessionReader: notificationPreferenceSessionReader,
+        ),
         const SizedBox(height: kProfileRowGap),
         MerzoxProfilePill(
           icon: Icons.logout_rounded,

@@ -24,9 +24,7 @@ const String _localeKey = 'locale';
 
 /// Opens the app's localization tree and reports the locale it settled on.
 Future<Locale> _openedLocale(WidgetTester tester, {String? saved}) async {
-  SharedPreferences.setMockInitialValues(<String, Object>{
-    _localeKey: ?saved,
-  });
+  SharedPreferences.setMockInitialValues(<String, Object>{_localeKey: ?saved});
 
   // What the real startup does before `runApp`: reads the saved choice into
   // the controller. Real asset and preference I/O, so it cannot run on the

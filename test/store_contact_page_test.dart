@@ -64,7 +64,10 @@ void main() {
 
       // `wa.me` wants digits alone: a `+` in the path is read as part of the
       // number and the chat opens on nobody.
-      expect(whatsappUri('+970562000000').toString(), 'https://wa.me/970562000000');
+      expect(
+        whatsappUri('+970562000000').toString(),
+        'https://wa.me/970562000000',
+      );
 
       expect(telUri('   '), isNull);
       expect(telUri('no digits here'), isNull);
@@ -89,30 +92,35 @@ void main() {
         'https://instagram.com/albatoul',
       );
       expect(
-        socialUri('https://instagram.com/albatoul', host: 'instagram.com')
-            .toString(),
+        socialUri(
+          'https://instagram.com/albatoul',
+          host: 'instagram.com',
+        ).toString(),
         'https://instagram.com/albatoul',
       );
     });
 
-    test('anything that is neither is refused rather than pasted on a host', () {
-      // A `javascript:` string hung off instagram.com would be a link to
-      // nowhere at best.
-      for (final String value in <String>[
-        '',
-        '   ',
-        'javascript:alert(1)',
-        'some one',
-        'path/with/slashes',
-        'ftp://host/x',
-      ]) {
-        expect(
-          socialUri(value, host: 'instagram.com'),
-          isNull,
-          reason: '$value should not become a link',
-        );
-      }
-    });
+    test(
+      'anything that is neither is refused rather than pasted on a host',
+      () {
+        // A `javascript:` string hung off instagram.com would be a link to
+        // nowhere at best.
+        for (final String value in <String>[
+          '',
+          '   ',
+          'javascript:alert(1)',
+          'some one',
+          'path/with/slashes',
+          'ftp://host/x',
+        ]) {
+          expect(
+            socialUri(value, host: 'instagram.com'),
+            isNull,
+            reason: '$value should not become a link',
+          );
+        }
+      },
+    );
   });
 
   group('when the account behind the numbers could not be read', () {
@@ -127,7 +135,9 @@ void main() {
       await pumpLocalized(
         tester,
         StoreContactPage(
-          business: _shop(links: const BusinessSocialLinks(facebook: 'albatoul')),
+          business: _shop(
+            links: const BusinessSocialLinks(facebook: 'albatoul'),
+          ),
           account: null,
           open: (Uri _) async => true,
         ),

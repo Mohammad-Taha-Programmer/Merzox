@@ -140,7 +140,9 @@ class MerzoxBackChevronButton extends StatelessWidget {
         child: SizedBox(
           width: touchTarget,
           height: touchTarget,
-          child: Center(child: MerzoxBackChevron(size: size, color: color)),
+          child: Center(
+            child: MerzoxBackChevron(size: size, color: color),
+          ),
         ),
       ),
     );

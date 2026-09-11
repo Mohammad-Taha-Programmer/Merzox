@@ -17,9 +17,7 @@ final class PasswordRecoveryApiService implements PasswordRecoveryGateway {
   // with. They all reach the one server, so a timeout raised for a
   // slow network has to reach all of them or it fixes one screen.
   PasswordRecoveryApiService({Dio? dio, String? baseUrl, Duration? timeout})
-    : _dio =
-          dio ??
-          Dio(ApiService.options(baseUrl: baseUrl, timeout: timeout));
+    : _dio = dio ?? Dio(ApiService.options(baseUrl: baseUrl, timeout: timeout));
 
   @override
   Future<void> requestPasswordReset({required String email}) async {

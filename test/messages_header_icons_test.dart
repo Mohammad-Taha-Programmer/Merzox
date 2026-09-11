@@ -82,14 +82,8 @@ void main() {
     final Rect drawn = _paintChevron(rightward: false).paths.single.getBounds();
 
     // Mirrored about the 24-square: the arms are now on the right.
-    expect(
-      drawn.left,
-      closeTo(kMerzoxChevronBox - kMerzoxChevronTipX, 0.01),
-    );
-    expect(
-      drawn.right,
-      closeTo(kMerzoxChevronBox - kMerzoxChevronArmX, 0.01),
-    );
+    expect(drawn.left, closeTo(kMerzoxChevronBox - kMerzoxChevronTipX, 0.01));
+    expect(drawn.right, closeTo(kMerzoxChevronBox - kMerzoxChevronArmX, 0.01));
   });
 
   test('its arms reach the artboard height, and it stays in its square', () {

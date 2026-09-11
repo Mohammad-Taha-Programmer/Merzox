@@ -126,10 +126,7 @@ void main() {
         .first;
 
     expect(
-      find.descendant(
-        of: chosenCard,
-        matching: find.textContaining('نابلس'),
-      ),
+      find.descendant(of: chosenCard, matching: find.textContaining('نابلس')),
       findsOneWidget,
     );
   });

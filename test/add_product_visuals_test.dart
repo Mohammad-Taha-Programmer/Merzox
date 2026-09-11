@@ -580,106 +580,112 @@ void main() {
   /// chip inside a dialog that is itself a capture. So the conversion of those
   /// three is asserted here, against the widgets the app ships, rather than
   /// left to a board that would never have shown it either way.
-  group('the designer marks a merchant cannot see on a board', () {
-    Future<void> pumpEditor(WidgetTester tester) async {
-      final BusinessBloc bloc = BusinessBloc(apiService: _NoProducts());
-      addTearDown(bloc.close);
+  group(
+    'the designer marks a merchant cannot see on a board',
+    () {
+      Future<void> pumpEditor(WidgetTester tester) async {
+        final BusinessBloc bloc = BusinessBloc(apiService: _NoProducts());
+        addTearDown(bloc.close);
 
-      await pumpMerzoxGoldenPage(
-        tester,
-        BlocProvider<BusinessBloc>.value(
-          value: bloc,
-          child: withMerzoxGoldenDeviceInsets(const MerchantProductEditorPage()),
-        ),
-      );
-    }
-
-    testWidgets('the panel that takes pictures carries the designer cloud', (
-      WidgetTester tester,
-    ) async {
-      await pumpEditor(tester);
-
-      // The editor's own wording, which is not quite the image manager's:
-      // `واسقط` here against `وأسقط` there, the same sentence spelled two ways
-      // on two screens. Left as it is - it is a copy question, not this
-      // branch's.
-      await tester.scrollUntilVisible(
-        find.text('اسحب واسقط الصور هنا'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await settleMerzoxGoldenFrames(tester);
-
-      final Icon cloud = tester.widget<Icon>(
-        find.byWidgetPredicate(
-          (Widget widget) =>
-              widget is Icon && widget.icon == MerzoxIcons.uploadProductImage,
-        ),
-      );
-
-      // The number written on the screen is `42 * factor`, not the product of
-      // the two: a reader of that line has to be able to see both the size the
-      // board asks for and why it is not the size passed.
-      expect(cloud.size, 42 * MerzoxIcons.uploadProductImageSizeFactor);
-    });
-
-    testWidgets('the preview row carries the designer eye', (
-      WidgetTester tester,
-    ) async {
-      await pumpEditor(tester);
-
-      await tester.scrollUntilVisible(
-        find.text('معاينة'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await settleMerzoxGoldenFrames(tester);
-
-      final Icon eye = tester.widget<Icon>(
-        find.byWidgetPredicate(
-          (Widget widget) =>
-              widget is Icon && widget.icon == MerzoxIcons.previewProduct,
-        ),
-      );
-
-      expect(eye.size, 18 * MerzoxIcons.previewProductSizeFactor);
-    });
-
-    testWidgets('removing a variant offers the designer bin', (
-      WidgetTester tester,
-    ) async {
-      await pumpMerzoxGoldenPage(
-        tester,
-        withMerzoxGoldenDeviceInsets(
-          Navigator(
-            onGenerateRoute: (RouteSettings settings) =>
-                MaterialPageRoute<void>(
-                  builder: (_) => ProductOptionsDialog(
-                    options: <ProductOptionDraft>[
-                      ProductOptionDraft.named('أحمر'),
-                    ],
-                    maxOptions: 12,
-                    maxLabelLength: 40,
-                  ),
-                ),
+        await pumpMerzoxGoldenPage(
+          tester,
+          BlocProvider<BusinessBloc>.value(
+            value: bloc,
+            child: withMerzoxGoldenDeviceInsets(
+              const MerchantProductEditorPage(),
+            ),
           ),
-        ),
-      );
+        );
+      }
 
-      // The sheet is what a chip hides, so getting to the bin means opening
-      // one.
-      await tester.tap(find.text('أحمر'));
-      await settleMerzoxGoldenFrames(tester);
+      testWidgets('the panel that takes pictures carries the designer cloud', (
+        WidgetTester tester,
+      ) async {
+        await pumpEditor(tester);
 
-      final Icon bin = tester.widget<Icon>(
-        find.byWidgetPredicate(
-          (Widget widget) =>
-              widget is Icon &&
-              widget.icon == MerzoxIcons.deleteProductForever,
-        ),
-      );
+        // The editor's own wording, which is not quite the image manager's:
+        // `واسقط` here against `وأسقط` there, the same sentence spelled two ways
+        // on two screens. Left as it is - it is a copy question, not this
+        // branch's.
+        await tester.scrollUntilVisible(
+          find.text('اسحب واسقط الصور هنا'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await settleMerzoxGoldenFrames(tester);
 
-      expect(bin.size, 18 * MerzoxIcons.deleteProductSizeFactor);
-    });
-  }, skip: merzoxGoldenPlatformSkip);
+        final Icon cloud = tester.widget<Icon>(
+          find.byWidgetPredicate(
+            (Widget widget) =>
+                widget is Icon && widget.icon == MerzoxIcons.uploadProductImage,
+          ),
+        );
+
+        // The number written on the screen is `42 * factor`, not the product of
+        // the two: a reader of that line has to be able to see both the size the
+        // board asks for and why it is not the size passed.
+        expect(cloud.size, 42 * MerzoxIcons.uploadProductImageSizeFactor);
+      });
+
+      testWidgets('the preview row carries the designer eye', (
+        WidgetTester tester,
+      ) async {
+        await pumpEditor(tester);
+
+        await tester.scrollUntilVisible(
+          find.text('معاينة'),
+          200,
+          scrollable: find.byType(Scrollable).first,
+        );
+        await settleMerzoxGoldenFrames(tester);
+
+        final Icon eye = tester.widget<Icon>(
+          find.byWidgetPredicate(
+            (Widget widget) =>
+                widget is Icon && widget.icon == MerzoxIcons.previewProduct,
+          ),
+        );
+
+        expect(eye.size, 18 * MerzoxIcons.previewProductSizeFactor);
+      });
+
+      testWidgets('removing a variant offers the designer bin', (
+        WidgetTester tester,
+      ) async {
+        await pumpMerzoxGoldenPage(
+          tester,
+          withMerzoxGoldenDeviceInsets(
+            Navigator(
+              onGenerateRoute: (RouteSettings settings) =>
+                  MaterialPageRoute<void>(
+                    builder: (_) => ProductOptionsDialog(
+                      options: <ProductOptionDraft>[
+                        ProductOptionDraft.named('أحمر'),
+                      ],
+                      maxOptions: 12,
+                      maxLabelLength: 40,
+                    ),
+                  ),
+            ),
+          ),
+        );
+
+        // The sheet is what a chip hides, so getting to the bin means opening
+        // one.
+        await tester.tap(find.text('أحمر'));
+        await settleMerzoxGoldenFrames(tester);
+
+        final Icon bin = tester.widget<Icon>(
+          find.byWidgetPredicate(
+            (Widget widget) =>
+                widget is Icon &&
+                widget.icon == MerzoxIcons.deleteProductForever,
+          ),
+        );
+
+        expect(bin.size, 18 * MerzoxIcons.deleteProductSizeFactor);
+      });
+    },
+    skip: merzoxGoldenPlatformSkip,
+  );
 }

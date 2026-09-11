@@ -86,9 +86,7 @@ void main() {
       await tester.tap(find.byKey(const ValueKey<String>('storeLogo.camera')));
       await settleFrames(tester);
 
-      expect(recorder.asked, <MerzoxPictureSource>[
-        MerzoxPictureSource.camera,
-      ]);
+      expect(recorder.asked, <MerzoxPictureSource>[MerzoxPictureSource.camera]);
       expect(recorder.uploaded.single, <int>[1, 2, 3]);
     });
 

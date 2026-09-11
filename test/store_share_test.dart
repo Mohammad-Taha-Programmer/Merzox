@@ -112,9 +112,7 @@ void main() {
   });
 
   group('the button', () {
-    testWidgets('is a control, and answers a tap', (
-      WidgetTester tester,
-    ) async {
+    testWidgets('is a control, and answers a tap', (WidgetTester tester) async {
       // The storefront itself is not pumped here: it does not settle in a
       // widget test, which is why the product page's slider and its purchase
       // controls were pulled out of it too. What it is made of is checkable.

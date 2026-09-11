@@ -2347,7 +2347,9 @@ void main() {
         // that matters: the window has always been promised here and never
         // enforced, and what limits it is not time alone.
         expect(
-          find.text('يمكن إلغاء الطلب خلال 24 ساعة من إنشائه، ما لم يخرج للتوصيل'),
+          find.text(
+            'يمكن إلغاء الطلب خلال 24 ساعة من إنشائه، ما لم يخرج للتوصيل',
+          ),
           findsOneWidget,
         );
 
@@ -2588,9 +2590,7 @@ void main() {
         // Read right to left: the glyph at the reading edge, the words beside
         // it, the chevron alone at the far end. This is the rule the merchant
         // screen already held itself to and this one did not.
-        final Rect icon = tester.getRect(
-          find.byIcon(MerzoxIcons.myOrders),
-        );
+        final Rect icon = tester.getRect(find.byIcon(MerzoxIcons.myOrders));
         final Rect label = tester.getRect(find.text('طلباتي'));
 
         expect(icon.center.dx, greaterThan(label.center.dx));

@@ -268,10 +268,7 @@ void main() {
 
             expect(find.text(longBusinessName), findsOneWidget);
             expect(find.text(longBusinessAddress), findsOneWidget);
-            expect(
-              find.byIcon(MerzoxIcons.chat),
-              findsOneWidget,
-            );
+            expect(find.byIcon(MerzoxIcons.chat), findsOneWidget);
             expect(tester.takeException(), isNull);
           },
         );

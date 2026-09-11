@@ -131,8 +131,8 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
     final String token = await _token();
     if (token.isEmpty || !mounted) return;
 
-    final List<SavedAddressApiModel>? updated =
-        await Navigator.of(context).push<List<SavedAddressApiModel>>(
+    final List<SavedAddressApiModel>? updated = await Navigator.of(context)
+        .push<List<SavedAddressApiModel>>(
           MaterialPageRoute<List<SavedAddressApiModel>>(
             builder: (_) =>
                 AddressFormPage(token: token, apiService: widget.apiService),

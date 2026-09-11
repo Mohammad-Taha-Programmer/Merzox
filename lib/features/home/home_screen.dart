@@ -2010,8 +2010,7 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
   /// the threads it is a party to, and deletes the picture it replaced - so
   /// all of that follows from this one call.
   Future<String?> _uploadAvatar(Uint8List bytes) async {
-    final AuthSessionSnapshot session = await const AuthSessionService()
-        .read();
+    final AuthSessionSnapshot session = await const AuthSessionService().read();
     final String? token = session.token;
     if (token == null) throw StateError('Authentication required');
 

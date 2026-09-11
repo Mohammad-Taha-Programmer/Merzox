@@ -245,9 +245,7 @@ class _ChatPageState extends State<ChatPage> {
             if (state.noticeCode.isNotEmpty) {
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
-                ..showSnackBar(
-                  SnackBar(content: Text(state.noticeCode.tr())),
-                );
+                ..showSnackBar(SnackBar(content: Text(state.noticeCode.tr())));
             }
 
             if (state.errorMessage.isNotEmpty) {
@@ -1351,12 +1349,9 @@ class _ReportSheetState extends State<_ReportSheet> {
                   // that looked ready would only fail at the server.
                   onPressed: _reason == null
                       ? null
-                      : () => Navigator.of(context).pop(
-                          _ReportDraft(
-                            reason: _reason!,
-                            note: _note.text,
-                          ),
-                        ),
+                      : () => Navigator.of(
+                          context,
+                        ).pop(_ReportDraft(reason: _reason!, note: _note.text)),
                   style: FilledButton.styleFrom(
                     backgroundColor: MerzoxColors.kColorEE6C4D,
                     shape: RoundedRectangleBorder(

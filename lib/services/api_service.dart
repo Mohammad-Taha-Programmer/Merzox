@@ -3775,7 +3775,8 @@ class BookmarkListApiResponse {
     final List<dynamic> rows =
         json['bookmarks'] as List<dynamic>? ?? const <dynamic>[];
     final Map<String, dynamic> pagination =
-        json['pagination'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+        json['pagination'] as Map<String, dynamic>? ??
+        const <String, dynamic>{};
 
     return BookmarkListApiResponse(
       bookmarks: rows
@@ -3830,7 +3831,8 @@ class BlockedUserListApiResponse {
     final List<dynamic> rows =
         json['blocks'] as List<dynamic>? ?? const <dynamic>[];
     final Map<String, dynamic> pagination =
-        json['pagination'] as Map<String, dynamic>? ?? const <String, dynamic>{};
+        json['pagination'] as Map<String, dynamic>? ??
+        const <String, dynamic>{};
 
     return BlockedUserListApiResponse(
       blocks: rows

@@ -50,8 +50,7 @@ class _ChatApi extends ApiService {
   final bool blockedByMe;
   final bool blockedMe;
 
-  final List<(String conversationId, bool blocked)> asked =
-      <(String, bool)>[];
+  final List<(String conversationId, bool blocked)> asked = <(String, bool)>[];
   final List<String> sent = <String>[];
 
   _ChatApi({this.blockedByMe = false, this.blockedMe = false});
@@ -267,7 +266,10 @@ void main() {
         find.byKey(const ValueKey<String>('chat.unblockFromNotice')),
         findsNothing,
       );
-      expect(find.text('هذه المحادثة مغلقة، ولا يمكن الإرسال فيها.'), findsOneWidget);
+      expect(
+        find.text('هذه المحادثة مغلقة، ولا يمكن الإرسال فيها.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('and nothing is sent across it', (WidgetTester tester) async {
@@ -318,10 +320,7 @@ void main() {
 
       await pumpLocalized(
         tester,
-        BlockedUsersPage(
-          apiService: api,
-          authSessionService: const _Session(),
-        ),
+        BlockedUsersPage(apiService: api, authSessionService: const _Session()),
       );
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 30)),

@@ -231,10 +231,7 @@ void main() {
         dio: _profileDio(requests, _userJson(birthDate: '2000-02-29')),
       );
 
-      await api.updateProfile(
-        token: 'token-1',
-        birthDate: '2000-02-29',
-      );
+      await api.updateProfile(token: 'token-1', birthDate: '2000-02-29');
 
       expect(requests, hasLength(1));
       expect(requests.single.method, 'PATCH');

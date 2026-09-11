@@ -63,6 +63,7 @@ AuthApiUser _user() => AuthApiUser.fromJson(<String, dynamic>{
 
 Future<_ProfileApi> _pumpForm(
   WidgetTester tester, {
+
   /// Tall by default so the whole form lays out at once. A test about
   /// scrolling asks for a phone, where the save button is below the fold.
   Size surface = const Size(1000, 2400),
@@ -174,7 +175,9 @@ void main() {
     await settleFrames(tester);
     await _tapBack(tester);
 
-    await tester.tap(find.byKey(const ValueKey<String>('profileEdit.unsavedNo')));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('profileEdit.unsavedNo')),
+    );
     await settleFrames(tester);
 
     expect(api.saved, isEmpty);
@@ -204,9 +207,7 @@ void main() {
     expect(find.text('ياسمين محمد'), findsOneWidget);
   });
 
-  testWidgets('yes carries the reader down to the save button', (
-    tester,
-  ) async {
+  testWidgets('yes carries the reader down to the save button', (tester) async {
     // Being told to press a button one cannot see is not being told anything:
     // on a phone the save button sits a screen below the name field the edit
     // was made in. The position is read rather than the button's rectangle,

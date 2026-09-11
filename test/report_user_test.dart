@@ -162,9 +162,7 @@ void main() {
       for (final String language in <String>['ar', 'en']) {
         final Map<String, dynamic> catalogue =
             jsonDecode(
-                  File(
-                    'assets/translations/$language.json',
-                  ).readAsStringSync(),
+                  File('assets/translations/$language.json').readAsStringSync(),
                 )
                 as Map<String, dynamic>;
 

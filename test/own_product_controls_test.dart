@@ -100,10 +100,7 @@ void main() {
         find.widgetWithText(FilledButton, 'أضف إلى السلة'),
         findsOneWidget,
       );
-      expect(
-        find.widgetWithText(OutlinedButton, 'شراء الآن'),
-        findsOneWidget,
-      );
+      expect(find.widgetWithText(OutlinedButton, 'شراء الآن'), findsOneWidget);
 
       expect(
         _live(tester, find.widgetWithText(FilledButton, 'أضف إلى السلة')),

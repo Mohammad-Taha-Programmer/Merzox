@@ -440,9 +440,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
 
       emit(state.copyWith(messages: messages));
     } catch (error) {
-      emit(
-        state.copyWith(errorMessage: ApiService.messageFromError(error)),
-      );
+      emit(state.copyWith(errorMessage: ApiService.messageFromError(error)));
     }
   }
 
@@ -587,10 +585,7 @@ class ChatBloc extends Bloc<ChatEvent, ChatState> {
     absorb(first);
     absorb(second);
 
-    return [
-      for (final id in order)
-        ?byId[id],
-    ];
+    return [for (final id in order) ?byId[id]];
   }
 
   /// Session truth lives in [AuthSessionService]: a stale token without an

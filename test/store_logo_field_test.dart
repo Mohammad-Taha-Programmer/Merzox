@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -174,13 +174,11 @@ void main() {
   });
 
   group('the three ways in', () {
-    for (final (String key, MerzoxPictureSource source) in <(
-      String,
-      MerzoxPictureSource,
-    )>[
-      ('storeLogo.camera', MerzoxPictureSource.camera),
-      ('storeLogo.gallery', MerzoxPictureSource.gallery),
-    ]) {
+    for (final (String key, MerzoxPictureSource source)
+        in <(String, MerzoxPictureSource)>[
+          ('storeLogo.camera', MerzoxPictureSource.camera),
+          ('storeLogo.gallery', MerzoxPictureSource.gallery),
+        ]) {
       testWidgets('$key reads the device and uploads what it read', (
         WidgetTester tester,
       ) async {
@@ -308,10 +306,7 @@ void main() {
       // would put a broken image on the shop.
       final Uint8List? bytes = await fetchPictureBytes(
         'https://host.test/x.png',
-        dio: dioAnswering(
-          contentType: 'text/html',
-          body: <int>[60, 104, 116],
-        ),
+        dio: dioAnswering(contentType: 'text/html', body: <int>[60, 104, 116]),
       );
 
       expect(bytes, isNull);

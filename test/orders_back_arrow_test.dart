@@ -141,9 +141,11 @@ void main() {
   ) async {
     // The chevron is one drawing mirrored, so which way it leans is the only
     // thing that says whether it reads as a way back or a way on.
-    for (final (TextDirection direction, bool rightward) in <
-      (TextDirection, bool)
-    >[(TextDirection.rtl, true), (TextDirection.ltr, false)]) {
+    for (final (TextDirection direction, bool rightward)
+        in <(TextDirection, bool)>[
+          (TextDirection.rtl, true),
+          (TextDirection.ltr, false),
+        ]) {
       await _pumpOrders(tester, direction: direction);
 
       final CustomPaint paint = tester.widget<CustomPaint>(

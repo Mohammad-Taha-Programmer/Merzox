@@ -138,7 +138,9 @@ String withPublicBaseUrl(String contents, String origin) {
   // written with CRLF endings the replacement would eat it and leave one line
   // ending unlike every other line in the file.
   final RegExp assignment = RegExp(
-    r'^[ \t]*' '${RegExp.escape(kPublicBaseUrlKey)}' r'[ \t]*=[^\r\n]*',
+    r'^[ \t]*'
+    '${RegExp.escape(kPublicBaseUrlKey)}'
+    r'[ \t]*=[^\r\n]*',
     multiLine: true,
   );
 

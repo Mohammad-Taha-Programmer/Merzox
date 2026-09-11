@@ -302,9 +302,7 @@ class MerzoxProfilePill extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: prominent ? 14 : 13,
-                      fontWeight: prominent
-                          ? FontWeight.w700
-                          : FontWeight.w500,
+                      fontWeight: prominent ? FontWeight.w700 : FontWeight.w500,
                       color: prominent ? Colors.white : const Color(0xFF292828),
                     ),
                   ),

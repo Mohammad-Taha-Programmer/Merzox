@@ -162,10 +162,7 @@ abstract final class MerzoxIcons {
   // separately and the file names say which is which.
 
   /// WhatsApp's own mark, where a generic bubble used to stand for it.
-  static const IconData whatsapp = IconData(
-    0xf232,
-    fontFamily: 'WatsappIcon',
-  );
+  static const IconData whatsapp = IconData(0xf232, fontFamily: 'WatsappIcon');
 
   /// A handset with signal waves: beside a phone number.
   static const IconData phoneNumber = IconData(

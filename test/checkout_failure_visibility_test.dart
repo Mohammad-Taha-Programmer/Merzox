@@ -32,7 +32,6 @@ const String _productId = '64c000000000000000000001';
 /// Refuses every order with [code], and refuses to re-read the cart line so
 /// the stored snapshot survives into checkout.
 class _RefusingApi extends ApiService {
-
   final String code;
 
   _RefusingApi(this.code);

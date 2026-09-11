@@ -77,17 +77,9 @@ class MerzoxNotchedShape extends NotchedShape {
       ..moveTo(host.left, host.top)
       ..lineTo(cx - dx, top)
       // Down off the flat edge, around the near corner.
-      ..arcToPoint(
-        meeting,
-        radius: Radius.circular(s),
-        clockwise: true,
-      )
+      ..arcToPoint(meeting, radius: Radius.circular(s), clockwise: true)
       // Around the bottom of the bite, under the button.
-      ..arcToPoint(
-        mirrored,
-        radius: Radius.circular(r),
-        clockwise: false,
-      )
+      ..arcToPoint(mirrored, radius: Radius.circular(r), clockwise: false)
       // Back up onto the flat edge, around the far corner.
       ..arcToPoint(
         Offset(cx + dx, top),

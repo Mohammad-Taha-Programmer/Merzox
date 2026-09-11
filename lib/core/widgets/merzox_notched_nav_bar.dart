@@ -137,7 +137,9 @@ class MerzoxNotchedNavBar extends StatelessWidget {
   /// for. The glyph is an [IconData] now and `find.byIcon` would reach it, but
   /// the key says *which button* rather than which picture is on it, and the
   /// picture is the half that changes.
-  static const ValueKey<String> buttonKey = ValueKey<String>('merzoxNav.button');
+  static const ValueKey<String> buttonKey = ValueKey<String>(
+    'merzoxNav.button',
+  );
 
   const MerzoxNotchedNavBar({
     super.key,
@@ -187,7 +189,8 @@ class MerzoxNotchedNavBar extends StatelessWidget {
               ),
             ),
             Positioned(
-              top: kMerzoxNavOverhang -
+              top:
+                  kMerzoxNavOverhang -
                   kMerzoxNavButtonLift -
                   kMerzoxNavButtonDiameter / 2,
               left: 0,
@@ -311,8 +314,7 @@ class _NavItem extends StatelessWidget {
 
   const _NavItem({required this.destination});
 
-  Widget _decorated(Widget glyph) =>
-      destination.decorate?.call(glyph) ?? glyph;
+  Widget _decorated(Widget glyph) => destination.decorate?.call(glyph) ?? glyph;
 
   @override
   Widget build(BuildContext context) {
@@ -358,10 +360,7 @@ class _NotchedBarPainter extends CustomPainter {
       size.height,
     );
     final Rect notch = Rect.fromCircle(
-      center: Offset(
-        size.width / 2,
-        kMerzoxNavOverhang - kMerzoxNavButtonLift,
-      ),
+      center: Offset(size.width / 2, kMerzoxNavOverhang - kMerzoxNavButtonLift),
       radius: kMerzoxNavNotchRadius,
     );
 
