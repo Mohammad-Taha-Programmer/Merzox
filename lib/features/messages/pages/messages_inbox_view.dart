@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
@@ -214,9 +215,12 @@ class _MessagesInboxViewState extends State<MessagesInboxView> {
           padding: const EdgeInsets.only(top: 90),
           child: Column(
             children: [
-              const Icon(
-                Icons.forum_outlined,
-                size: 56,
+              // The library has one bubble where Material had two, and one is
+              // what an empty inbox is about. Converted against the bubble
+              // rather than against `forum_outlined`, which is a wider mark.
+              Icon(
+                MerzoxIcons.chat,
+                size: 56 * MerzoxIcons.chatSizeFactor,
                 color: MerzoxColors.kColorBEBEBE,
               ),
               const SizedBox(height: 18),

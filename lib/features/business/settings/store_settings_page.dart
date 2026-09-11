@@ -1,9 +1,10 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
@@ -296,7 +297,11 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                         _Field(
                           controller: _whatsapp,
                           label: 'storeSettings.whatsapp'.tr(),
-                          icon: Icons.chat_outlined,
+                          // WhatsApp's own mark, not a bubble standing in for
+                          // it. The field draws its prefix at 18 and this
+                          // fills more of its em box than the bubble did.
+                          icon: MerzoxIcons.whatsapp,
+                          iconSize: 18 * MerzoxIcons.whatsappSizeFactor,
                           keyboardType: TextInputType.phone,
                         ),
                         _Field(
@@ -450,6 +455,12 @@ class _Field extends StatelessWidget {
   final String label;
   final int maxLines;
   final IconData? icon;
+
+  /// The prefix's size. Overridden only where a glyph from the designer's
+  /// fonts fills more of its em box than the Material one it replaced and
+  /// would otherwise draw larger than the fields around it.
+  final double iconSize;
+
   final TextInputType? keyboardType;
 
   const _Field({
@@ -457,6 +468,7 @@ class _Field extends StatelessWidget {
     required this.label,
     this.maxLines = 1,
     this.icon,
+    this.iconSize = 18,
     this.keyboardType,
   });
 
@@ -470,7 +482,7 @@ class _Field extends StatelessWidget {
         keyboardType: keyboardType,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: icon == null ? null : Icon(icon, size: 18),
+          prefixIcon: icon == null ? null : Icon(icon, size: iconSize),
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
         ),
         style: const TextStyle(fontSize: 13),

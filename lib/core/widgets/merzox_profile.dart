@@ -182,12 +182,23 @@ class MerzoxProfileMenuRow extends StatelessWidget {
   /// the same behind it, and drops it from the ones that do a single thing.
   final bool showChevron;
 
+  /// The icon's size.
+  ///
+  /// Twenty suits a glyph from the designer's fonts, which fill their whole em
+  /// box - and on the customer's board every row is one of those. A board part
+  /// way through the conversion has Material icons beside them, and Material's
+  /// fill about 0.83 of theirs, so a converted row passes its own smaller
+  /// number to stand level with the ones still waiting. When a board is wholly
+  /// converted the overrides come off and this default serves every row again.
+  final double iconSize;
+
   const MerzoxProfileMenuRow({
     super.key,
     required this.icon,
     required this.label,
     required this.onTap,
     this.showChevron = false,
+    this.iconSize = 20,
   });
 
   @override
@@ -212,7 +223,7 @@ class MerzoxProfileMenuRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
               children: <Widget>[
-                Icon(icon, size: 20, color: MerzoxColors.kColor3D5A80),
+                Icon(icon, size: iconSize, color: MerzoxColors.kColor3D5A80),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(

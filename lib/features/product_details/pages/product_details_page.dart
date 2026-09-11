@@ -759,7 +759,8 @@ class _SellerDetails extends StatelessWidget {
             ),
             const SizedBox(width: 12),
             _IconSquare(
-              icon: Icons.chat_bubble_outline_rounded,
+              icon: MerzoxIcons.chat,
+              iconSize: 24 * MerzoxIcons.chatSizeFactor,
               onPressed: () => AuthGate.run(
                 context,
                 // The chat route opens an existing thread with this store or
@@ -1339,7 +1340,15 @@ class _IconSquare extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
 
-  const _IconSquare({required this.icon, required this.onPressed});
+  /// Material's own default. A glyph from the designer's fonts passes its own
+  /// converted number, since those fill more of their em box.
+  final double iconSize;
+
+  const _IconSquare({
+    required this.icon,
+    required this.onPressed,
+    this.iconSize = 24,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1353,7 +1362,7 @@ class _IconSquare extends StatelessWidget {
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
         ),
-        icon: Icon(icon),
+        icon: Icon(icon, size: iconSize),
       ),
     );
   }

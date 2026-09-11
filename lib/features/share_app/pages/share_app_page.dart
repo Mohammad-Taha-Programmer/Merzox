@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/merzox_icons.dart';
 import '../../../core/widgets/merzox_back_chevron.dart';
 import '../../../services/share_app_service.dart';
 import '../bloc/share_app_bloc.dart';
@@ -334,7 +335,7 @@ class _ShareTargetButton extends StatelessWidget {
                             color: style.color,
                           ),
                         )
-                      : Icon(style.icon, color: style.color, size: 25),
+                      : Icon(style.icon, color: style.color, size: style.iconSize),
                 ),
               ),
               const SizedBox(width: 8),
@@ -364,11 +365,17 @@ final class _ShareTargetStyle {
   final IconData icon;
   final Color color;
 
+  /// What the row draws every target at. One of them carries a glyph from the
+  /// designer's fonts, which fills more of its em box than Material's, so it
+  /// passes its own converted number to stand level with the rest.
+  final double iconSize;
+
   const _ShareTargetStyle({
     required this.target,
     required this.labelKey,
     required this.icon,
     required this.color,
+    this.iconSize = 25,
   });
 }
 
@@ -376,7 +383,10 @@ const _targetStyles = [
   _ShareTargetStyle(
     target: ShareAppTarget.whatsapp,
     labelKey: 'shareApp.whatsapp',
-    icon: Icons.chat_rounded,
+    // WhatsApp's own mark. A bubble in WhatsApp's green was the app naming a
+    // service it would not draw.
+    icon: MerzoxIcons.whatsapp,
+    iconSize: 25 * MerzoxIcons.whatsappSizeFactor,
     color: Color(0xFF25A85A),
   ),
   _ShareTargetStyle(

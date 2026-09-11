@@ -387,7 +387,12 @@ class StoreContactButton extends StatelessWidget {
         foregroundColor: Colors.white,
         fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
       ),
-      icon: const Icon(Icons.phone_outlined, size: 19),
+      // The bare handset: this button reaches the shop rather than showing
+      // its number. The size it drew at as a Material handset, converted.
+      icon: Icon(
+        MerzoxIcons.contactUs,
+        size: 19 * MerzoxIcons.contactUsSizeFactor,
+      ),
     );
   }
 }
@@ -1449,7 +1454,8 @@ class _ChatButton extends StatelessWidget {
         foregroundColor: Colors.white,
         fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
       ),
-      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 22),
+      // The size it drew at as a Material bubble, converted.
+      icon: Icon(MerzoxIcons.chat, size: 22 * MerzoxIcons.chatSizeFactor),
     );
   }
 }

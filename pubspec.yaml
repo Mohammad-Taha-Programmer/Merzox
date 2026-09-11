@@ -179,6 +179,19 @@ flutter:
     - family: SearchIcon
       fonts:
         - asset: assets/fonts/icons_fonts/SearchIcon.ttf
+    # The ways of being reached.
+    - family: WatsappIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/WatsappIcon.ttf
+    - family: PhoneNumberIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/PhoneNumberIcon.ttf
+    - family: ContactUs
+      fonts:
+        - asset: assets/fonts/icons_fonts/ContactUs.ttf
+    - family: ChatIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/ChatIcon.ttf
     # The pair on a password field.
     - family: EyeIconShowPassword
       fonts:

@@ -15,6 +15,7 @@ import 'package:merzox/core/constants/money.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/merzox_icons.dart';
 import '../../authentication/bloc/auth_bloc.dart';
 import '../../../injection/injector.dart';
 import '../../../services/push_service.dart';
@@ -289,9 +290,13 @@ class _PageHeader extends StatelessWidget {
         IconButton(
           tooltip: 'messages.title'.tr(),
           onPressed: () => context.push('/business/messages'),
-          icon: const MessageBadge(
+          // Material's own default was 24; the factor converts it.
+          icon: MessageBadge(
             businessAudience: true,
-            child: Icon(Icons.chat_bubble_outline_rounded),
+            child: Icon(
+              MerzoxIcons.chat,
+              size: 24 * MerzoxIcons.chatSizeFactor,
+            ),
           ),
         ),
         if (onLogout case final VoidCallback signOut)
@@ -869,7 +874,10 @@ class _Profile extends StatelessWidget {
               ),
             ),
             MerzoxProfileMenuRow(
-              icon: Icons.chat_bubble_outline_rounded,
+              icon: MerzoxIcons.chat,
+              // Level with the rows above it, which are still Material's and
+              // fill less of their em box than this does.
+              iconSize: 20 * MerzoxIcons.chatSizeFactor,
               label: 'messages.title'.tr(),
               showChevron: true,
               onTap: () => context.push('/business/messages'),
@@ -877,7 +885,10 @@ class _Profile extends StatelessWidget {
             // The board drops the chevron from here down: these three do
             // not open a screen with more of the same behind it.
             MerzoxProfileMenuRow(
-              icon: Icons.phone_outlined,
+              // The bare handset: this row reaches somebody rather than
+              // showing a number.
+              icon: MerzoxIcons.contactUs,
+              iconSize: 20 * MerzoxIcons.contactUsSizeFactor,
               label: 'businessShell.contactUs'.tr(),
               showChevron: true,
               // It used to push `/about`, which is not a route - the one

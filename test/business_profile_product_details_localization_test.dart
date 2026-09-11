@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart';
 import 'package:merzox/features/business_profile/business_profile_view_mode.dart';
@@ -268,7 +269,7 @@ void main() {
             expect(find.text(longBusinessName), findsOneWidget);
             expect(find.text(longBusinessAddress), findsOneWidget);
             expect(
-              find.byIcon(Icons.chat_bubble_outline_rounded),
+              find.byIcon(MerzoxIcons.chat),
               findsOneWidget,
             );
             expect(tester.takeException(), isNull);

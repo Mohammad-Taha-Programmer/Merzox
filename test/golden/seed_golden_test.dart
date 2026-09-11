@@ -1,4 +1,4 @@
-﻿// MERZOX-UI-GOLDEN-I4-I1 - the five deterministic seed goldens.
+// MERZOX-UI-GOLDEN-I4-I1 - the five deterministic seed goldens.
 //
 // These are Flutter rendering baselines captured on the canonical Windows
 // golden environment. They are NOT evidence of Adobe XD parity: nothing here
@@ -2025,7 +2025,7 @@ void main() {
           find.byKey(const ValueKey<String>('storefront.share')),
         );
         final Rect chatBox = tester.getRect(
-          find.widgetWithIcon(IconButton, Icons.chat_bubble_outline_rounded),
+          find.widgetWithIcon(IconButton, MerzoxIcons.chat),
         );
         final Rect contactBox = tester.getRect(
           find.byKey(const ValueKey<String>('storefront.contact')),
