@@ -687,7 +687,8 @@
     "profileGuestMessage": "To view your account and edit your details, please log in first",
     "profileGreeting": "Hello, {}",
     "registerAsMerchant": "Register as a merchant",
-    "buyNow": "Buy now"
+    "buyNow": "Buy now",
+    "offerRibbon": "OFFER"
   },
   "businessProfile": {
     "followers": "followers",

@@ -687,7 +687,8 @@
     "profileGuestMessage": "لعرض حسابك وتعديل بياناتك، يرجى تسجيل الدخول أولا",
     "profileGreeting": "{} ، أهلا",
     "registerAsMerchant": "التسجيل كتاجر",
-    "buyNow": "اشتري الآن"
+    "buyNow": "اشتري الآن",
+    "offerRibbon": "عـــرض"
   },
   "businessProfile": {
     "followers": "متابع",

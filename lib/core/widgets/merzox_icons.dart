@@ -607,6 +607,15 @@ abstract final class MerzoxIcons {
 
   // -- Sizes ----------------------------------------------------------------
 
+  /// Against Material's `person_rounded`, the figure the home bar's avatar
+  /// used to draw.
+  ///
+  /// Width. Material's figure is square in its ink and this one is half again
+  /// as tall as it is wide, so anchoring on height put a small mark in the
+  /// middle of a 28 circle with room all round it. Both were drawn inside the
+  /// circle before this was chosen.
+  static const double accountFigureSizeFactor = 0.670 / 0.833;
+
   /// Against Material's `logout_rounded`, which the bars drew beside it.
   ///
   /// The home bar and the profile's own button are two ways out of the same
