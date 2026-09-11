@@ -844,7 +844,7 @@ void main() {
       );
 
       expect(
-        find.widgetWithIcon(IconButton, Icons.chat_bubble_outline_rounded),
+        find.widgetWithIcon(IconButton, MerzoxIcons.chat),
         findsNothing,
         reason: 'the preview must not offer a chat with its own store',
       );
@@ -958,7 +958,7 @@ void main() {
       // Scoped to the button: the customer bottom navigation carries a chat
       // glyph of its own, which is not the affordance under test.
       expect(
-        find.widgetWithIcon(IconButton, Icons.chat_bubble_outline_rounded),
+        find.widgetWithIcon(IconButton, MerzoxIcons.chat),
         findsOneWidget,
       );
 
@@ -1065,8 +1065,8 @@ void main() {
         expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
         expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
         // Two the menu added, which the card had no room for at all.
-        expect(find.byIcon(Icons.chat_bubble_outline_rounded), findsWidgets);
-        expect(find.byIcon(Icons.phone_outlined), findsOneWidget);
+        expect(find.byIcon(MerzoxIcons.chat), findsWidgets);
+        expect(find.byIcon(MerzoxIcons.contactUs), findsOneWidget);
       },
     );
   });
@@ -1242,7 +1242,7 @@ void main() {
       expect(find.text('اسم من القائمة العامة'), findsOneWidget);
       expect(find.text('المنتجات'), findsOneWidget);
       expect(
-        find.widgetWithIcon(IconButton, Icons.chat_bubble_outline_rounded),
+        find.widgetWithIcon(IconButton, MerzoxIcons.chat),
         findsOneWidget,
       );
 

@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -60,6 +61,103 @@ bool globalBellWantedAt(String location) {
   ];
 
   return !silent.any(location.startsWith);
+}
+
+/// Hangs the bell over whatever the router is showing.
+///
+/// It listens to the router rather than reading it. That distinction is the
+/// whole of this widget: the app's own `builder` used to decide from
+/// [currentAppLocation] without subscribing to anything, so the answer it gave
+/// was whichever one it had when it last ran for some unrelated reason. A
+/// reader signed in, arrived at a home screen with no bell on it, and the bell
+/// appeared when they pressed the language toggle - because changing the
+/// locale is what finally rebuilt the app root.
+///
+/// The delegate is what it listens to, not the route information provider:
+/// that provider carries the initial location and does not move for a `push`,
+/// and a `push` is how the bell opens the very screen it has to stay reachable
+/// from.
+class GlobalBellOverlay extends StatefulWidget {
+  final GoRouter router;
+
+  /// The router's own subtree, which this hangs the bell over.
+  final Widget child;
+
+  /// Builds the bell. Passed in so this widget owns the following and the
+  /// placing, and nothing else.
+  final WidgetBuilder bellBuilder;
+
+  const GlobalBellOverlay({
+    super.key,
+    required this.router,
+    required this.child,
+    required this.bellBuilder,
+  });
+
+  @override
+  State<GlobalBellOverlay> createState() => _GlobalBellOverlayState();
+}
+
+class _GlobalBellOverlayState extends State<GlobalBellOverlay> {
+  late bool _wanted = globalBellWantedAt(currentAppLocation(widget.router));
+
+  @override
+  void initState() {
+    super.initState();
+    widget.router.routerDelegate.addListener(_followRouter);
+  }
+
+  @override
+  void dispose() {
+    widget.router.routerDelegate.removeListener(_followRouter);
+    super.dispose();
+  }
+
+  /// Re-reads where the app is, after the frame that moved it.
+  ///
+  /// After, not during. This widget is built inside the router's own build, so
+  /// the delegate's notification arrives while this element is being built and
+  /// marking it dirty then trips `'!_dirty': is not true` - which is a red
+  /// screen, not a missing bell. A `ListenableBuilder` here does exactly that.
+  void _followRouter() {
+    final bool wanted = globalBellWantedAt(currentAppLocation(widget.router));
+    if (wanted == _wanted) return;
+
+    final SchedulerPhase phase = SchedulerBinding.instance.schedulerPhase;
+    final bool building =
+        phase == SchedulerPhase.persistentCallbacks ||
+        phase == SchedulerPhase.midFrameMicrotasks;
+
+    if (!building) {
+      setState(() => _wanted = wanted);
+      return;
+    }
+
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final bool now = globalBellWantedAt(currentAppLocation(widget.router));
+      if (now == _wanted) return;
+      setState(() => _wanted = now);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: <Widget>[
+        widget.child,
+        if (_wanted)
+          PositionedDirectional(
+            top: MediaQuery.paddingOf(context).top + kGlobalBellInset,
+            // The trailing edge, which right-to-left is the left: where every
+            // bar that had a bell already drew one. The leading edge is where
+            // the account's picture lives.
+            end: kGlobalBellInset,
+            child: widget.bellBuilder(context),
+          ),
+      ],
+    );
+  }
 }
 
 /// The one bell, floating over whatever screen is showing.

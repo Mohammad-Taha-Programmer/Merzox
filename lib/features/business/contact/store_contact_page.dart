@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/widgets/remote_circle_avatar.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/services/api_service.dart';
@@ -330,11 +331,25 @@ class _ChannelRow extends StatelessWidget {
   IconData get _icon => switch (channel.kind) {
     // The same glyphs the settings screen puts beside the same fields, so a
     // merchant recognises what they filled in.
-    StoreContactKind.whatsapp => Icons.chat_outlined,
+    //
+    // WhatsApp gets its own mark rather than a speech bubble standing in for
+    // it, and a number gets the handset with signal waves. The three that are
+    // still Material's are the social marks and the envelope, which the
+    // library has no answer for yet.
+    StoreContactKind.whatsapp => MerzoxIcons.whatsapp,
     StoreContactKind.instagram => Icons.camera_alt_outlined,
     StoreContactKind.facebook => Icons.facebook_outlined,
-    StoreContactKind.phone => Icons.phone_outlined,
+    StoreContactKind.phone => MerzoxIcons.phoneNumber,
     StoreContactKind.email => Icons.mail_outline_rounded,
+  };
+
+  /// The row draws every channel at 20, and these two glyphs fill more of
+  /// their em box than the Material ones they replaced, so their own numbers
+  /// come down to keep each mark the size it was.
+  double get _iconSize => switch (channel.kind) {
+    StoreContactKind.whatsapp => 20 * MerzoxIcons.whatsappSizeFactor,
+    StoreContactKind.phone => 20 * MerzoxIcons.phoneNumberSizeFactor,
+    _ => 20,
   };
 
   @override
@@ -355,7 +370,11 @@ class _ChannelRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(
               children: <Widget>[
-                Icon(_icon, size: 20, color: MerzoxColors.kColor3D5A80),
+                Icon(
+                  _icon,
+                  size: _iconSize,
+                  color: MerzoxColors.kColor3D5A80,
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -462,9 +481,13 @@ class _NothingYet extends StatelessWidget {
     return Column(
       children: <Widget>[
         const SizedBox(height: 40),
-        const Icon(
-          Icons.contact_support_outlined,
-          size: 40,
+        // The empty state of a page about reaching somebody, so it takes the
+        // handset. Its size is converted against `phone_outlined` rather than
+        // the `contact_support_outlined` that stood here - a headset with a
+        // question mark, which is not what the page is about.
+        Icon(
+          MerzoxIcons.contactUs,
+          size: 40 * MerzoxIcons.contactUsSizeFactor,
           color: MerzoxColors.kColor98C1D9,
         ),
         const SizedBox(height: 12),

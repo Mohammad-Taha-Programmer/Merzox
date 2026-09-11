@@ -53,6 +53,12 @@ abstract final class MerzoxIcons {
   /// `تسجيل خروج`
   static const IconData signOut = IconData(0xe812, fontFamily: 'SignOutIcon');
 
+  /// Against Material's `logout_rounded`, which the bars drew beside it.
+  ///
+  /// The home bar and the profile's own button are two ways out of the same
+  /// account, and they were two different marks until this.
+  static const double signOutSizeFactor = 0.750 / 0.834;
+
   /// `التسجيل كتاجر`
   static const IconData stores = IconData(0xe808, fontFamily: 'BusinessesIcon');
 
@@ -143,6 +149,48 @@ abstract final class MerzoxIcons {
     0xe816,
     fontFamily: 'RatingBarStar',
   );
+
+  // -- Ways of being reached ------------------------------------------------
+  //
+  // Four marks, and the set is the reason to take them together: three of
+  // these places were drawing a plain speech bubble for WhatsApp, which is a
+  // service with a mark of its own that everybody already knows.
+  //
+  // The two handsets are not interchangeable. [phoneNumber] is a handset with
+  // signal waves and belongs beside a number; [contactUs] is a bare handset
+  // and belongs on the action that reaches somebody. The designer drew them
+  // separately and the file names say which is which.
+
+  /// WhatsApp's own mark, where a generic bubble used to stand for it.
+  static const IconData whatsapp = IconData(
+    0xf232,
+    fontFamily: 'WatsappIcon',
+  );
+
+  /// A handset with signal waves: beside a phone number.
+  static const IconData phoneNumber = IconData(
+    0xe80b,
+    fontFamily: 'PhoneNumberIcon',
+  );
+
+  /// A bare handset: on the action that reaches somebody.
+  static const IconData contactUs = IconData(0xe809, fontFamily: 'ContactUs');
+
+  /// A speech bubble: a conversation, and the way into one.
+  static const IconData chat = IconData(0xe805, fontFamily: 'ChatIcon');
+
+  /// Against Material's `chat_outlined`, which these WhatsApp places drew.
+  static const double whatsappSizeFactor = 0.832 / 0.857;
+
+  /// Against Material's `phone_outlined`.
+  static const double phoneNumberSizeFactor = 0.750 / 0.833;
+
+  /// Against Material's `phone_outlined` too - the mark is different but the
+  /// size it has to match is the same one.
+  static const double contactUsSizeFactor = 0.750 / 1.0;
+
+  /// Against Material's `chat_bubble_outline_rounded`.
+  static const double chatSizeFactor = 0.832 / 1.0;
 
   // -- The eye on a password field ------------------------------------------
   //
