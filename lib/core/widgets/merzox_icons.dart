@@ -438,15 +438,6 @@ abstract final class MerzoxIcons {
     fontFamily: 'MessagesHeaderSearch',
   );
 
-  // -- The message list ----------------------------------------------------
-  //
-  // `messages_inbox/`
-
-  static const IconData messagesInboxChat = IconData(
-    0xe805,
-    fontFamily: 'MessagesInboxChat',
-  );
-
   // -- The map -------------------------------------------------------------
   //
   // `nearby_map/`
