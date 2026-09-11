@@ -442,6 +442,47 @@ abstract final class MerzoxIcons {
   /// hundred, so this one is width by convention rather than by argument.
   static const double businessSettingsSizeFactor = 0.815 / 0.955;
 
+  // -- A product, and adding one --------------------------------------------
+  //
+  // These two files close the library out, and the four left beside them are
+  // accounted for rather than unused: HomeIcon.ttf, CartIcon.ttf,
+  // ProductsIcon.ttf and AddProductsIcon.ttf are byte-for-byte the originals
+  // that were copied into the two bottom-bar folders. They were checked by
+  // hash, not by name. Nothing in the app draws a house or a trolley outside
+  // those bars, so HomeIcon and CartIcon get no constant here and are not
+  // orphans either - they are already on screen under their bars' families.
+  //
+  // The two parcels are not a duplicate. [productsCount] is a box seen from a
+  // corner and stands beside a number; this one is a box seen face on and is
+  // the mark the bar uses for `المنتجات`. The designer drew both, and which
+  // is which was settled by rendering them side by side.
+
+  /// A parcel: a product, where its own picture is missing.
+  static const IconData products = IconData(0xe813, fontFamily: 'ProductsIcon');
+
+  /// A plus in a rounded square: add a product.
+  ///
+  /// Only on the button that carries no words. The labelled `إضافة منتج`
+  /// button keeps Material's bare plus: a plus beside a word is a typographic
+  /// mark, and boxing it makes the button a different button rather than the
+  /// same one drawn by the designer. At that button's 18 the box is either
+  /// illegible or louder than its own label - both were rendered before this
+  /// was decided.
+  static const IconData addProduct = IconData(
+    0xe814,
+    fontFamily: 'AddProductsIcon',
+  );
+
+  /// Against Material's `inventory_2_outlined`, the archive box five
+  /// placeholders were drawing.
+  static const double productsSizeFactor = 0.835 / 1.002;
+
+  /// Against Material's `add_circle_outline_rounded`.
+  ///
+  /// A circle becomes a rounded square at the same size, which is as close to
+  /// a like-for-like swap as this library gets.
+  static const double addProductSizeFactor = 0.835 / 1.005;
+
   // -- The customer's bottom bar --------------------------------------------
   //
   // Five places, the middle one raised out of the bar. Home and the account

@@ -632,10 +632,10 @@ class _FavoriteProductImage extends StatelessWidget {
     final fallback = Container(
       color: MerzoxColors.kColorF4F8FB,
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.inventory_2_outlined,
+      child: Icon(
+        MerzoxIcons.products,
         color: MerzoxColors.kColor3D5A80,
-        size: 38,
+        size: 38 * MerzoxIcons.productsSizeFactor,
       ),
     );
 

@@ -243,6 +243,16 @@ flutter:
     - family: BusinessSettings
       fonts:
         - asset: assets/fonts/icons_fonts/BusinessSettings.ttf
+    # A product where its picture is missing, and the button that adds one.
+    # HomeIcon.ttf and CartIcon.ttf are not declared here and are not unused
+    # either: they are byte-for-byte the files the two bottom-bar folders
+    # carry, and nothing draws a house or a trolley outside those bars.
+    - family: ProductsIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/ProductsIcon.ttf
+    - family: AddProductsIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/AddProductsIcon.ttf
     - family: EditProfileIcon
       fonts:
         - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf

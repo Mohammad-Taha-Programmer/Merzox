@@ -533,10 +533,10 @@ class _ItemRow extends StatelessWidget {
               child: item.imageUrl.isEmpty
                   ? Container(
                       color: MerzoxColors.kColorF3F7FA,
-                      child: const Icon(
-                        Icons.inventory_2_outlined,
+                      child: Icon(
+                        MerzoxIcons.products,
                         color: MerzoxColors.kColor98C1D9,
-                        size: 28,
+                        size: 28 * MerzoxIcons.productsSizeFactor,
                       ),
                     )
                   : Image.network(
@@ -544,10 +544,10 @@ class _ItemRow extends StatelessWidget {
                       fit: BoxFit.cover,
                       errorBuilder: (_, _, _) => Container(
                         color: MerzoxColors.kColorF3F7FA,
-                        child: const Icon(
-                          Icons.inventory_2_outlined,
+                        child: Icon(
+                          MerzoxIcons.products,
                           color: MerzoxColors.kColor98C1D9,
-                          size: 28,
+                          size: 28 * MerzoxIcons.productsSizeFactor,
                         ),
                       ),
                     ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:merzox/core/widgets/merzox_back_chevron.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/favorites/bloc/favorites_bloc.dart';
 import 'package:merzox/features/favorites/bloc/favorites_event.dart';
@@ -293,6 +294,9 @@ void main() {
   ) async {
     await _pumpFavorites(tester, tab: FavoritesTab.products, imageUrl: '');
 
-    expect(find.byIcon(Icons.inventory_2_outlined), findsOneWidget);
+    // The designer's parcel now, where Material's archive box stood. The
+    // test is about a card with no picture still drawing something, not
+    // about which set drew it.
+    expect(find.byIcon(MerzoxIcons.products), findsOneWidget);
   });
 }

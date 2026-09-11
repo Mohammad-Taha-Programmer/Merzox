@@ -739,9 +739,9 @@ class _ProductsState extends State<_Products> {
           leading: IconButton(
             tooltip: 'businessShell.addNewProduct'.tr(),
             onPressed: () => _showProductEditor(context),
-            icon: const Icon(
-              Icons.add_circle_outline_rounded,
-              size: 24,
+            icon: Icon(
+              MerzoxIcons.addProduct,
+              size: 24 * MerzoxIcons.addProductSizeFactor,
               color: MerzoxColors.kColor98C1D9,
             ),
           ),
