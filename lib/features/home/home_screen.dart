@@ -568,7 +568,7 @@ class _HomeTopBar extends StatelessWidget {
                     ),
                     // The size it drew at as a Material bell, converted.
                     icon: Icon(
-                      MerzoxIcons.notifications,
+                      MerzoxIcons.homeScreenNotifications,
                       size: 24 * MerzoxIcons.notificationsSizeFactor,
                     ),
                   ),
@@ -596,7 +596,7 @@ class _HomeTopBar extends StatelessWidget {
                     // the two doors out of one account look like one thing.
                     // The size it drew at as a Material arrow, converted.
                     icon: Icon(
-                      MerzoxIcons.signOut,
+                      MerzoxIcons.homeScreenSignOut,
                       size: 24 * MerzoxIcons.signOutSizeFactor,
                       color: MerzoxColors.kColor8D99AE,
                     ),
@@ -759,7 +759,7 @@ class _SearchBox extends StatelessWidget {
           hintStyle: TextStyle(color: MerzoxColors.kColor9F9F9F, fontSize: 14),
           // Material's own default was 24; the factor converts it.
           prefixIcon: Icon(
-            MerzoxIcons.search,
+            MerzoxIcons.homeScreenSearch,
             size: 24 * MerzoxIcons.searchSizeFactor,
             color: MerzoxColors.kColor98C1D9,
           ),
@@ -802,7 +802,7 @@ class _StoresSearchField extends StatelessWidget {
           hintStyle: TextStyle(color: MerzoxColors.kColor9F9F9F, fontSize: 14),
           // Material's own default was 24; the factor converts it.
           prefixIcon: Icon(
-            MerzoxIcons.search,
+            MerzoxIcons.homeScreenSearch,
             size: 24 * MerzoxIcons.searchSizeFactor,
             color: MerzoxColors.kColor98C1D9,
           ),
@@ -1810,7 +1810,7 @@ class _AllBusinessesTopBar extends StatelessWidget {
                     ),
                     // The size it drew at as a Material bell, converted.
                     icon: Icon(
-                      MerzoxIcons.notifications,
+                      MerzoxIcons.homeScreenNotifications,
                       color: MerzoxColors.kColor3D5A80,
                       size: 20 * MerzoxIcons.notificationsSizeFactor,
                     ),
@@ -2114,31 +2114,31 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
         ),
         const SizedBox(height: 25),
         MerzoxProfileMenuRow(
-          icon: MerzoxIcons.editProfile,
+          icon: MerzoxIcons.homeScreenEditProfile,
           label: 'profileEdit.title'.tr(),
           showChevron: true,
           onTap: widget.onEditProfile,
         ),
         MerzoxProfileMenuRow(
-          icon: MerzoxIcons.myOrders,
+          icon: MerzoxIcons.homeScreenMyOrders,
           label: 'orders.title'.tr(),
           showChevron: true,
           onTap: widget.onOrders,
         ),
         MerzoxProfileMenuRow(
-          icon: MerzoxIcons.map,
+          icon: MerzoxIcons.homeScreenMap,
           label: 'map.title'.tr(),
           showChevron: true,
           onTap: widget.onMap,
         ),
         MerzoxProfileMenuRow(
-          icon: MerzoxIcons.favorites,
+          icon: MerzoxIcons.homeScreenFavoriteOutline,
           label: 'favorites.title'.tr(),
           showChevron: true,
           onTap: widget.onFavorites,
         ),
         MerzoxProfileMenuRow(
-          icon: MerzoxIcons.whoWeAre,
+          icon: MerzoxIcons.homeScreenWhoWeAre,
           label: 'aboutUs.title'.tr(),
           showChevron: true,
           onTap: widget.onAboutUs,
@@ -2148,7 +2148,7 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
         const Padding(
           padding: EdgeInsets.symmetric(horizontal: kProfileGutter),
           child: NotificationPreferenceControl(
-            icon: MerzoxIcons.campaignsProductsNotifications,
+            icon: MerzoxIcons.homeScreenCampaignsProductsNotifications,
             // The rows above draw at 20 and fill their whole em box; this
             // bell fills 0.834 of its, so 20 / 0.834 is what makes the two
             // the same size to the eye.
@@ -2185,7 +2185,7 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
           ),
         ),
         MerzoxProfileMenuRow(
-          icon: MerzoxIcons.shareApp,
+          icon: MerzoxIcons.homeScreenShareApp,
           label: 'shareApp.profileTitle'.tr(),
           onTap: widget.onShareApp,
         ),
@@ -2193,7 +2193,7 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
         const _ProfileSocialRow(),
         const SizedBox(height: 18),
         MerzoxProfilePill(
-          icon: MerzoxIcons.signOut,
+          icon: MerzoxIcons.homeScreenSignOut,
           label: 'common.logout'.tr(),
           onPressed: widget.onLogout,
         ),
@@ -2227,7 +2227,7 @@ class _ProfileXdAvatar extends StatelessWidget {
         hintKey: 'profile.pictureChangeHint',
         keyPrefix: 'profileAvatar',
         placeholder: const Icon(
-          MerzoxIcons.profile,
+          MerzoxIcons.homeScreenProfile,
           size: 20,
           color: MerzoxColors.kColor3D5A80,
         ),
@@ -2244,7 +2244,7 @@ class _ProfileMerchantButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MerzoxProfilePill(
-      icon: MerzoxIcons.stores,
+      icon: MerzoxIcons.homeScreenStores,
       label: 'home.registerAsMerchant'.tr(),
       onPressed: () => onPressed(),
       width: 182,
@@ -2261,9 +2261,9 @@ class _ProfileSocialRow extends StatelessWidget {
     return const Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
-        _ProfileSocialMark(icon: MerzoxIcons.instagram),
+        _ProfileSocialMark(icon: MerzoxIcons.homeScreenInstagram),
         SizedBox(width: 10),
-        _ProfileSocialMark(icon: MerzoxIcons.facebook),
+        _ProfileSocialMark(icon: MerzoxIcons.homeScreenFacebook),
       ],
     );
   }
@@ -2388,7 +2388,7 @@ class _BusinessProfileTopBar extends StatelessWidget {
               children: [
                 // The size it drew at as a Material bell, converted.
                 Icon(
-                  MerzoxIcons.notifications,
+                  MerzoxIcons.homeScreenNotifications,
                   size: 22 * MerzoxIcons.notificationsSizeFactor,
                   color: MerzoxColors.kColor98C1D9,
                 ),

@@ -266,7 +266,7 @@ class _SearchField extends StatelessWidget {
               : null,
           // The size it drew at as a Material magnifier, converted.
           suffixIcon: Icon(
-            MerzoxIcons.search,
+            MerzoxIcons.searchPageSearch,
             color: MerzoxColors.kColor707070,
             size: 28 * MerzoxIcons.searchSizeFactor,
           ),
@@ -665,7 +665,7 @@ class _ProductResultTile extends StatelessWidget {
                                   // for: the display star, sized like the 16
                                   // it replaces.
                                   Icon(
-                                    MerzoxIcons.ratingStarFull,
+                                    MerzoxIcons.searchPageRatingStarFull,
                                     size: 16 * MerzoxIcons.ratingStarSizeFactor,
                                     color: const Color(0xFFFFB703),
                                   ),
@@ -874,7 +874,7 @@ class _BusinessResultTile extends StatelessWidget {
                                 mainAxisSize: MainAxisSize.min,
                                 children: <Widget>[
                                   Icon(
-                                    MerzoxIcons.productsCount,
+                                    MerzoxIcons.searchPageProductsCount,
                                     size:
                                         14 *
                                         MerzoxIcons.productsCountSizeFactor,

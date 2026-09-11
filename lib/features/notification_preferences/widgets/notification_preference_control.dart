@@ -42,7 +42,7 @@ class NotificationPreferenceControl extends StatelessWidget {
   const NotificationPreferenceControl({
     super.key,
     this.labelKey = 'notificationPreferences.productOffers',
-    this.icon = MerzoxIcons.notifications,
+    this.icon = MerzoxIcons.notificationPreferencesNotifications,
     // The size it drew at as a Material bell, converted. It is not raised
     // further to match the 20 the rows beside it draw at - that gap
     // predates this and is a question about the row, not the glyph.

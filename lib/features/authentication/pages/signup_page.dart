@@ -222,8 +222,8 @@ class _SignupPageState extends State<SignupPage> {
                               // the eye that shows.
                               icon: Icon(
                                 _obscurePassword
-                                    ? MerzoxIcons.showPassword
-                                    : MerzoxIcons.hidePassword,
+                                    ? MerzoxIcons.signupShowPassword
+                                    : MerzoxIcons.signupHidePassword,
                                 color: MerzoxColors.kColor98C1D9,
                                 size: 24 * MerzoxIcons.passwordEyeSizeFactor,
                               ),

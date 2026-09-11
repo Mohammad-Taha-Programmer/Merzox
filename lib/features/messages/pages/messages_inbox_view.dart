@@ -219,7 +219,7 @@ class _MessagesInboxViewState extends State<MessagesInboxView> {
               // what an empty inbox is about. Converted against the bubble
               // rather than against `forum_outlined`, which is a wider mark.
               Icon(
-                MerzoxIcons.chat,
+                MerzoxIcons.messagesInboxChat,
                 size: 56 * MerzoxIcons.chatSizeFactor,
                 color: MerzoxColors.kColorBEBEBE,
               ),

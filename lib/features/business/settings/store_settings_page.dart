@@ -301,7 +301,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                           // WhatsApp's own mark, not a bubble standing in for
                           // it. The field draws its prefix at 18 and this
                           // fills more of its em box than the bubble did.
-                          icon: MerzoxIcons.whatsapp,
+                          icon: MerzoxIcons.storeSettingsWhatsapp,
                           iconSize: 18 * MerzoxIcons.whatsappSizeFactor,
                           keyboardType: TextInputType.phone,
                         ),

@@ -105,7 +105,7 @@ class _MessagesHeaderState extends State<MessagesHeader> {
             valueKey: 'merzox.messages.searchOpen',
             onTap: _open,
             child: Icon(
-              MerzoxIcons.search,
+              MerzoxIcons.messagesHeaderSearch,
               size: 24 * MerzoxIcons.searchSizeFactor,
               color: MerzoxColors.kColor353535,
             ),
@@ -165,7 +165,7 @@ class _MessagesHeaderState extends State<MessagesHeader> {
           ),
           const SizedBox(width: 6),
           Icon(
-            MerzoxIcons.search,
+            MerzoxIcons.messagesHeaderSearch,
             size: 20 * MerzoxIcons.searchSizeFactor,
             color: MerzoxColors.kColor353535,
           ),

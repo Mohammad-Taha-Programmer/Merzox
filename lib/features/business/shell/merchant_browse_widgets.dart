@@ -161,7 +161,7 @@ class MerchantSearchRow extends StatelessWidget {
                     ),
                     // The size it drew at as a Material magnifier, converted.
                     prefixIcon: Icon(
-                      MerzoxIcons.search,
+                      MerzoxIcons.merchantBrowseSearch,
                       size: 20 * MerzoxIcons.searchSizeFactor,
                       color: MerzoxColors.kColor2B2B2B,
                     ),
@@ -205,7 +205,7 @@ class _FilterButton extends StatelessWidget {
             alignment: Alignment.center,
             children: <Widget>[
               Icon(
-                MerzoxIcons.filter,
+                MerzoxIcons.merchantBrowseFilter,
                 size: 22 * MerzoxIcons.filterSizeFactor,
                 color: Colors.white,
               ),
@@ -490,7 +490,7 @@ class _Photo extends StatelessWidget {
                       // one filled 0.835 of its, so an unstated size would
                       // have grown the mark by a fifth.
                       child: Icon(
-                        MerzoxIcons.products,
+                        MerzoxIcons.merchantBrowseProducts,
                         size: 24 * MerzoxIcons.productsSizeFactor,
                       ),
                     )
@@ -670,7 +670,7 @@ class MerchantProductActionsMenu extends StatelessWidget {
         _row(
           MerchantProductAction.edit,
           'businessShell.editProduct',
-          MerzoxIcons.editProduct,
+          MerzoxIcons.merchantBrowseEditProduct,
           iconSize: 16 * MerzoxIcons.editProductSizeFactor,
         ),
         if (product.isActive)
@@ -693,7 +693,7 @@ class MerchantProductActionsMenu extends StatelessWidget {
         _row(
           MerchantProductAction.delete,
           'businessShell.deleteProduct',
-          MerzoxIcons.deleteProductForever,
+          MerzoxIcons.merchantBrowseDeleteProductForever,
           iconSize: 16 * MerzoxIcons.deleteProductSizeFactor,
         ),
       ],

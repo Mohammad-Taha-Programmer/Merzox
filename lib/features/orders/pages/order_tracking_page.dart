@@ -919,8 +919,8 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
                 // a read rating shows - the designer drew the two separately.
                 icon: Icon(
                   star <= _rating
-                      ? MerzoxIcons.ratingBarStar
-                      : MerzoxIcons.ratingStarEmpty,
+                      ? MerzoxIcons.orderTrackingRatingBarStar
+                      : MerzoxIcons.orderTrackingRatingStarEmpty,
                   color: MerzoxColors.kColorFBB300,
                   size: 28 * MerzoxIcons.ratingStarSizeFactor,
                 ),

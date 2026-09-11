@@ -51,13 +51,13 @@ class BusinessRatingStars extends StatelessWidget {
               final Color color;
 
               if (displayRating >= starStart + 1) {
-                icon = MerzoxIcons.ratingStarFull;
+                icon = MerzoxIcons.businessRatingStarsRatingStarFull;
                 color = const Color(0xFFF2CB06);
               } else if (displayRating >= starStart + 0.5) {
-                icon = MerzoxIcons.ratingStarHalf;
+                icon = MerzoxIcons.businessRatingStarsRatingStarHalf;
                 color = const Color(0xFFF2CB06);
               } else {
-                icon = MerzoxIcons.ratingStarEmpty;
+                icon = MerzoxIcons.businessRatingStarsRatingStarEmpty;
                 color = const Color(0xFFD8D8D8);
               }
 

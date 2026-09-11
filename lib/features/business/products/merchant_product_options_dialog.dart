@@ -480,7 +480,7 @@ class _OptionDetailsSheetState extends State<_OptionDetailsSheet> {
                 foregroundColor: MerzoxColors.kColorEE6C4D,
               ),
               icon: Icon(
-                MerzoxIcons.deleteProductForever,
+                MerzoxIcons.merchantProductOptionsDeleteProductForever,
                 size: 18 * MerzoxIcons.deleteProductSizeFactor,
               ),
               label: Text('merchantProduct.removeVariant'.tr()),

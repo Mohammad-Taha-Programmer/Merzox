@@ -194,7 +194,7 @@ void main() {
     testWidgets('the orange button raises it', (WidgetTester tester) async {
       await pumpProducts(tester, <Map<String, dynamic>>[_product('p1')]);
 
-      await tester.tap(find.byIcon(MerzoxIcons.filter));
+      await tester.tap(find.byIcon(MerzoxIcons.merchantBrowseFilter));
       await settleFrames(tester);
 
       expect(find.text('تصفية'), findsOneWidget);
@@ -212,7 +212,7 @@ void main() {
       ]);
       expect(find.text('أحمر شفاه'), findsOneWidget);
 
-      await tester.tap(find.byIcon(MerzoxIcons.filter));
+      await tester.tap(find.byIcon(MerzoxIcons.merchantBrowseFilter));
       await settleFrames(tester);
       await tester.enterText(find.byType(TextField).first, 'شفاه');
       await tester.tap(find.text('بحث'));

@@ -1,101 +1,617 @@
 import 'package:flutter/widgets.dart';
 
-/// The designer's own glyphs.
+/// The designer's own glyphs, one copy per screen.
 ///
-/// Each arrived as its own `.ttf` holding one real icon and a handful of
-/// leftovers the generator puts in every file, so each one is its own font
-/// family and the family name is the file name. That is why every constant
-/// below names a family of its own rather than sharing one - it is how the
-/// set was exported, not a choice made here. Merging them into a single font
-/// is worth doing when the rest of the screens are converted; the whole map
-/// lives in this one file so that day is a change to this file alone.
+/// Every screen that draws a mark owns its own font file, in its own folder,
+/// under its own family, named for that screen. A drawing used on five
+/// screens is five files - `FavoritesRatingStarFull.ttf`,
+/// `SearchPageRatingStarFull.ttf`, and so on - and they are byte-identical
+/// today.
 ///
-/// The fonts sit under `assets/fonts/icons_fonts/<screen>/`, each file named
-/// for the section it serves rather than for the picture it happens to be.
-/// So [campaignsProductsNotifications] is its own font although it is, today,
-/// the same bell the library keeps as `Notifications.ttf` - the day the
-/// offers row wants a drawing of its own, one file changes and one screen
-/// with it.
+/// That is the point. When one screen wants a different star, its file is
+/// replaced and no other screen moves. Sharing one file would have made every
+/// such change a decision about five screens at once, and the reason a screen
+/// looks the way it does would have lived somewhere other than that screen.
 ///
-/// The code points are read out of each font's own `cmap`, not guessed. What
-/// the filenames could not tell was whether each glyph draws what its name
-/// says, so they were rendered and looked at before any of them went onto a
-/// screen.
+/// What it costs is worth saying too: a change meant for every screen is now
+/// as many edits as there are screens, and the bundle carries the repeats.
+/// The repeats are small - the whole set is under 600 KB - because the three
+/// files the generator shipped with all of Material inside them happen to be
+/// drawn on one screen each.
+///
+/// The code points are read out of each font's own `cmap`, not guessed, and
+/// every glyph was rendered and looked at before it went on a screen: in
+/// three of these files the real mark is not the last entry in the `cmap`,
+/// and in three more it sits at the end of the entire Material library.
 ///
 /// There is deliberately no chevron here. The set has no arrow of any kind,
 /// and the row chevron has to keep `matchTextDirection` so Material leans it
 /// into an Arabic reading - which Material's own glyph already does and a
 /// hand-built [IconData] would not.
+///
+/// The sizes are at the foot of the file. A factor is a measurement of one
+/// drawing against the Material mark it replaced, so it is shared by every
+/// screen drawing that mark; a screen that swaps its copy for a different
+/// drawing needs a factor of its own measured with it.
 abstract final class MerzoxIcons {
   const MerzoxIcons._();
 
-  /// `تعديل الملف الشخصي`
-  static const IconData editProfile = IconData(
-    0xe809,
-    fontFamily: 'EditProfileIcon',
+  // -- A storefront, as a customer sees it ---------------------------------
+  //
+  // `business_profile/`
+
+  static const IconData businessProfileChat = IconData(
+    0xe805,
+    fontFamily: 'BusinessProfileChat',
   );
 
-  /// `طلباتي`
-  static const IconData myOrders = IconData(0xe80a, fontFamily: 'MyOrdersIcon');
+  static const IconData businessProfileContactUs = IconData(
+    0xe809,
+    fontFamily: 'BusinessProfileContactUs',
+  );
 
-  /// `الخريطة`
-  static const IconData map = IconData(0xe80b, fontFamily: 'MapIcon');
+  static const IconData businessProfileFavoriteOutline = IconData(
+    0xe80c,
+    fontFamily: 'BusinessProfileFavoriteOutline',
+  );
 
-  /// `المفضلة`
-  static const IconData favorites = IconData(0xe80c, fontFamily: 'Favorites');
+  static const IconData businessProfileFavoriteProduct = IconData(
+    0xe80e,
+    fontFamily: 'BusinessProfileFavoriteProduct',
+  );
 
-  /// `من نحن`
-  static const IconData whoWeAre = IconData(0xe80d, fontFamily: 'WhoWeAreIcon');
+  static const IconData businessProfileNotifications = IconData(
+    0xe80a,
+    fontFamily: 'BusinessProfileNotifications',
+  );
 
-  /// `شارك التطبيق مع أصدقائك`
-  static const IconData shareApp = IconData(0xe80f, fontFamily: 'ShareAppIcon');
+  static const IconData businessProfileProductsCount = IconData(
+    0xe802,
+    fontFamily: 'BusinessProfileProductsCount',
+  );
 
-  /// `تسجيل خروج`
-  static const IconData signOut = IconData(0xe812, fontFamily: 'SignOutIcon');
+  static const IconData businessProfileRatingBarStar = IconData(
+    0xe816,
+    fontFamily: 'BusinessProfileRatingBarStar',
+  );
+
+  static const IconData businessProfileRatingStarEmpty = IconData(
+    0xe801,
+    fontFamily: 'BusinessProfileRatingStarEmpty',
+  );
+
+  static const IconData businessProfileRatingStarFull = IconData(
+    0xf005,
+    fontFamily: 'BusinessProfileRatingStarFull',
+  );
+
+  // -- The shared star strip on a business card ----------------------------
+  //
+  // `business_rating_stars/`
+
+  static const IconData businessRatingStarsRatingStarEmpty = IconData(
+    0xe801,
+    fontFamily: 'BusinessRatingStarsRatingStarEmpty',
+  );
+
+  static const IconData businessRatingStarsRatingStarFull = IconData(
+    0xf005,
+    fontFamily: 'BusinessRatingStarsRatingStarFull',
+  );
+
+  static const IconData businessRatingStarsRatingStarHalf = IconData(
+    0xf5c0,
+    fontFamily: 'BusinessRatingStarsRatingStarHalf',
+  );
+
+  // -- The checkout step strip ---------------------------------------------
+  //
+  // `checkout_steps/`
+
+  static const IconData checkoutStepsOrderData = IconData(
+    0xe80d,
+    fontFamily: 'CheckoutStepsOrderData',
+  );
+
+  static const IconData checkoutStepsOrderPayment = IconData(
+    0xe80c,
+    fontFamily: 'CheckoutStepsOrderPayment',
+  );
+
+  // -- The customer's bottom bar -------------------------------------------
+  //
+  // `customer_navigation_bar/`
+
+  static const IconData customerNavigationBarCart = IconData(
+    0xe806,
+    fontFamily: 'CustomerNavigationBarCart',
+  );
+
+  static const IconData customerNavigationBarHome = IconData(
+    0xe807,
+    fontFamily: 'CustomerNavigationBarHome',
+  );
+
+  static const IconData customerNavigationBarMessages = IconData(
+    0xe805,
+    fontFamily: 'CustomerNavigationBarMessages',
+  );
+
+  static const IconData customerNavigationBarProfile = IconData(
+    0xe804,
+    fontFamily: 'CustomerNavigationBarProfile',
+  );
+
+  static const IconData customerNavigationBarStores = IconData(
+    0xe808,
+    fontFamily: 'CustomerNavigationBarStores',
+  );
+
+  // -- المفضلة -------------------------------------------------------------
+  //
+  // `favorites/`
+
+  static const IconData favoritesFavoriteOutline = IconData(
+    0xe80c,
+    fontFamily: 'FavoritesFavoriteOutline',
+  );
+
+  static const IconData favoritesFavoriteProduct = IconData(
+    0xe80e,
+    fontFamily: 'FavoritesFavoriteProduct',
+  );
+
+  static const IconData favoritesProducts = IconData(
+    0xe813,
+    fontFamily: 'FavoritesProducts',
+  );
+
+  static const IconData favoritesRatingStarEmpty = IconData(
+    0xe801,
+    fontFamily: 'FavoritesRatingStarEmpty',
+  );
+
+  static const IconData favoritesRatingStarFull = IconData(
+    0xf005,
+    fontFamily: 'FavoritesRatingStarFull',
+  );
+
+  // -- The bell that sits above every route --------------------------------
+  //
+  // `global_bell/`
+
+  static const IconData globalBellNotifications = IconData(
+    0xe80a,
+    fontFamily: 'GlobalBellNotifications',
+  );
+
+  // -- The customer home screen and the profile tab inside it --------------
+  //
+  // `home_screen/`
+
+  static const IconData homeScreenCampaignsProductsNotifications = IconData(
+    0xe80a,
+    fontFamily: 'HomeScreenCampaignsProductsNotifications',
+  );
+
+  static const IconData homeScreenEditProfile = IconData(
+    0xe809,
+    fontFamily: 'HomeScreenEditProfile',
+  );
+
+  static const IconData homeScreenFacebook = IconData(
+    0xe810,
+    fontFamily: 'HomeScreenFacebook',
+  );
+
+  static const IconData homeScreenFavoriteOutline = IconData(
+    0xe80c,
+    fontFamily: 'HomeScreenFavoriteOutline',
+  );
+
+  static const IconData homeScreenInstagram = IconData(
+    0xe811,
+    fontFamily: 'HomeScreenInstagram',
+  );
+
+  static const IconData homeScreenMap = IconData(
+    0xe80b,
+    fontFamily: 'HomeScreenMap',
+  );
+
+  static const IconData homeScreenMyOrders = IconData(
+    0xe80a,
+    fontFamily: 'HomeScreenMyOrders',
+  );
+
+  static const IconData homeScreenNotifications = IconData(
+    0xe80a,
+    fontFamily: 'HomeScreenNotifications',
+  );
+
+  static const IconData homeScreenProfile = IconData(
+    0xe804,
+    fontFamily: 'HomeScreenProfile',
+  );
+
+  static const IconData homeScreenSearch = IconData(
+    0xe815,
+    fontFamily: 'HomeScreenSearch',
+  );
+
+  static const IconData homeScreenShareApp = IconData(
+    0xe80f,
+    fontFamily: 'HomeScreenShareApp',
+  );
+
+  static const IconData homeScreenSignOut = IconData(
+    0xe812,
+    fontFamily: 'HomeScreenSignOut',
+  );
+
+  static const IconData homeScreenStores = IconData(
+    0xe808,
+    fontFamily: 'HomeScreenStores',
+  );
+
+  static const IconData homeScreenWhoWeAre = IconData(
+    0xe80d,
+    fontFamily: 'HomeScreenWhoWeAre',
+  );
+
+  // -- Signing in ----------------------------------------------------------
+  //
+  // `login/`
+
+  static const IconData loginHidePassword = IconData(
+    0xe802,
+    fontFamily: 'LoginHidePassword',
+  );
+
+  static const IconData loginShowPassword = IconData(
+    0xe803,
+    fontFamily: 'LoginShowPassword',
+  );
+
+  // -- The merchant's own products and orders ------------------------------
+  //
+  // `merchant_browse/`
+
+  static const IconData merchantBrowseDeleteProductForever = IconData(
+    0xe805,
+    fontFamily: 'MerchantBrowseDeleteProductForever',
+  );
+
+  static const IconData merchantBrowseEditProduct = IconData(
+    0xeba4,
+    fontFamily: 'MerchantBrowseEditProduct',
+  );
+
+  static const IconData merchantBrowseFilter = IconData(
+    0xeba4,
+    fontFamily: 'MerchantBrowseFilter',
+  );
+
+  static const IconData merchantBrowseProducts = IconData(
+    0xe813,
+    fontFamily: 'MerchantBrowseProducts',
+  );
+
+  static const IconData merchantBrowseSearch = IconData(
+    0xe815,
+    fontFamily: 'MerchantBrowseSearch',
+  );
+
+  // -- The merchant's dashboard controls -----------------------------------
+  //
+  // `merchant_dashboard/`
+
+  static const IconData merchantDashboardSearch = IconData(
+    0xe815,
+    fontFamily: 'MerchantDashboardSearch',
+  );
+
+  // -- The merchant's bottom bar -------------------------------------------
+  //
+  // `merchant_navigation_bar/`
+
+  static const IconData merchantNavigationBarAddProduct = IconData(
+    0xe814,
+    fontFamily: 'MerchantNavigationBarAddProduct',
+  );
+
+  static const IconData merchantNavigationBarHome = IconData(
+    0xe807,
+    fontFamily: 'MerchantNavigationBarHome',
+  );
+
+  static const IconData merchantNavigationBarOrders = IconData(
+    0xe80a,
+    fontFamily: 'MerchantNavigationBarOrders',
+  );
+
+  static const IconData merchantNavigationBarProducts = IconData(
+    0xe813,
+    fontFamily: 'MerchantNavigationBarProducts',
+  );
+
+  static const IconData merchantNavigationBarProfile = IconData(
+    0xe804,
+    fontFamily: 'MerchantNavigationBarProfile',
+  );
+
+  // -- One order, in the merchant hands ------------------------------------
+  //
+  // `merchant_order_detail/`
+
+  static const IconData merchantOrderDetailNotifications = IconData(
+    0xe80a,
+    fontFamily: 'MerchantOrderDetailNotifications',
+  );
+
+  static const IconData merchantOrderDetailProducts = IconData(
+    0xe813,
+    fontFamily: 'MerchantOrderDetailProducts',
+  );
+
+  // -- The invoice ---------------------------------------------------------
+  //
+  // `merchant_order_invoice/`
+
+  static const IconData merchantOrderInvoicePrintInvoice = IconData(
+    0xeba4,
+    fontFamily: 'MerchantOrderInvoicePrintInvoice',
+  );
+
+  // -- Adding or editing a product -----------------------------------------
+  //
+  // `merchant_product_editor/`
+
+  static const IconData merchantProductEditorPreviewProduct = IconData(
+    0xe801,
+    fontFamily: 'MerchantProductEditorPreviewProduct',
+  );
+
+  static const IconData merchantProductEditorUploadProductImage = IconData(
+    0xe800,
+    fontFamily: 'MerchantProductEditorUploadProductImage',
+  );
+
+  // -- A product's pictures ------------------------------------------------
+  //
+  // `merchant_product_images/`
+
+  static const IconData merchantProductImagesDeleteProductForever = IconData(
+    0xe805,
+    fontFamily: 'MerchantProductImagesDeleteProductForever',
+  );
+
+  static const IconData merchantProductImagesUploadProductImage = IconData(
+    0xe800,
+    fontFamily: 'MerchantProductImagesUploadProductImage',
+  );
+
+  // -- A product's options -------------------------------------------------
+  //
+  // `merchant_product_options/`
+
+  static const IconData merchantProductOptionsDeleteProductForever = IconData(
+    0xe805,
+    fontFamily: 'MerchantProductOptionsDeleteProductForever',
+  );
+
+  // -- The merchant's profile tab ------------------------------------------
+  //
+  // `merchant_profile/`
+
+  static const IconData merchantProfileAddProduct = IconData(
+    0xe814,
+    fontFamily: 'MerchantProfileAddProduct',
+  );
+
+  static const IconData merchantProfileBusinessSettings = IconData(
+    0xe808,
+    fontFamily: 'MerchantProfileBusinessSettings',
+  );
+
+  static const IconData merchantProfileChat = IconData(
+    0xe805,
+    fontFamily: 'MerchantProfileChat',
+  );
+
+  static const IconData merchantProfileContactUs = IconData(
+    0xe809,
+    fontFamily: 'MerchantProfileContactUs',
+  );
+
+  static const IconData merchantProfilePreviewProduct = IconData(
+    0xe801,
+    fontFamily: 'MerchantProfilePreviewProduct',
+  );
+
+  // -- The bar above the messages ------------------------------------------
+  //
+  // `messages_header/`
+
+  static const IconData messagesHeaderSearch = IconData(
+    0xe815,
+    fontFamily: 'MessagesHeaderSearch',
+  );
+
+  // -- The message list ----------------------------------------------------
+  //
+  // `messages_inbox/`
+
+  static const IconData messagesInboxChat = IconData(
+    0xe805,
+    fontFamily: 'MessagesInboxChat',
+  );
+
+  // -- The map -------------------------------------------------------------
+  //
+  // `nearby_map/`
+
+  static const IconData nearbyMapSearch = IconData(
+    0xe815,
+    fontFamily: 'NearbyMapSearch',
+  );
+
+  // -- The notification switches -------------------------------------------
+  //
+  // `notification_preferences/`
+
+  static const IconData notificationPreferencesNotifications = IconData(
+    0xe80a,
+    fontFamily: 'NotificationPreferencesNotifications',
+  );
+
+  // -- The notifications board ---------------------------------------------
+  //
+  // `notifications_page/`
+
+  static const IconData notificationsPageNotifications = IconData(
+    0xe80a,
+    fontFamily: 'NotificationsPageNotifications',
+  );
+
+  // -- Following one order -------------------------------------------------
+  //
+  // `order_tracking/`
+
+  static const IconData orderTrackingRatingBarStar = IconData(
+    0xe816,
+    fontFamily: 'OrderTrackingRatingBarStar',
+  );
+
+  static const IconData orderTrackingRatingStarEmpty = IconData(
+    0xe801,
+    fontFamily: 'OrderTrackingRatingStarEmpty',
+  );
+
+  // -- طلباتي --------------------------------------------------------------
+  //
+  // `orders/`
+
+  static const IconData ordersProducts = IconData(
+    0xe813,
+    fontFamily: 'OrdersProducts',
+  );
+
+  // -- One product ---------------------------------------------------------
+  //
+  // `product_details/`
+
+  static const IconData productDetailsChat = IconData(
+    0xe805,
+    fontFamily: 'ProductDetailsChat',
+  );
+
+  static const IconData productDetailsRatingBarStar = IconData(
+    0xe816,
+    fontFamily: 'ProductDetailsRatingBarStar',
+  );
+
+  static const IconData productDetailsRatingStarEmpty = IconData(
+    0xe801,
+    fontFamily: 'ProductDetailsRatingStarEmpty',
+  );
+
+  static const IconData productDetailsRatingStarFull = IconData(
+    0xf005,
+    fontFamily: 'ProductDetailsRatingStarFull',
+  );
+
+  // -- Setting a new password ----------------------------------------------
+  //
+  // `reset_password/`
+
+  static const IconData resetPasswordHidePassword = IconData(
+    0xe802,
+    fontFamily: 'ResetPasswordHidePassword',
+  );
+
+  static const IconData resetPasswordShowPassword = IconData(
+    0xe803,
+    fontFamily: 'ResetPasswordShowPassword',
+  );
+
+  // -- Search --------------------------------------------------------------
+  //
+  // `search_page/`
+
+  static const IconData searchPageProductsCount = IconData(
+    0xe802,
+    fontFamily: 'SearchPageProductsCount',
+  );
+
+  static const IconData searchPageRatingStarFull = IconData(
+    0xf005,
+    fontFamily: 'SearchPageRatingStarFull',
+  );
+
+  static const IconData searchPageSearch = IconData(
+    0xe815,
+    fontFamily: 'SearchPageSearch',
+  );
+
+  // -- Sharing the app -----------------------------------------------------
+  //
+  // `share_app/`
+
+  static const IconData shareAppWhatsapp = IconData(
+    0xf232,
+    fontFamily: 'ShareAppWhatsapp',
+  );
+
+  // -- Registering ---------------------------------------------------------
+  //
+  // `signup/`
+
+  static const IconData signupHidePassword = IconData(
+    0xe802,
+    fontFamily: 'SignupHidePassword',
+  );
+
+  static const IconData signupShowPassword = IconData(
+    0xe803,
+    fontFamily: 'SignupShowPassword',
+  );
+
+  // -- How a shop can be reached -------------------------------------------
+  //
+  // `store_contact/`
+
+  static const IconData storeContactContactUs = IconData(
+    0xe809,
+    fontFamily: 'StoreContactContactUs',
+  );
+
+  static const IconData storeContactPhoneNumber = IconData(
+    0xe80b,
+    fontFamily: 'StoreContactPhoneNumber',
+  );
+
+  static const IconData storeContactWhatsapp = IconData(
+    0xf232,
+    fontFamily: 'StoreContactWhatsapp',
+  );
+
+  // -- A shop's own settings -----------------------------------------------
+  //
+  // `store_settings/`
+
+  static const IconData storeSettingsWhatsapp = IconData(
+    0xf232,
+    fontFamily: 'StoreSettingsWhatsapp',
+  );
+
+  // -- Sizes ----------------------------------------------------------------
 
   /// Against Material's `logout_rounded`, which the bars drew beside it.
   ///
   /// The home bar and the profile's own button are two ways out of the same
   /// account, and they were two different marks until this.
   static const double signOutSizeFactor = 0.750 / 0.834;
-
-  /// `التسجيل كتاجر`
-  static const IconData stores = IconData(0xe808, fontFamily: 'BusinessesIcon');
-
-  /// The account, where no picture was ever stored for one.
-  static const IconData profile = IconData(0xe804, fontFamily: 'ProfileIcon');
-
-  static const IconData facebook = IconData(
-    0xe810,
-    fontFamily: 'FacebookLogoIcon',
-  );
-
-  static const IconData instagram = IconData(
-    0xe811,
-    fontFamily: 'InstagramLogoIcon',
-  );
-
-  /// `تنبيهات المنتجات والعروض`
-  static const IconData campaignsProductsNotifications = IconData(
-    0xe80a,
-    fontFamily: 'CampaignsProductsNotifications',
-  );
-
-  /// The bell, wherever one is drawn.
-  ///
-  /// The one glyph here that is not a section's own. It is the same bell on
-  /// the home bar, the notifications board, a storefront, a merchant's order
-  /// and the preference switches, and it is meant to stay the same on all of
-  /// them - so it is read from the library's own file rather than copied per
-  /// screen the way the rest are.
-  ///
-  /// Its ink fills 0.835 of the em box where Material's fills nearly all of
-  /// one, so a site swapping from `Icons.notifications_none_rounded` divides
-  /// its old size by that to keep the mark the size it was.
-  static const IconData notifications = IconData(
-    0xe80a,
-    fontFamily: 'Notifications',
-  );
 
   /// What to multiply a Material bell's size by to get [notifications] at the
   /// same apparent size.
@@ -112,70 +628,6 @@ abstract final class MerzoxIcons {
   /// this bell is drawn slightly wider for its height than Material's.
   static const double notificationsSizeFactor = 0.812 / 0.834;
 
-  // -- Rating stars ---------------------------------------------------------
-  //
-  // Four drawings, read from the library rather than copied per screen: a
-  // rating looks the same wherever one is shown, and that is the point.
-  //
-  // The first three are the display set. The fourth is the star of the bar a
-  // reader taps to leave a rating - it is a different outline from
-  // [ratingStarFull], not a copy of it, which was checked rather than assumed.
-  //
-  // Their code points are the only ones in this set that are not in the
-  // private-use range the rest of the library uses: the generator left three
-  // of its own glyphs in each file, and in three of the four the real star is
-  // not the last entry in the `cmap`. They were rendered and looked at.
-
-  /// A whole star, in a rating that is being read.
-  static const IconData ratingStarFull = IconData(
-    0xf005,
-    fontFamily: 'FullRoundedRatingStar',
-  );
-
-  /// Half a star, for an average that lands between two.
-  static const IconData ratingStarHalf = IconData(
-    0xf5c0,
-    fontFamily: 'HalfRoundedRatingStar',
-  );
-
-  /// A star not reached.
-  static const IconData ratingStarEmpty = IconData(
-    0xe801,
-    fontFamily: 'OutlinedRatingStar',
-  );
-
-  /// The star of the bar a reader taps to leave a rating.
-  static const IconData ratingBarStar = IconData(
-    0xe816,
-    fontFamily: 'RatingBarStar',
-  );
-
-  // -- Ways of being reached ------------------------------------------------
-  //
-  // Four marks, and the set is the reason to take them together: three of
-  // these places were drawing a plain speech bubble for WhatsApp, which is a
-  // service with a mark of its own that everybody already knows.
-  //
-  // The two handsets are not interchangeable. [phoneNumber] is a handset with
-  // signal waves and belongs beside a number; [contactUs] is a bare handset
-  // and belongs on the action that reaches somebody. The designer drew them
-  // separately and the file names say which is which.
-
-  /// WhatsApp's own mark, where a generic bubble used to stand for it.
-  static const IconData whatsapp = IconData(0xf232, fontFamily: 'WatsappIcon');
-
-  /// A handset with signal waves: beside a phone number.
-  static const IconData phoneNumber = IconData(
-    0xe80b,
-    fontFamily: 'PhoneNumberIcon',
-  );
-
-  /// A bare handset: on the action that reaches somebody.
-  static const IconData contactUs = IconData(0xe809, fontFamily: 'ContactUs');
-
-  /// A speech bubble: a conversation, and the way into one.
-  static const IconData chat = IconData(0xe805, fontFamily: 'ChatIcon');
-
   /// Against Material's `chat_outlined`, which these WhatsApp places drew.
   static const double whatsappSizeFactor = 0.832 / 0.857;
 
@@ -189,30 +641,6 @@ abstract final class MerzoxIcons {
   /// Against Material's `chat_bubble_outline_rounded`.
   static const double chatSizeFactor = 0.832 / 1.0;
 
-  // -- The eye on a password field ------------------------------------------
-  //
-  // The names are the designer's and they settle a question the app was of two
-  // minds about: which eye stands beside a password that is hidden. This one -
-  // "show password" - is what a reader presses to reveal it, so it is the one
-  // drawn while the field is obscured. The crossed eye is what they press to
-  // put it back.
-  //
-  // `EyeIconHidePassword` also carries a stray box glyph the generator left
-  // behind, so the code points here were read out of each `cmap` and the
-  // glyphs rendered before either went on a field.
-
-  /// The open eye: press it to reveal a hidden password.
-  static const IconData showPassword = IconData(
-    0xe803,
-    fontFamily: 'EyeIconShowPassword',
-  );
-
-  /// The crossed eye: press it to hide a revealed one.
-  static const IconData hidePassword = IconData(
-    0xe802,
-    fontFamily: 'EyeIconHidePassword',
-  );
-
   /// What to multiply a Material eye's size by to get these at the same
   /// apparent size.
   ///
@@ -221,15 +649,6 @@ abstract final class MerzoxIcons {
   /// these two are the same height. Anchoring on width is what keeps the pair
   /// the same size as each other when a press swaps one for the other.
   static const double passwordEyeSizeFactor = 0.918 / 1.24;
-
-  // -- Search ---------------------------------------------------------------
-
-  /// The magnifier, on every field that searches something.
-  ///
-  /// There is no companion for Material's `search_off_rounded` - the crossed
-  /// magnifier a screen shows when a search found nothing - so those keep
-  /// theirs. The set has nothing that draws an absence.
-  static const IconData search = IconData(0xe815, fontFamily: 'SearchIcon');
 
   /// What to multiply a Material magnifier's size by to get [search] at the
   /// same apparent size.
@@ -250,53 +669,6 @@ abstract final class MerzoxIcons {
   /// a pixel of each other and of Material's - the designer drew them to
   /// match, so scaling each to its own ink would have pulled them apart.
   static const double ratingStarSizeFactor = 0.712 / 1.086;
-
-  // -- Keeping a product -----------------------------------------------------
-  //
-  // What a merchant does to one of their own products: edit it, delete it,
-  // look at it the way a customer will, and put pictures on it. The count of
-  // them is here too, because it is the same drawing and it is read off the
-  // same idea of a product.
-  //
-  // `EditProductIcon.ttf` is not like the others in this set: the generator
-  // shipped it with the whole Material library inside it and the designer's
-  // own mark appended at the very end, at U+EBA4. Taking the last entry in a
-  // `cmap` is a habit that would have been right here and wrong three times
-  // already, so this one was rendered and looked at like the rest.
-  //
-  // `CropProductPic.ttf` has no constant. Nothing in the app crops a picture
-  // yet - the image manager says so in its own header - and a mark for an
-  // action that does not exist is not an icon, it is a promise.
-
-  /// The pencil on a product's row: opens the editor.
-  static const IconData editProduct = IconData(
-    0xeba4,
-    fontFamily: 'EditProductIcon',
-  );
-
-  /// The bin: removes a product, one of its variants, or one of its pictures.
-  static const IconData deleteProductForever = IconData(
-    0xe805,
-    fontFamily: 'DeleteProductForever',
-  );
-
-  /// The eye: shows a merchant what a customer would see.
-  static const IconData previewProduct = IconData(
-    0xe801,
-    fontFamily: 'PreviewProductIcon',
-  );
-
-  /// The cloud with an arrow, on the panel that takes pictures.
-  static const IconData uploadProductImage = IconData(
-    0xe800,
-    fontFamily: 'UploadProductImage',
-  );
-
-  /// A parcel, beside a number of products.
-  static const IconData productsCount = IconData(
-    0xe802,
-    fontFamily: 'ProductsCount',
-  );
 
   /// Against Material's `edit_outlined`.
   ///
@@ -334,42 +706,6 @@ abstract final class MerzoxIcons {
   /// Matching their height is what puts the two counts on the same footing.
   static const double productsCountSizeFactor = 0.835 / 0.990;
 
-  // -- An order, and what is done with one ----------------------------------
-  //
-  // The checkout's three steps and the printed invoice. Two of the three steps
-  // convert; the third is a tick in a circle and the set has nothing that
-  // draws one, so it keeps Material's.
-  //
-  // `PrintInvoice.ttf` is the second file in this library shipped with the
-  // whole Material set inside it and the designer's mark appended at U+EBA4,
-  // after `EditProductIcon.ttf`. Two out of forty is enough to make rendering
-  // every glyph the rule rather than a precaution.
-  //
-  // `ILSIcon.ttf` has no constant, and the reason is worth writing down: the
-  // shekel in this app is not an icon. `merzoxPrice` builds a string - `65 ₪`
-  // - and every price on every screen is that string inside a `Text`. Putting
-  // the drawn mark there means an inline span at each of them, which changes
-  // how prices align, select and read aloud. That is a typography decision
-  // about money, not an icon swap, and it is left for its own day.
-
-  /// The printer, on the invoice a merchant sends to paper.
-  static const IconData printInvoice = IconData(
-    0xeba4,
-    fontFamily: 'PrintInvoice',
-  );
-
-  /// A written page: the checkout step where the buyer's details are given.
-  static const IconData orderData = IconData(
-    0xe80d,
-    fontFamily: 'OrderDataIcon',
-  );
-
-  /// A wallet: the checkout step where the order is paid for.
-  static const IconData orderPayment = IconData(
-    0xe80c,
-    fontFamily: 'OrderPaymentIcon',
-  );
-
   /// Against Material's `print_outlined`.
   ///
   /// Width, and it happens to be exactly one: the two printers are drawn to
@@ -389,34 +725,6 @@ abstract final class MerzoxIcons {
   /// is tall, and at 22 the two anchorings differ by a single pixel - so the
   /// one that keeps the mark's width is the one to take.
   static const double orderPaymentSizeFactor = 0.792 / 1.002;
-
-  // -- Liking, filtering, and a shop's own settings -------------------------
-
-  /// A filled heart: a product that is liked, or one already in the list.
-  ///
-  /// [favorites] is the same heart drawn as an outline, and the two are a
-  /// matched pair - same silhouette, same highlight, same ink to three
-  /// decimal places - which is what makes them usable as the two faces of one
-  /// toggle. Material's pair matches too, but mixing one from each set would
-  /// have changed the mark's shape on a tap and not only its fill.
-  static const IconData favoriteProduct = IconData(
-    0xe80e,
-    fontFamily: 'FavoriteProduct',
-  );
-
-  /// The sliders on the button that filters a merchant's own products.
-  ///
-  /// A third file shipped with the whole Material set inside it, the mark
-  /// appended at U+EBA4. Its ink fills only 0.417 of the em box - far less
-  /// than anything else in this library - so its factor is above 1.7 where
-  /// every other one here is below 1.1. That is the glyph, not a mistake.
-  static const IconData filter = IconData(0xeba4, fontFamily: 'FilterIcon');
-
-  /// The gear on the row that opens a shop's settings.
-  static const IconData businessSettings = IconData(
-    0xe808,
-    fontFamily: 'BusinessSettings',
-  );
 
   /// Against Material's `favorite_rounded` and `favorite_border_rounded`.
   ///
@@ -442,37 +750,6 @@ abstract final class MerzoxIcons {
   /// hundred, so this one is width by convention rather than by argument.
   static const double businessSettingsSizeFactor = 0.815 / 0.955;
 
-  // -- A product, and adding one --------------------------------------------
-  //
-  // These two files close the library out, and the four left beside them are
-  // accounted for rather than unused: HomeIcon.ttf, CartIcon.ttf,
-  // ProductsIcon.ttf and AddProductsIcon.ttf are byte-for-byte the originals
-  // that were copied into the two bottom-bar folders. They were checked by
-  // hash, not by name. Nothing in the app draws a house or a trolley outside
-  // those bars, so HomeIcon and CartIcon get no constant here and are not
-  // orphans either - they are already on screen under their bars' families.
-  //
-  // The two parcels are not a duplicate. [productsCount] is a box seen from a
-  // corner and stands beside a number; this one is a box seen face on and is
-  // the mark the bar uses for `المنتجات`. The designer drew both, and which
-  // is which was settled by rendering them side by side.
-
-  /// A parcel: a product, where its own picture is missing.
-  static const IconData products = IconData(0xe813, fontFamily: 'ProductsIcon');
-
-  /// A plus in a rounded square: add a product.
-  ///
-  /// Only on the button that carries no words. The labelled `إضافة منتج`
-  /// button keeps Material's bare plus: a plus beside a word is a typographic
-  /// mark, and boxing it makes the button a different button rather than the
-  /// same one drawn by the designer. At that button's 18 the box is either
-  /// illegible or louder than its own label - both were rendered before this
-  /// was decided.
-  static const IconData addProduct = IconData(
-    0xe814,
-    fontFamily: 'AddProductsIcon',
-  );
-
   /// Against Material's `inventory_2_outlined`, the archive box five
   /// placeholders were drawing.
   static const double productsSizeFactor = 0.835 / 1.002;
@@ -482,64 +759,4 @@ abstract final class MerzoxIcons {
   /// A circle becomes a rounded square at the same size, which is as close to
   /// a like-for-like swap as this library gets.
   static const double addProductSizeFactor = 0.835 / 1.005;
-
-  // -- The customer's bottom bar --------------------------------------------
-  //
-  // Five places, the middle one raised out of the bar. Home and the account
-  // are the same drawings the merchant's bar uses, kept in their own folder
-  // and under their own family for the reason the file header gives.
-
-  static const IconData customerNavHome = IconData(
-    0xe807,
-    fontFamily: 'CustomerNavHome',
-  );
-
-  static const IconData customerNavCart = IconData(
-    0xe806,
-    fontFamily: 'CustomerNavCart',
-  );
-
-  /// The raised button: `المتاجر`, drawn as a shop awning.
-  static const IconData customerNavStores = IconData(
-    0xe808,
-    fontFamily: 'CustomerNavStores',
-  );
-
-  static const IconData customerNavMessages = IconData(
-    0xe805,
-    fontFamily: 'CustomerNavMessages',
-  );
-
-  static const IconData customerNavProfile = IconData(
-    0xe804,
-    fontFamily: 'CustomerNavProfile',
-  );
-
-  // -- The merchant's bottom bar --------------------------------------------
-
-  static const IconData merchantNavHome = IconData(
-    0xe807,
-    fontFamily: 'MerchantNavHome',
-  );
-
-  static const IconData merchantNavOrders = IconData(
-    0xe80a,
-    fontFamily: 'MerchantNavOrders',
-  );
-
-  /// The raised button: `إضافة منتجات`, a cross in a rounded square.
-  static const IconData merchantNavAddProduct = IconData(
-    0xe814,
-    fontFamily: 'MerchantNavAddProduct',
-  );
-
-  static const IconData merchantNavProducts = IconData(
-    0xe813,
-    fontFamily: 'MerchantNavProducts',
-  );
-
-  static const IconData merchantNavProfile = IconData(
-    0xe804,
-    fontFamily: 'MerchantNavProfile',
-  );
 }

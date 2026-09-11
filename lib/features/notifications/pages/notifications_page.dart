@@ -156,7 +156,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
         children: [
           // The size it drew at as a Material bell, converted.
           Icon(
-            MerzoxIcons.notifications,
+            MerzoxIcons.notificationsPageNotifications,
             size: 56 * MerzoxIcons.notificationsSizeFactor,
             color: MerzoxColors.kColorBEBEBE,
           ),

@@ -50,118 +50,277 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   'Tajawal': <String>['assets/fonts/Tajawal-Regular.ttf'],
   'Concept': <String>['assets/fonts/Concept Medium.ttf'],
   'Minion': <String>['assets/fonts/MINIONVARIABLECONCEPT-ROMAN.OTF'],
-  // The designer's glyphs, one family per icon as they were exported.
-  // The bell, read from the library rather than copied per screen: it is the
-  // same mark on six boards and is meant to stay so.
-  'Notifications': <String>['assets/fonts/icons_fonts/Notifications.ttf'],
-  // The rating stars, read from the library for the same reason.
-  'FullRoundedRatingStar': <String>[
-    'assets/fonts/icons_fonts/FullRoundedRatingStar.ttf',
+  // The designer's glyphs, one family per screen that draws one.
+  // Generated alongside the files themselves; a family left out here
+  // does not fail a test, it renders the empty box the engine falls
+  // back to - which in a capture looks like an icon that was never
+  // drawn rather than a font that was never loaded.
+  'BusinessProfileChat': <String>[
+    'assets/fonts/icons_fonts/business_profile/BusinessProfileChat.ttf',
   ],
-  'HalfRoundedRatingStar': <String>[
-    'assets/fonts/icons_fonts/HalfRoundedRatingStar.ttf',
+  'BusinessProfileContactUs': <String>[
+    'assets/fonts/icons_fonts/business_profile/BusinessProfileContactUs.ttf',
   ],
-  'OutlinedRatingStar': <String>[
-    'assets/fonts/icons_fonts/OutlinedRatingStar.ttf',
+  'BusinessProfileFavoriteOutline': <String>[
+    'assets/fonts/icons_fonts/business_profile/BusinessProfileFavoriteOutline.ttf',
   ],
-  'RatingBarStar': <String>['assets/fonts/icons_fonts/RatingBarStar.ttf'],
-  'SearchIcon': <String>['assets/fonts/icons_fonts/SearchIcon.ttf'],
-  'WatsappIcon': <String>['assets/fonts/icons_fonts/WatsappIcon.ttf'],
-  'PhoneNumberIcon': <String>['assets/fonts/icons_fonts/PhoneNumberIcon.ttf'],
-  'ContactUs': <String>['assets/fonts/icons_fonts/ContactUs.ttf'],
-  'ChatIcon': <String>['assets/fonts/icons_fonts/ChatIcon.ttf'],
-  'EyeIconShowPassword': <String>[
-    'assets/fonts/icons_fonts/EyeIconShowPassword.ttf',
+  'BusinessProfileFavoriteProduct': <String>[
+    'assets/fonts/icons_fonts/business_profile/BusinessProfileFavoriteProduct.ttf',
   ],
-  'EyeIconHidePassword': <String>[
-    'assets/fonts/icons_fonts/EyeIconHidePassword.ttf',
+  'BusinessProfileNotifications': <String>[
+    'assets/fonts/icons_fonts/business_profile/BusinessProfileNotifications.ttf',
   ],
-  'EditProductIcon': <String>['assets/fonts/icons_fonts/EditProductIcon.ttf'],
-  'DeleteProductForever': <String>[
-    'assets/fonts/icons_fonts/DeleteProductForever.ttf',
+  'BusinessProfileProductsCount': <String>[
+    'assets/fonts/icons_fonts/business_profile/BusinessProfileProductsCount.ttf',
   ],
-  'PreviewProductIcon': <String>[
-    'assets/fonts/icons_fonts/PreviewProductIcon.ttf',
+  'BusinessProfileRatingBarStar': <String>[
+    'assets/fonts/icons_fonts/business_profile/BusinessProfileRatingBarStar.ttf',
   ],
-  'UploadProductImage': <String>[
-    'assets/fonts/icons_fonts/UploadProductImage.ttf',
+  'BusinessProfileRatingStarEmpty': <String>[
+    'assets/fonts/icons_fonts/business_profile/BusinessProfileRatingStarEmpty.ttf',
   ],
-  'ProductsCount': <String>['assets/fonts/icons_fonts/ProductsCount.ttf'],
-  'PrintInvoice': <String>['assets/fonts/icons_fonts/PrintInvoice.ttf'],
-  'OrderDataIcon': <String>['assets/fonts/icons_fonts/OrderDataIcon.ttf'],
-  'OrderPaymentIcon': <String>['assets/fonts/icons_fonts/OrderPaymentIcon.ttf'],
-  'FavoriteProduct': <String>['assets/fonts/icons_fonts/FavoriteProduct.ttf'],
-  'FilterIcon': <String>['assets/fonts/icons_fonts/FilterIcon.ttf'],
-  'BusinessSettings': <String>['assets/fonts/icons_fonts/BusinessSettings.ttf'],
-  'ProductsIcon': <String>['assets/fonts/icons_fonts/ProductsIcon.ttf'],
-  'AddProductsIcon': <String>['assets/fonts/icons_fonts/AddProductsIcon.ttf'],
-  'EditProfileIcon': <String>[
-    'assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf',
+  'BusinessProfileRatingStarFull': <String>[
+    'assets/fonts/icons_fonts/business_profile/BusinessProfileRatingStarFull.ttf',
   ],
-  'MyOrdersIcon': <String>[
-    'assets/fonts/icons_fonts/customer_profile/MyOrdersIcon.ttf',
+  'BusinessRatingStarsRatingStarEmpty': <String>[
+    'assets/fonts/icons_fonts/business_rating_stars/BusinessRatingStarsRatingStarEmpty.ttf',
   ],
-  'MapIcon': <String>['assets/fonts/icons_fonts/customer_profile/MapIcon.ttf'],
-  'Favorites': <String>[
-    'assets/fonts/icons_fonts/customer_profile/Favorites.ttf',
+  'BusinessRatingStarsRatingStarFull': <String>[
+    'assets/fonts/icons_fonts/business_rating_stars/BusinessRatingStarsRatingStarFull.ttf',
   ],
-  'WhoWeAreIcon': <String>[
-    'assets/fonts/icons_fonts/customer_profile/WhoWeAreIcon.ttf',
+  'BusinessRatingStarsRatingStarHalf': <String>[
+    'assets/fonts/icons_fonts/business_rating_stars/BusinessRatingStarsRatingStarHalf.ttf',
   ],
-  'ShareAppIcon': <String>[
-    'assets/fonts/icons_fonts/customer_profile/ShareAppIcon.ttf',
+  'CheckoutStepsOrderData': <String>[
+    'assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderData.ttf',
   ],
-  'SignOutIcon': <String>[
-    'assets/fonts/icons_fonts/customer_profile/SignOutIcon.ttf',
+  'CheckoutStepsOrderPayment': <String>[
+    'assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderPayment.ttf',
   ],
-  'BusinessesIcon': <String>[
-    'assets/fonts/icons_fonts/customer_profile/BusinessesIcon.ttf',
+  'CustomerNavigationBarCart': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarCart.ttf',
   ],
-  'ProfileIcon': <String>[
-    'assets/fonts/icons_fonts/customer_profile/ProfileIcon.ttf',
+  'CustomerNavigationBarHome': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarHome.ttf',
   ],
-  'FacebookLogoIcon': <String>[
-    'assets/fonts/icons_fonts/customer_profile/FacebookLogoIcon.ttf',
+  'CustomerNavigationBarMessages': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarMessages.ttf',
   ],
-  'InstagramLogoIcon': <String>[
-    'assets/fonts/icons_fonts/customer_profile/InstagramLogoIcon.ttf',
+  'CustomerNavigationBarProfile': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarProfile.ttf',
   ],
-  'CampaignsProductsNotifications': <String>[
-    'assets/fonts/icons_fonts/customer_profile/'
-        'CampaignsProductsNotifications.ttf',
+  'CustomerNavigationBarStores': <String>[
+    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarStores.ttf',
   ],
-  // The two bottom bars. Every board in the seed suite draws one of them, so
-  // a family missing here empties five icons at once rather than one.
-  'CustomerNavHome': <String>[
-    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavHome.ttf',
+  'FavoritesFavoriteOutline': <String>[
+    'assets/fonts/icons_fonts/favorites/FavoritesFavoriteOutline.ttf',
   ],
-  'CustomerNavCart': <String>[
-    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavCart.ttf',
+  'FavoritesFavoriteProduct': <String>[
+    'assets/fonts/icons_fonts/favorites/FavoritesFavoriteProduct.ttf',
   ],
-  'CustomerNavStores': <String>[
-    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavStores.ttf',
+  'FavoritesProducts': <String>[
+    'assets/fonts/icons_fonts/favorites/FavoritesProducts.ttf',
   ],
-  'CustomerNavMessages': <String>[
-    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavMessages.ttf',
+  'FavoritesRatingStarEmpty': <String>[
+    'assets/fonts/icons_fonts/favorites/FavoritesRatingStarEmpty.ttf',
   ],
-  'CustomerNavProfile': <String>[
-    'assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavProfile.ttf',
+  'FavoritesRatingStarFull': <String>[
+    'assets/fonts/icons_fonts/favorites/FavoritesRatingStarFull.ttf',
   ],
-  'MerchantNavHome': <String>[
-    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavHome.ttf',
+  'GlobalBellNotifications': <String>[
+    'assets/fonts/icons_fonts/global_bell/GlobalBellNotifications.ttf',
   ],
-  'MerchantNavOrders': <String>[
-    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavOrders.ttf',
+  'HomeScreenCampaignsProductsNotifications': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenCampaignsProductsNotifications.ttf',
   ],
-  'MerchantNavAddProduct': <String>[
-    'assets/fonts/icons_fonts/merchant_navigation_bar/'
-        'MerchantNavAddProduct.ttf',
+  'HomeScreenEditProfile': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenEditProfile.ttf',
   ],
-  'MerchantNavProducts': <String>[
-    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavProducts.ttf',
+  'HomeScreenFacebook': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenFacebook.ttf',
   ],
-  'MerchantNavProfile': <String>[
-    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavProfile.ttf',
+  'HomeScreenFavoriteOutline': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenFavoriteOutline.ttf',
+  ],
+  'HomeScreenInstagram': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenInstagram.ttf',
+  ],
+  'HomeScreenMap': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenMap.ttf',
+  ],
+  'HomeScreenMyOrders': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenMyOrders.ttf',
+  ],
+  'HomeScreenNotifications': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenNotifications.ttf',
+  ],
+  'HomeScreenProfile': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenProfile.ttf',
+  ],
+  'HomeScreenSearch': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenSearch.ttf',
+  ],
+  'HomeScreenShareApp': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenShareApp.ttf',
+  ],
+  'HomeScreenSignOut': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenSignOut.ttf',
+  ],
+  'HomeScreenStores': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenStores.ttf',
+  ],
+  'HomeScreenWhoWeAre': <String>[
+    'assets/fonts/icons_fonts/home_screen/HomeScreenWhoWeAre.ttf',
+  ],
+  'LoginHidePassword': <String>[
+    'assets/fonts/icons_fonts/login/LoginHidePassword.ttf',
+  ],
+  'LoginShowPassword': <String>[
+    'assets/fonts/icons_fonts/login/LoginShowPassword.ttf',
+  ],
+  'MerchantBrowseDeleteProductForever': <String>[
+    'assets/fonts/icons_fonts/merchant_browse/MerchantBrowseDeleteProductForever.ttf',
+  ],
+  'MerchantBrowseEditProduct': <String>[
+    'assets/fonts/icons_fonts/merchant_browse/MerchantBrowseEditProduct.ttf',
+  ],
+  'MerchantBrowseFilter': <String>[
+    'assets/fonts/icons_fonts/merchant_browse/MerchantBrowseFilter.ttf',
+  ],
+  'MerchantBrowseProducts': <String>[
+    'assets/fonts/icons_fonts/merchant_browse/MerchantBrowseProducts.ttf',
+  ],
+  'MerchantBrowseSearch': <String>[
+    'assets/fonts/icons_fonts/merchant_browse/MerchantBrowseSearch.ttf',
+  ],
+  'MerchantDashboardSearch': <String>[
+    'assets/fonts/icons_fonts/merchant_dashboard/MerchantDashboardSearch.ttf',
+  ],
+  'MerchantNavigationBarAddProduct': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarAddProduct.ttf',
+  ],
+  'MerchantNavigationBarHome': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarHome.ttf',
+  ],
+  'MerchantNavigationBarOrders': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarOrders.ttf',
+  ],
+  'MerchantNavigationBarProducts': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarProducts.ttf',
+  ],
+  'MerchantNavigationBarProfile': <String>[
+    'assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarProfile.ttf',
+  ],
+  'MerchantOrderDetailNotifications': <String>[
+    'assets/fonts/icons_fonts/merchant_order_detail/MerchantOrderDetailNotifications.ttf',
+  ],
+  'MerchantOrderDetailProducts': <String>[
+    'assets/fonts/icons_fonts/merchant_order_detail/MerchantOrderDetailProducts.ttf',
+  ],
+  'MerchantOrderInvoicePrintInvoice': <String>[
+    'assets/fonts/icons_fonts/merchant_order_invoice/MerchantOrderInvoicePrintInvoice.ttf',
+  ],
+  'MerchantProductEditorPreviewProduct': <String>[
+    'assets/fonts/icons_fonts/merchant_product_editor/MerchantProductEditorPreviewProduct.ttf',
+  ],
+  'MerchantProductEditorUploadProductImage': <String>[
+    'assets/fonts/icons_fonts/merchant_product_editor/MerchantProductEditorUploadProductImage.ttf',
+  ],
+  'MerchantProductImagesDeleteProductForever': <String>[
+    'assets/fonts/icons_fonts/merchant_product_images/MerchantProductImagesDeleteProductForever.ttf',
+  ],
+  'MerchantProductImagesUploadProductImage': <String>[
+    'assets/fonts/icons_fonts/merchant_product_images/MerchantProductImagesUploadProductImage.ttf',
+  ],
+  'MerchantProductOptionsDeleteProductForever': <String>[
+    'assets/fonts/icons_fonts/merchant_product_options/MerchantProductOptionsDeleteProductForever.ttf',
+  ],
+  'MerchantProfileAddProduct': <String>[
+    'assets/fonts/icons_fonts/merchant_profile/MerchantProfileAddProduct.ttf',
+  ],
+  'MerchantProfileBusinessSettings': <String>[
+    'assets/fonts/icons_fonts/merchant_profile/MerchantProfileBusinessSettings.ttf',
+  ],
+  'MerchantProfileChat': <String>[
+    'assets/fonts/icons_fonts/merchant_profile/MerchantProfileChat.ttf',
+  ],
+  'MerchantProfileContactUs': <String>[
+    'assets/fonts/icons_fonts/merchant_profile/MerchantProfileContactUs.ttf',
+  ],
+  'MerchantProfilePreviewProduct': <String>[
+    'assets/fonts/icons_fonts/merchant_profile/MerchantProfilePreviewProduct.ttf',
+  ],
+  'MessagesHeaderSearch': <String>[
+    'assets/fonts/icons_fonts/messages_header/MessagesHeaderSearch.ttf',
+  ],
+  'MessagesInboxChat': <String>[
+    'assets/fonts/icons_fonts/messages_inbox/MessagesInboxChat.ttf',
+  ],
+  'NearbyMapSearch': <String>[
+    'assets/fonts/icons_fonts/nearby_map/NearbyMapSearch.ttf',
+  ],
+  'NotificationPreferencesNotifications': <String>[
+    'assets/fonts/icons_fonts/notification_preferences/NotificationPreferencesNotifications.ttf',
+  ],
+  'NotificationsPageNotifications': <String>[
+    'assets/fonts/icons_fonts/notifications_page/NotificationsPageNotifications.ttf',
+  ],
+  'OrderTrackingRatingBarStar': <String>[
+    'assets/fonts/icons_fonts/order_tracking/OrderTrackingRatingBarStar.ttf',
+  ],
+  'OrderTrackingRatingStarEmpty': <String>[
+    'assets/fonts/icons_fonts/order_tracking/OrderTrackingRatingStarEmpty.ttf',
+  ],
+  'OrdersProducts': <String>[
+    'assets/fonts/icons_fonts/orders/OrdersProducts.ttf',
+  ],
+  'ProductDetailsChat': <String>[
+    'assets/fonts/icons_fonts/product_details/ProductDetailsChat.ttf',
+  ],
+  'ProductDetailsRatingBarStar': <String>[
+    'assets/fonts/icons_fonts/product_details/ProductDetailsRatingBarStar.ttf',
+  ],
+  'ProductDetailsRatingStarEmpty': <String>[
+    'assets/fonts/icons_fonts/product_details/ProductDetailsRatingStarEmpty.ttf',
+  ],
+  'ProductDetailsRatingStarFull': <String>[
+    'assets/fonts/icons_fonts/product_details/ProductDetailsRatingStarFull.ttf',
+  ],
+  'ResetPasswordHidePassword': <String>[
+    'assets/fonts/icons_fonts/reset_password/ResetPasswordHidePassword.ttf',
+  ],
+  'ResetPasswordShowPassword': <String>[
+    'assets/fonts/icons_fonts/reset_password/ResetPasswordShowPassword.ttf',
+  ],
+  'SearchPageProductsCount': <String>[
+    'assets/fonts/icons_fonts/search_page/SearchPageProductsCount.ttf',
+  ],
+  'SearchPageRatingStarFull': <String>[
+    'assets/fonts/icons_fonts/search_page/SearchPageRatingStarFull.ttf',
+  ],
+  'SearchPageSearch': <String>[
+    'assets/fonts/icons_fonts/search_page/SearchPageSearch.ttf',
+  ],
+  'ShareAppWhatsapp': <String>[
+    'assets/fonts/icons_fonts/share_app/ShareAppWhatsapp.ttf',
+  ],
+  'SignupHidePassword': <String>[
+    'assets/fonts/icons_fonts/signup/SignupHidePassword.ttf',
+  ],
+  'SignupShowPassword': <String>[
+    'assets/fonts/icons_fonts/signup/SignupShowPassword.ttf',
+  ],
+  'StoreContactContactUs': <String>[
+    'assets/fonts/icons_fonts/store_contact/StoreContactContactUs.ttf',
+  ],
+  'StoreContactPhoneNumber': <String>[
+    'assets/fonts/icons_fonts/store_contact/StoreContactPhoneNumber.ttf',
+  ],
+  'StoreContactWhatsapp': <String>[
+    'assets/fonts/icons_fonts/store_contact/StoreContactWhatsapp.ttf',
+  ],
+  'StoreSettingsWhatsapp': <String>[
+    'assets/fonts/icons_fonts/store_settings/StoreSettingsWhatsapp.ttf',
   ],
 };
 

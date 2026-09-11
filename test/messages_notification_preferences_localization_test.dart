@@ -324,7 +324,9 @@ void main() {
           _expectDirection(tester, find.text(label), direction);
 
           final iconX = tester
-              .getCenter(find.byIcon(MerzoxIcons.notifications))
+              .getCenter(
+                find.byIcon(MerzoxIcons.notificationPreferencesNotifications),
+              )
               .dx;
 
           final switchX = tester.getCenter(find.byType(Switch)).dx;
@@ -352,7 +354,9 @@ void main() {
         expect(find.byType(Switch), findsNothing);
 
         final iconX = tester
-            .getCenter(find.byIcon(MerzoxIcons.notifications))
+            .getCenter(
+              find.byIcon(MerzoxIcons.notificationPreferencesNotifications),
+            )
             .dx;
 
         final retryX = tester.getCenter(find.text(retry)).dx;

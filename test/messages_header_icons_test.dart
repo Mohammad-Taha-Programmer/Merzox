@@ -140,7 +140,7 @@ void main() {
     // the magnifier's glyph fills its own em box, so the magnifier's font size
     // is 24 converted - and the two come out the same height, which is the
     // whole reason the drawn one existed.
-    expect(MerzoxIcons.search.fontFamily, 'SearchIcon');
+    expect(MerzoxIcons.messagesHeaderSearch.fontFamily, 'MessagesHeaderSearch');
     expect(
       24 * MerzoxIcons.searchSizeFactor,
       closeTo(24 * 0.711, 0.001),

@@ -948,7 +948,7 @@ class _ImagesDropZone extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: <Widget>[
                     Icon(
-                      MerzoxIcons.uploadProductImage,
+                      MerzoxIcons.merchantProductEditorUploadProductImage,
                       size: 42 * MerzoxIcons.uploadProductImageSizeFactor,
                       color: MerzoxColors.kColor98C1D9,
                     ),
@@ -1064,7 +1064,7 @@ class _PublishRow extends StatelessWidget {
           ),
           const Spacer(),
           Icon(
-            MerzoxIcons.previewProduct,
+            MerzoxIcons.merchantProductEditorPreviewProduct,
             size: 18 * MerzoxIcons.previewProductSizeFactor,
             color: MerzoxColors.kColor8D99AE,
           ),

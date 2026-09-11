@@ -297,6 +297,6 @@ void main() {
     // The designer's parcel now, where Material's archive box stood. The
     // test is about a card with no picture still drawing something, not
     // about which set drew it.
-    expect(find.byIcon(MerzoxIcons.products), findsOneWidget);
+    expect(find.byIcon(MerzoxIcons.favoritesProducts), findsOneWidget);
   });
 }

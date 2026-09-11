@@ -2025,7 +2025,7 @@ void main() {
           find.byKey(const ValueKey<String>('storefront.share')),
         );
         final Rect chatBox = tester.getRect(
-          find.widgetWithIcon(IconButton, MerzoxIcons.chat),
+          find.widgetWithIcon(IconButton, MerzoxIcons.businessProfileChat),
         );
         final Rect contactBox = tester.getRect(
           find.byKey(const ValueKey<String>('storefront.contact')),
@@ -2590,7 +2590,9 @@ void main() {
         // Read right to left: the glyph at the reading edge, the words beside
         // it, the chevron alone at the far end. This is the rule the merchant
         // screen already held itself to and this one did not.
-        final Rect icon = tester.getRect(find.byIcon(MerzoxIcons.myOrders));
+        final Rect icon = tester.getRect(
+          find.byIcon(MerzoxIcons.homeScreenMyOrders),
+        );
         final Rect label = tester.getRect(find.text('طلباتي'));
 
         expect(icon.center.dx, greaterThan(label.center.dx));
@@ -4167,7 +4169,7 @@ void main() {
           ),
         );
 
-        await tester.tap(find.byIcon(MerzoxIcons.filter));
+        await tester.tap(find.byIcon(MerzoxIcons.merchantBrowseFilter));
         await settleMerzoxGoldenFrames(tester);
 
         expect(find.text('تصفية'), findsOneWidget);
@@ -4222,7 +4224,7 @@ void main() {
           ),
         );
 
-        await tester.tap(find.byIcon(MerzoxIcons.filter));
+        await tester.tap(find.byIcon(MerzoxIcons.merchantBrowseFilter));
         await settleMerzoxGoldenFrames(tester);
 
         expect(find.text('قم باختيار تصنيف المنتجات'), findsOneWidget);

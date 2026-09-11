@@ -142,206 +142,310 @@ flutter:
     - family: Tajawal
       fonts:
         - asset: assets/fonts/Tajawal-Regular.ttf
-    # The designer's own glyphs, one font per icon as they were exported.
+    # The designer's own glyphs: one copy per screen, in that screen's
+    # own folder and under its own family, named for the screen. A
+    # drawing used on five screens is five files, and they are identical
+    # today - so that the day one screen wants a different star, its
+    # file is replaced and no other screen moves.
     #
-    # assets/fonts/icons_fonts is the library as it was delivered; each screen
-    # then has a folder holding the ones it draws, named for the section each
-    # one serves rather than for the picture it happens to be. That is why
-    # CampaignsProductsNotifications exists beside the library's own
-    # Notifications: the two are the same drawing today, and the day the
-    # offers row wants its own, one screen changes and no other does.
-    # The one glyph that is deliberately not copied into a screen's folder.
-    # A bell is not a section's mark - it is the same bell on the home bar, the
-    # notifications board, the storefront, a merchant's order and two
-    # preference switches, and it is meant to stay the same on all of them. So
-    # it is declared where the library keeps it. The offers row's
-    # CampaignsProductsNotifications below stays its own copy for the reason
-    # written beside it.
-    - family: Notifications
+    # Generated from the same map the files were copied by. A family
+    # named here with no file under it is an empty box at runtime and
+    # nothing before it.
+    # business_profile/
+    - family: BusinessProfileChat
       fonts:
-        - asset: assets/fonts/icons_fonts/Notifications.ttf
-    # The rating stars, for the same reason: one set of stars on every board
-    # that shows or asks for a rating, so they are read from the library
-    # rather than copied per screen. Three of them are the display set - full,
-    # half, empty - and the fourth is the star of the bar a reader taps.
-    - family: FullRoundedRatingStar
+        - asset: assets/fonts/icons_fonts/business_profile/BusinessProfileChat.ttf
+    - family: BusinessProfileContactUs
       fonts:
-        - asset: assets/fonts/icons_fonts/FullRoundedRatingStar.ttf
-    - family: HalfRoundedRatingStar
+        - asset: assets/fonts/icons_fonts/business_profile/BusinessProfileContactUs.ttf
+    - family: BusinessProfileFavoriteOutline
       fonts:
-        - asset: assets/fonts/icons_fonts/HalfRoundedRatingStar.ttf
-    - family: OutlinedRatingStar
+        - asset: assets/fonts/icons_fonts/business_profile/BusinessProfileFavoriteOutline.ttf
+    - family: BusinessProfileFavoriteProduct
       fonts:
-        - asset: assets/fonts/icons_fonts/OutlinedRatingStar.ttf
-    - family: RatingBarStar
+        - asset: assets/fonts/icons_fonts/business_profile/BusinessProfileFavoriteProduct.ttf
+    - family: BusinessProfileNotifications
       fonts:
-        - asset: assets/fonts/icons_fonts/RatingBarStar.ttf
-    # The magnifier, on every field that searches something.
-    - family: SearchIcon
+        - asset: assets/fonts/icons_fonts/business_profile/BusinessProfileNotifications.ttf
+    - family: BusinessProfileProductsCount
       fonts:
-        - asset: assets/fonts/icons_fonts/SearchIcon.ttf
-    # The ways of being reached.
-    - family: WatsappIcon
+        - asset: assets/fonts/icons_fonts/business_profile/BusinessProfileProductsCount.ttf
+    - family: BusinessProfileRatingBarStar
       fonts:
-        - asset: assets/fonts/icons_fonts/WatsappIcon.ttf
-    - family: PhoneNumberIcon
+        - asset: assets/fonts/icons_fonts/business_profile/BusinessProfileRatingBarStar.ttf
+    - family: BusinessProfileRatingStarEmpty
       fonts:
-        - asset: assets/fonts/icons_fonts/PhoneNumberIcon.ttf
-    - family: ContactUs
+        - asset: assets/fonts/icons_fonts/business_profile/BusinessProfileRatingStarEmpty.ttf
+    - family: BusinessProfileRatingStarFull
       fonts:
-        - asset: assets/fonts/icons_fonts/ContactUs.ttf
-    - family: ChatIcon
+        - asset: assets/fonts/icons_fonts/business_profile/BusinessProfileRatingStarFull.ttf
+    # business_rating_stars/
+    - family: BusinessRatingStarsRatingStarEmpty
       fonts:
-        - asset: assets/fonts/icons_fonts/ChatIcon.ttf
-    # The pair on a password field.
-    - family: EyeIconShowPassword
+        - asset: assets/fonts/icons_fonts/business_rating_stars/BusinessRatingStarsRatingStarEmpty.ttf
+    - family: BusinessRatingStarsRatingStarFull
       fonts:
-        - asset: assets/fonts/icons_fonts/EyeIconShowPassword.ttf
-    - family: EyeIconHidePassword
+        - asset: assets/fonts/icons_fonts/business_rating_stars/BusinessRatingStarsRatingStarFull.ttf
+    - family: BusinessRatingStarsRatingStarHalf
       fonts:
-        - asset: assets/fonts/icons_fonts/EyeIconHidePassword.ttf
-    # What a merchant does to their own product, and the count of them.
-    # CropProductPic.ttf is deliberately absent: nothing in the app crops a
-    # picture yet, so there is nothing for it to sit on.
-    - family: EditProductIcon
+        - asset: assets/fonts/icons_fonts/business_rating_stars/BusinessRatingStarsRatingStarHalf.ttf
+    # checkout_steps/
+    - family: CheckoutStepsOrderData
       fonts:
-        - asset: assets/fonts/icons_fonts/EditProductIcon.ttf
-    - family: DeleteProductForever
+        - asset: assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderData.ttf
+    - family: CheckoutStepsOrderPayment
       fonts:
-        - asset: assets/fonts/icons_fonts/DeleteProductForever.ttf
-    - family: PreviewProductIcon
+        - asset: assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderPayment.ttf
+    # customer_navigation_bar/
+    - family: CustomerNavigationBarCart
       fonts:
-        - asset: assets/fonts/icons_fonts/PreviewProductIcon.ttf
-    - family: UploadProductImage
+        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarCart.ttf
+    - family: CustomerNavigationBarHome
       fonts:
-        - asset: assets/fonts/icons_fonts/UploadProductImage.ttf
-    - family: ProductsCount
+        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarHome.ttf
+    - family: CustomerNavigationBarMessages
       fonts:
-        - asset: assets/fonts/icons_fonts/ProductsCount.ttf
-    # An order: two of the checkout's three steps, and the printed invoice.
-    # ILSIcon.ttf is deliberately absent - the shekel is a character inside a
-    # price string, not a mark drawn beside one.
-    - family: PrintInvoice
+        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarMessages.ttf
+    - family: CustomerNavigationBarProfile
       fonts:
-        - asset: assets/fonts/icons_fonts/PrintInvoice.ttf
-    - family: OrderDataIcon
+        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarProfile.ttf
+    - family: CustomerNavigationBarStores
       fonts:
-        - asset: assets/fonts/icons_fonts/OrderDataIcon.ttf
-    - family: OrderPaymentIcon
+        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavigationBarStores.ttf
+    # favorites/
+    - family: FavoritesFavoriteOutline
       fonts:
-        - asset: assets/fonts/icons_fonts/OrderPaymentIcon.ttf
-    # Liking a product, filtering a list, and a shop's own settings. The
-    # filled heart's outlined twin is Favorites.ttf, already declared below
-    # under the customer profile, and the two are drawn as one pair.
-    # EditsIcon.ttf is deliberately absent: there is no Material pencil left
-    # anywhere in the app for it to replace.
-    - family: FavoriteProduct
+        - asset: assets/fonts/icons_fonts/favorites/FavoritesFavoriteOutline.ttf
+    - family: FavoritesFavoriteProduct
       fonts:
-        - asset: assets/fonts/icons_fonts/FavoriteProduct.ttf
-    - family: FilterIcon
+        - asset: assets/fonts/icons_fonts/favorites/FavoritesFavoriteProduct.ttf
+    - family: FavoritesProducts
       fonts:
-        - asset: assets/fonts/icons_fonts/FilterIcon.ttf
-    - family: BusinessSettings
+        - asset: assets/fonts/icons_fonts/favorites/FavoritesProducts.ttf
+    - family: FavoritesRatingStarEmpty
       fonts:
-        - asset: assets/fonts/icons_fonts/BusinessSettings.ttf
-    # A product where its picture is missing, and the button that adds one.
-    # HomeIcon.ttf and CartIcon.ttf are not declared here and are not unused
-    # either: they are byte-for-byte the files the two bottom-bar folders
-    # carry, and nothing draws a house or a trolley outside those bars.
-    - family: ProductsIcon
+        - asset: assets/fonts/icons_fonts/favorites/FavoritesRatingStarEmpty.ttf
+    - family: FavoritesRatingStarFull
       fonts:
-        - asset: assets/fonts/icons_fonts/ProductsIcon.ttf
-    - family: AddProductsIcon
+        - asset: assets/fonts/icons_fonts/favorites/FavoritesRatingStarFull.ttf
+    # global_bell/
+    - family: GlobalBellNotifications
       fonts:
-        - asset: assets/fonts/icons_fonts/AddProductsIcon.ttf
-    - family: EditProfileIcon
+        - asset: assets/fonts/icons_fonts/global_bell/GlobalBellNotifications.ttf
+    # home_screen/
+    - family: HomeScreenCampaignsProductsNotifications
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf
-    - family: MyOrdersIcon
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenCampaignsProductsNotifications.ttf
+    - family: HomeScreenEditProfile
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/MyOrdersIcon.ttf
-    - family: MapIcon
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenEditProfile.ttf
+    - family: HomeScreenFacebook
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/MapIcon.ttf
-    - family: Favorites
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenFacebook.ttf
+    - family: HomeScreenFavoriteOutline
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/Favorites.ttf
-    - family: WhoWeAreIcon
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenFavoriteOutline.ttf
+    - family: HomeScreenInstagram
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/WhoWeAreIcon.ttf
-    - family: ShareAppIcon
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenInstagram.ttf
+    - family: HomeScreenMap
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/ShareAppIcon.ttf
-    - family: SignOutIcon
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenMap.ttf
+    - family: HomeScreenMyOrders
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/SignOutIcon.ttf
-    - family: BusinessesIcon
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenMyOrders.ttf
+    - family: HomeScreenNotifications
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/BusinessesIcon.ttf
-    - family: ProfileIcon
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenNotifications.ttf
+    - family: HomeScreenProfile
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/ProfileIcon.ttf
-    - family: FacebookLogoIcon
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenProfile.ttf
+    - family: HomeScreenSearch
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/FacebookLogoIcon.ttf
-    - family: InstagramLogoIcon
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenSearch.ttf
+    - family: HomeScreenShareApp
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_profile/InstagramLogoIcon.ttf
-    - family: CampaignsProductsNotifications
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenShareApp.ttf
+    - family: HomeScreenSignOut
       fonts:
-        - asset: >-
-            assets/fonts/icons_fonts/customer_profile/CampaignsProductsNotifications.ttf
-    # The two bottom bars. Home and the profile mark are the same drawing on
-    # both, and are copied into both folders rather than shared: the customer's
-    # bar and the merchant's are two surfaces, and the day one of them wants a
-    # different home, one folder changes and the other does not.
-    - family: CustomerNavHome
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenSignOut.ttf
+    - family: HomeScreenStores
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavHome.ttf
-    - family: CustomerNavCart
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenStores.ttf
+    - family: HomeScreenWhoWeAre
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavCart.ttf
-    - family: CustomerNavStores
+        - asset: assets/fonts/icons_fonts/home_screen/HomeScreenWhoWeAre.ttf
+    # login/
+    - family: LoginHidePassword
       fonts:
-        - asset: assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavStores.ttf
-    - family: CustomerNavMessages
+        - asset: assets/fonts/icons_fonts/login/LoginHidePassword.ttf
+    - family: LoginShowPassword
       fonts:
-        - asset: >-
-            assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavMessages.ttf
-    - family: CustomerNavProfile
+        - asset: assets/fonts/icons_fonts/login/LoginShowPassword.ttf
+    # merchant_browse/
+    - family: MerchantBrowseDeleteProductForever
       fonts:
-        - asset: >-
-            assets/fonts/icons_fonts/customer_navigation_bar/CustomerNavProfile.ttf
-    - family: MerchantNavHome
+        - asset: assets/fonts/icons_fonts/merchant_browse/MerchantBrowseDeleteProductForever.ttf
+    - family: MerchantBrowseEditProduct
       fonts:
-        - asset: assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavHome.ttf
-    - family: MerchantNavOrders
+        - asset: assets/fonts/icons_fonts/merchant_browse/MerchantBrowseEditProduct.ttf
+    - family: MerchantBrowseFilter
       fonts:
-        - asset: >-
-            assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavOrders.ttf
-    - family: MerchantNavAddProduct
+        - asset: assets/fonts/icons_fonts/merchant_browse/MerchantBrowseFilter.ttf
+    - family: MerchantBrowseProducts
       fonts:
-        - asset: >-
-            assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavAddProduct.ttf
-    - family: MerchantNavProducts
+        - asset: assets/fonts/icons_fonts/merchant_browse/MerchantBrowseProducts.ttf
+    - family: MerchantBrowseSearch
       fonts:
-        - asset: >-
-            assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavProducts.ttf
-    - family: MerchantNavProfile
+        - asset: assets/fonts/icons_fonts/merchant_browse/MerchantBrowseSearch.ttf
+    # merchant_dashboard/
+    - family: MerchantDashboardSearch
       fonts:
-        - asset: >-
-            assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavProfile.ttf
-  # fonts:
-  #   - family: Schyler
-  #     fonts:
-  #       - asset: fonts/Schyler-Regular.ttf
-  #       - asset: fonts/Schyler-Italic.ttf
-  #         style: italic
-  #   - family: Trajan Pro
-  #     fonts:
-  #       - asset: fonts/TrajanPro.ttf
-  #       - asset: fonts/TrajanPro_Bold.ttf
-  #         weight: 700
-  #
-  # For details regarding fonts from package dependencies,
-  # see https://flutter.dev/to/font-from-package
+        - asset: assets/fonts/icons_fonts/merchant_dashboard/MerchantDashboardSearch.ttf
+    # merchant_navigation_bar/
+    - family: MerchantNavigationBarAddProduct
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarAddProduct.ttf
+    - family: MerchantNavigationBarHome
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarHome.ttf
+    - family: MerchantNavigationBarOrders
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarOrders.ttf
+    - family: MerchantNavigationBarProducts
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarProducts.ttf
+    - family: MerchantNavigationBarProfile
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_navigation_bar/MerchantNavigationBarProfile.ttf
+    # merchant_order_detail/
+    - family: MerchantOrderDetailNotifications
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_order_detail/MerchantOrderDetailNotifications.ttf
+    - family: MerchantOrderDetailProducts
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_order_detail/MerchantOrderDetailProducts.ttf
+    # merchant_order_invoice/
+    - family: MerchantOrderInvoicePrintInvoice
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_order_invoice/MerchantOrderInvoicePrintInvoice.ttf
+    # merchant_product_editor/
+    - family: MerchantProductEditorPreviewProduct
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_product_editor/MerchantProductEditorPreviewProduct.ttf
+    - family: MerchantProductEditorUploadProductImage
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_product_editor/MerchantProductEditorUploadProductImage.ttf
+    # merchant_product_images/
+    - family: MerchantProductImagesDeleteProductForever
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_product_images/MerchantProductImagesDeleteProductForever.ttf
+    - family: MerchantProductImagesUploadProductImage
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_product_images/MerchantProductImagesUploadProductImage.ttf
+    # merchant_product_options/
+    - family: MerchantProductOptionsDeleteProductForever
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_product_options/MerchantProductOptionsDeleteProductForever.ttf
+    # merchant_profile/
+    - family: MerchantProfileAddProduct
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_profile/MerchantProfileAddProduct.ttf
+    - family: MerchantProfileBusinessSettings
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_profile/MerchantProfileBusinessSettings.ttf
+    - family: MerchantProfileChat
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_profile/MerchantProfileChat.ttf
+    - family: MerchantProfileContactUs
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_profile/MerchantProfileContactUs.ttf
+    - family: MerchantProfilePreviewProduct
+      fonts:
+        - asset: assets/fonts/icons_fonts/merchant_profile/MerchantProfilePreviewProduct.ttf
+    # messages_header/
+    - family: MessagesHeaderSearch
+      fonts:
+        - asset: assets/fonts/icons_fonts/messages_header/MessagesHeaderSearch.ttf
+    # messages_inbox/
+    - family: MessagesInboxChat
+      fonts:
+        - asset: assets/fonts/icons_fonts/messages_inbox/MessagesInboxChat.ttf
+    # nearby_map/
+    - family: NearbyMapSearch
+      fonts:
+        - asset: assets/fonts/icons_fonts/nearby_map/NearbyMapSearch.ttf
+    # notification_preferences/
+    - family: NotificationPreferencesNotifications
+      fonts:
+        - asset: assets/fonts/icons_fonts/notification_preferences/NotificationPreferencesNotifications.ttf
+    # notifications_page/
+    - family: NotificationsPageNotifications
+      fonts:
+        - asset: assets/fonts/icons_fonts/notifications_page/NotificationsPageNotifications.ttf
+    # order_tracking/
+    - family: OrderTrackingRatingBarStar
+      fonts:
+        - asset: assets/fonts/icons_fonts/order_tracking/OrderTrackingRatingBarStar.ttf
+    - family: OrderTrackingRatingStarEmpty
+      fonts:
+        - asset: assets/fonts/icons_fonts/order_tracking/OrderTrackingRatingStarEmpty.ttf
+    # orders/
+    - family: OrdersProducts
+      fonts:
+        - asset: assets/fonts/icons_fonts/orders/OrdersProducts.ttf
+    # product_details/
+    - family: ProductDetailsChat
+      fonts:
+        - asset: assets/fonts/icons_fonts/product_details/ProductDetailsChat.ttf
+    - family: ProductDetailsRatingBarStar
+      fonts:
+        - asset: assets/fonts/icons_fonts/product_details/ProductDetailsRatingBarStar.ttf
+    - family: ProductDetailsRatingStarEmpty
+      fonts:
+        - asset: assets/fonts/icons_fonts/product_details/ProductDetailsRatingStarEmpty.ttf
+    - family: ProductDetailsRatingStarFull
+      fonts:
+        - asset: assets/fonts/icons_fonts/product_details/ProductDetailsRatingStarFull.ttf
+    # reset_password/
+    - family: ResetPasswordHidePassword
+      fonts:
+        - asset: assets/fonts/icons_fonts/reset_password/ResetPasswordHidePassword.ttf
+    - family: ResetPasswordShowPassword
+      fonts:
+        - asset: assets/fonts/icons_fonts/reset_password/ResetPasswordShowPassword.ttf
+    # search_page/
+    - family: SearchPageProductsCount
+      fonts:
+        - asset: assets/fonts/icons_fonts/search_page/SearchPageProductsCount.ttf
+    - family: SearchPageRatingStarFull
+      fonts:
+        - asset: assets/fonts/icons_fonts/search_page/SearchPageRatingStarFull.ttf
+    - family: SearchPageSearch
+      fonts:
+        - asset: assets/fonts/icons_fonts/search_page/SearchPageSearch.ttf
+    # share_app/
+    - family: ShareAppWhatsapp
+      fonts:
+        - asset: assets/fonts/icons_fonts/share_app/ShareAppWhatsapp.ttf
+    # signup/
+    - family: SignupHidePassword
+      fonts:
+        - asset: assets/fonts/icons_fonts/signup/SignupHidePassword.ttf
+    - family: SignupShowPassword
+      fonts:
+        - asset: assets/fonts/icons_fonts/signup/SignupShowPassword.ttf
+    # store_contact/
+    - family: StoreContactContactUs
+      fonts:
+        - asset: assets/fonts/icons_fonts/store_contact/StoreContactContactUs.ttf
+    - family: StoreContactPhoneNumber
+      fonts:
+        - asset: assets/fonts/icons_fonts/store_contact/StoreContactPhoneNumber.ttf
+    - family: StoreContactWhatsapp
+      fonts:
+        - asset: assets/fonts/icons_fonts/store_contact/StoreContactWhatsapp.ttf
+    # store_settings/
+    - family: StoreSettingsWhatsapp
+      fonts:
+        - asset: assets/fonts/icons_fonts/store_settings/StoreSettingsWhatsapp.ttf

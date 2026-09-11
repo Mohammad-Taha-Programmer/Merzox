@@ -234,7 +234,7 @@ class GlobalNotificationBell extends StatelessWidget {
                     children: <Widget>[
                       // The size it drew at as a Material bell, converted.
                       Icon(
-                        MerzoxIcons.notifications,
+                        MerzoxIcons.globalBellNotifications,
                         size: 24 * MerzoxIcons.notificationsSizeFactor,
                         color: MerzoxColors.kColor98C1D9,
                       ),

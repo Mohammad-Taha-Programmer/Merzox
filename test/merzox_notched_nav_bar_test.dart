@@ -16,19 +16,19 @@ import 'localization_test_harness.dart';
 /// `BuildContext` and translations to build, and what is being asked here is
 /// about the icons themselves.
 const List<IconData> _customerNavIcons = <IconData>[
-  MerzoxIcons.customerNavHome,
-  MerzoxIcons.customerNavCart,
-  MerzoxIcons.customerNavStores,
-  MerzoxIcons.customerNavMessages,
-  MerzoxIcons.customerNavProfile,
+  MerzoxIcons.customerNavigationBarHome,
+  MerzoxIcons.customerNavigationBarCart,
+  MerzoxIcons.customerNavigationBarStores,
+  MerzoxIcons.customerNavigationBarMessages,
+  MerzoxIcons.customerNavigationBarProfile,
 ];
 
 const List<IconData> _merchantNavIcons = <IconData>[
-  MerzoxIcons.merchantNavHome,
-  MerzoxIcons.merchantNavOrders,
-  MerzoxIcons.merchantNavAddProduct,
-  MerzoxIcons.merchantNavProducts,
-  MerzoxIcons.merchantNavProfile,
+  MerzoxIcons.merchantNavigationBarHome,
+  MerzoxIcons.merchantNavigationBarOrders,
+  MerzoxIcons.merchantNavigationBarAddProduct,
+  MerzoxIcons.merchantNavigationBarProducts,
+  MerzoxIcons.merchantNavigationBarProfile,
 ];
 
 /// The bar with a bite in its top edge, and the button floating in the bite.
@@ -264,13 +264,13 @@ void main() {
           bottomNavigationBar: MerzoxNotchedNavBar(
             leading: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxIcons.customerNavHome,
+                glyph: MerzoxIcons.customerNavigationBarHome,
                 label: 'home',
                 selected: true,
                 onTap: () => pressed.add('home'),
               ),
               MerzoxNavDestination(
-                glyph: MerzoxIcons.customerNavCart,
+                glyph: MerzoxIcons.customerNavigationBarCart,
                 label: 'cart',
                 selected: false,
                 onTap: () => pressed.add('cart'),
@@ -278,19 +278,19 @@ void main() {
             ],
             trailing: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxIcons.customerNavMessages,
+                glyph: MerzoxIcons.customerNavigationBarMessages,
                 label: 'messages',
                 selected: false,
                 onTap: () => pressed.add('messages'),
               ),
               MerzoxNavDestination(
-                glyph: MerzoxIcons.customerNavProfile,
+                glyph: MerzoxIcons.customerNavigationBarProfile,
                 label: 'profile',
                 selected: false,
                 onTap: () => pressed.add('profile'),
               ),
             ],
-            buttonGlyph: MerzoxIcons.customerNavStores,
+            buttonGlyph: MerzoxIcons.customerNavigationBarStores,
             buttonLabel: 'stores',
             onButtonPressed: () => pressed.add('button'),
           ),
@@ -328,7 +328,7 @@ void main() {
           bottomNavigationBar: MerzoxNotchedNavBar(
             leading: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxIcons.customerNavHome,
+                glyph: MerzoxIcons.customerNavigationBarHome,
                 label: 'home',
                 selected: false,
                 onTap: () {},
@@ -336,13 +336,13 @@ void main() {
             ],
             trailing: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxIcons.customerNavProfile,
+                glyph: MerzoxIcons.customerNavigationBarProfile,
                 label: 'profile',
                 selected: true,
                 onTap: () {},
               ),
             ],
-            buttonGlyph: MerzoxIcons.merchantNavAddProduct,
+            buttonGlyph: MerzoxIcons.merchantNavigationBarAddProduct,
             buttonLabel: 'add',
             onButtonPressed: () {},
           ),
@@ -366,7 +366,7 @@ void main() {
           bottomNavigationBar: MerzoxNotchedNavBar(
             leading: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxIcons.customerNavHome,
+                glyph: MerzoxIcons.customerNavigationBarHome,
                 label: 'home',
                 selected: false,
                 onTap: () {},
@@ -374,7 +374,7 @@ void main() {
             ],
             trailing: <MerzoxNavDestination>[
               MerzoxNavDestination(
-                glyph: MerzoxIcons.customerNavMessages,
+                glyph: MerzoxIcons.customerNavigationBarMessages,
                 label: 'messages',
                 selected: false,
                 onTap: () {},
@@ -392,7 +392,7 @@ void main() {
                 ),
               ),
             ],
-            buttonGlyph: MerzoxIcons.customerNavStores,
+            buttonGlyph: MerzoxIcons.customerNavigationBarStores,
             buttonLabel: 'stores',
             onButtonPressed: () {},
           ),

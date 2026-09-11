@@ -82,7 +82,7 @@ class _MerchantOrderSearchFieldState extends State<MerchantOrderSearchField> {
           hintText: 'businessShell.orderSearchHint'.tr(),
           // Material's own default was 24; the factor converts it.
           prefixIcon: Icon(
-            MerzoxIcons.search,
+            MerzoxIcons.merchantDashboardSearch,
             size: 24 * MerzoxIcons.searchSizeFactor,
           ),
           suffixIcon: _controller.text.isEmpty
