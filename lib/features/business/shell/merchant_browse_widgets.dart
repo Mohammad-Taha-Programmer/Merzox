@@ -482,9 +482,17 @@ class _Photo extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6),
               child: url.isEmpty
-                  ? const ColoredBox(
+                  ? ColoredBox(
                       color: MerzoxColors.kColorDEEEF8,
-                      child: Icon(Icons.inventory_2_outlined),
+                      // The size was inherited before, and Material's default
+                      // 24 is what it inherited. Written down here because the
+                      // designer's parcel fills its whole em box where that
+                      // one filled 0.835 of its, so an unstated size would
+                      // have grown the mark by a fifth.
+                      child: Icon(
+                        MerzoxIcons.products,
+                        size: 24 * MerzoxIcons.productsSizeFactor,
+                      ),
                     )
                   : Image.network(
                       url,

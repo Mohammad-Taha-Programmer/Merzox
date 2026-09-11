@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/widgets/merzox_back_chevron.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart';
 import 'package:merzox/features/orders/bloc/orders_bloc.dart';
@@ -727,10 +728,10 @@ class _OrderProductImage extends StatelessWidget {
     final placeholder = Container(
       color: Colors.white,
       alignment: Alignment.center,
-      child: const Icon(
-        Icons.inventory_2_outlined,
+      child: Icon(
+        MerzoxIcons.products,
         color: MerzoxColors.kColor98C1D9,
-        size: 28,
+        size: 28 * MerzoxIcons.productsSizeFactor,
       ),
     );
 
