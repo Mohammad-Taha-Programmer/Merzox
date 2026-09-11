@@ -204,7 +204,11 @@ class _FilterButton extends StatelessWidget {
           child: Stack(
             alignment: Alignment.center,
             children: <Widget>[
-              const Icon(Icons.tune_rounded, size: 22, color: Colors.white),
+              Icon(
+                MerzoxIcons.filter,
+                size: 22 * MerzoxIcons.filterSizeFactor,
+                color: Colors.white,
+              ),
               if (isActive)
                 const PositionedDirectional(
                   end: 6,

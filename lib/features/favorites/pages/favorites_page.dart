@@ -479,10 +479,10 @@ class _FavoriteProductCard extends StatelessWidget {
                             color: Colors.white,
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.favorite_rounded,
+                          child: Icon(
+                            MerzoxIcons.favoriteProduct,
                             color: MerzoxColors.kColor3D5A80,
-                            size: 18,
+                            size: 18 * MerzoxIcons.favoriteHeartSizeFactor,
                           ),
                         ),
                       ),
@@ -697,9 +697,11 @@ class _EmptyFavoritesState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Column(
         children: [
-          const Icon(
-            Icons.favorite_border_rounded,
-            size: 96,
+          Icon(
+            // The outlined twin of the heart on a favourite's badge, so an
+            // empty list and a full one are drawn by the same hand.
+            MerzoxIcons.favorites,
+            size: 96 * MerzoxIcons.favoriteHeartSizeFactor,
             color: MerzoxColors.kColor3D5A80,
           ),
           const SizedBox(height: 24),

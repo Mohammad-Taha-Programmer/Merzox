@@ -924,14 +924,14 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(GridView),
-          matching: find.byIcon(Icons.favorite_border_rounded),
+          matching: find.byIcon(MerzoxIcons.favorites),
         ),
         findsNothing,
       );
       expect(
         find.descendant(
           of: find.byType(GridView),
-          matching: find.byIcon(Icons.favorite_rounded),
+          matching: find.byIcon(MerzoxIcons.favoriteProduct),
         ),
         findsNothing,
       );
@@ -968,7 +968,7 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(GridView),
-          matching: find.byIcon(Icons.favorite_border_rounded),
+          matching: find.byIcon(MerzoxIcons.favorites),
         ),
         findsOneWidget,
       );
@@ -1064,7 +1064,7 @@ void main() {
         expect(find.byIcon(MerzoxIcons.previewProduct), findsOneWidget);
         // Nothing existing was displaced to make room for it: editing the
         // business is the settings row, and logging out is still there.
-        expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+        expect(find.byIcon(MerzoxIcons.businessSettings), findsOneWidget);
         expect(find.byIcon(Icons.logout_rounded), findsOneWidget);
         // Two the menu added, which the card had no room for at all.
         expect(find.byIcon(MerzoxIcons.chat), findsWidgets);
@@ -1428,7 +1428,7 @@ void main() {
         bloc.add(const BusinessTabChanged(4));
         await settleFrames(tester);
 
-        final settingsRow = find.byIcon(Icons.settings_outlined);
+        final settingsRow = find.byIcon(MerzoxIcons.businessSettings);
         expect(settingsRow, findsOneWidget);
 
         await tester.tap(settingsRow);

@@ -4167,7 +4167,7 @@ void main() {
           ),
         );
 
-        await tester.tap(find.byIcon(Icons.tune_rounded));
+        await tester.tap(find.byIcon(MerzoxIcons.filter));
         await settleMerzoxGoldenFrames(tester);
 
         expect(find.text('تصفية'), findsOneWidget);
@@ -4222,7 +4222,7 @@ void main() {
           ),
         );
 
-        await tester.tap(find.byIcon(Icons.tune_rounded));
+        await tester.tap(find.byIcon(MerzoxIcons.filter));
         await settleMerzoxGoldenFrames(tester);
 
         expect(find.text('قم باختيار تصنيف المنتجات'), findsOneWidget);

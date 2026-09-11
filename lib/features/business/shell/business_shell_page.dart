@@ -861,7 +861,8 @@ class _Profile extends StatelessWidget {
           onTap: () => context.push('/profile/edit'),
         ),
         MerzoxProfileMenuRow(
-          icon: Icons.settings_outlined,
+          icon: MerzoxIcons.businessSettings,
+          iconSize: 20 * MerzoxIcons.businessSettingsSizeFactor,
           label: 'storeSettings.title'.tr(),
           showChevron: true,
           onTap: () => Navigator.of(context).push(

@@ -229,6 +229,20 @@ flutter:
     - family: OrderPaymentIcon
       fonts:
         - asset: assets/fonts/icons_fonts/OrderPaymentIcon.ttf
+    # Liking a product, filtering a list, and a shop's own settings. The
+    # filled heart's outlined twin is Favorites.ttf, already declared below
+    # under the customer profile, and the two are drawn as one pair.
+    # EditsIcon.ttf is deliberately absent: there is no Material pencil left
+    # anywhere in the app for it to replace.
+    - family: FavoriteProduct
+      fonts:
+        - asset: assets/fonts/icons_fonts/FavoriteProduct.ttf
+    - family: FilterIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/FilterIcon.ttf
+    - family: BusinessSettings
+      fonts:
+        - asset: assets/fonts/icons_fonts/BusinessSettings.ttf
     - family: EditProfileIcon
       fonts:
         - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf
