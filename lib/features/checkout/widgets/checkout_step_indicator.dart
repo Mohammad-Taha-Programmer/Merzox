@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 
 /// The three checkout steps, in the order the artboards draw them.
 ///
@@ -22,11 +23,30 @@ class CheckoutStepIndicator extends StatelessWidget {
   static const double _chipRadius = 4;
   static const double _gap = 24;
 
-  static const List<IconData> _icons = <IconData>[
-    Icons.description_outlined,
-    Icons.account_balance_wallet_outlined,
-    Icons.check_circle_outline_rounded,
-  ];
+  /// What each chip draws, and how large.
+  ///
+  /// The size travels with the glyph because the strip is half converted: the
+  /// first two marks are the designer's and fill their whole em box, the third
+  /// is Material's and fills three quarters of one. Drawing all three at 22
+  /// would leave the first two a fifth larger than the tick beside them.
+  ///
+  /// The tick stays Material's because the set has nothing that draws one. It
+  /// is the last Material mark in this strip, and it is here on purpose rather
+  /// than by oversight.
+  static const List<({IconData icon, double size})> _steps =
+      <({IconData icon, double size})>[
+        (
+          icon: MerzoxIcons.orderData,
+          size: _glyphSize * MerzoxIcons.orderDataSizeFactor,
+        ),
+        (
+          icon: MerzoxIcons.orderPayment,
+          size: _glyphSize * MerzoxIcons.orderPaymentSizeFactor,
+        ),
+        (icon: Icons.check_circle_outline_rounded, size: _glyphSize),
+      ];
+
+  static const double _glyphSize = 22;
 
   @override
   Widget build(BuildContext context) {
@@ -35,9 +55,13 @@ class CheckoutStepIndicator extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
-          for (int step = 0; step < _icons.length; step++) ...<Widget>[
+          for (int step = 0; step < _steps.length; step++) ...<Widget>[
             if (step > 0) const _StepConnector(width: _gap),
-            _StepChip(icon: _icons[step], active: step == current.index),
+            _StepChip(
+              icon: _steps[step].icon,
+              iconSize: _steps[step].size,
+              active: step == current.index,
+            ),
           ],
         ],
       ),
@@ -47,9 +71,14 @@ class CheckoutStepIndicator extends StatelessWidget {
 
 class _StepChip extends StatelessWidget {
   final IconData icon;
+  final double iconSize;
   final bool active;
 
-  const _StepChip({required this.icon, required this.active});
+  const _StepChip({
+    required this.icon,
+    required this.iconSize,
+    required this.active,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +94,7 @@ class _StepChip extends StatelessWidget {
       ),
       child: Icon(
         icon,
-        size: 22,
+        size: iconSize,
         color: active ? Colors.white : MerzoxColors.kColorBEBEBE,
       ),
     );

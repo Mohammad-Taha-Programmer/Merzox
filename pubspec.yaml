@@ -217,6 +217,18 @@ flutter:
     - family: ProductsCount
       fonts:
         - asset: assets/fonts/icons_fonts/ProductsCount.ttf
+    # An order: two of the checkout's three steps, and the printed invoice.
+    # ILSIcon.ttf is deliberately absent - the shekel is a character inside a
+    # price string, not a mark drawn beside one.
+    - family: PrintInvoice
+      fonts:
+        - asset: assets/fonts/icons_fonts/PrintInvoice.ttf
+    - family: OrderDataIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/OrderDataIcon.ttf
+    - family: OrderPaymentIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/OrderPaymentIcon.ttf
     - family: EditProfileIcon
       fonts:
         - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf
