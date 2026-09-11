@@ -199,6 +199,24 @@ flutter:
     - family: EyeIconHidePassword
       fonts:
         - asset: assets/fonts/icons_fonts/EyeIconHidePassword.ttf
+    # What a merchant does to their own product, and the count of them.
+    # CropProductPic.ttf is deliberately absent: nothing in the app crops a
+    # picture yet, so there is nothing for it to sit on.
+    - family: EditProductIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/EditProductIcon.ttf
+    - family: DeleteProductForever
+      fonts:
+        - asset: assets/fonts/icons_fonts/DeleteProductForever.ttf
+    - family: PreviewProductIcon
+      fonts:
+        - asset: assets/fonts/icons_fonts/PreviewProductIcon.ttf
+    - family: UploadProductImage
+      fonts:
+        - asset: assets/fonts/icons_fonts/UploadProductImage.ttf
+    - family: ProductsCount
+      fonts:
+        - asset: assets/fonts/icons_fonts/ProductsCount.ttf
     - family: EditProfileIcon
       fonts:
         - asset: assets/fonts/icons_fonts/customer_profile/EditProfileIcon.ttf

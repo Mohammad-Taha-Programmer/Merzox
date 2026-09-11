@@ -917,7 +917,8 @@ class _Profile extends StatelessWidget {
               ),
             ),
             MerzoxProfileMenuRow(
-              icon: Icons.visibility_outlined,
+              icon: MerzoxIcons.previewProduct,
+              iconSize: 20 * MerzoxIcons.previewProductSizeFactor,
               label: 'businessShell.previewStore'.tr(),
               onTap: () => context.push('/business/preview'),
             ),

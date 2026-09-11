@@ -608,7 +608,8 @@ class _Stats extends StatelessWidget {
         _Stat(
           value: '$productCount',
           label: 'businessProfile.products'.tr(),
-          icon: Icons.inventory_2_outlined,
+          icon: MerzoxIcons.productsCount,
+          iconSize: 23 * MerzoxIcons.productsCountSizeFactor,
         ),
       ],
     );
@@ -620,13 +621,25 @@ class _Stat extends StatelessWidget {
   final String label;
   final IconData icon;
 
-  const _Stat({required this.value, required this.label, required this.icon});
+  /// What to draw the mark at, which is not the same question as how large it
+  /// looks: the parcel beside the product count is the designer's and fills
+  /// its whole em box, while the figure beside the follower count is
+  /// Material's and fills 0.835 of one. The default is what both drew before
+  /// either moved.
+  final double iconSize;
+
+  const _Stat({
+    required this.value,
+    required this.label,
+    required this.icon,
+    this.iconSize = 23,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 23, color: MerzoxColors.kColor98C1D9),
+        Icon(icon, size: iconSize, color: MerzoxColors.kColor98C1D9),
         const SizedBox(width: 8),
         Text('$value $label', style: const TextStyle(fontSize: 13)),
       ],

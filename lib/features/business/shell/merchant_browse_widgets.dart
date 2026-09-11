@@ -658,7 +658,8 @@ class MerchantProductActionsMenu extends StatelessWidget {
         _row(
           MerchantProductAction.edit,
           'businessShell.editProduct',
-          Icons.edit_outlined,
+          MerzoxIcons.editProduct,
+          iconSize: 16 * MerzoxIcons.editProductSizeFactor,
         ),
         if (product.isActive)
           _row(
@@ -680,25 +681,33 @@ class MerchantProductActionsMenu extends StatelessWidget {
         _row(
           MerchantProductAction.delete,
           'businessShell.deleteProduct',
-          Icons.delete_outline_rounded,
+          MerzoxIcons.deleteProductForever,
+          iconSize: 16 * MerzoxIcons.deleteProductSizeFactor,
         ),
       ],
       child: const _ActionsButton(),
     );
   }
 
+  /// [iconSize] because the menu is half converted: two of its four rows draw
+  /// the designer's own marks, which fill their em box where Material's fill
+  /// three quarters of one, so the two sets need different numbers to stand
+  /// the same height. The default is what every row drew before any moved, so
+  /// the two still on Material do not shift under the conversion of the
+  /// others.
   PopupMenuItem<MerchantProductAction> _row(
     MerchantProductAction action,
     String label,
-    IconData icon,
-  ) {
+    IconData icon, {
+    double iconSize = 16,
+  }) {
     return PopupMenuItem<MerchantProductAction>(
       value: action,
       height: _rowHeight,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
         children: <Widget>[
-          Icon(icon, size: 16, color: MerzoxColors.kColor98C1D9),
+          Icon(icon, size: iconSize, color: MerzoxColors.kColor98C1D9),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
