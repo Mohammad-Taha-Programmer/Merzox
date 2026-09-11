@@ -670,7 +670,7 @@
       "guestMessage": "To view your cart contents, please log in first",
       "emptyTitle": "Sorry, your cart is empty",
       "emptyBody": "There are no products in your cart. Continue shopping\nand add anything you want",
-      "exploreShopping": "Explore shopping",
+      "continueShopping": "Continue shopping",
       "quantity": "Quantity: {}",
       "subtotal": "Subtotal",
       "deliveryCalculatedLater": "Calculated later",
