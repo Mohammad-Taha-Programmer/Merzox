@@ -91,27 +91,18 @@ class _MerzoxAppState extends State<MerzoxApp> {
       // draw its own and several drew none, so a merchant deep in a product
       // editor could take an order and have no way to know.
       builder: (BuildContext context, Widget? child) {
-        return Stack(
-          children: <Widget>[
-            child ?? const SizedBox.shrink(),
-            if (globalBellWantedAt(currentAppLocation(_router)))
-              PositionedDirectional(
-                top: MediaQuery.paddingOf(context).top + kGlobalBellInset,
-                // The trailing edge, which right-to-left is the left: where
-                // every bar that had a bell already drew one. The leading edge
-                // is where the account's picture lives.
-                end: kGlobalBellInset,
-                child: GlobalBellAudience(
-                  builder: (BuildContext _, bool businessAudience) =>
-                      GlobalNotificationBell(
-                        businessAudience: businessAudience,
-                        // The router itself, not `context.push`: this hangs
-                        // above the router, so there is none in its context.
-                        onOpen: _toggleNotifications,
-                      ),
+        return GlobalBellOverlay(
+          router: _router,
+          child: child ?? const SizedBox.shrink(),
+          bellBuilder: (BuildContext _) => GlobalBellAudience(
+            builder: (BuildContext _, bool businessAudience) =>
+                GlobalNotificationBell(
+                  businessAudience: businessAudience,
+                  // The router itself, not `context.push`: this hangs above
+                  // the router, so there is none in its context.
+                  onOpen: _toggleNotifications,
                 ),
-              ),
-          ],
+          ),
         );
       },
     );

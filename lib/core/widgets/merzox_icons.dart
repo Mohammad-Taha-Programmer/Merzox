@@ -53,6 +53,12 @@ abstract final class MerzoxIcons {
   /// `تسجيل خروج`
   static const IconData signOut = IconData(0xe812, fontFamily: 'SignOutIcon');
 
+  /// Against Material's `logout_rounded`, which the bars drew beside it.
+  ///
+  /// The home bar and the profile's own button are two ways out of the same
+  /// account, and they were two different marks until this.
+  static const double signOutSizeFactor = 0.750 / 0.834;
+
   /// `التسجيل كتاجر`
   static const IconData stores = IconData(0xe808, fontFamily: 'BusinessesIcon');
 

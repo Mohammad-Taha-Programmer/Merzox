@@ -592,9 +592,12 @@ class _HomeTopBar extends StatelessWidget {
                       minWidth: 40,
                       minHeight: 40,
                     ),
+                    // The same mark the profile's own way out carries, so
+                    // the two doors out of one account look like one thing.
+                    // The size it drew at as a Material arrow, converted.
                     icon: Icon(
-                      Icons.logout_rounded,
-                      size: 24,
+                      MerzoxIcons.signOut,
+                      size: 24 * MerzoxIcons.signOutSizeFactor,
                       color: MerzoxColors.kColor8D99AE,
                     ),
                   ),
