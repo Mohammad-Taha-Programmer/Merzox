@@ -504,7 +504,7 @@ Future<void> pumpMerzoxGoldenPage(WidgetTester tester, Widget page) async {
     await tester.idle();
     await tester.pump();
 
-    await precacheMerzoxGoldenImages(tester);
+    await precacheMerzoxGoldenImages();
     await tester.pump();
   });
 
@@ -516,7 +516,10 @@ Future<void> pumpMerzoxGoldenPage(WidgetTester tester, Widget page) async {
 ///
 /// Deterministic by construction: it waits on the image futures themselves
 /// rather than on a duration. Must be called inside `runAsync`.
-Future<void> precacheMerzoxGoldenImages(WidgetTester tester) async {
+/// Takes no tester: Finder.evaluate reads the binding's own tree, and the
+/// context each image needs is the element it was found in. That is what lets
+/// [expectMerzoxSeedGolden] call it, which has no tester to hand.
+Future<void> precacheMerzoxGoldenImages() async {
   await Future.wait(<Future<void>>[
     for (final Element element in find.byType(Image).evaluate())
       _precacheOne(element),
@@ -565,7 +568,19 @@ Future<void> settleMerzoxGoldenFrames(
 
 /// Captures the fixed 375x812 surface and compares it with [fileName] under
 /// `test/goldens/seed/`.
-Future<void> expectMerzoxSeedGolden(String fileName) {
+///
+/// Images are awaited once more first. [pumpMerzoxGoldenPage] precaches what
+/// the first frame holds, which is everything on a board a test only pumps -
+/// but a board reached by tapping through to it shows widgets that did not
+/// exist when that ran. The checkout confirmation is one: its illustration
+/// appears two taps after the pump, and captured without this it was a blank
+/// space where a courier should be, on a board that otherwise looked right.
+Future<void> expectMerzoxSeedGolden(String fileName) async {
+  final TestWidgetsFlutterBinding binding = TestWidgetsFlutterBinding.instance;
+
+  await binding.runAsync(precacheMerzoxGoldenImages);
+  await binding.pump();
+
   return expectLater(
     find.byKey(merzoxGoldenRootKey),
     matchesGoldenFile('$merzoxSeedGoldenDirectory$fileName'),

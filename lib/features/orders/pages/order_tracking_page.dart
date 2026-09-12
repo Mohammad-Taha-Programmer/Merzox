@@ -839,10 +839,15 @@ class _ReviewSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 22),
-                const Icon(
-                  Icons.delivery_dining_rounded,
-                  size: 90,
-                  color: MerzoxColors.kColorEE6C4D,
+                // The board's own courier, where a Material scooter stood in
+                // for one. Drawn at the height that icon was, so the sheet
+                // keeps its proportions; the picture is a little wider than it
+                // is tall and is fitted inside rather than stretched.
+                Image.asset(
+                  'assets/images/Orders/rate_your_experience.png',
+                  height: 90,
+                  filterQuality: FilterQuality.medium,
+                  excludeFromSemantics: true,
                 ),
                 const SizedBox(height: 20),
                 _ReviewPrompt(busy: state.isBusy, framed: false),
@@ -967,6 +972,12 @@ class _ReviewPromptState extends State<_ReviewPrompt> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
               backgroundColor: MerzoxColors.kColorEE6C4D,
+              // A rectangle with its corners taken off, not the stadium
+              // Material 3 gives a filled button by default. Every other
+              // button the reader has passed to get here is this shape.
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
             ),
             child: Text('common.save'.tr()),
           ),

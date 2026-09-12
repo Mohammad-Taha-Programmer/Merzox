@@ -3709,7 +3709,7 @@ void main() {
 
         // Each slide brings its own illustration, and only the first was
         // precached by the pump.
-        await tester.runAsync(() => precacheMerzoxGoldenImages(tester));
+        await tester.runAsync(precacheMerzoxGoldenImages);
         await settleMerzoxGoldenFrames(tester);
       }
 
