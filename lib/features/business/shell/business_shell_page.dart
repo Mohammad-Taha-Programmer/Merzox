@@ -268,9 +268,36 @@ class _PageHeader extends StatelessWidget {
 
   const _PageHeader({required this.title, this.avatarUrl = '', this.onLogout});
 
+  /// The colour every control in this corner is drawn in.
+  ///
+  /// The bell's, because the bell is the one of the three that cannot be
+  /// changed from here - it floats over every screen. The messages mark had no
+  /// colour of its own and took the theme's, and the sign-out a mid grey, so
+  /// three controls on one line were three different shades.
+  static const Color _barControlColour = MerzoxColors.kColor98C1D9;
+
+  /// Half of Material's own 48 tap target, which is what an `IconButton` is.
+  static const double _iconButtonRadius = 24;
+
+  /// What the bar used to leave above itself.
+  static const double _artboardTop = 16;
+
+  /// Enough that the bar's icons land on the bell's line.
+  ///
+  /// The bell floats over every screen and cannot move for one of them, so the
+  /// bar comes to it. The whole row rises together - picture, title and both
+  /// icons - because lifting only the two would have left them sitting higher
+  /// than the words beside them.
+  static const double _top =
+      kGlobalBellCentreFromSafeAreaTop - _iconButtonRadius;
+
+  /// What came off the top goes back on the bottom, so the header is the same
+  /// height it was and nothing below it moves.
+  static const double _bottom = 12 + (_artboardTop - _top);
+
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+    padding: const EdgeInsets.fromLTRB(18, _top, 18, _bottom),
     child: Row(
       children: [
         MerchantAvatarButton(
@@ -296,6 +323,7 @@ class _PageHeader extends StatelessWidget {
             child: Icon(
               MerzoxIcons.merchantProfileChat,
               size: 24 * MerzoxIcons.chatSizeFactor,
+              color: _barControlColour,
             ),
           ),
         ),
@@ -307,7 +335,7 @@ class _PageHeader extends StatelessWidget {
             icon: const Icon(
               Icons.logout_rounded,
               size: 24,
-              color: MerzoxColors.kColor8D99AE,
+              color: _barControlColour,
             ),
           ),
         // The floating bell owns this corner on every screen, so the bar
@@ -376,11 +404,12 @@ class _Dashboard extends StatelessWidget {
                   child: _Metric(
                     'businessShell.visits'.tr(),
                     '${data?.viewCount ?? 0}',
-                    // Sales and orders answer to the period above; visits are
-                    // a running counter with no dates behind it, so the card
-                    // says which of the two it is rather than letting the
-                    // merchant assume.
-                    footnote: 'businessShell.visitsAllTime'.tr(),
+                    // No footnote. `إجمالي منذ البداية` was added because
+                    // sales and orders answer to the period chosen above and
+                    // this counter does not, so the card said which of the two
+                    // it was. It answered a question nobody had while leaving
+                    // the one they did have - visits to what? - unanswered,
+                    // and that one is the designer's to settle.
                   ),
                 ),
               ],
@@ -445,11 +474,7 @@ class _Metric extends StatelessWidget {
   final String label;
   final String value;
 
-  /// A quieter line under the figure, for a card whose figure does not mean
-  /// the same thing as its neighbours'.
-  final String? footnote;
-
-  const _Metric(this.label, this.value, {this.footnote});
+  const _Metric(this.label, this.value);
 
   @override
   Widget build(BuildContext context) => Container(
@@ -470,16 +495,6 @@ class _Metric extends StatelessWidget {
           value,
           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
         ),
-        if (footnote case final String note) ...<Widget>[
-          const SizedBox(height: 4),
-          Text(
-            note,
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: 9, color: MerzoxColors.kColor8D99AE),
-          ),
-        ],
       ],
     ),
   );
