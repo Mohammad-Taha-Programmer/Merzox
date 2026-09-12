@@ -118,9 +118,21 @@ class _ProductOptionsDialogState extends State<ProductOptionsDialog> {
 
   String _error = '';
 
+  /// Options the merchant removed, kept only until this box closes.
+  ///
+  /// They are out of [_options] and out of what is handed back, so nobody else
+  /// will dispose them; disposing them at the moment of removal is what was
+  /// unsafe, not disposing them at all.
+  final List<ProductOptionDraft> _discarded = <ProductOptionDraft>[];
+
   @override
   void dispose() {
     _name.dispose();
+
+    for (final ProductOptionDraft option in _discarded) {
+      option.dispose();
+    }
+
     super.dispose();
   }
 
@@ -166,7 +178,12 @@ class _ProductOptionsDialogState extends State<ProductOptionsDialog> {
     if (removed ?? false) {
       setState(() {
         _options.remove(option);
-        option.dispose();
+        // Not disposed here. The sheet that asked for the removal is still on
+        // screen fading out, and its fields still hold these controllers - the
+        // same shape that threw `'_dependents.isEmpty': is not true` when a
+        // courier was saved one screen over. They go when this dialog goes, by
+        // which time the sheet has been gone for a while.
+        _discarded.add(option);
       });
       return;
     }

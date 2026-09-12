@@ -6,6 +6,7 @@ import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/constants/money.dart';
 import 'package:merzox/features/business/models/business_models.dart';
+import 'package:merzox/features/business/orders/courier_prompt.dart';
 import 'package:merzox/features/business/orders/merchant_order_invoice_page.dart';
 import 'package:merzox/features/orders/order_status_policy.dart';
 
@@ -45,58 +46,18 @@ class MerchantOrderDetailPage extends StatelessWidget {
       OrderStatusPolicy.merchantTransitionsFrom(order.status);
 
   Future<void> _assignCourier(BuildContext context) async {
-    final TextEditingController nameController = TextEditingController(
-      text: order.courier.name,
-    );
-    final TextEditingController phoneController = TextEditingController(
-      text: order.courier.phone,
-    );
-
-    final bool? saved = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        title: Text('merchantOrder.assignCourier'.tr()),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            TextField(
-              controller: nameController,
-              decoration: InputDecoration(
-                labelText: 'merchantOrder.courierName'.tr(),
-                border: const OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: 'merchantOrder.courierPhone'.tr(),
-                border: const OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text('common.cancel'.tr()),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: Text('common.save'.tr()),
-          ),
-        ],
-      ),
+    // The box owns its own fields. This used to build the two controllers
+    // here and dispose them on the line after the await, which threw the
+    // moment a merchant pressed save - see `askForCourier` for why.
+    final CourierDetails? courier = await askForCourier(
+      context,
+      initialName: order.courier.name,
+      initialPhone: order.courier.phone,
     );
 
-    final String name = nameController.text.trim();
-    final String phone = phoneController.text.trim();
-    nameController.dispose();
-    phoneController.dispose();
+    if (courier == null || courier.name.isEmpty) return;
 
-    if (saved != true || name.isEmpty) return;
-    await onCourierAssigned?.call(name, phone);
+    await onCourierAssigned?.call(courier.name, courier.phone);
   }
 
   void _openInvoice(BuildContext context) {
