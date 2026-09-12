@@ -236,6 +236,7 @@
   "tracking": {
     "title": "تتبع الطلب",
     "courier": "السائق",
+    "callCourier": "اتصل بالسائق",
     "liveCourierLocation": "موقع السائق المباشر",
     "changeAddress": "تغيير العنوان",
     "addressHint": "قم بإدخال عنوان التوصيل كاملاً",

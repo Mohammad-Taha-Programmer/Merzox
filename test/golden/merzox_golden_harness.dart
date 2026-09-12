@@ -262,6 +262,9 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   'NotificationsPageNotifications': <String>[
     'assets/fonts/icons_fonts/notifications_page/NotificationsPageNotifications.ttf',
   ],
+  'OrderTrackingPhoneNumber': <String>[
+    'assets/fonts/icons_fonts/order_tracking/OrderTrackingPhoneNumber.ttf',
+  ],
   'OrderTrackingRatingBarStar': <String>[
     'assets/fonts/icons_fonts/order_tracking/OrderTrackingRatingBarStar.ttf',
   ],

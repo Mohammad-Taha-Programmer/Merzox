@@ -469,6 +469,12 @@ abstract final class MerzoxIcons {
   //
   // `order_tracking/`
 
+  /// The handset on the button that calls the courier.
+  static const IconData orderTrackingPhoneNumber = IconData(
+    0xe80b,
+    fontFamily: 'OrderTrackingPhoneNumber',
+  );
+
   static const IconData orderTrackingRatingBarStar = IconData(
     0xe816,
     fontFamily: 'OrderTrackingRatingBarStar',

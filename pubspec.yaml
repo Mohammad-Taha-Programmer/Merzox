@@ -383,6 +383,9 @@ flutter:
       fonts:
         - asset: assets/fonts/icons_fonts/notifications_page/NotificationsPageNotifications.ttf
     # order_tracking/
+    - family: OrderTrackingPhoneNumber
+      fonts:
+        - asset: assets/fonts/icons_fonts/order_tracking/OrderTrackingPhoneNumber.ttf
     - family: OrderTrackingRatingBarStar
       fonts:
         - asset: assets/fonts/icons_fonts/order_tracking/OrderTrackingRatingBarStar.ttf

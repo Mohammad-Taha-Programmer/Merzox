@@ -236,6 +236,7 @@
   "tracking": {
     "title": "Order tracking",
     "courier": "Driver",
+    "callCourier": "Call the courier",
     "liveCourierLocation": "Live driver location",
     "changeAddress": "Change address",
     "addressHint": "Enter the full delivery address",

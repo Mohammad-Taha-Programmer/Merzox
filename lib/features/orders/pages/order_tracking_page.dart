@@ -11,6 +11,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/widgets/merzox_back_chevron.dart';
+// `telUri` already knows how a phone dials a number written for people to
+// read, and is already tested. Two of those is one that can disagree.
+import 'package:merzox/features/business/contact/store_contact_channels.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/services/api_service.dart';
@@ -527,16 +530,63 @@ class _CourierCard extends StatelessWidget {
               ],
             ),
           ),
-          if (courier.phone.isNotEmpty)
-            Text(
-              courier.phone,
-              style: const TextStyle(
-                fontSize: 12,
-                color: MerzoxColors.kColor3D5A80,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+          if (telUri(courier.phone) case final Uri dial)
+            CourierCallButton(dial: dial, number: courier.phone),
         ],
+      ),
+    );
+  }
+}
+
+/// The orange disc that calls the courier.
+///
+/// The number itself used to be printed here, which left the reader to copy
+/// eleven digits into their own dialler while a delivery was on its way. The
+/// mark says what it does and the number travels with the tap.
+///
+/// It opens the dialler with the number already in it rather than placing the
+/// call: `tel:` fills the field and waits, and the last press is the reader's.
+/// A button that rang somebody the moment it was brushed would be a different
+/// and worse promise.
+class CourierCallButton extends StatelessWidget {
+  final Uri dial;
+
+  /// Kept for the screen reader, which should say the number rather than
+  /// "button": the mark carries the meaning for everyone who can see it.
+  final String number;
+
+  const CourierCallButton({
+    required this.dial,
+    required this.number,
+    super.key,
+  });
+
+  /// The avatar on the other end of the row is a 44 circle, and a row with one
+  /// circle at each end reads as balanced only if they are the same circle.
+  static const double diameter = 44;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: '${'tracking.callCourier'.tr()} $number',
+      child: Material(
+        color: MerzoxColors.kColorEE6C4D,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          key: const ValueKey<String>('tracking.callCourier'),
+          onTap: () => launchUrl(dial, mode: LaunchMode.externalApplication),
+          child: SizedBox(
+            width: diameter,
+            height: diameter,
+            child: Icon(
+              MerzoxIcons.orderTrackingPhoneNumber,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+        ),
       ),
     );
   }
