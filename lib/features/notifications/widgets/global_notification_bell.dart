@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/auth/auth_session_service.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/widgets/merzox_icons.dart';
+import '../../../injection/injector.dart';
+import '../../../services/realtime_service.dart';
 import '../bloc/notification_badge_bloc.dart';
 import '../bloc/notification_badge_event.dart';
 import '../bloc/notification_badge_state.dart';
@@ -17,6 +19,22 @@ import '../bloc/notification_badge_state.dart';
 /// reads as those bells becoming permanent rather than as a new thing landing
 /// on top of them.
 const double kGlobalBellInset = 8;
+
+/// How tall the bell's tap target is: its glyph, and the padding around it.
+///
+/// Stated rather than measured at runtime so a bar can line its own icons up
+/// with the bell before either is laid out.
+const double kGlobalBellDiameter =
+    kGlobalBellInset * 2 + 24 * MerzoxIcons.notificationsSizeFactor;
+
+/// Where the bell's middle sits, measured down from the top of the safe area.
+///
+/// A bar that wants its icons on the bell's line puts their centres here. The
+/// merchant's bar did not, and drew them fourteen pixels below the customer's:
+/// the three controls in that corner sat on two different lines until the
+/// reader scrolled and two of them left.
+const double kGlobalBellCentreFromSafeAreaTop =
+    kGlobalBellInset + kGlobalBellDiameter / 2;
 
 /// How much room a top bar leaves at its trailing edge for the bell above it.
 ///
@@ -197,24 +215,55 @@ class GlobalNotificationBell extends StatelessWidget {
   String get destination =>
       businessAudience ? '/notifications?audience=business' : '/notifications';
 
+  /// The badge the bell wears, wired to the socket that feeds it.
+  ///
+  /// Without the two streams the count is read once, when the bell is first
+  /// built, and never again: a merchant taking an order saw nothing until they
+  /// restarted the app, and reading a notification left the number where it
+  /// was. Both symptoms were the same omission - the bloc was constructed with
+  /// its audience and nothing else, so it subscribed to nothing.
+  ///
+  /// The service is read through the locator rather than passed down, because
+  /// this widget hangs above the router and there is no provider tree over it.
+  /// A missing registration is tolerated rather than thrown on: a bell that
+  /// counts only on open is poor, and one that crashes the app root is worse.
+  NotificationBadgeBloc _createBloc() {
+    final NotificationBadgeBloc? supplied = blocBuilder?.call();
+
+    if (supplied != null) return supplied;
+
+    final RealtimeService? realtime = locator.isRegistered<RealtimeService>()
+        ? locator<RealtimeService>()
+        : null;
+
+    return NotificationBadgeBloc(
+      businessAudience: businessAudience,
+      realtimeNotificationInvalidations: realtime?.notificationInvalidations,
+      realtimeConnectionStatuses: realtime?.connectionStatuses,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocProvider<NotificationBadgeBloc>(
-      create: (_) =>
-          (blocBuilder?.call() ??
-                NotificationBadgeBloc(businessAudience: businessAudience))
-            ..add(const NotificationBadgeStarted()),
+      create: (_) => _createBloc()..add(const NotificationBadgeStarted()),
       child: BlocBuilder<NotificationBadgeBloc, NotificationBadgeState>(
         builder: (BuildContext inner, NotificationBadgeState state) {
           // A white disc under it, not a colour chosen per screen. The bell
           // floats over every screen and any of them may be the same blue -
           // the merchant profile's header is exactly this one, and the bell
           // vanished into it. Fixing that screen alone would leave the next.
+          //
+          // The disc is flat, though. It used to carry a shadow, which on the
+          // two home screens - both of them white - was the only thing the
+          // disc drew at all: a faint ring around a bell that had nothing to
+          // stand out from, making it read as a button sitting on top of the
+          // screen rather than a mark on it. The disc stays because the blue
+          // header still needs it; the lift does not.
           return Material(
             color: Colors.white,
             shape: const CircleBorder(),
-            elevation: 1,
-            shadowColor: Colors.black26,
+            elevation: 0,
             child: InkWell(
               key: const ValueKey<String>('merzox.globalBell'),
               customBorder: const CircleBorder(),

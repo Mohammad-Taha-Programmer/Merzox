@@ -41,6 +41,7 @@ import '../features/messages/bloc/chat_event.dart';
 import '../features/messages/pages/chat_page.dart';
 import '../features/notifications/bloc/notifications_bloc.dart';
 import '../features/notifications/bloc/notifications_event.dart';
+import '../features/notifications/notifications_session_store.dart';
 import '../features/notifications/pages/notifications_page.dart';
 import '../features/onboarding/bloc/onboarding_bloc.dart';
 import '../features/onboarding/view/onboarding_screen.dart';
@@ -91,6 +92,16 @@ class AppRouter {
     }
 
     return locator<RealtimeService>();
+  }
+
+  /// Null when nothing is registered, which is what a test gets: no store means
+  /// every open fetches, which is the behaviour this had before there was one.
+  NotificationsSessionStore? get _notificationsSessionStore {
+    if (!locator.isRegistered<NotificationsSessionStore>()) {
+      return null;
+    }
+
+    return locator<NotificationsSessionStore>();
   }
 
   GoRouter get router => GoRouter(
@@ -344,6 +355,10 @@ class AppRouter {
             realtimeNotificationInvalidations:
                 _realtimeService?.notificationInvalidations,
             realtimeConnectionStatuses: _realtimeService?.connectionStatuses,
+            // This bloc is built again on every press of the bell. The store
+            // is what survives between them, so the second press opens on what
+            // the first already fetched.
+            sessionStore: _notificationsSessionStore,
           )..add(const NotificationsStarted()),
           child: const NotificationsPage(),
         ),

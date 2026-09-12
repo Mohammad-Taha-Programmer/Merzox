@@ -118,6 +118,55 @@ void main() {
     });
   });
 
+  testWidgets('the line a bar lines its own icons up with is the real one', (
+    WidgetTester tester,
+  ) async {
+    // `kGlobalBellCentreFromSafeAreaTop` is arithmetic written by hand, and
+    // the merchant's bar sets its top padding from it so the three controls in
+    // that corner sit on one line. If the bell's own padding or glyph size
+    // changes and the constant does not, the bar would follow a number that
+    // no longer describes the bell - and the fault would show on a phone, in a
+    // corner no board captures, because the bell floats above the router and
+    // no golden includes it.
+    // Hung the way the overlay hangs it: pinned in a Stack under a safe area,
+    // not stretched to fill whatever it is given.
+    const double safeTop = 44;
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.rtl,
+        child: MediaQuery(
+          data: const MediaQueryData(padding: EdgeInsets.only(top: safeTop)),
+          child: Stack(
+            children: <Widget>[
+              PositionedDirectional(
+                top: safeTop + kGlobalBellInset,
+                end: kGlobalBellInset,
+                child: GlobalNotificationBell(
+                  businessAudience: true,
+                  onOpen: (String _) {},
+                  blocBuilder: () => _Counted(1),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await settleFrames(tester);
+
+    final Rect box = tester.getRect(
+      find.byKey(const ValueKey<String>('merzox.globalBell')),
+    );
+
+    expect(box.height, closeTo(kGlobalBellDiameter, 0.01));
+    expect(
+      box.center.dy - safeTop,
+      closeTo(kGlobalBellCentreFromSafeAreaTop, 0.01),
+      reason: 'a bar placing its icons on this line would miss the bell',
+    );
+  });
+
   testWidgets('the bell is the sky blue it was asked to be', (
     WidgetTester tester,
   ) async {

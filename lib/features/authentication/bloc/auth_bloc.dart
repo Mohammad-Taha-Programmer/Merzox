@@ -1,4 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/features/notifications/notifications_session_store.dart';
+import 'package:merzox/injection/injector.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/services/push_service.dart';
 import 'package:merzox/services/realtime_service.dart';
@@ -207,6 +209,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await _unregisterPushSession();
     await clearStoredSession();
     await _disconnectRealtimeSession();
+    _clearNotificationsSession();
+  }
+
+  /// Signing out empties the notification feed held for this run of the app.
+  ///
+  /// The rule that feed lives by is "until the app closes", which does not
+  /// cover this: the next person to sign in on a shared phone would otherwise
+  /// open the bell onto the last one's notifications, read in full, before any
+  /// request of their own had been sent.
+  void _clearNotificationsSession() {
+    if (!locator.isRegistered<NotificationsSessionStore>()) {
+      return;
+    }
+
+    locator<NotificationsSessionStore>().clear();
   }
 
   Future<void> _syncPushSession() async {

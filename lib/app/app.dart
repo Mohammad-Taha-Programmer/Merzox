@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/startup/startup_destination.dart';
+import '../features/notifications/notifications_excursion.dart';
 import '../injection/injector.dart';
 import '../router/app_router.dart';
 import '../services/push_service.dart';
@@ -32,6 +33,11 @@ class _MerzoxAppState extends State<MerzoxApp> {
     // recreate navigation state or push subscriptions.
     _router = AppRouter(widget.destination).router;
 
+    // Plain bookkeeping, no rebuild: the delegate notifies during its own
+    // build, and asking for one from here is what put `'!_dirty': is not true`
+    // on the screen the last time something listened to it.
+    _router.routerDelegate.addListener(_forgetAnchorOnLeaving);
+
     if (locator.isRegistered<PushService>()) {
       final pushService = locator<PushService>();
 
@@ -52,26 +58,22 @@ class _MerzoxAppState extends State<MerzoxApp> {
   void dispose() {
     unawaited(_pushTapSubscription?.cancel());
 
+    _router.routerDelegate.removeListener(_forgetAnchorOnLeaving);
+
     _router.dispose();
 
     super.dispose();
   }
 
-  /// The bell opens the notifications screen, and closes it again.
-  ///
-  /// The location is read when the bell is tapped rather than when it was
-  /// built: a push does not necessarily rebuild this, and a toggle that acts
-  /// on a stale answer opens a second copy of the screen it meant to close.
-  void _toggleNotifications(String destination) {
-    final String location = currentAppLocation(_router);
+  /// What the bell does to the back stack. See [NotificationsExcursion].
+  late final NotificationsExcursion _notifications = NotificationsExcursion(
+    _router,
+  );
 
-    if (location.startsWith('/notifications')) {
-      if (_router.canPop()) _router.pop();
-      return;
-    }
+  void _forgetAnchorOnLeaving() => _notifications.forgetAnchorOnLeaving();
 
-    _router.push(destination);
-  }
+  void _toggleNotifications(String destination) =>
+      _notifications.toggle(destination);
 
   @override
   Widget build(BuildContext context) {

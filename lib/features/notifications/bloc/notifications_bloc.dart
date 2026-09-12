@@ -5,8 +5,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/auth/auth_session_service.dart';
 import '../../../services/api_service.dart';
 import '../../../services/realtime_service.dart';
+import '../notifications_session_store.dart';
 import 'notifications_event.dart';
 import 'notifications_state.dart';
+
+/// How many the server is asked for at a time.
+///
+/// Fifty, which is the most it will give: the screen shows fifty before it
+/// offers to show more, so asking for twenty meant the first screenful cost
+/// three round trips instead of one.
+const int kNotificationsFetchSize = 50;
 
 class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   final ApiService _apiService;
@@ -34,14 +42,22 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
   bool _realtimeSyncInFlight = false;
   bool _realtimeSyncPending = false;
 
+  /// What was already fetched in this run of the app, if anything.
+  ///
+  /// Null means no store: every open pays for a fetch, which is how this
+  /// behaved before and is still what a test gets unless it says otherwise.
+  final NotificationsSessionStore? _sessionStore;
+
   NotificationsBloc({
     ApiService? apiService,
     AuthSessionService authSessionService = const AuthSessionService(),
     Stream<RealtimeNotificationInvalidation>? realtimeNotificationInvalidations,
     Stream<RealtimeConnectionStatus>? realtimeConnectionStatuses,
+    NotificationsSessionStore? sessionStore,
     this.businessAudience = false,
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
+       _sessionStore = sessionStore,
        super(const NotificationsState()) {
     on<NotificationsStarted>(_onStarted);
     on<NotificationsRefreshRequested>(_onRefreshRequested);
@@ -118,10 +134,56 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
     _scheduleRealtimeSync();
   }
 
+  /// Keeps the store in step with whatever was just proven.
+  ///
+  /// Only a settled, ready state. Remembering a failure would hand the next
+  /// press of the bell an empty list wearing the face of a loaded one, and the
+  /// reader would have to close the app to be shown their notifications again.
+  void _remember(NotificationsState settled) {
+    if (settled.status != NotificationsStatus.ready) return;
+
+    _sessionStore?.write(
+      businessAudience,
+      NotificationsSessionSnapshot(
+        notifications: settled.notifications,
+        unreadCount: settled.unreadCount,
+        page: settled.page,
+        hasMore: settled.hasMore,
+      ),
+    );
+  }
+
+  /// Opens on what is already known, and asks the server only if nothing is.
+  ///
+  /// The bell builds a new bloc every time it is pressed, so without this the
+  /// second press refetched a list that had not changed and made the reader
+  /// watch a spinner to be shown it again. What has arrived since is not
+  /// missed: the socket says so, and a realtime sync folds it in.
   Future<void> _onStarted(
     NotificationsStarted event,
     Emitter<NotificationsState> emit,
   ) async {
+    final NotificationsSessionSnapshot? held = _sessionStore?.read(
+      businessAudience,
+    );
+
+    if (held != null) {
+      emit(
+        state.copyWith(
+          status: NotificationsStatus.ready,
+          notifications: held.notifications,
+          unreadCount: held.unreadCount,
+          page: held.page,
+          hasMore: held.hasMore,
+          errorMessage: '',
+        ),
+      );
+
+      _remember(state);
+      _drainPendingRealtimeSync();
+      return;
+    }
+
     await _loadFirstPage(emit);
   }
 
@@ -147,6 +209,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       final response = await _apiService.notifications(
         token: await _token(),
         businessAudience: businessAudience,
+        limit: kNotificationsFetchSize,
       );
 
       emit(
@@ -166,6 +229,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         ),
       );
     } finally {
+      _remember(state);
       _drainPendingRealtimeSync();
     }
   }
@@ -185,6 +249,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         token: await _token(),
         businessAudience: businessAudience,
         page: state.page + 1,
+        limit: kNotificationsFetchSize,
       );
 
       emit(
@@ -204,6 +269,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         ),
       );
     } finally {
+      _remember(state);
       _drainPendingRealtimeSync();
     }
   }
@@ -260,6 +326,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       );
     } finally {
       _readWritesInFlight -= 1;
+      _remember(state);
       _drainPendingRealtimeSync();
     }
   }
@@ -306,6 +373,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       );
     } finally {
       _markingAll = false;
+      _remember(state);
       _drainPendingRealtimeSync();
     }
   }
@@ -333,17 +401,31 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
         token: await _token(),
         businessAudience: businessAudience,
         page: 1,
+        limit: kNotificationsFetchSize,
       );
 
-      // Notifications are a newest-first feed, not a historical thread.
-      // Realtime invalidation intentionally resets pagination to server page 1.
+      // Page one goes on top of what is already held rather than replacing
+      // it. A notification arriving says nothing about the pages a reader has
+      // scrolled through, and throwing them away sent somebody who had gone
+      // four pages deep back to the top because a message came in.
+      //
+      // Which page we are on therefore does not reset either: the next `load
+      // more` has to ask for the page after the deepest one fetched, not for
+      // the second one again. `hasMore` is only the fresh page's answer while
+      // page one is all there is - past that, the deepest page is the only one
+      // that knows whether the feed has an end.
+      final bool deeperThanPageOne = state.page > 1;
+
       emit(
         state.copyWith(
           status: NotificationsStatus.ready,
-          notifications: response.notifications,
+          notifications: mergeNotificationPageOne(
+            held: state.notifications,
+            fresh: response.notifications,
+          ),
           unreadCount: response.unreadCount,
-          page: response.page,
-          hasMore: response.hasMore,
+          page: deeperThanPageOne ? state.page : response.page,
+          hasMore: deeperThanPageOne ? state.hasMore : response.hasMore,
           errorMessage: '',
         ),
       );
@@ -352,6 +434,7 @@ class NotificationsBloc extends Bloc<NotificationsEvent, NotificationsState> {
       // or manual refresh will retry REST truth.
     } finally {
       _realtimeSyncInFlight = false;
+      _remember(state);
       _drainPendingRealtimeSync();
     }
   }
