@@ -587,10 +587,9 @@ class _PaymentStep extends StatelessWidget {
 /// The confirmation of `تفاصيل المتجر – 17`.
 ///
 /// The artboard draws a courier, a success line, the order number and two ways
-/// on: to the customer's orders, or back to the home screen. There is no
-/// courier illustration in the asset bundle, so the icon that stands in for it
-/// is the same one the order-tracking screen uses for a delivery in progress —
-/// borrowed rather than invented.
+/// on: to the customer's orders, or back to the home screen. The courier was a
+/// Material scooter standing in for an illustration nobody had exported; it is
+/// the board's own drawing now.
 class _ConfirmedStep extends StatelessWidget {
   final List<String> orderIds;
   final VoidCallback? onDone;
@@ -603,10 +602,15 @@ class _ConfirmedStep extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 24, 16, 24),
       children: <Widget>[
         const SizedBox(height: 20),
-        const Icon(
-          Icons.delivery_dining_rounded,
-          size: 120,
-          color: MerzoxColors.kColor98C1D9,
+        // Drawn at the height the icon it replaces was, so the block below it
+        // does not move. The picture is wider than it is tall, so it is fitted
+        // to that height and centred rather than stretched to the gutter.
+        Image.asset(
+          'assets/images/Orders/order_in_process.png',
+          height: 120,
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
+          excludeFromSemantics: true,
         ),
         const SizedBox(height: 40),
         Text(
@@ -634,49 +638,76 @@ class _ConfirmedStep extends StatelessWidget {
             ),
           ),
         const SizedBox(height: 36),
-        SizedBox(
-          height: 44,
-          child: FilledButton(
-            onPressed: () {
-              onDone?.call();
-              context.go('/orders');
-            },
-            style: FilledButton.styleFrom(
-              backgroundColor: MerzoxColors.kColorEE6C4D,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+        // Half the width, in the middle of it. Run edge to edge these two read
+        // as the end of a form; there is nothing left to fill in here, and a
+        // narrower pair sits under the courier as a choice rather than as a
+        // last step. A fraction and not a fixed width, so the pair keeps its
+        // proportion on a narrow phone and a wide one alike.
+        _HalfWidth(
+          child: SizedBox(
+            height: 44,
+            child: FilledButton(
+              onPressed: () {
+                onDone?.call();
+                context.go('/orders');
+              },
+              style: FilledButton.styleFrom(
+                backgroundColor: MerzoxColors.kColorEE6C4D,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
               ),
-            ),
-            child: Text(
-              'checkout.goToOrders'.tr(),
-              style: const TextStyle(fontSize: 14, color: Colors.white),
+              child: Text(
+                'checkout.goToOrders'.tr(),
+                style: const TextStyle(fontSize: 14, color: Colors.white),
+              ),
             ),
           ),
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 44,
-          child: OutlinedButton(
-            onPressed: () {
-              onDone?.call();
-              context.go('/home');
-            },
-            style: OutlinedButton.styleFrom(
-              foregroundColor: MerzoxColors.kColor2B2B2B,
-              side: const BorderSide(color: MerzoxColors.kColorEE6C4D),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+        _HalfWidth(
+          child: SizedBox(
+            height: 44,
+            child: OutlinedButton(
+              onPressed: () {
+                onDone?.call();
+                context.go('/home');
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: MerzoxColors.kColor2B2B2B,
+                side: const BorderSide(color: MerzoxColors.kColorEE6C4D),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
               ),
-            ),
-            child: Text(
-              'checkout.backHome'.tr(),
-              style: const TextStyle(fontSize: 14),
+              child: Text(
+                'checkout.backHome'.tr(),
+                style: const TextStyle(fontSize: 14),
+              ),
             ),
           ),
         ),
       ],
     );
   }
+}
+
+/// Half the available width, in the middle of it.
+///
+/// A fraction rather than a fixed width, so the pair holds its proportion on a
+/// narrow phone and a wide one alike instead of being half of one particular
+/// screen and some other part of every other.
+class _HalfWidth extends StatelessWidget {
+  final Widget child;
+
+  const _HalfWidth({required this.child});
+
+  @override
+  Widget build(BuildContext context) => FractionallySizedBox(
+    widthFactor: 0.5,
+    alignment: Alignment.center,
+    child: child,
+  );
 }
 
 class _CheckoutLine extends StatelessWidget {

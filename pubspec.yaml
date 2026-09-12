@@ -111,6 +111,7 @@ flutter:
     - assets/images/HomeScreen/
     - assets/images/Cart/
     - assets/images/Messages/
+    - assets/images/Orders/
     - assets/images/follow_business_emoji_pics/
     - assets/translations/
   # The following line ensures that the Material Icons font is
