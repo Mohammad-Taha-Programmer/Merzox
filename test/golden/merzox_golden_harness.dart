@@ -94,6 +94,9 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   'CheckoutStepsOrderData': <String>[
     'assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderData.ttf',
   ],
+  'CheckoutStepsOrderDone': <String>[
+    'assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderDone.ttf',
+  ],
   'CheckoutStepsOrderPayment': <String>[
     'assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderPayment.ttf',
   ],

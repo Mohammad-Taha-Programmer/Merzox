@@ -25,14 +25,16 @@ class CheckoutStepIndicator extends StatelessWidget {
 
   /// What each chip draws, and how large.
   ///
-  /// The size travels with the glyph because the strip is half converted: the
-  /// first two marks are the designer's and fill their whole em box, the third
-  /// is Material's and fills three quarters of one. Drawing all three at 22
-  /// would leave the first two a fifth larger than the tick beside them.
+  /// The size travels with the glyph because each mark fills its em box its
+  /// own way, and drawing all three at 22 would put them at three different
+  /// apparent sizes.
   ///
-  /// The tick stays Material's because the set has nothing that draws one. It
-  /// is the last Material mark in this strip, and it is here on purpose rather
-  /// than by oversight.
+  /// All three are this library's now. The tick used to be Material's, because
+  /// the designer's set has no tick of any kind - and it showed: a heavier
+  /// stroke than the two beside it, a guest on its own strip. The one here was
+  /// drawn to the family's measured weight to stand with them, and is the only
+  /// mark in the set nobody designed. When a real one arrives it is one file
+  /// to replace and nothing else moves.
   static const List<({IconData icon, double size})> _steps =
       <({IconData icon, double size})>[
         (
@@ -43,7 +45,10 @@ class CheckoutStepIndicator extends StatelessWidget {
           icon: MerzoxIcons.checkoutStepsOrderPayment,
           size: _glyphSize * MerzoxIcons.orderPaymentSizeFactor,
         ),
-        (icon: Icons.check_circle_outline_rounded, size: _glyphSize),
+        (
+          icon: MerzoxIcons.checkoutStepsOrderDone,
+          size: _glyphSize * MerzoxIcons.orderDoneSizeFactor,
+        ),
       ];
 
   static const double _glyphSize = 22;

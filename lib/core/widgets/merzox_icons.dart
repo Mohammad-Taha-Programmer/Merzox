@@ -113,6 +113,27 @@ abstract final class MerzoxIcons {
     fontFamily: 'CheckoutStepsOrderData',
   );
 
+  /// A tick in a circle: the order is placed.
+  ///
+  /// The one mark in this library the designer did not draw. The set has
+  /// no tick of any kind, so the strip carried Material's - heavier than
+  /// the two beside it, and visibly a guest among them. This one is drawn
+  /// at the weight the family uses, which was measured off its own
+  /// outlines rather than guessed: between 62 and 79 units of the 1000
+  /// the em is divided into.
+  ///
+  /// Its outline is straight segments where the rest are curves, so it is
+  /// the one glyph here that would not survive being blown up to a poster.
+  /// At the 22 the strip draws it, and at every size a phone will ever
+  /// ask for, the difference is not there to see.
+  ///
+  /// It is a stand-in, and a good one. If the designer draws a tick, this
+  /// file is what gets replaced and nothing else moves.
+  static const IconData checkoutStepsOrderDone = IconData(
+    0xe80e,
+    fontFamily: 'CheckoutStepsOrderDone',
+  );
+
   static const IconData checkoutStepsOrderPayment = IconData(
     0xe80c,
     fontFamily: 'CheckoutStepsOrderPayment',
@@ -724,6 +745,15 @@ abstract final class MerzoxIcons {
   ///
   /// Height: a page is read by how tall it stands.
   static const double orderDataSizeFactor = 0.835 / 1.002;
+
+  /// Against Material's `check_circle_outline_rounded`.
+  ///
+  /// Both are circles and both fill their box the same way in either
+  /// direction, so this is the rare swap where the two anchorings agree to
+  /// three decimals. Drawn to that size on purpose: the mark was made for this
+  /// one place and could have been made any size, so it was made the size of
+  /// the thing it replaces.
+  static const double orderDoneSizeFactor = 0.835 / 1.000;
 
   /// Against Material's `account_balance_wallet_outlined`.
   ///

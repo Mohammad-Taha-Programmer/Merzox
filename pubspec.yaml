@@ -196,6 +196,9 @@ flutter:
     - family: CheckoutStepsOrderData
       fonts:
         - asset: assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderData.ttf
+    - family: CheckoutStepsOrderDone
+      fonts:
+        - asset: assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderDone.ttf
     - family: CheckoutStepsOrderPayment
       fonts:
         - asset: assets/fonts/icons_fonts/checkout_steps/CheckoutStepsOrderPayment.ttf
