@@ -6,7 +6,15 @@ import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/bloc/auth_event.dart';
 import 'package:merzox/features/authentication/bloc/auth_state.dart';
+import 'package:merzox/features/authentication/widgets/dial_code_selector.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+
+/// The box every field on this page sits in.
+///
+/// Named because the line that divides the country from the number has to run
+/// the whole of it: a literal in two places is a line that stops short the
+/// first time one of them changes.
+const double _kFieldHeight = 46;
 
 class SignupPage extends StatefulWidget {
   final VoidCallback onSignupCreated;
@@ -27,7 +35,7 @@ class _SignupPageState extends State<SignupPage> {
   final _nameController = TextEditingController();
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
-  _DialCode _selectedDialCode = _dialCodes.first;
+  DialCode _selectedDialCode = defaultDialCode;
   _Gender _gender = _Gender.female;
   bool _obscurePassword = true;
 
@@ -172,9 +180,17 @@ class _SignupPageState extends State<SignupPage> {
                           onChanged: (_) => setState(() {}),
                           decoration: _fieldDecoration(
                             hintText: 'auth.signupIdentifierHint'.tr(),
+                            // The same block the sign-in screen draws, in
+                            // this screen's own box: its height and its border
+                            // colour, which belong to the set of fields around
+                            // it rather than to the block.
                             suffixIcon: _identifierIsEmail
                                 ? null
-                                : _DialCodeDropdown(
+                                : DialCodeSelector(
+                                    key: const Key('signup.countryCode'),
+                                    lineKey: const Key('signup.countryDivider'),
+                                    fieldHeight: _kFieldHeight,
+                                    lineColor: MerzoxColors.kColorB9DDF3,
                                     value: _selectedDialCode,
                                     onChanged: (value) {
                                       if (value == null) {
@@ -186,11 +202,15 @@ class _SignupPageState extends State<SignupPage> {
                                       });
                                     },
                                   ),
+                            // The block draws its own dividing line and its
+                            // own insets, so it is handed the box without
+                            // Material's 48-square minimum around it.
                             suffixIconConstraints: _identifierIsEmail
                                 ? null
-                                : const BoxConstraints.tightFor(
-                                    width: 82,
-                                    height: 46,
+                                : const BoxConstraints(
+                                    minWidth: 0,
+                                    minHeight: _kFieldHeight,
+                                    maxHeight: _kFieldHeight,
                                   ),
                           ),
                           validator: _identifierValidator,
@@ -471,7 +491,7 @@ class _LabeledField extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        SizedBox(height: 46, child: child),
+        SizedBox(height: _kFieldHeight, child: child),
       ],
     );
   }
@@ -488,7 +508,7 @@ InputDecoration _fieldDecoration({
     suffixIcon: suffixIcon,
     suffixIconConstraints:
         suffixIconConstraints ??
-        const BoxConstraints(minWidth: 48, minHeight: 46),
+        const BoxConstraints(minWidth: 48, minHeight: _kFieldHeight),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     filled: true,
     fillColor: Colors.white,
@@ -498,84 +518,6 @@ InputDecoration _fieldDecoration({
     errorBorder: _border(MerzoxColors.kColorE40909),
     focusedErrorBorder: _border(MerzoxColors.kColorE40909, 1.4),
   );
-}
-
-class _DialCodeDropdown extends StatelessWidget {
-  final _DialCode value;
-  final ValueChanged<_DialCode?> onChanged;
-
-  const _DialCodeDropdown({required this.value, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 82,
-      height: 46,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: BorderDirectional(
-            end: BorderSide(color: MerzoxColors.kColorB9DDF3),
-          ),
-        ),
-        child: Align(
-          alignment: AlignmentDirectional.centerStart,
-          child: Padding(
-            padding: const EdgeInsetsDirectional.only(start: 10, end: 4),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<_DialCode>(
-                value: value,
-                isDense: true,
-                isExpanded: true,
-                iconSize: 16,
-                dropdownColor: Colors.white,
-                onChanged: onChanged,
-                selectedItemBuilder: (context) {
-                  return _dialCodes
-                      .map(
-                        (dialCode) =>
-                            _DialCodeView(dialCode: dialCode, showFlag: false),
-                      )
-                      .toList();
-                },
-                items: _dialCodes.map((dialCode) {
-                  return DropdownMenuItem(
-                    value: dialCode,
-                    child: _DialCodeView(dialCode: dialCode),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DialCodeView extends StatelessWidget {
-  final _DialCode dialCode;
-  final bool showFlag;
-
-  const _DialCodeView({required this.dialCode, this.showFlag = true});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      textDirection: TextDirection.ltr,
-      children: [
-        if (showFlag) ...<Widget>[
-          Text(dialCode.flag, style: const TextStyle(fontSize: 14)),
-          const SizedBox(width: 4),
-        ],
-        Text(
-          dialCode.prefix,
-          textDirection: TextDirection.ltr,
-          style: const TextStyle(fontSize: 12, color: Color(0xFF2B2B2B)),
-        ),
-      ],
-    );
-  }
 }
 
 class _GenderRadio extends StatelessWidget {
@@ -638,23 +580,3 @@ OutlineInputBorder _border(Color color, [double width = 1]) {
 }
 
 enum _Gender { male, female }
-
-class _DialCode {
-  final String flag;
-  final String prefix;
-
-  const _DialCode({required this.flag, required this.prefix});
-
-  @override
-  String toString() => prefix;
-}
-
-const List<_DialCode> _dialCodes = [
-  _DialCode(flag: '🇮🇱', prefix: '+972'),
-  _DialCode(flag: '🇵🇸', prefix: '+970'),
-  _DialCode(flag: '🇯🇴', prefix: '+962'),
-  _DialCode(flag: '🇪🇬', prefix: '+20'),
-  _DialCode(flag: '🇸🇦', prefix: '+966'),
-  _DialCode(flag: '🇦🇪', prefix: '+971'),
-  _DialCode(flag: '🇺🇸', prefix: '+1'),
-];

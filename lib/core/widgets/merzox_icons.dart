@@ -282,15 +282,21 @@ abstract final class MerzoxIcons {
 
   // -- Signing in ----------------------------------------------------------
   //
-  // `login/`
+  // `login/`, and `auth/` for the one mark the two sign-in screens share.
 
-  /// The chevron the country list opens with.
+  /// The chevron the country list opens with, on both screens that ask for a
+  /// phone number.
   ///
   /// Authored, not supplied: the designer's set has no arrow of any kind, as
   /// the note at the head of this file says, and the list needs one.
-  static const IconData loginCountryChevron = IconData(
+  ///
+  /// The one drawing here that is deliberately not per-screen. The two screens
+  /// draw one phone field between them, so a change to this mark is meant to
+  /// reach both of them; two copies would be two fields that look alike until
+  /// somebody edits one.
+  static const IconData authCountryChevron = IconData(
     0xe80f,
-    fontFamily: 'LoginCountryChevron',
+    fontFamily: 'AuthCountryChevron',
   );
 
   static const IconData loginHidePassword = IconData(

@@ -7,6 +7,7 @@ import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/bloc/auth_event.dart';
 import 'package:merzox/features/authentication/bloc/auth_state.dart';
+import 'package:merzox/features/authentication/widgets/dial_code_selector.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
 // MERZOX-UI-GOLDEN-I5-I1-R1 - customer login SCREEN-SPACE geometry.
@@ -78,16 +79,6 @@ const double _kFieldLabelToField = 9;
 const double _kFieldHeight = 48;
 const double _kFieldRadius = 5;
 
-/// The country block inside the identifier field: its outer inset, the gap
-/// between it and the line that divides it from the number, and the line.
-///
-/// The outer inset matches the field's own `contentPadding`, so the dial code
-/// starts where text on the other side of the line would.
-const double _kCountryOuterInset = 14;
-const double _kCountryToDivider = 12;
-const double _kFlagToChevron = 6;
-const double _kCountryDividerWidth = 1;
-
 /// Identifier field bottom (368) -> password label slot top (383).
 const double _kFieldToNextLabel = 15;
 
@@ -125,13 +116,6 @@ const double _kSignupRowHeight = 28;
 /// Merzox does not draw a fake one.
 const double _kPageBottomPadding = 24;
 
-/// The country the flag list opens on.
-///
-/// A default is a guess about who is signing in, and the guess here is the
-/// reader Merzox is for. Anyone it guesses wrong about changes it in one tap,
-/// and the number they type is read the same way whichever flag is showing.
-const String _kDefaultDialPrefix = '+970';
-
 class LoginPage extends StatefulWidget {
   final VoidCallback onAuthenticated;
   final VoidCallback onBrowseAsGuest;
@@ -158,9 +142,7 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
-  _CountryDialCode _selectedCountry = _countryDialCodes.firstWhere(
-    (country) => country.prefix == _kDefaultDialPrefix,
-  );
+  DialCode _selectedCountry = defaultDialCode;
   bool _rememberMe = true;
   bool _obscurePassword = true;
 
@@ -307,9 +289,12 @@ class _LoginPageState extends State<LoginPage> {
                                 // the box with the number written away from
                                 // it, and that is the edge an Arabic reader
                                 // finishes on.
-                                trailing: _CountryCodeDropdown(
+                                trailing: DialCodeSelector(
                                   key: const Key('login.countryCode'),
-                                  selectedCountry: _selectedCountry,
+                                  lineKey: const Key('login.countryDivider'),
+                                  fieldHeight: _kFieldHeight,
+                                  lineColor: MerzoxColors.kColor98C1D9,
+                                  value: _selectedCountry,
                                   onChanged: (country) {
                                     if (country == null) {
                                       return;
@@ -697,123 +682,6 @@ class _XdField extends StatelessWidget {
     );
   }
 }
-
-class _CountryCodeDropdown extends StatelessWidget {
-  final _CountryDialCode selectedCountry;
-  final ValueChanged<_CountryDialCode?> onChanged;
-
-  const _CountryCodeDropdown({
-    super.key,
-    required this.selectedCountry,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    // Left to right whatever the page around it is doing. A dial code is a
-    // left-to-right thing wherever it sits, and the order asked for - the
-    // code, then the flag, then the chevron - is that order on the glass and
-    // not a start-to-end one that would turn round with the language.
-    return Directionality(
-      textDirection: TextDirection.ltr,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(
-              left: _kCountryOuterInset,
-              right: _kCountryToDivider,
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<_CountryDialCode>(
-                value: selectedCountry,
-                isDense: true,
-                menuMaxHeight: 300,
-                dropdownColor: Colors.white,
-                onChanged: onChanged,
-                // Material sets the icon hard against the chip; the chevron
-                // is a mark about the list rather than part of the reading of
-                // the flag, so it is given air of its own.
-                icon: const Padding(
-                  padding: EdgeInsets.only(left: _kFlagToChevron),
-                  child: Icon(
-                    MerzoxIcons.loginCountryChevron,
-                    color: MerzoxColors.kColor3D5A80,
-                    // The size Material's triangle drew at, converted.
-                    size: 18 * MerzoxIcons.countryChevronSizeFactor,
-                  ),
-                ),
-                selectedItemBuilder: (context) {
-                  return _countryDialCodes.map((country) {
-                    return _CountryDialCodeView(country: country);
-                  }).toList();
-                },
-                items: _countryDialCodes.map((country) {
-                  return DropdownMenuItem(
-                    value: country,
-                    child: _CountryDialCodeView(country: country),
-                  );
-                }).toList(),
-              ),
-            ),
-          ),
-          // The two halves of the box, told apart. Full height, so it reads as
-          // a division of the field rather than a mark floating inside it.
-          Container(
-            key: const Key('login.countryDivider'),
-            width: _kCountryDividerWidth,
-            height: _kFieldHeight,
-            color: MerzoxColors.kColor98C1D9,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CountryDialCodeView extends StatelessWidget {
-  final _CountryDialCode country;
-
-  const _CountryDialCodeView({required this.country});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      textDirection: TextDirection.ltr,
-      children: [
-        Text(
-          country.prefix,
-          textDirection: TextDirection.ltr,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Color(0xFF2B2B2B),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(country.flag, style: const TextStyle(fontSize: 16)),
-      ],
-    );
-  }
-}
-
-class _CountryDialCode {
-  final String flag;
-  final String prefix;
-
-  const _CountryDialCode({required this.flag, required this.prefix});
-}
-
-const List<_CountryDialCode> _countryDialCodes = [
-  _CountryDialCode(flag: '🇮🇱', prefix: '+972'),
-  _CountryDialCode(flag: '🇵🇸', prefix: '+970'),
-  _CountryDialCode(flag: '🇯🇴', prefix: '+962'),
-  _CountryDialCode(flag: '🇪🇬', prefix: '+20'),
-  _CountryDialCode(flag: '🇸🇦', prefix: '+966'),
-  _CountryDialCode(flag: '🇦🇪', prefix: '+971'),
-  _CountryDialCode(flag: '🇺🇸', prefix: '+1'),
-];
 
 class _PrimaryAuthButton extends StatelessWidget {
   final String label;
