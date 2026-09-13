@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/auth/sign_in_identifier.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
@@ -171,27 +172,16 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   /// The Arabic identifier label reads "رقم الجوال" for XD parity, but the
-  /// field itself stays an identifier field: an entry containing '@' is sent
-  /// verbatim as an email, an entry already carrying an international prefix is
-  /// left alone, and anything else is normalized against the selected country
-  /// dial code.
-  String get _normalizedIdentifier {
-    final value = _identifierController.text.trim();
-    final isEmail = value.contains('@');
-    final hasInternationalPrefix = value.startsWith('+');
-
-    if (isEmail || hasInternationalPrefix) {
-      return value;
-    }
-
-    final countryCode = _selectedCountry.prefix.startsWith('+')
-        ? _selectedCountry.prefix
-        : '+${_selectedCountry.prefix}';
-    final digits = value.replaceAll(RegExp(r'\D'), '');
-    final localNumber = digits.startsWith('0') ? digits.substring(1) : digits;
-
-    return '$countryCode$localNumber';
-  }
+  /// field itself stays an identifier field, so an email travels untouched and
+  /// a phone number is put into the one spelling the server stores.
+  ///
+  /// The rule lives in [signInIdentifier], where it can be read and checked
+  /// without a screen; the page's only part in it is naming the flag that is
+  /// currently picked.
+  String get _normalizedIdentifier => signInIdentifier(
+    _identifierController.text,
+    dialPrefix: _selectedCountry.prefix,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -289,12 +279,14 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: _kSubtitleToForm),
                               _XdField(
+                                key: const Key('login.identifier'),
                                 label: 'auth.loginIdentifierLabel'.tr(),
                                 hint: 'auth.loginIdentifierHint'.tr(),
                                 controller: _identifierController,
                                 keyboardType: TextInputType.emailAddress,
                                 textInputAction: TextInputAction.next,
                                 leading: _CountryCodeDropdown(
+                                  key: const Key('login.countryCode'),
                                   selectedCountry: _selectedCountry,
                                   onChanged: (country) {
                                     if (country == null) {
@@ -315,6 +307,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: _kFieldToNextLabel),
                               _XdField(
+                                key: const Key('login.password'),
                                 label: 'auth.password'.tr(),
                                 hint: 'auth.passwordHint'.tr(),
                                 controller: _passwordController,
@@ -406,6 +399,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: _kRememberRowToButton),
                               _PrimaryAuthButton(
+                                key: const Key('login.submit'),
                                 label: 'authGate.login'.tr(),
                                 isLoading: isLoading,
                                 onPressed: () => _submit(bloc),
@@ -591,6 +585,7 @@ class _XdField extends StatelessWidget {
   final ValueChanged<String>? onSubmitted;
 
   const _XdField({
+    super.key,
     required this.label,
     required this.hint,
     required this.controller,
@@ -677,6 +672,7 @@ class _CountryCodeDropdown extends StatelessWidget {
   final ValueChanged<_CountryDialCode?> onChanged;
 
   const _CountryCodeDropdown({
+    super.key,
     required this.selectedCountry,
     required this.onChanged,
   });
@@ -760,6 +756,7 @@ class _PrimaryAuthButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   const _PrimaryAuthButton({
+    super.key,
     required this.label,
     required this.isLoading,
     required this.onPressed,
