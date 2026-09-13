@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:merzox/core/auth/sign_in_identifier.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
@@ -77,6 +78,16 @@ const double _kFieldLabelToField = 9;
 const double _kFieldHeight = 48;
 const double _kFieldRadius = 5;
 
+/// The country block inside the identifier field: its outer inset, the gap
+/// between it and the line that divides it from the number, and the line.
+///
+/// The outer inset matches the field's own `contentPadding`, so the dial code
+/// starts where text on the other side of the line would.
+const double _kCountryOuterInset = 14;
+const double _kCountryToDivider = 12;
+const double _kFlagToChevron = 6;
+const double _kCountryDividerWidth = 1;
+
 /// Identifier field bottom (368) -> password label slot top (383).
 const double _kFieldToNextLabel = 15;
 
@@ -114,6 +125,13 @@ const double _kSignupRowHeight = 28;
 /// Merzox does not draw a fake one.
 const double _kPageBottomPadding = 24;
 
+/// The country the flag list opens on.
+///
+/// A default is a guess about who is signing in, and the guess here is the
+/// reader Merzox is for. Anyone it guesses wrong about changes it in one tap,
+/// and the number they type is read the same way whichever flag is showing.
+const String _kDefaultDialPrefix = '+970';
+
 class LoginPage extends StatefulWidget {
   final VoidCallback onAuthenticated;
   final VoidCallback onBrowseAsGuest;
@@ -141,7 +159,7 @@ class _LoginPageState extends State<LoginPage> {
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   _CountryDialCode _selectedCountry = _countryDialCodes.firstWhere(
-    (country) => country.prefix == '+972',
+    (country) => country.prefix == _kDefaultDialPrefix,
   );
   bool _rememberMe = true;
   bool _obscurePassword = true;
@@ -171,27 +189,16 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   /// The Arabic identifier label reads "رقم الجوال" for XD parity, but the
-  /// field itself stays an identifier field: an entry containing '@' is sent
-  /// verbatim as an email, an entry already carrying an international prefix is
-  /// left alone, and anything else is normalized against the selected country
-  /// dial code.
-  String get _normalizedIdentifier {
-    final value = _identifierController.text.trim();
-    final isEmail = value.contains('@');
-    final hasInternationalPrefix = value.startsWith('+');
-
-    if (isEmail || hasInternationalPrefix) {
-      return value;
-    }
-
-    final countryCode = _selectedCountry.prefix.startsWith('+')
-        ? _selectedCountry.prefix
-        : '+${_selectedCountry.prefix}';
-    final digits = value.replaceAll(RegExp(r'\D'), '');
-    final localNumber = digits.startsWith('0') ? digits.substring(1) : digits;
-
-    return '$countryCode$localNumber';
-  }
+  /// field itself stays an identifier field, so an email travels untouched and
+  /// a phone number is put into the one spelling the server stores.
+  ///
+  /// The rule lives in [signInIdentifier], where it can be read and checked
+  /// without a screen; the page's only part in it is naming the flag that is
+  /// currently picked.
+  String get _normalizedIdentifier => signInIdentifier(
+    _identifierController.text,
+    dialPrefix: _selectedCountry.prefix,
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -289,12 +296,19 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: _kSubtitleToForm),
                               _XdField(
+                                key: const Key('login.identifier'),
                                 label: 'auth.loginIdentifierLabel'.tr(),
                                 hint: 'auth.loginIdentifierHint'.tr(),
                                 controller: _identifierController,
                                 keyboardType: TextInputType.emailAddress,
                                 textInputAction: TextInputAction.next,
-                                leading: _CountryCodeDropdown(
+                                // Trailing, which an Arabic page draws on the
+                                // left: the country belongs at the far edge of
+                                // the box with the number written away from
+                                // it, and that is the edge an Arabic reader
+                                // finishes on.
+                                trailing: _CountryCodeDropdown(
+                                  key: const Key('login.countryCode'),
                                   selectedCountry: _selectedCountry,
                                   onChanged: (country) {
                                     if (country == null) {
@@ -306,6 +320,15 @@ class _LoginPageState extends State<LoginPage> {
                                     });
                                   },
                                 ),
+                                // The block draws its own dividing line and
+                                // its own insets, so it is handed the box
+                                // without Material's 48-square minimum around
+                                // it.
+                                trailingConstraints: const BoxConstraints(
+                                  minWidth: 0,
+                                  minHeight: _kFieldHeight,
+                                  maxHeight: _kFieldHeight,
+                                ),
                                 validator: (value) {
                                   if (value == null || value.trim().isEmpty) {
                                     return 'validation.required'.tr();
@@ -315,6 +338,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: _kFieldToNextLabel),
                               _XdField(
+                                key: const Key('login.password'),
                                 label: 'auth.password'.tr(),
                                 hint: 'auth.passwordHint'.tr(),
                                 controller: _passwordController,
@@ -406,6 +430,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               const SizedBox(height: _kRememberRowToButton),
                               _PrimaryAuthButton(
+                                key: const Key('login.submit'),
                                 label: 'authGate.login'.tr(),
                                 isLoading: isLoading,
                                 onPressed: () => _submit(bloc),
@@ -585,20 +610,21 @@ class _XdField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextInputAction? textInputAction;
   final bool obscureText;
-  final Widget? leading;
   final Widget? trailing;
+  final BoxConstraints? trailingConstraints;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onSubmitted;
 
   const _XdField({
+    super.key,
     required this.label,
     required this.hint,
     required this.controller,
     this.keyboardType,
     this.textInputAction,
     this.obscureText = false,
-    this.leading,
     this.trailing,
+    this.trailingConstraints,
     this.validator,
     this.onSubmitted,
   });
@@ -651,8 +677,8 @@ class _XdField extends StatelessWidget {
                 fontWeight: FontWeight.w300,
                 color: MerzoxColors.kColorBEBEBE,
               ),
-              prefixIcon: leading,
               suffixIcon: trailing,
+              suffixIconConstraints: trailingConstraints,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 14,
                 vertical: 13,
@@ -677,34 +703,69 @@ class _CountryCodeDropdown extends StatelessWidget {
   final ValueChanged<_CountryDialCode?> onChanged;
 
   const _CountryCodeDropdown({
+    super.key,
     required this.selectedCountry,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsetsDirectional.only(start: 8, end: 4),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<_CountryDialCode>(
-          value: selectedCountry,
-          isDense: true,
-          iconSize: 18,
-          menuMaxHeight: 300,
-          dropdownColor: Colors.white,
-          onChanged: onChanged,
-          selectedItemBuilder: (context) {
-            return _countryDialCodes.map((country) {
-              return _CountryDialCodeView(country: country);
-            }).toList();
-          },
-          items: _countryDialCodes.map((country) {
-            return DropdownMenuItem(
-              value: country,
-              child: _CountryDialCodeView(country: country),
-            );
-          }).toList(),
-        ),
+    // Left to right whatever the page around it is doing. A dial code is a
+    // left-to-right thing wherever it sits, and the order asked for - the
+    // code, then the flag, then the chevron - is that order on the glass and
+    // not a start-to-end one that would turn round with the language.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(
+              left: _kCountryOuterInset,
+              right: _kCountryToDivider,
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<_CountryDialCode>(
+                value: selectedCountry,
+                isDense: true,
+                menuMaxHeight: 300,
+                dropdownColor: Colors.white,
+                onChanged: onChanged,
+                // Material sets the icon hard against the chip; the chevron
+                // is a mark about the list rather than part of the reading of
+                // the flag, so it is given air of its own.
+                icon: const Padding(
+                  padding: EdgeInsets.only(left: _kFlagToChevron),
+                  child: Icon(
+                    MerzoxIcons.loginCountryChevron,
+                    color: MerzoxColors.kColor3D5A80,
+                    // The size Material's triangle drew at, converted.
+                    size: 18 * MerzoxIcons.countryChevronSizeFactor,
+                  ),
+                ),
+                selectedItemBuilder: (context) {
+                  return _countryDialCodes.map((country) {
+                    return _CountryDialCodeView(country: country);
+                  }).toList();
+                },
+                items: _countryDialCodes.map((country) {
+                  return DropdownMenuItem(
+                    value: country,
+                    child: _CountryDialCodeView(country: country),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+          // The two halves of the box, told apart. Full height, so it reads as
+          // a division of the field rather than a mark floating inside it.
+          Container(
+            key: const Key('login.countryDivider'),
+            width: _kCountryDividerWidth,
+            height: _kFieldHeight,
+            color: MerzoxColors.kColor98C1D9,
+          ),
+        ],
       ),
     );
   }
@@ -721,8 +782,6 @@ class _CountryDialCodeView extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       textDirection: TextDirection.ltr,
       children: [
-        Text(country.flag, style: const TextStyle(fontSize: 16)),
-        const SizedBox(width: 6),
         Text(
           country.prefix,
           textDirection: TextDirection.ltr,
@@ -732,6 +791,8 @@ class _CountryDialCodeView extends StatelessWidget {
             color: Color(0xFF2B2B2B),
           ),
         ),
+        const SizedBox(width: 6),
+        Text(country.flag, style: const TextStyle(fontSize: 16)),
       ],
     );
   }
@@ -760,6 +821,7 @@ class _PrimaryAuthButton extends StatelessWidget {
   final VoidCallback onPressed;
 
   const _PrimaryAuthButton({
+    super.key,
     required this.label,
     required this.isLoading,
     required this.onPressed,

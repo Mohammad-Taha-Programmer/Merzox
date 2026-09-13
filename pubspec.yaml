@@ -282,6 +282,9 @@ flutter:
       fonts:
         - asset: assets/fonts/icons_fonts/home_screen/HomeScreenWhoWeAre.ttf
     # login/
+    - family: LoginCountryChevron
+      fonts:
+        - asset: assets/fonts/icons_fonts/login/LoginCountryChevron.ttf
     - family: LoginHidePassword
       fonts:
         - asset: assets/fonts/icons_fonts/login/LoginHidePassword.ttf
