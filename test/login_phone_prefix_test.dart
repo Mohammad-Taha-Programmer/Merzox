@@ -80,12 +80,16 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
-  testWidgets('a local number leaves with the flag beside the field', (
+  // The list opens on Palestine, so a reader who types their number without
+  // touching the flag is taken at that word. The default is pinned here by what
+  // it does rather than by what it paints: a default nobody checks is a default
+  // that drifts.
+  testWidgets('a local number leaves with the flag the list opens on', (
     tester,
   ) async {
     expect(
       await _identifierSentBy(tester, typed: '0592029316'),
-      '+972592029316',
+      '+970592029316',
     );
   });
 
@@ -111,8 +115,8 @@ void main() {
     tester,
   ) async {
     expect(
-      await _identifierSentBy(tester, typed: '0592029316', pickCountry: '+970'),
-      '+970592029316',
+      await _identifierSentBy(tester, typed: '0592029316', pickCountry: '+972'),
+      '+972592029316',
     );
   });
 

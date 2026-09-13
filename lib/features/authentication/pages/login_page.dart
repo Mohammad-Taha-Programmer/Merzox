@@ -115,6 +115,13 @@ const double _kSignupRowHeight = 28;
 /// Merzox does not draw a fake one.
 const double _kPageBottomPadding = 24;
 
+/// The country the flag list opens on.
+///
+/// A default is a guess about who is signing in, and the guess here is the
+/// reader Merzox is for. Anyone it guesses wrong about changes it in one tap,
+/// and the number they type is read the same way whichever flag is showing.
+const String _kDefaultDialPrefix = '+970';
+
 class LoginPage extends StatefulWidget {
   final VoidCallback onAuthenticated;
   final VoidCallback onBrowseAsGuest;
@@ -142,7 +149,7 @@ class _LoginPageState extends State<LoginPage> {
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   _CountryDialCode _selectedCountry = _countryDialCodes.firstWhere(
-    (country) => country.prefix == '+972',
+    (country) => country.prefix == _kDefaultDialPrefix,
   );
   bool _rememberMe = true;
   bool _obscurePassword = true;
