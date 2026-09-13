@@ -248,6 +248,10 @@ class HomeScreen extends StatelessWidget {
                 isGuest: isGuest,
                 onLogout: () => _logout(context),
                 onProtectedAction: () => _showAuthGate(context),
+                // Straight there, not through the gate's dialog: the figure
+                // has already said what it is for, and the other sign-in
+                // buttons on this screen go the same way.
+                onSignIn: () => context.go('/login'),
                 onBusinessEnrollment: () => _openBusinessEnrollment(context),
                 onLocationRequested: () => context.read<HomeBloc>().add(
                   const HomeLocationServiceRequested(reason: 'nearby'),
@@ -325,6 +329,7 @@ class _HomeTab extends StatelessWidget {
   final bool isGuest;
   final VoidCallback onLogout;
   final VoidCallback onProtectedAction;
+  final VoidCallback onSignIn;
   final VoidCallback onLocationRequested;
   final VoidCallback onBusinessEnrollment;
 
@@ -333,6 +338,7 @@ class _HomeTab extends StatelessWidget {
     required this.isGuest,
     required this.onLogout,
     required this.onProtectedAction,
+    required this.onSignIn,
     required this.onLocationRequested,
     required this.onBusinessEnrollment,
   });
@@ -366,6 +372,7 @@ class _HomeTab extends StatelessWidget {
                   isGuest: isGuest,
                   onLogout: onLogout,
                   onProtectedAction: onProtectedAction,
+                  onSignIn: onSignIn,
                 ),
               ],
             ),
@@ -480,15 +487,71 @@ class _HomeTab extends StatelessWidget {
   }
 }
 
+/// The account figure at the reading edge of the top bar.
+///
+/// For a guest it is a door rather than a label: they have no account, and the
+/// figure is the only thing on this screen that stands for one, so a tap on it
+/// goes to the sign-in screen. A signed-in reader's stays inert - their account
+/// is a tab on the bar below, and one place should not have two doors.
+class _AccountMark extends StatelessWidget {
+  final bool isGuest;
+  final VoidCallback onSignIn;
+
+  const _AccountMark({required this.isGuest, required this.onSignIn});
+
+  @override
+  Widget build(BuildContext context) {
+    const Widget figure = CircleAvatar(
+      radius: 14,
+      backgroundColor: MerzoxColors.kColorDEEEF8,
+      // The same mark the profile row carries, so the bar and the screen it
+      // leads to name the account the same way. One drawing for both states:
+      // the designer's set has a single account mark, and a guest is already
+      // told apart by the words beside it rather than by a hollower figure.
+      //
+      // The size it drew at as a Material figure, converted on width: this one
+      // is taller than it is wide where Material's is square, and matching its
+      // height left it small enough to float in the circle.
+      child: Icon(
+        MerzoxIcons.homeScreenProfile,
+        size: 24 * MerzoxIcons.accountFigureSizeFactor,
+        color: MerzoxColors.kColor3D5A80,
+      ),
+    );
+
+    if (!isGuest) return figure;
+
+    // As tall as the bar's other controls and no wider than the circle it is.
+    // The height is free - the bar is 44 and the figure floats in it - where a
+    // wider box would push the greeting along and move a row that is drawn to
+    // the artboard.
+    return SizedBox(
+      height: kHomeBarControlBox,
+      child: Tooltip(
+        message: 'authGate.login'.tr(),
+        child: InkResponse(
+          key: const ValueKey<String>('merzox.home.guestSignIn'),
+          onTap: onSignIn,
+          customBorder: const CircleBorder(),
+          radius: 22,
+          child: const Center(child: figure),
+        ),
+      ),
+    );
+  }
+}
+
 class _HomeTopBar extends StatelessWidget {
   final bool isGuest;
   final VoidCallback onLogout;
   final VoidCallback onProtectedAction;
+  final VoidCallback onSignIn;
 
   const _HomeTopBar({
     required this.isGuest,
     required this.onLogout,
     required this.onProtectedAction,
+    required this.onSignIn,
   });
 
   @override
@@ -504,25 +567,7 @@ class _HomeTopBar extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: MerzoxColors.kColorDEEEF8,
-                  // The same mark the profile row carries, so the bar and the
-                  // screen it leads to name the account the same way. One
-                  // drawing for both states: the designer's set has a single
-                  // account mark, and a guest is already told apart by the
-                  // words beside it rather than by a hollower figure.
-                  //
-                  // The size it drew at as a Material figure, converted on
-                  // width: this one is taller than it is wide where Material's
-                  // is square, and matching its height left it small enough to
-                  // float in the circle.
-                  child: Icon(
-                    MerzoxIcons.homeScreenProfile,
-                    size: 24 * MerzoxIcons.accountFigureSizeFactor,
-                    color: MerzoxColors.kColor3D5A80,
-                  ),
-                ),
+                _AccountMark(isGuest: isGuest, onSignIn: onSignIn),
                 const SizedBox(width: 10),
                 Column(
                   mainAxisSize: MainAxisSize.min,
@@ -588,8 +633,8 @@ class _HomeTopBar extends StatelessWidget {
                     onPressed: onProtectedAction,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
+                      minWidth: kHomeBarControlBox,
+                      minHeight: kHomeBarControlBox,
                     ),
                     // The size it drew at as a Material bell, converted, and
                     // the colour the floating bell carries. It had no colour
@@ -609,7 +654,10 @@ class _HomeTopBar extends StatelessWidget {
                   iconSize: 24,
                   color: kHomeBarControlColour,
                   padding: EdgeInsets.zero,
-                  constraints: BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: BoxConstraints(
+                    minWidth: kHomeBarControlBox,
+                    minHeight: kHomeBarControlBox,
+                  ),
                 ),
                 if (!isGuest)
                   // Same box as the icons beside it, so the group reads as one
@@ -620,8 +668,8 @@ class _HomeTopBar extends StatelessWidget {
                     onPressed: onLogout,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
-                      minWidth: 40,
-                      minHeight: 40,
+                      minWidth: kHomeBarControlBox,
+                      minHeight: kHomeBarControlBox,
                     ),
                     // The same mark the profile's own way out carries, so
                     // the two doors out of one account look like one thing.
@@ -1225,6 +1273,12 @@ class _BusinessInteractionCorner extends StatelessWidget {
 /// A constant rather than the colour written three times, so the row cannot
 /// drift apart again one control at a time.
 const Color kHomeBarControlColour = MerzoxColors.kColor98C1D9;
+
+/// The box each control in the top bar takes, whatever it draws inside it.
+///
+/// Written three times as a literal before, which is how a row ends up with
+/// one tap target smaller than the rest of them.
+const double kHomeBarControlBox = 40;
 
 /// Whether anything can be advertised in the band under the top bar.
 ///
