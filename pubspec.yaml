@@ -154,6 +154,13 @@ flutter:
     # Generated from the same map the files were copied by. A family
     # named here with no file under it is an empty box at runtime and
     # nothing before it.
+    #
+    # auth/ - not a screen. The two sign-in screens draw one phone field
+    # between them, so the mark inside it belongs to both of them and is
+    # meant to be replaced once rather than twice.
+    - family: AuthCountryChevron
+      fonts:
+        - asset: assets/fonts/icons_fonts/auth/AuthCountryChevron.ttf
     # business_profile/
     - family: BusinessProfileChat
       fonts:
@@ -282,9 +289,6 @@ flutter:
       fonts:
         - asset: assets/fonts/icons_fonts/home_screen/HomeScreenWhoWeAre.ttf
     # login/
-    - family: LoginCountryChevron
-      fonts:
-        - asset: assets/fonts/icons_fonts/login/LoginCountryChevron.ttf
     - family: LoginHidePassword
       fonts:
         - asset: assets/fonts/icons_fonts/login/LoginHidePassword.ttf
