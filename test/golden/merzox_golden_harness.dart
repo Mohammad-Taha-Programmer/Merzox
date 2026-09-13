@@ -175,6 +175,9 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   'HomeScreenWhoWeAre': <String>[
     'assets/fonts/icons_fonts/home_screen/HomeScreenWhoWeAre.ttf',
   ],
+  'LoginCountryChevron': <String>[
+    'assets/fonts/icons_fonts/login/LoginCountryChevron.ttf',
+  ],
   'LoginHidePassword': <String>[
     'assets/fonts/icons_fonts/login/LoginHidePassword.ttf',
   ],

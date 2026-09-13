@@ -284,6 +284,15 @@ abstract final class MerzoxIcons {
   //
   // `login/`
 
+  /// The chevron the country list opens with.
+  ///
+  /// Authored, not supplied: the designer's set has no arrow of any kind, as
+  /// the note at the head of this file says, and the list needs one.
+  static const IconData loginCountryChevron = IconData(
+    0xe80f,
+    fontFamily: 'LoginCountryChevron',
+  );
+
   static const IconData loginHidePassword = IconData(
     0xe802,
     fontFamily: 'LoginHidePassword',
@@ -624,6 +633,19 @@ abstract final class MerzoxIcons {
   );
 
   // -- Sizes ----------------------------------------------------------------
+
+  /// Against Material's `arrow_drop_down`, the triangle the country list drew
+  /// before it.
+  ///
+  /// Width. A chevron is wide and shallow, and its width is the whole of what
+  /// a reader registers of it; anchored on height, a mark two and a third
+  /// times wider than it is tall would have come out enormous beside the
+  /// digits it sits next to.
+  ///
+  /// Measured on a board Flutter drew, not on the font in the SDK's cache:
+  /// that file maps `arrow_drop_down`'s code point to a glyph of a different
+  /// name, and reading it directly gives a figure for the wrong drawing.
+  static const double countryChevronSizeFactor = 0.425 / 0.745;
 
   /// Against Material's `person_rounded`, the figure the home bar's avatar
   /// used to draw.
