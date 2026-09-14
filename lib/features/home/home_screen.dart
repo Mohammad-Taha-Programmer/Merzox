@@ -2206,9 +2206,10 @@ class _ProfileXdContentState extends State<_ProfileXdContent> {
     final String url = account.avatarUrl.trim();
     if (url.isEmpty) return null;
 
-    // Written back so the next open paints it without asking anybody.
-    final SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AuthBloc.avatarUrlKey, url);
+    // Stored and announced in one step. Writing straight to storage was the
+    // fault: this tab repainted from its own `setState` and the top bar, which
+    // reads the picture too, heard nothing and went on drawing the figure.
+    await AccountAvatar.remember(url);
 
     if (mounted) setState(() => _avatarUrl = url);
 
