@@ -101,7 +101,6 @@ async function seed() {
   const normalUser = new User({
     name: 'مستخدم تجريبي',
     email: 'user@merzox.local',
-    phone: '+972590000001',
     phones: [{ value: '+972590000001', isPrimary: true }],
     address: 'رام الله',
     userType: 'normal',
@@ -114,7 +113,6 @@ async function seed() {
   const businessUser = new User({
     name: 'تاجر تجريبي',
     email: 'merchant@merzox.local',
-    phone: '+972590000002',
     phones: [{ value: '+972590000002', isPrimary: true }],
     address: 'القدس',
     userType: 'business',

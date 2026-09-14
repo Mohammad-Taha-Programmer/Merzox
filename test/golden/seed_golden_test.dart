@@ -1190,8 +1190,18 @@ final class _SeedProfileApi extends ApiService {
       'email': filled ? 'yasmeen@example.test' : '',
       'emailVerified': filled,
       'emails': const <Map<String, dynamic>>[],
-      'phone': filled ? '0592029316' : '',
-      'phones': const <Map<String, dynamic>>[],
+      // The list, because that is the whole of what the server sends. This
+      // seed used to carry a single `phone` beside an empty list, which is a
+      // response the server can no longer produce.
+      'phones': filled
+          ? const <Map<String, dynamic>>[
+              <String, dynamic>{
+                'value': '0592029316',
+                'label': 'mobile',
+                'isPrimary': true,
+              },
+            ]
+          : const <Map<String, dynamic>>[],
       'address': filled ? 'أريحا' : '',
       'addresses': const <Map<String, dynamic>>[],
       'userType': 'normal',

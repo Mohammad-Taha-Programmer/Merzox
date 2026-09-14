@@ -75,8 +75,15 @@ export const signup = asyncHandler(async (req, res) => {
   const phone = req.body.phone ? normalizePhone(req.body.phone) : undefined;
   const email = req.body.email ? normalizeIdentifier(req.body.email) : undefined;
 
+  // Against the list. Asking after the single `phone` that used to sit beside
+  // it would now match nothing at all, and a number already in use would slip
+  // past this and be refused by the unique index instead - a raw driver error
+  // in place of a plain "account already exists".
   const existingUser = await User.findOne({
-    $or: [...(phone ? [{ phone }] : []), ...(email ? [{ email }] : [])]
+    $or: [
+      ...(phone ? [{ 'phones.value': phone }] : []),
+      ...(email ? [{ email }] : [])
+    ]
   });
 
   if (existingUser) {
@@ -114,7 +121,6 @@ export const signup = asyncHandler(async (req, res) => {
 
   const user = new User({
     name: String(req.body.name).trim(),
-    phone,
     phones: phone ? [{ value: phone, label: 'mobile', isPrimary: true }] : [],
     userType: 'normal',
     gender: normalizeGender(req.body.gender),
@@ -144,8 +150,12 @@ export const login = asyncHandler(async (req, res) => {
   const identifier = normalizeIdentifier(req.body.identifier);
   const phoneIdentifier = normalizePhone(req.body.identifier);
 
+  // Any of the account's numbers signs it in, not only the one it was created
+  // with. The lookup used to be against the single copy of the first entry, so
+  // a reader who added a second number and typed that one was told their
+  // credentials were wrong.
   const user = await User.findOne({
-    $or: [{ email: identifier }, { phone: phoneIdentifier }]
+    $or: [{ email: identifier }, { 'phones.value': phoneIdentifier }]
   }).select('+passwordHash');
 
   if (!user || !(await user.verifyPassword(String(req.body.password)))) {

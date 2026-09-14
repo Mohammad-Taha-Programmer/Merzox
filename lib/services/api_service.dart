@@ -3128,8 +3128,26 @@ class AuthApiUser {
   final String avatarUrl;
   final String? email;
   final List<ContactEmail> emails;
-  final String? phone;
   final List<ContactPhone> phones;
+
+  /// The one number that stands for the account: the entry marked primary, or
+  /// the first one if none is.
+  ///
+  /// Worked out here rather than sent. The server used to carry a `phone`
+  /// beside this list holding a copy of the same value, and one fact in two
+  /// places is two places that can disagree; the list travels now, and each
+  /// side answers the singular question for itself.
+  String? get phone {
+    if (phones.isEmpty) return null;
+
+    return phones
+        .firstWhere(
+          (ContactPhone entry) => entry.isPrimary,
+          orElse: () => phones.first,
+        )
+        .value;
+  }
+
   final String userType;
   final String gender;
 
@@ -3148,7 +3166,6 @@ class AuthApiUser {
     this.avatarUrl = '',
     required this.email,
     required this.emails,
-    required this.phone,
     required this.phones,
     required this.userType,
     required this.gender,
@@ -3173,7 +3190,6 @@ class AuthApiUser {
           .map(ContactEmail.fromJson)
           .where((email) => email.value.isNotEmpty)
           .toList(),
-      phone: json['phone'] as String?,
       phones: phonesJson
           .whereType<Map<String, dynamic>>()
           .map(ContactPhone.fromJson)

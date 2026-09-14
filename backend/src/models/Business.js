@@ -367,21 +367,24 @@ businessSchema.methods.publicContactJSON = function publicContactJSON(owner) {
   }
 
   return {
-    phones: contactEntries(owner.phones, owner.phone, 'mobile'),
-    emails: contactEntries(owner.emails, owner.email, 'personal')
+    phones: contactEntries(owner.phones, 'mobile'),
+    emails: contactEntries(owner.emails, 'personal', owner.email)
   };
 };
 
 /**
- * A list of contact entries, falling back to the single value older accounts
- * carry - one created before the lists existed holds only `phone` and
- * `email`, and reading the lists alone would publish nothing for it.
+ * A list of contact entries, optionally falling back to a single value.
+ *
+ * The fallback is for emails alone, where a single `email` still sits beside
+ * the list. Phones no longer have one: the single `phone` was a copy of the
+ * list's first entry and has been removed, so the list is the only thing there
+ * is to read.
  *
  * `isPrimary` is deliberately not among the fields that travel: which of a
  * merchant's numbers they marked first is theirs to know, and a customer only
  * needs the ones they can call.
  */
-function contactEntries(list, single, fallbackLabel) {
+function contactEntries(list, fallbackLabel, single = null) {
   const entries = Array.isArray(list) ? list : [];
 
   if (entries.length > 0) {

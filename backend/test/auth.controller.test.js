@@ -188,6 +188,32 @@ test('the pending signup travels encrypted, not as readable claims', async () =>
   }
 });
 
+test('a number already in use is refused before anything is written', async () => {
+  const stub = stubUser({ found: await makeUser() });
+
+  try {
+    const result = await invoke(signup, {
+      body: {
+        name: 'سامر',
+        phone: '+972590000001',
+        password: 'correct-horse'
+      }
+    });
+
+    assert.equal(result.error?.code, 'ACCOUNT_EXISTS');
+    assert.equal(result.error?.statusCode, 409);
+    assert.equal(stub.saved.length, 0);
+
+    // Against the list, which is the only place a number lives now. Asked of
+    // the removed single field the query matched nothing, and the duplicate
+    // reached the unique index - a driver error instead of this.
+    const [filter] = stub.filters;
+    assert.deepEqual(filter.$or[0], { 'phones.value': '+972590000001' });
+  } finally {
+    stub.restore();
+  }
+});
+
 test('a phone signup creates the account immediately', async () => {
   const stub = stubUser();
 
@@ -481,7 +507,39 @@ test('login looks the account up by either identifier, normalized', async () => 
 
     const [filter] = stub.filters;
     assert.deepEqual(filter.$or[0], { email: 'yasmine@example.com' });
-    assert.equal(typeof filter.$or[1].phone, 'string');
+    // Against the list, so any of the account's numbers signs it in. It used
+    // to be against a single copy of the first entry, and a reader who added
+    // a second number and typed that one was told their password was wrong.
+    assert.equal(typeof filter.$or[1]['phones.value'], 'string');
+  } finally {
+    stub.restore();
+  }
+});
+
+test('a second number on the account signs it in like the first', async () => {
+  const user = await makeUser();
+  user.phones = [
+    { value: '+972590000001', label: 'mobile', isPrimary: true },
+    { value: '+972590000002', label: 'work', isPrimary: false }
+  ];
+
+  const stub = stubUser({ found: user });
+
+  try {
+    await invoke(login, {
+      body: { identifier: '+972 590 000 002', password: 'correct-horse' }
+    });
+
+    const [filter] = stub.filters;
+    // The server normalizes the writing of a number, never its country: the
+    // app is what puts a dial code in front of a local number, and what
+    // arrives here already carries one.
+    const asked = filter.$or[1]['phones.value'];
+
+    assert.ok(
+      user.phones.some((entry) => entry.value === asked),
+      `the lookup asked for ${asked}, which is not one of the account's numbers`
+    );
   } finally {
     stub.restore();
   }

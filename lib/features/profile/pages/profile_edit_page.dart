@@ -204,12 +204,12 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
             if ((user.email ?? '').isNotEmpty)
               ContactEmail(value: user.email!, label: 'personal'),
           ];
-    final phones = user.phones.isNotEmpty
-        ? user.phones
-        : [
-            if ((user.phone ?? '').isNotEmpty)
-              ContactPhone(value: user.phone!, label: 'mobile'),
-          ];
+    // The list is the whole of it. There was a fallback here to a single
+    // `phone` the account carried beside the list, for accounts old enough to
+    // have one and no list; that field is gone, and the fallback with it -
+    // `user.phone` is now read out of this very list, so it could only ever
+    // have repeated what the list already said.
+    final phones = user.phones;
 
     for (final email in _emails) {
       email.dispose();

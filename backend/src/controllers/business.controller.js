@@ -389,7 +389,7 @@ export const getBusiness = asyncHandler(async (req, res) => {
 async function publishedOwner(business) {
   if (business.showOwnerContact !== true || !business.owner) return null;
 
-  return User.findById(business.owner).select('phones emails phone email');
+  return User.findById(business.owner).select('phones emails email');
 }
 
 export const listBusinessProducts = asyncHandler(async (req, res) => {

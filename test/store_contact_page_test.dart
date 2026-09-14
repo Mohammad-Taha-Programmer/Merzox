@@ -328,20 +328,44 @@ void main() {
     });
   });
 
-  group('an account from before the lists existed', () {
-    test('its single number and address are still offered', () {
-      // Older accounts carry `phone` and `email` alone, and a page that read
-      // only the lists would show nothing for them.
-      final AuthApiUser legacy = AuthApiUser.fromJson(<String, dynamic>{
+  group('an account carrying only its single address', () {
+    test('the address is still offered', () {
+      // `email` still sits beside `emails`, so an account holding only the one
+      // it was opened with is offered rather than shown as having nothing.
+      final AuthApiUser single = AuthApiUser.fromJson(<String, dynamic>{
+        'id': 'u1',
+        'name': 'بتول طه',
+        'userType': 'business',
+        'email': 'b@taha.com',
+      });
+
+      expect(storeEmailChannels(single).single.label, 'b@taha.com');
+    });
+
+    test('a number comes from the list and from nowhere else', () {
+      // The single `phone` is gone - it held a copy of the list's first entry
+      // - so a `phone` arriving on the wire is not a second source. An empty
+      // list is an account with no number to offer.
+      final AuthApiUser stray = AuthApiUser.fromJson(<String, dynamic>{
         'id': 'u1',
         'name': 'بتول طه',
         'userType': 'business',
         'phone': '+970562000000',
-        'email': 'b@taha.com',
+        'phones': <dynamic>[],
       });
 
-      expect(storePhoneChannels(legacy).single.label, '+970562000000');
-      expect(storeEmailChannels(legacy).single.label, 'b@taha.com');
+      expect(storePhoneChannels(stray), isEmpty);
+
+      final AuthApiUser listed = AuthApiUser.fromJson(<String, dynamic>{
+        'id': 'u1',
+        'name': 'بتول طه',
+        'userType': 'business',
+        'phones': <dynamic>[
+          <String, dynamic>{'value': '+970562000000', 'label': 'mobile'},
+        ],
+      });
+
+      expect(storePhoneChannels(listed).single.label, '+970562000000');
     });
 
     test('and no account at all offers nothing rather than throwing', () {

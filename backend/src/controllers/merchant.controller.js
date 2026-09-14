@@ -78,7 +78,8 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
   const phone = normalizePhone(req.body.phone);
   const email = normalizeIdentifier(req.body.email);
 
-  if (user.phone && user.phone !== phone) {
+  const accountPhones = (user.phones ?? []).map((entry) => entry.value);
+  if (accountPhones.length > 0 && !accountPhones.includes(phone)) {
     throw new AppError(
       'Phone number must match the current account',
       409,
@@ -95,12 +96,7 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
 
   const conflictingUser = await User.findOne({
     _id: { $ne: user._id },
-    $or: [
-      { phone },
-      { 'phones.value': phone },
-      { email },
-      { 'emails.value': email }
-    ]
+    $or: [{ 'phones.value': phone }, { email }, { 'emails.value': email }]
   });
   if (conflictingUser) {
     throw new AppError(
@@ -114,8 +110,7 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
     throw new AppError('This account already owns a business', 409, 'BUSINESS_ALREADY_EXISTS');
   }
 
-  if (!user.phone) {
-    user.phone = phone;
+  if (accountPhones.length === 0) {
     user.phones = [{ value: phone, label: 'mobile', isPrimary: true }];
   }
   if (!user.email) {

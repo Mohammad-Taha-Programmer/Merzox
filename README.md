@@ -19,7 +19,9 @@ language-aware sharing payloads are generated in Arabic or English at runtime.
 ### Customer experience
 
 - Custom splash screen and three-step onboarding flow.
-- Sign up and login with either an email address or an international phone number.
+- Sign up and login with either an email address or an international phone
+  number - and with any of the numbers on the account, not only the one it
+  was opened with.
 - Email verification before an email-based account is persisted.
 - Guest browsing with purchasing and account changes restricted to authenticated users.
 - Home feed for new, highly rated, discounted, and nearby businesses.

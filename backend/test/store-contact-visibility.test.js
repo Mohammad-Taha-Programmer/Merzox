@@ -72,20 +72,37 @@ test('forgetting the owner publishes nothing rather than everything', () => {
   assert.deepEqual(detail.contact, { phones: [], emails: [] });
 });
 
-test('an account older than the contact lists is still reachable', () => {
-  // An account created before `phones` and `emails` existed carries only the
-  // single value it was opened with, and reading the lists alone would show a
-  // shop that said yes as having given nothing.
+test('an account with only the single email is still reachable', () => {
+  // `email` still sits beside `emails`, so an account that carries only the
+  // one it was opened with is published rather than shown as having given
+  // nothing.
   const detail = shop({ showOwnerContact: true }).toDetailJSON({
-    phone: ' +972590000009 ',
     email: 'old@example.test'
   });
 
-  assert.deepEqual(detail.contact.phones, [
-    { value: '+972590000009', label: 'mobile' }
-  ]);
   assert.deepEqual(detail.contact.emails, [
     { value: 'old@example.test', label: 'personal' }
+  ]);
+});
+
+test('a number is published from the list and from nowhere else', () => {
+  // The single `phone` is gone: it held a copy of the list's first entry, so
+  // there is no second place a number could come from. An account with an
+  // empty list has no number to publish, and a stray `phone` on the object -
+  // a document from before the field was dropped - is not one either.
+  const detail = shop({ showOwnerContact: true }).toDetailJSON({
+    phone: '+972590000009',
+    phones: []
+  });
+
+  assert.deepEqual(detail.contact.phones, []);
+
+  const listed = shop({ showOwnerContact: true }).toDetailJSON({
+    phones: [{ value: ' +972590000009 ', label: 'mobile' }]
+  });
+
+  assert.deepEqual(listed.contact.phones, [
+    { value: '+972590000009', label: 'mobile' }
   ]);
 });
 

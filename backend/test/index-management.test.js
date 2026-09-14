@@ -67,7 +67,7 @@ function fakeModel({
 }
 
 test(
-  'real model registry yields the reviewed 12-model 54-index plan without connecting',
+  'real model registry yields the reviewed 12-model 53-index plan without connecting',
   () => {
     assert.equal(
       mongoose.connection.readyState,
@@ -94,9 +94,12 @@ test(
       12
     );
 
+    // 53, not 54. The unique index on the single `phone` went with the field:
+    // it was a copy of the list's first entry, and `phones.value` already
+    // carries a unique index of its own.
     assert.equal(
       plan.indexCount,
-      54
+      53
     );
 
     assert.equal(

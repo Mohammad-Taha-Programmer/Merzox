@@ -207,7 +207,6 @@ void main() {
         name: 'ليان',
         email: null,
         emails: [],
-        phone: null,
         phones: [],
         userType: 'normal',
         gender: 'female',
