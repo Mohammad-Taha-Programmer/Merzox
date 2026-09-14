@@ -206,8 +206,11 @@ test('a phone signup creates the account immediately', async () => {
     assert.equal(stub.saved.length, 1);
 
     const saved = stub.saved[0];
-    // There is no address to verify, so the account is usable at once.
-    assert.equal(saved.emailVerified, true);
+    // No address was given, so there is nothing verified about one. This read
+    // `true` and the document said the account had confirmed an address it had
+    // never supplied. Nothing is blocked by the honest answer: the gate that
+    // reads this field also requires an address to be present.
+    assert.equal(saved.emailVerified, false);
     assert.equal(saved.phones[0].isPrimary, true);
     assert.ok(saved.passwordHash, 'the password is stored hashed, not raw');
     assert.notEqual(saved.passwordHash, 'correct-horse');

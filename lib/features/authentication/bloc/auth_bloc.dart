@@ -4,6 +4,7 @@ import 'package:merzox/injection/injector.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/services/push_service.dart';
 import 'package:merzox/services/realtime_service.dart';
+import 'package:merzox/features/authentication/account_avatar.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:merzox/core/auth/secure_token_store.dart';
@@ -289,6 +290,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await prefs.remove(emailKey);
     await prefs.remove(phoneKey);
     await prefs.remove(genderKey);
+    // The picture goes with the session. Left behind, it was the previous
+    // account's face on the first frame the next one drew.
+    await AccountAvatar.forget();
     await prefs.remove(locationPermissionGrantedKey);
     await prefs.remove(locationPromptPendingKey);
   }
@@ -314,7 +318,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     await prefs.setString(emailKey, auth.user.email ?? '');
     await prefs.setString(phoneKey, auth.user.phone ?? '');
     await prefs.setString(genderKey, auth.user.gender);
-    await prefs.setString(avatarUrlKey, auth.user.avatarUrl);
+    await AccountAvatar.remember(auth.user.avatarUrl);
     await prefs.setBool(
       locationPermissionGrantedKey,
       auth.user.permissions.location,
