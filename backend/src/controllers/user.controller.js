@@ -173,10 +173,7 @@ export const updateMe = asyncHandler(async (req, res) => {
 
     const conflictingUser = await req.user.constructor.findOne({
       _id: { $ne: req.user._id },
-      $or: [
-        { phone: { $in: uniquePhones.map((phone) => phone.value) } },
-        { 'phones.value': { $in: uniquePhones.map((phone) => phone.value) } }
-      ]
+      'phones.value': { $in: uniquePhones.map((phone) => phone.value) }
     });
 
     if (conflictingUser) {
@@ -188,7 +185,6 @@ export const updateMe = asyncHandler(async (req, res) => {
       label: phone.label,
       isPrimary: index === 0
     }));
-    req.user.phone = uniquePhones[0]?.value;
   }
 
   if (updates.permissions && typeof updates.permissions === 'object') {

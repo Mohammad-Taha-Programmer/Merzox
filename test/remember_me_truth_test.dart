@@ -27,7 +27,6 @@ class _SuccessfulLoginApi extends ApiService {
         name: 'Remember User',
         email: 'user@example.com',
         emails: const [],
-        phone: null,
         phones: const [],
         userType: userType,
         gender: 'unspecified',

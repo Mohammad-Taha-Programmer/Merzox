@@ -107,13 +107,18 @@ const userSchema = new mongoose.Schema(
     },
     emailVerified: { type: Boolean, default: false },
     emails: { type: [emailSchema], default: [] },
-    phone: {
-      type: String,
-      trim: true,
-      sparse: true,
-      unique: true,
-      match: [/^\+?[0-9]{7,15}$/, 'Phone number must be international format']
-    },
+    /**
+     * Every number this account can be reached on and signed in with.
+     *
+     * There was a single `phone` string beside this, and it was not a second
+     * fact: it was a copy of the first entry here, written in the same breath
+     * by every path that touched either. Two fields holding one fact is two
+     * fields that can disagree, and the only question about them was which
+     * one a given piece of code happened to read.
+     *
+     * The list is what remains, and `primaryPhone` below is how anything that
+     * needs the number singular asks for it.
+     */
     phones: { type: [phoneSchema], default: [] },
     /**
      * Every place this account has asked for a delivery to.
@@ -209,9 +214,24 @@ const userSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-userSchema.index({ name: 'text', email: 'text', phone: 'text' });
+userSchema.index({ name: 'text', email: 'text', 'phones.value': 'text' });
 userSchema.index({ 'emails.value': 1 }, { unique: true, sparse: true });
 userSchema.index({ 'phones.value': 1 }, { unique: true, sparse: true });
+
+/**
+ * The one number that stands for the account: the entry marked primary, or the
+ * first one if none is.
+ *
+ * A list answers "how can this account be reached"; several places need to
+ * answer "what is this account's number", and this is where that question is
+ * answered once instead of at each of them.
+ */
+userSchema.virtual('primaryPhone').get(function primaryPhone() {
+  const entries = Array.isArray(this.phones) ? this.phones : [];
+  const chosen = entries.find((entry) => entry?.isPrimary) ?? entries[0];
+
+  return chosen?.value ?? null;
+});
 
 userSchema.virtual('canChangeName').get(function canChangeName() {
   return !this.nameChangedAt;
@@ -237,7 +257,6 @@ userSchema.methods.toSafeJSON = function toSafeJSON() {
     email: this.email ?? null,
     emailVerified: this.emailVerified,
     emails: this.emails,
-    phone: this.phone ?? null,
     phones: this.phones,
     addresses: this.addresses.map((entry) => ({
       id: entry._id.toString(),

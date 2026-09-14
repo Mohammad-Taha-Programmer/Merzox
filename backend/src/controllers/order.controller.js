@@ -912,7 +912,7 @@ export const createOrder = asyncHandler(async (req, res) => {
       clientOrderId,
       user: req.user._id,
       customerName: req.user.name,
-      customerPhone: req.user.phone ?? req.user.phones?.[0]?.value ?? '',
+      customerPhone: req.user.primaryPhone ?? '',
       business: business._id,
       businessName: business.name,
       businessAddress: business.address,

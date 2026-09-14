@@ -140,7 +140,7 @@ List<StoreContactChannel> storeSocialChannels(BusinessSocialLinks links) {
 List<StoreContactChannel> storePhoneChannels(AuthApiUser? account) {
   if (account == null) return const <StoreContactChannel>[];
 
-  return contactPhoneChannels(_phonesOf(account));
+  return contactPhoneChannels(account.phones);
 }
 
 /// The same rows from numbers that arrived on their own.
@@ -195,19 +195,13 @@ List<StoreContactChannel> contactEmailChannels(List<ContactEmail> emails) {
   return channels;
 }
 
-/// The account's numbers, falling back to the single one older accounts have.
+/// The account's emails, falling back to the single one it may carry beside
+/// the list.
 ///
-/// An account created before the list existed carries only `phone`, and a
-/// page that read the list alone would show nothing for it.
-List<ContactPhone> _phonesOf(AuthApiUser account) {
-  if (account.phones.isNotEmpty) return account.phones;
-
-  final String single = account.phone?.trim() ?? '';
-  return single.isEmpty
-      ? const <ContactPhone>[]
-      : <ContactPhone>[ContactPhone(value: single)];
-}
-
+/// There is no such pair for numbers any more. The single `phone` held a copy
+/// of the list's first entry and has been removed, so the list is the only
+/// place a number can come from - which is why [storePhoneChannels] reads it
+/// directly and this has no twin.
 List<ContactEmail> _emailsOf(AuthApiUser account) {
   if (account.emails.isNotEmpty) return account.emails;
 
