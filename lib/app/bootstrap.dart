@@ -7,6 +7,7 @@ import '../injection/injector.dart';
 import '../services/push_service.dart';
 import '../services/realtime_service.dart';
 import 'app.dart';
+import 'package:merzox/features/authentication/account_avatar.dart';
 
 Future<void> bootstrap() async {
   await EasyLocalization.ensureInitialized();
@@ -27,6 +28,10 @@ Future<void> bootstrap() async {
   final startupService = locator<StartupService>();
 
   final destination = await startupService.initialize();
+
+  // Read before the first frame, so a returning reader's own picture is what
+  // the top bar draws rather than the figure followed by a swap.
+  await AccountAvatar.restore();
 
   // StartupService resolves cold-start session truth first. Only then may
   // realtime authenticate, so an intentionally non-remembered session is

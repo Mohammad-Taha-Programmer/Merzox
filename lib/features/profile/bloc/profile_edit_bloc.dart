@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/auth/auth_session_service.dart';
+import 'package:merzox/features/authentication/account_avatar.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -95,6 +96,6 @@ class ProfileEditBloc extends Bloc<ProfileEditEvent, ProfileEditState> {
     // Not edited on that screen, but this is where the account is read from
     // the server, so it is where a picture changed on another device catches
     // up with this one.
-    await prefs.setString(AuthBloc.avatarUrlKey, user.avatarUrl);
+    await AccountAvatar.remember(user.avatarUrl);
   }
 }

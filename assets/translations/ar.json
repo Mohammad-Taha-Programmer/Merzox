@@ -2,6 +2,7 @@
   "common": {
     "back": "رجوع",
     "cancel": "إلغاء",
+    "close": "إغلاق",
     "confirm": "تأكيد",
     "changeLanguage": "تغيير اللغة",
     "retry": "إعادة المحاولة",
@@ -572,6 +573,7 @@
   },
   "profile": {
     "title": "الملف الشخصي",
+    "viewPicture": "عرض الصورة",
     "pictureChangeHint": "اضغط مطولًا لتغيير صورتك"
   },
   "profileEdit": {

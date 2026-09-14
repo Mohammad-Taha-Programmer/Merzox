@@ -39,6 +39,7 @@ import 'package:merzox/services/notification_preference_service.dart';
 import 'package:merzox/services/recommendation_preference_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../authentication/account_avatar.dart';
 import '../authentication/bloc/auth_bloc.dart';
 import 'widgets/business_id_badge.dart';
 import 'widgets/business_rating_stars.dart';
@@ -48,6 +49,8 @@ import 'dart:typed_data';
 
 import '../../core/auth/auth_session_service.dart';
 import '../../core/widgets/merzox_icons.dart';
+import '../../core/widgets/picture_viewer.dart';
+import '../../core/widgets/remote_circle_avatar.dart';
 import '../../core/widgets/merzox_picture_field.dart';
 import '../../core/widgets/merzox_profile.dart';
 import 'widgets/feature_bottom_navigation_bar.dart';
@@ -487,28 +490,75 @@ class _HomeTab extends StatelessWidget {
   }
 }
 
-/// The account figure at the reading edge of the top bar.
+/// The account at the reading edge of the top bar: a picture if there is one,
+/// the figure if there is not.
 ///
-/// For a guest it is a door rather than a label: they have no account, and the
-/// figure is the only thing on this screen that stands for one, so a tap on it
-/// goes to the sign-in screen. A signed-in reader's stays inert - their account
-/// is a tab on the bar below, and one place should not have two doors.
+/// It answers to a press either way, and what it answers is the difference
+/// between the two readers. A guest has no account, and this is the only thing
+/// on the screen that stands for one, so it is the way to the sign-in screen.
+/// A signed-in reader's own picture opens full-size instead - their account is
+/// a tab on the bar below and one place should not have two doors, but their
+/// own face is not a door.
+///
+/// The picture comes from [AccountAvatar] rather than from storage, and that
+/// is the whole of the fix: storage already held it after an upload, and this
+/// widget was simply never told that it had changed.
 class _AccountMark extends StatelessWidget {
   final bool isGuest;
   final VoidCallback onSignIn;
 
   const _AccountMark({required this.isGuest, required this.onSignIn});
 
+  static const double _radius = 14;
+
   @override
   Widget build(BuildContext context) {
-    const Widget figure = CircleAvatar(
-      radius: 14,
+    if (isGuest) {
+      return _Pressable(
+        onTap: onSignIn,
+        tooltip: 'authGate.login'.tr(),
+        markKey: const ValueKey<String>('merzox.home.guestSignIn'),
+        child: const _AccountFigure(),
+      );
+    }
+
+    return ValueListenableBuilder<String>(
+      valueListenable: AccountAvatar.url,
+      builder: (BuildContext context, String url, Widget? _) {
+        // Nothing to enlarge, so nothing to press: a button that opens an
+        // empty screen is worse than a mark that is plainly a label.
+        if (url.isEmpty) return const _AccountFigure();
+
+        return _Pressable(
+          onTap: () => showPictureViewer(context, url),
+          tooltip: 'profile.viewPicture'.tr(),
+          markKey: const ValueKey<String>('merzox.home.accountPicture'),
+          child: RemoteCircleAvatar(
+            url: url,
+            radius: _radius,
+            backgroundColor: MerzoxColors.kColorDEEEF8,
+            fallback: const _AccountFigure(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The account mark with no picture behind it.
+///
+/// The same drawing the profile row carries, so the bar and the screen it
+/// leads to name the account the same way. One drawing for every state: the
+/// designer's set has a single account mark, and a guest is already told apart
+/// by the words beside it rather than by a hollower figure.
+class _AccountFigure extends StatelessWidget {
+  const _AccountFigure();
+
+  @override
+  Widget build(BuildContext context) {
+    return CircleAvatar(
+      radius: _AccountMark._radius,
       backgroundColor: MerzoxColors.kColorDEEEF8,
-      // The same mark the profile row carries, so the bar and the screen it
-      // leads to name the account the same way. One drawing for both states:
-      // the designer's set has a single account mark, and a guest is already
-      // told apart by the words beside it rather than by a hollower figure.
-      //
       // The size it drew at as a Material figure, converted on width: this one
       // is taller than it is wide where Material's is square, and matching its
       // height left it small enough to float in the circle.
@@ -518,23 +568,39 @@ class _AccountMark extends StatelessWidget {
         color: MerzoxColors.kColor3D5A80,
       ),
     );
+  }
+}
 
-    if (!isGuest) return figure;
+/// The mark, made pressable without moving it.
+///
+/// As tall as the bar's other controls and no wider than the circle it is. The
+/// height is free - the bar is 44 and the mark floats in it - where a wider box
+/// would push the greeting along and move a row that is drawn to the artboard.
+class _Pressable extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final String tooltip;
+  final Key markKey;
 
-    // As tall as the bar's other controls and no wider than the circle it is.
-    // The height is free - the bar is 44 and the figure floats in it - where a
-    // wider box would push the greeting along and move a row that is drawn to
-    // the artboard.
+  const _Pressable({
+    required this.child,
+    required this.onTap,
+    required this.tooltip,
+    required this.markKey,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return SizedBox(
       height: kHomeBarControlBox,
       child: Tooltip(
-        message: 'authGate.login'.tr(),
+        message: tooltip,
         child: InkResponse(
-          key: const ValueKey<String>('merzox.home.guestSignIn'),
-          onTap: onSignIn,
+          key: markKey,
+          onTap: onTap,
           customBorder: const CircleBorder(),
           radius: 22,
-          child: const Center(child: figure),
+          child: Center(child: child),
         ),
       ),
     );

@@ -119,7 +119,13 @@ export const signup = asyncHandler(async (req, res) => {
     userType: 'normal',
     gender: normalizeGender(req.body.gender),
     permissions: req.body.permissions ?? undefined,
-    emailVerified: true
+    // No email was given, so there is nothing verified about one. This said
+    // `true`, which put a claim in the document that the account had never
+    // made. Nothing depended on it: the only gate that reads this field also
+    // requires an address to be present, so an account with no address never
+    // reaches it, and one that adds an address later gets `false` written
+    // alongside it.
+    emailVerified: false
   });
 
   await user.setPassword(String(req.body.password));

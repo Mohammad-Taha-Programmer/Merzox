@@ -2,6 +2,7 @@
   "common": {
     "back": "Back",
     "cancel": "Cancel",
+    "close": "Close",
     "confirm": "Confirm",
     "changeLanguage": "Change language",
     "retry": "Try again",
@@ -572,6 +573,7 @@
   },
   "profile": {
     "title": "Profile",
+    "viewPicture": "View picture",
     "pictureChangeHint": "Hold to change your picture"
   },
   "profileEdit": {
