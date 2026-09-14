@@ -1614,67 +1614,31 @@ class _GuestLoginTabState extends StatelessWidget {
   }
 }
 
+/// The mark at the head of every guest sign-in screen.
+///
+/// The drawing itself, rather than a rebuilding of it out of circles. What
+/// stood here was four `Container`s arranged to look like the artboard - a
+/// blue disc, a head, a pair of shoulders and a badge - which is a copy that
+/// has to be re-measured by hand every time the drawing changes, and which was
+/// never going to be exactly it.
 class _GuestAvatarMark extends StatelessWidget {
   const _GuestAvatarMark();
+
+  /// The height of the slot, kept from the drawn version so nothing below it
+  /// moves. The artwork is taller than it is wide, so fitting it to this height
+  /// leaves the blue disc at the 150 across that the drawn one had.
+  static const double _height = 166;
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 166,
-      height: 166,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Container(
-            width: 150,
-            height: 150,
-            decoration: BoxDecoration(
-              color: MerzoxColors.kColor95BDD5,
-              shape: BoxShape.circle,
-            ),
-          ),
-          Positioned(
-            top: 46,
-            child: Container(
-              width: 56,
-              height: 56,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 22,
-            child: Container(
-              width: 104,
-              height: 58,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(58)),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 16,
-            child: Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: MerzoxColors.kColor3D5A80,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.add_rounded, color: Colors.white),
-            ),
-          ),
-        ],
+      height: _height,
+      child: Image.asset(
+        'assets/images/Guest Mode/temp_avatar.png',
+        fit: BoxFit.contain,
+        // A flat drawing brought down a few percent from its own size; the
+        // better sampler costs nothing here and keeps the disc's edge clean.
+        filterQuality: FilterQuality.medium,
       ),
     );
   }

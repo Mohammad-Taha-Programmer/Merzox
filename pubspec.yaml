@@ -113,6 +113,8 @@ flutter:
     - assets/images/Messages/
     - assets/images/Orders/
     - assets/images/follow_business_emoji_pics/
+    # A space in the folder name, because that is where the drawing was put.
+    - assets/images/Guest Mode/
     - assets/translations/
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
