@@ -11,6 +11,7 @@ import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/core/widgets/merzox_picture_field.dart';
 import 'package:merzox/features/business/shell/business_bloc.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 /// Store settings flow from the design: one page with the three sections
 /// the artboards split across tabs — logo, description, and social links.
@@ -303,7 +304,7 @@ class _StoreSettingsPageState extends State<StoreSettingsPage> {
                           // fills more of its em box than the bubble did.
                           icon: MerzoxIcons.storeSettingsWhatsapp,
                           iconSize: 18 * MerzoxIcons.whatsappSizeFactor,
-                          keyboardType: TextInputType.phone,
+                          keyboardType: kMerzoxPhoneKeyboard,
                         ),
                         _Field(
                           controller: _facebook,

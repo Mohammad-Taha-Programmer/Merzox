@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  validateBusinessEnrollment,
   validateBusinessOrderStatus,
   validateBusinessProfilePatch,
   validateConversationOpen,
@@ -410,4 +411,52 @@ test('a profile patch still refuses fields it does not own', () => {
       `${field} should be refused`
     );
   }
+});
+
+// ---------------------------------------------------------------------------
+// Becoming a merchant
+// ---------------------------------------------------------------------------
+
+/// The payload the enrolment screen sends at its first step.
+function enrollment(overrides = {}) {
+  return {
+    phone: '+970592029316',
+    email: 'shop@example.test',
+    currentPassword: 'correct-horse',
+    name: 'متجر ليان',
+    englishName: 'Layan Store',
+    description: 'حلويات',
+    category: 'food',
+    address: 'أريحا',
+    attachmentUrl: 'https://example.test/licence.pdf',
+    ...overrides
+  };
+}
+
+test('enrolment takes the payload the screen sends', () => {
+  accept(validateBusinessEnrollment, enrollment());
+});
+
+test('enrolment no longer demands an address', () => {
+  // Optional at this step: the number is a way to reach the merchant, and an
+  // address can be added later from the shop's own settings. Demanding it here
+  // stopped somebody with one shop and no work email from getting started.
+  accept(validateBusinessEnrollment, enrollment({ email: '' }));
+
+  const { email: _dropped, ...withoutEmail } = enrollment();
+  accept(validateBusinessEnrollment, withoutEmail);
+});
+
+test('a half-typed address is still a mistake, not an omission', () => {
+  assert.equal(
+    rejectCode(validateBusinessEnrollment, enrollment({ email: 'shop@' })),
+    'INVALID_EMAIL'
+  );
+});
+
+test('the number is still required', () => {
+  assert.equal(
+    rejectCode(validateBusinessEnrollment, enrollment({ phone: '' })),
+    'INVALID_PHONE'
+  );
 });

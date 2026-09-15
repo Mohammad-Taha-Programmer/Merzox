@@ -3,8 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../core/constants/colors.dart';
+import '../../../core/widgets/merzox_back_chevron.dart';
+import '../../../core/widgets/merzox_icons.dart';
+import '../../../core/widgets/merzox_notched_nav_bar.dart';
+import '../../authentication/bloc/auth_bloc.dart';
 import 'business_enrollment_bloc.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 class BusinessEnrollmentPage extends StatefulWidget {
   final VoidCallback onCompleted;
@@ -27,6 +34,36 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
   final _category = TextEditingController();
   final _address = TextEditingController();
   final _attachment = TextEditingController();
+
+  bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fillPhoneFromAccount();
+  }
+
+  /// The number the reader already signs in with, put in the field for them.
+  ///
+  /// A guess, and a safe one: somebody opening a shop on their own account is
+  /// almost always reachable on the number that account already carries, and
+  /// the server refuses a number belonging to anybody else anyway. It is a
+  /// starting value and nothing more - the field is ordinary, and clearing it
+  /// and typing another number is the whole of changing the guess.
+  ///
+  /// Read from the copy the app already keeps rather than asked of the server:
+  /// the account's own number is not worth a round trip, and a field that
+  /// fills in a moment late has already been typed into.
+  Future<void> _fillPhoneFromAccount() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String stored = prefs.getString(AuthBloc.phoneKey)?.trim() ?? '';
+
+    // Never over the reader. They may have started typing while this was in
+    // flight, and their own typing outranks a guess.
+    if (!mounted || stored.isEmpty || _phone.text.isNotEmpty) return;
+
+    _phone.text = stored;
+  }
 
   @override
   void dispose() {
@@ -67,9 +104,18 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
         : 'validation.invalidPhone'.tr();
   }
 
+  /// An address is welcome here and not required.
+  ///
+  /// Opening a shop needs a way to reach the merchant, and the number above is
+  /// one. An address can be added later from the shop's own settings, so
+  /// demanding it at this step stops somebody who has one shop and no work
+  /// email from getting started at all.
+  ///
+  /// Empty passes. Anything else still has to be an address: a half-typed one
+  /// is a mistake, not an omission.
   String? _emailValidator(String? value) {
     final email = value?.trim() ?? '';
-    if (email.isEmpty) return 'validation.required'.tr();
+    if (email.isEmpty) return null;
     return RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)
         ? null
         : 'validation.invalidEmail'.tr();
@@ -118,14 +164,35 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
           appBar: AppBar(
             backgroundColor: Colors.white,
             title: Text('businessEnrollment.title'.tr()),
-            leading: state.step == 1
-                ? IconButton(
-                    onPressed: () => context.read<BusinessEnrollmentBloc>().add(
+            // A null `leading` does not mean "no way back": `AppBar` fills
+            // it in itself when the route can be popped, and what it fills it
+            // in with is Material's own back button. The chevron here was put
+            // on the second step only, so the first - the step a reader lands
+            // on - kept Material's arrow, and the screen drew two different
+            // marks for one thing.
+            //
+            // The fix is the `leading` below, which is now given on both
+            // steps; this line is the fence behind it, for the day somebody
+            // makes it conditional again.
+            automaticallyImplyLeading: false,
+            // What it means differs - the second step goes back a step, the
+            // first leaves the screen - and the mark does not.
+            leading: Center(
+              child: MerzoxBackChevronButton(
+                valueKey: const ValueKey<String>('businessEnrollment.back'),
+                semanticsLabel: 'common.back'.tr(),
+                onTap: () {
+                  if (state.step == 1) {
+                    context.read<BusinessEnrollmentBloc>().add(
                       const BusinessEnrollmentBackPressed(),
-                    ),
-                    icon: const Icon(Icons.arrow_forward_ios_rounded),
-                  )
-                : null,
+                    );
+                    return;
+                  }
+
+                  Navigator.of(context).maybePop();
+                },
+              ),
+            ),
           ),
           body: SafeArea(
             child: SingleChildScrollView(
@@ -149,9 +216,9 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _stepIcon(Icons.person_outline_rounded, selected == 0),
+          _stepIcon(MerzoxIcons.businessEnrollmentAccountStep, selected == 0),
           const SizedBox(width: 18),
-          _stepIcon(Icons.storefront_outlined, selected == 1),
+          _stepIcon(MerzoxIcons.businessEnrollmentStoreStep, selected == 1),
         ],
       ),
       const SizedBox(height: 28),
@@ -168,6 +235,9 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
     ),
     child: Icon(
       icon,
+      // The size the bar's own places draw these at. Their ink fills the em
+      // box, so the number is the mark's height as well as its font size.
+      size: kMerzoxNavItemGlyphSize,
       color: selected ? Colors.white : MerzoxColors.kColor8D99AE,
     ),
   );
@@ -181,21 +251,38 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
         _field(
           _phone,
           'businessEnrollment.phoneLabel'.tr(),
-          keyboardType: TextInputType.phone,
+          keyboardType: kMerzoxPhoneKeyboard,
           validator: _phoneValidator,
           hintText: '+972 59 000 0000',
         ),
         _field(
           _email,
           'businessEnrollment.emailLabel'.tr(),
-          keyboardType: TextInputType.emailAddress,
+          keyboardType: kMerzoxEmailKeyboard,
           validator: _emailValidator,
         ),
         _field(
           _password,
           'businessEnrollment.currentPasswordLabel'.tr(),
-          obscure: true,
+          obscure: _obscurePassword,
           validator: _passwordValidator,
+          // Hidden, so the eye offered is the one that reveals it.
+          suffix: IconButton(
+            key: const ValueKey<String>('businessEnrollment.revealPassword'),
+            tooltip: _obscurePassword
+                ? 'auth.showPassword'.tr()
+                : 'auth.hidePassword'.tr(),
+            onPressed: () =>
+                setState(() => _obscurePassword = !_obscurePassword),
+            icon: Icon(
+              _obscurePassword
+                  ? MerzoxIcons.businessEnrollmentShowPassword
+                  : MerzoxIcons.businessEnrollmentHidePassword,
+              color: MerzoxColors.kColor98C1D9,
+              // The size it drew at as a Material eye, converted.
+              size: 24 * MerzoxIcons.passwordEyeSizeFactor,
+            ),
+          ),
         ),
         const SizedBox(height: 22),
         _button('businessEnrollment.next'.tr(), () {
@@ -267,6 +354,7 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
     TextInputType? keyboardType,
     String? Function(String?)? validator,
     String? hintText,
+    Widget? suffix,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 15),
     child: TextFormField(
@@ -278,6 +366,7 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
       decoration: InputDecoration(
         labelText: label,
         hintText: hintText,
+        suffixIcon: suffix,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(7)),
       ),
     ),

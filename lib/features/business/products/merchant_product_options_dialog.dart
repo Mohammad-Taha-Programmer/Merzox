@@ -5,6 +5,7 @@ import 'package:merzox/core/constants/money.dart';
 import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/business/models/business_models.dart';
 import 'package:merzox/features/business/products/merchant_product_editor_page.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 /// One product option being edited — `الخيار1` on the artboard, a variant to
 /// the server.
@@ -456,7 +457,7 @@ class _OptionDetailsSheetState extends State<_OptionDetailsSheet> {
               child: ProductField(
                 controller: option.priceOverride,
                 hint: 'merchantProduct.priceOverrideHint'.tr(),
-                keyboardType: TextInputType.number,
+                keyboardType: kMerzoxMoneyKeyboard,
               ),
             ),
             const SizedBox(height: kProductGroupGap),
@@ -465,7 +466,7 @@ class _OptionDetailsSheetState extends State<_OptionDetailsSheet> {
               child: ProductField(
                 controller: option.costPrice,
                 hint: 'merchantProduct.costPriceHint'.tr(),
-                keyboardType: TextInputType.number,
+                keyboardType: kMerzoxMoneyKeyboard,
               ),
             ),
             const SizedBox(height: kProductGroupGap),
@@ -480,7 +481,7 @@ class _OptionDetailsSheetState extends State<_OptionDetailsSheet> {
               ProductField(
                 controller: option.stockQuantity,
                 hint: 'merchantProduct.quantityHint'.tr(),
-                keyboardType: TextInputType.number,
+                keyboardType: kMerzoxWholeNumberKeyboard,
               ),
             ],
             const SizedBox(height: kProductGroupGap),

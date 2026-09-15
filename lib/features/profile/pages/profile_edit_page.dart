@@ -11,6 +11,7 @@ import 'package:merzox/core/auth/auth_session_service.dart';
 import 'package:merzox/features/checkout/pages/address_form_page.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 class ProfileEditPage extends StatefulWidget {
   /// Reads and edits the account's address book. Injectable because the book
@@ -916,7 +917,7 @@ class _EmailInputRow extends StatelessWidget {
       hintText: 'profileEdit.emailHint'.tr(),
       enabled: enabled,
       canRemove: canRemove,
-      keyboardType: TextInputType.emailAddress,
+      keyboardType: kMerzoxEmailKeyboard,
       onLabelChanged: (value) => data.label = value,
       onRemove: onRemove,
       validator: (value) {
@@ -952,7 +953,7 @@ class _PhoneInputRow extends StatelessWidget {
       hintText: 'profileEdit.phoneHint'.tr(),
       enabled: enabled,
       canRemove: canRemove,
-      keyboardType: TextInputType.phone,
+      keyboardType: kMerzoxPhoneKeyboard,
       onLabelChanged: (value) => data.label = value,
       onRemove: onRemove,
       validator: (value) {

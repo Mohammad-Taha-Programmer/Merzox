@@ -163,6 +163,19 @@ flutter:
     - family: AuthCountryChevron
       fonts:
         - asset: assets/fonts/icons_fonts/auth/AuthCountryChevron.ttf
+    # business_enrollment/
+    - family: BusinessEnrollmentAccountStep
+      fonts:
+        - asset: assets/fonts/icons_fonts/business_enrollment/BusinessEnrollmentAccountStep.ttf
+    - family: BusinessEnrollmentHidePassword
+      fonts:
+        - asset: assets/fonts/icons_fonts/business_enrollment/BusinessEnrollmentHidePassword.ttf
+    - family: BusinessEnrollmentShowPassword
+      fonts:
+        - asset: assets/fonts/icons_fonts/business_enrollment/BusinessEnrollmentShowPassword.ttf
+    - family: BusinessEnrollmentStoreStep
+      fonts:
+        - asset: assets/fonts/icons_fonts/business_enrollment/BusinessEnrollmentStoreStep.ttf
     # business_profile/
     - family: BusinessProfileChat
       fonts:

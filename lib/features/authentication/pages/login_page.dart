@@ -9,6 +9,7 @@ import 'package:merzox/features/authentication/bloc/auth_event.dart';
 import 'package:merzox/features/authentication/bloc/auth_state.dart';
 import 'package:merzox/features/authentication/widgets/dial_code_selector.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 // MERZOX-UI-GOLDEN-I5-I1-R1 - customer login SCREEN-SPACE geometry.
 //
@@ -282,7 +283,7 @@ class _LoginPageState extends State<LoginPage> {
                                 label: 'auth.loginIdentifierLabel'.tr(),
                                 hint: 'auth.loginIdentifierHint'.tr(),
                                 controller: _identifierController,
-                                keyboardType: TextInputType.emailAddress,
+                                keyboardType: kMerzoxEmailKeyboard,
                                 textInputAction: TextInputAction.next,
                                 // Trailing, which an Arabic page draws on the
                                 // left: the country belongs at the far edge of

@@ -6,6 +6,7 @@ import 'package:merzox/core/localization/api_error_localizer.dart';
 import '../bloc/password_recovery_bloc.dart';
 import '../bloc/password_recovery_event.dart';
 import '../bloc/password_recovery_state.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   final VoidCallback onRequestAccepted;
@@ -96,7 +97,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                       const SizedBox(height: 32),
                       TextFormField(
                         controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
+                        keyboardType: kMerzoxEmailKeyboard,
                         textInputAction: TextInputAction.done,
                         enabled: !isLoading,
                         onFieldSubmitted: (_) => _submit(),

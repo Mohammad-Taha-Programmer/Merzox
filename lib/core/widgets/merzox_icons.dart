@@ -596,6 +596,35 @@ abstract final class MerzoxIcons {
     fontFamily: 'ShareAppWhatsapp',
   );
 
+  // -- Becoming a merchant -------------------------------------------------
+  //
+  // `business_enrollment/`
+
+  /// The two steps, as the artboard names them: the account, then the shop.
+  ///
+  /// The same two marks the customer's bottom bar draws - its profile place and
+  /// its raised button - because they stand for the same two things, and a
+  /// screen that invented its own would be naming them twice.
+  static const IconData businessEnrollmentAccountStep = IconData(
+    0xe804,
+    fontFamily: 'BusinessEnrollmentAccountStep',
+  );
+
+  static const IconData businessEnrollmentStoreStep = IconData(
+    0xe808,
+    fontFamily: 'BusinessEnrollmentStoreStep',
+  );
+
+  static const IconData businessEnrollmentHidePassword = IconData(
+    0xe802,
+    fontFamily: 'BusinessEnrollmentHidePassword',
+  );
+
+  static const IconData businessEnrollmentShowPassword = IconData(
+    0xe803,
+    fontFamily: 'BusinessEnrollmentShowPassword',
+  );
+
   // -- Registering ---------------------------------------------------------
   //
   // `signup/`

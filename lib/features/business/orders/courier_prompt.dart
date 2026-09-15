@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 /// Who is carrying this order, and on what number.
 class CourierDetails {
@@ -90,7 +91,7 @@ class _CourierPromptState extends State<_CourierPrompt> {
           TextField(
             key: const ValueKey<String>('courierPrompt.phone'),
             controller: _phone,
-            keyboardType: TextInputType.phone,
+            keyboardType: kMerzoxPhoneKeyboard,
             decoration: InputDecoration(
               labelText: 'merchantOrder.courierPhone'.tr(),
               border: const OutlineInputBorder(),

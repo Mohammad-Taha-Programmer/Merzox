@@ -55,6 +55,18 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   // does not fail a test, it renders the empty box the engine falls
   // back to - which in a capture looks like an icon that was never
   // drawn rather than a font that was never loaded.
+  'BusinessEnrollmentAccountStep': <String>[
+    'assets/fonts/icons_fonts/business_enrollment/BusinessEnrollmentAccountStep.ttf',
+  ],
+  'BusinessEnrollmentHidePassword': <String>[
+    'assets/fonts/icons_fonts/business_enrollment/BusinessEnrollmentHidePassword.ttf',
+  ],
+  'BusinessEnrollmentShowPassword': <String>[
+    'assets/fonts/icons_fonts/business_enrollment/BusinessEnrollmentShowPassword.ttf',
+  ],
+  'BusinessEnrollmentStoreStep': <String>[
+    'assets/fonts/icons_fonts/business_enrollment/BusinessEnrollmentStoreStep.ttf',
+  ],
   'BusinessProfileChat': <String>[
     'assets/fonts/icons_fonts/business_profile/BusinessProfileChat.ttf',
   ],
