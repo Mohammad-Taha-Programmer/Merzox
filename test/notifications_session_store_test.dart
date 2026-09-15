@@ -122,11 +122,9 @@ void main() {
     second.add(const NotificationsStarted());
     final NotificationsState opened = await second.stream.first;
 
-    expect(
-      api.pagesAsked,
-      <int>[1],
-      reason: 'the second press asked the server for a list it already had',
-    );
+    expect(api.pagesAsked, <int>[
+      1,
+    ], reason: 'the second press asked the server for a list it already had');
     expect(opened.status, NotificationsStatus.ready);
     expect(
       opened.notifications.map((AppNotificationApiModel n) => n.id),

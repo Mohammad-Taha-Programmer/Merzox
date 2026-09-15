@@ -93,11 +93,9 @@ void main() {
         contains(family),
         reason: '$family is declared but no capture would draw it',
       );
-      expect(
-        merzoxGoldenFontAssets[family],
-        <String>[declaredAsset[family]!],
-        reason: '$family is loaded from a different file than it ships from',
-      );
+      expect(merzoxGoldenFontAssets[family], <String>[
+        declaredAsset[family]!,
+      ], reason: '$family is loaded from a different file than it ships from');
     }
   });
 
