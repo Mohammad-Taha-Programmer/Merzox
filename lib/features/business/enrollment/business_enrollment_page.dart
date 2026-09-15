@@ -86,6 +86,9 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
   String? _required(String? value) =>
       value == null || value.trim().isEmpty ? 'validation.required'.tr() : null;
 
+  /// Anything, including nothing.
+  String? _optional(String? value) => null;
+
   String get _normalizedPhone {
     final raw = _phone.text.trim();
     if (raw.startsWith('+')) return raw;
@@ -128,9 +131,13 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
     return null;
   }
 
+  /// A link to the register is welcome here and not required.
+  ///
+  /// Empty passes. Anything else still has to be a link a browser could open:
+  /// a half-typed one helps nobody and cannot be told from a typo later.
   String? _urlValidator(String? value) {
     final raw = value?.trim() ?? '';
-    if (raw.isEmpty) return 'validation.required'.tr();
+    if (raw.isEmpty) return null;
     final uri = Uri.tryParse(raw);
     return uri != null &&
             (uri.scheme == 'https' || uri.scheme == 'http') &&
@@ -307,13 +314,31 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
           children: [
             _header(1),
             _field(_name, 'business.storeName'.tr()),
-            _field(_englishName, 'businessEnrollment.storeEnglishName'.tr()),
+            // Optional, and not policed for language either. Most shops here
+            // trade under one name; the field is a second name for the ones
+            // that have one, and a shop with a single Arabic name should not
+            // be made to invent an English one - nor stopped from writing the
+            // Arabic one again if that is what it wants on the label.
+            _field(
+              _englishName,
+              'businessEnrollment.storeEnglishName'.tr(),
+              validator: _optional,
+            ),
             _field(
               _description,
               'businessEnrollment.storeDescription'.tr(),
               maxLines: 3,
             ),
-            _field(_category, 'businessEnrollment.productCategory'.tr()),
+            // Optional for now. It is how a customer comes across the shop -
+            // the catalogue and the search both match on it, and it is one of
+            // the four fields in the text index - rather than something the
+            // shop cannot exist without, and every screen that draws it checks
+            // first whether it is there.
+            _field(
+              _category,
+              'businessEnrollment.productCategory'.tr(),
+              validator: _optional,
+            ),
             _field(_address, 'businessEnrollment.storeAddress'.tr()),
             _field(
               _attachment,
