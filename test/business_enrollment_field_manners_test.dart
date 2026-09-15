@@ -58,6 +58,12 @@ TextField _fieldAt(WidgetTester tester, String label) =>
       ),
     );
 
+/// The bloc the screen is driving, read from the tree.
+BusinessEnrollmentBloc _blocOf(WidgetTester tester) =>
+    BlocProvider.of<BusinessEnrollmentBloc>(
+      tester.element(find.byType(BusinessEnrollmentPage)),
+    );
+
 void main() {
   setUpAll(() async {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -211,6 +217,8 @@ void main() {
   // The two marks the customer's bottom bar draws for the same two things -
   // its profile place and its raised button - rather than a pair Material
   // happened to have.
+  _theNumberThatIsSent();
+
   _secondStep();
 
   testWidgets("the two steps carry the app's own marks", (tester) async {
@@ -236,6 +244,73 @@ Future<void> _toTheSecondStep(WidgetTester tester) async {
   await tester.enterText(_fieldLabelled('كلمة المرور الحالية'), 'secret-123');
   await tester.tap(find.text('التالي'));
   await settleFrames(tester);
+}
+
+/// What the first step hands the bloc, which is what will reach the server.
+void _theNumberThatIsSent() {
+  // The block is only furniture unless the country it shows is the country
+  // that travels. This screen had its own copy of the arithmetic with `+972`
+  // written into it, so the flag could say anything and the number went out
+  // Israeli.
+  testWidgets('a local number leaves with the flag the list opens on', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+
+    await tester.enterText(_fieldLabelled('رقم الجوال'), '0592029316');
+    await tester.enterText(_fieldLabelled('كلمة المرور الحالية'), 'secret-123');
+    await tester.tap(find.text('التالي'));
+    await settleFrames(tester);
+
+    expect(_blocOf(tester).state.phone, '+970592029316');
+  });
+
+  testWidgets('picking a country is what changes the number', (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+
+    await tester.tap(find.byKey(const Key('businessEnrollment.countryCode')));
+    await settleFrames(tester);
+    await tester.tap(find.text('+972').last);
+    await settleFrames(tester);
+
+    await tester.enterText(_fieldLabelled('رقم الجوال'), '0592029316');
+    await tester.enterText(_fieldLabelled('كلمة المرور الحالية'), 'secret-123');
+    await tester.tap(find.text('التالي'));
+    await settleFrames(tester);
+
+    expect(_blocOf(tester).state.phone, '+972592029316');
+  });
+
+  testWidgets('two leading zeros leave as the plus the server stores', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+
+    await tester.enterText(_fieldLabelled('رقم الجوال'), '00972592029316');
+    await tester.enterText(_fieldLabelled('كلمة المرور الحالية'), 'secret-123');
+    await tester.tap(find.text('التالي'));
+    await settleFrames(tester);
+
+    expect(_blocOf(tester).state.phone, '+972592029316');
+  });
+
+  testWidgets("the account's own number travels as it was stored", (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      AuthBloc.phoneKey: _accountNumber,
+    });
+    await _pump(tester);
+
+    await tester.enterText(_fieldLabelled('كلمة المرور الحالية'), 'secret-123');
+    await tester.tap(find.text('التالي'));
+    await settleFrames(tester);
+
+    expect(_blocOf(tester).state.phone, _accountNumber);
+  });
 }
 
 void _secondStep() {

@@ -485,6 +485,7 @@
     "title": "Create business account",
     "subtitle": "Create your account in two steps",
     "phoneLabel": "Mobile number",
+    "phoneHint": "Enter the mobile number",
     "emailLabel": "Email address",
     "currentPasswordLabel": "Current password",
     "next": "Next",
