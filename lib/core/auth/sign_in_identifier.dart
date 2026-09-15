@@ -48,7 +48,23 @@ String internationalDialPrefix(String prefix) {
 /// person typing.
 String signInIdentifier(String typed, {required String dialPrefix}) {
   final String value = typed.trim();
-  if (value.isEmpty || value.contains('@')) return value;
+  if (value.contains('@')) return value;
+
+  return internationalPhoneNumber(value, dialPrefix: dialPrefix);
+}
+
+/// A phone number in the one spelling the server stores, from whichever of the
+/// three a reader arrived with.
+///
+/// The same rule [signInIdentifier] applies, without the question of whether
+/// the entry might be an email: a field labelled for a number is a number.
+/// Every screen that asks for one calls this, so there is one place where the
+/// three spellings become one - there were three copies of this arithmetic and
+/// they had already stopped agreeing, one of them prepending a country code
+/// written into the source.
+String internationalPhoneNumber(String typed, {required String dialPrefix}) {
+  final String value = typed.trim();
+  if (value.isEmpty) return value;
 
   final String digits = value.replaceAll(RegExp(r'\D'), '');
   if (digits.isEmpty) return value;

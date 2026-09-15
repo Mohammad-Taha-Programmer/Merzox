@@ -5,16 +5,19 @@ import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/authentication/bloc/auth_bloc.dart';
 import 'package:merzox/features/authentication/pages/login_page.dart';
 import 'package:merzox/features/authentication/pages/signup_page.dart';
+import 'package:merzox/features/business/enrollment/business_enrollment_bloc.dart';
+import 'package:merzox/features/business/enrollment/business_enrollment_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'localization_test_harness.dart';
 
 /// How a phone field is divided, and in what order it reads.
 ///
-/// Both screens are put through the same assertions, because the claim being
-/// made is that they are one field drawn twice. Two test files, like the two
-/// copies of the widget that used to exist, would let one of them go on
-/// passing while the screen it describes drifted.
+/// All three screens that ask for a number are put through the same
+/// assertions, because the claim being made is that they are one field drawn
+/// three times. Three test files, like the three copies of the widget that
+/// used to exist, would let one of them go on passing while the screen it
+/// describes drifted.
 ///
 /// All of it is geometry, which is the only thing that can tell "the country
 /// is on the left" apart from "the country is somewhere on the screen". A page
@@ -56,6 +59,15 @@ final List<_Screen> _screens = <_Screen>[
     fieldKey: 'signup',
     fieldHeight: 46,
     page: () => SignupPage(onSignupCreated: () {}, onLoginRequested: () {}),
+  ),
+  _Screen(
+    name: 'opening a shop',
+    fieldKey: 'businessEnrollment',
+    fieldHeight: 56,
+    page: () => BlocProvider<BusinessEnrollmentBloc>(
+      create: (_) => BusinessEnrollmentBloc(),
+      child: BusinessEnrollmentPage(onCompleted: () {}),
+    ),
   ),
 ];
 

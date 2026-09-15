@@ -9,9 +9,19 @@ import '../../../core/constants/colors.dart';
 import '../../../core/widgets/merzox_back_chevron.dart';
 import '../../../core/widgets/merzox_icons.dart';
 import '../../../core/widgets/merzox_notched_nav_bar.dart';
+import '../../../core/auth/sign_in_identifier.dart';
 import '../../authentication/bloc/auth_bloc.dart';
+import '../../authentication/widgets/dial_code_selector.dart';
 import 'business_enrollment_bloc.dart';
 import 'package:merzox/core/widgets/merzox_keyboards.dart';
+
+/// The box every field on this screen sits in.
+///
+/// Measured rather than chosen: these are ordinary Material fields with a
+/// floating label and they settle at 56. It is named because the line that
+/// divides the country from the number has to run the whole of it, and a test
+/// holds the two together.
+const double _kFieldHeight = 56;
 
 class BusinessEnrollmentPage extends StatefulWidget {
   final VoidCallback onCompleted;
@@ -35,6 +45,7 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
   final _address = TextEditingController();
   final _attachment = TextEditingController();
 
+  DialCode _selectedCountry = defaultDialCode;
   bool _obscurePassword = true;
 
   @override
@@ -89,19 +100,26 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
   /// Anything, including nothing.
   String? _optional(String? value) => null;
 
-  String get _normalizedPhone {
-    final raw = _phone.text.trim();
-    if (raw.startsWith('+')) return raw;
-    final digits = raw.replaceAll(RegExp(r'\D'), '');
-    if (digits.startsWith('972')) return '+$digits';
-    final local = digits.startsWith('0') ? digits.substring(1) : digits;
-    return '+972$local';
-  }
+  /// The number as the server stores it, from whichever spelling was typed.
+  ///
+  /// This screen had its own copy of the arithmetic, and the copy had a
+  /// country written into it: anything that was not already international got
+  /// `+972` in front of it whatever the reader meant. The rule lives in one
+  /// place now, and the country comes from the flag beside the field.
+  String get _normalizedPhone => internationalPhoneNumber(
+    _phone.text,
+    dialPrefix: _selectedCountry.prefix,
+  );
 
   String? _phoneValidator(String? value) {
     final raw = value?.trim() ?? '';
     if (raw.isEmpty) return 'validation.required'.tr();
-    final normalized = raw.startsWith('+') ? raw : _normalizedPhone;
+    // Judged on what will be sent, not on what was typed: a local number is
+    // seven digits and a refusal of it would be a refusal of the normal case.
+    final String normalized = internationalPhoneNumber(
+      raw,
+      dialPrefix: _selectedCountry.prefix,
+    );
     return RegExp(r'^\+?[0-9]{7,15}$').hasMatch(normalized)
         ? null
         : 'validation.invalidPhone'.tr();
@@ -260,7 +278,29 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
           'businessEnrollment.phoneLabel'.tr(),
           keyboardType: kMerzoxPhoneKeyboard,
           validator: _phoneValidator,
-          hintText: '+972 59 000 0000',
+          // Was `+972 59 000 0000`. A worked example naming one country, in a
+          // field that now carries a flag list, tells the reader the opposite
+          // of what the list does.
+          hintText: 'businessEnrollment.phoneHint'.tr(),
+          // The same block the other two screens draw, in this screen's own
+          // box: its height, and its border colour, which here is the theme's
+          // own outline rather than a colour of the screen's choosing.
+          suffix: DialCodeSelector(
+            key: const Key('businessEnrollment.countryCode'),
+            lineKey: const Key('businessEnrollment.countryDivider'),
+            fieldHeight: _kFieldHeight,
+            lineColor: Theme.of(context).colorScheme.outline,
+            value: _selectedCountry,
+            onChanged: (DialCode? country) {
+              if (country == null) return;
+              setState(() => _selectedCountry = country);
+            },
+          ),
+          suffixConstraints: const BoxConstraints(
+            minWidth: 0,
+            minHeight: _kFieldHeight,
+            maxHeight: _kFieldHeight,
+          ),
         ),
         _field(
           _email,
@@ -380,6 +420,7 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
     String? Function(String?)? validator,
     String? hintText,
     Widget? suffix,
+    BoxConstraints? suffixConstraints,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 15),
     child: TextFormField(
@@ -392,6 +433,7 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
         labelText: label,
         hintText: hintText,
         suffixIcon: suffix,
+        suffixIconConstraints: suffixConstraints,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(7)),
       ),
     ),
