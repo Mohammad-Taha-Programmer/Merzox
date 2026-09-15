@@ -410,8 +410,12 @@ export function validateBusinessEnrollment(req, _res, next) {
   if (String(req.body.englishName ?? '').trim().length > 120) {
     throw new AppError('English business name is too long', 400, 'INVALID_ENGLISH_NAME');
   }
-  if (String(req.body.category ?? '').trim().length < 2) {
-    throw new AppError('Business category is required', 400, 'INVALID_BUSINESS_CATEGORY');
+  // Optional, at enrolment and afterwards. It is a way for customers to come
+  // across the shop rather than something the shop cannot exist without, and
+  // holding somebody at the door over it is a poor trade for a field they can
+  // fill in from their own settings the moment they want to be found.
+  if (String(req.body.category ?? '').trim().length > 80) {
+    throw new AppError('Business category is too long', 400, 'INVALID_BUSINESS_CATEGORY');
   }
   if (String(req.body.description ?? '').trim().length > 1500) {
     throw new AppError('Business description is too long', 400, 'INVALID_BUSINESS_DESCRIPTION');
@@ -454,8 +458,11 @@ export function validateBusinessProfilePatch(req, _res, next) {
   ) {
     throw new AppError('English business name is too long', 400, 'INVALID_ENGLISH_NAME');
   }
-  if (req.body.category !== undefined && String(req.body.category).trim().length < 2) {
-    throw new AppError('Business category is required', 400, 'INVALID_BUSINESS_CATEGORY');
+  // Clearable, and it has to be: the settings screen sends every field on
+  // every save, so a shop that enrolled without a category would have had this
+  // refuse each attempt to change anything else.
+  if (req.body.category !== undefined && String(req.body.category).trim().length > 80) {
+    throw new AppError('Business category is too long', 400, 'INVALID_BUSINESS_CATEGORY');
   }
   if (req.body.description !== undefined && String(req.body.description).trim().length > 1500) {
     throw new AppError('Business description is too long', 400, 'INVALID_BUSINESS_DESCRIPTION');

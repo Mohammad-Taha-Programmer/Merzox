@@ -234,7 +234,17 @@ const businessSchema = new mongoose.Schema(
     publicId: { type: String, required: true, unique: true, index: true },
     name: { type: String, required: true, trim: true, maxlength: 120 },
     englishName: { type: String, trim: true, maxlength: 120, default: '' },
-    category: { type: String, required: true, trim: true, maxlength: 80 },
+    /**
+     * What the shop sells, in the merchant's own words.
+     *
+     * Optional, and it is worth saying what that costs: this is one of the
+     * four fields the text index covers and one of the fields the catalogue
+     * and the public search match a customer's words against, so a shop that
+     * leaves it blank is a shop that is harder to come across. Nothing breaks
+     * - every screen that draws it already checks whether it is there first -
+     * and it can be filled in later from the shop's own settings.
+     */
+    category: { type: String, trim: true, maxlength: 80, default: '' },
     description: { type: String, trim: true, maxlength: 1500, default: '' },
     address: { type: String, trim: true, maxlength: 250, default: '' },
     attachmentUrl: { type: String, trim: true, maxlength: 1000, default: '' },

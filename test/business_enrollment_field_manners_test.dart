@@ -211,6 +211,8 @@ void main() {
   // The two marks the customer's bottom bar draws for the same two things -
   // its profile place and its raised button - rather than a pair Material
   // happened to have.
+  _secondStep();
+
   testWidgets("the two steps carry the app's own marks", (tester) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
     await _pump(tester);
@@ -225,5 +227,109 @@ void main() {
     );
     expect(find.byIcon(Icons.person_outline_rounded), findsNothing);
     expect(find.byIcon(Icons.storefront_outlined), findsNothing);
+  });
+}
+
+/// Fills the first step and presses on, so the second step is showing.
+Future<void> _toTheSecondStep(WidgetTester tester) async {
+  await tester.enterText(_fieldLabelled('رقم الجوال'), _accountNumber);
+  await tester.enterText(_fieldLabelled('كلمة المرور الحالية'), 'secret-123');
+  await tester.tap(find.text('التالي'));
+  await settleFrames(tester);
+}
+
+void _secondStep() {
+  // Most shops here trade under one name. The second name is for the ones that
+  // have one, and a shop with a single Arabic name should be neither made to
+  // invent an English one nor stopped from writing the Arabic one again.
+  testWidgets('the English name is optional, and takes Arabic', (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+    await _toTheSecondStep(tester);
+
+    await tester.enterText(_fieldLabelled('اسم المتجر'), 'متجر ليان');
+    await tester.tap(find.text('إنشاء الحساب'));
+    await settleFrames(tester);
+
+    expect(
+      _fieldAt(tester, 'اسم المتجر باللغة الإنجليزية').decoration?.errorText,
+      isNull,
+      reason: 'an empty second name is not a fault',
+    );
+
+    await tester.enterText(
+      _fieldLabelled('اسم المتجر باللغة الإنجليزية'),
+      'متجر ليان',
+    );
+    await tester.tap(find.text('إنشاء الحساب'));
+    await settleFrames(tester);
+
+    expect(
+      _fieldAt(tester, 'اسم المتجر باللغة الإنجليزية').decoration?.errorText,
+      isNull,
+      reason: 'Arabic in the second name is not a fault either',
+    );
+  });
+
+  // Optional for now, and the cost of leaving it blank is findability rather
+  // than function: the catalogue and the search match on it.
+  testWidgets('what the shop sells is optional', (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+    await _toTheSecondStep(tester);
+
+    await tester.enterText(_fieldLabelled('اسم المتجر'), 'متجر ليان');
+    await tester.tap(find.text('إنشاء الحساب'));
+    await settleFrames(tester);
+
+    expect(
+      _fieldAt(tester, 'نوع المنتجات التي تبيعها').decoration?.errorText,
+      isNull,
+    );
+  });
+
+  testWidgets('the link to the register is optional', (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+    await _toTheSecondStep(tester);
+
+    await tester.enterText(_fieldLabelled('اسم المتجر'), 'متجر ليان');
+    await tester.tap(find.text('إنشاء الحساب'));
+    await settleFrames(tester);
+
+    expect(
+      _fieldAt(tester, 'رابط مرفق سجل المتجر').decoration?.errorText,
+      isNull,
+    );
+  });
+
+  // Optional is not the same as unchecked. Something that is not a link is a
+  // typo, and a typo told about now is one fewer dead link on a shop page.
+  testWidgets('a link that is not a link is still refused', (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+    await _toTheSecondStep(tester);
+
+    await tester.enterText(_fieldLabelled('اسم المتجر'), 'متجر ليان');
+    await tester.enterText(_fieldLabelled('رابط مرفق سجل المتجر'), 'صفحتي');
+    await tester.tap(find.text('إنشاء الحساب'));
+    await settleFrames(tester);
+
+    expect(
+      _fieldAt(tester, 'رابط مرفق سجل المتجر').decoration?.errorText,
+      isNotNull,
+    );
+  });
+
+  // The one thing the step still insists on.
+  testWidgets('the shop still has to be called something', (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+    await _toTheSecondStep(tester);
+
+    await tester.tap(find.text('إنشاء الحساب'));
+    await settleFrames(tester);
+
+    expect(_fieldAt(tester, 'اسم المتجر').decoration?.errorText, isNotNull);
   });
 }

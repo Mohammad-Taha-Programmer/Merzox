@@ -460,3 +460,45 @@ test('the number is still required', () => {
     'INVALID_PHONE'
   );
 });
+
+test('the second step asks for a name and nothing else', () => {
+  // What the shop sells, its second name and the link to its register are all
+  // optional. The first is how customers come across it - the catalogue and
+  // the public search both match on it, and it is one of the four fields in
+  // the text index - so leaving it blank costs findability and nothing else,
+  // and every screen that draws it checks first whether it is there.
+  accept(
+    validateBusinessEnrollment,
+    enrollment({ englishName: '', category: '', attachmentUrl: '' })
+  );
+
+  const { englishName, category, attachmentUrl, ...bare } = enrollment();
+  accept(validateBusinessEnrollment, bare);
+});
+
+test('the second name is not policed for language', () => {
+  // Most shops here trade under one name, and a shop that wants its Arabic one
+  // on the label twice is not making a mistake.
+  accept(validateBusinessEnrollment, enrollment({ englishName: 'متجر ليان' }));
+});
+
+test('a link that is not a link is still refused', () => {
+  assert.equal(
+    rejectCode(validateBusinessEnrollment, enrollment({ attachmentUrl: 'صفحتي' })),
+    'INVALID_ATTACHMENT_URL'
+  );
+});
+
+test('the shop still has to be called something', () => {
+  assert.equal(
+    rejectCode(validateBusinessEnrollment, enrollment({ name: '' })),
+    'INVALID_BUSINESS_NAME'
+  );
+});
+
+test('a shop with no category can still save its settings', () => {
+  // The settings screen sends every field on every save, so a shop that
+  // enrolled without a category would have had this refuse each attempt to
+  // change anything else about itself.
+  accept(validateBusinessProfilePatch, { name: 'متجر ليان', category: '' });
+});
