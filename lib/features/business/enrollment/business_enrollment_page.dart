@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/colors.dart';
 import '../../../core/widgets/merzox_back_chevron.dart';
 import '../../../core/widgets/merzox_icons.dart';
+import '../../../core/widgets/merzox_notched_nav_bar.dart';
 import '../../authentication/bloc/auth_bloc.dart';
 import 'business_enrollment_bloc.dart';
 import 'package:merzox/core/widgets/merzox_keyboards.dart';
@@ -163,23 +164,35 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
           appBar: AppBar(
             backgroundColor: Colors.white,
             title: Text('businessEnrollment.title'.tr()),
-            // The artboard's chevron, like every other board's way back. This
-            // drew Material's own `arrow_forward_ios`, which is a different
-            // shape at a different weight and leans the wrong way round unless
-            // somebody remembers to turn it.
-            leading: state.step == 1
-                ? Center(
-                    child: MerzoxBackChevronButton(
-                      valueKey: const ValueKey<String>(
-                        'businessEnrollment.back',
-                      ),
-                      semanticsLabel: 'common.back'.tr(),
-                      onTap: () => context.read<BusinessEnrollmentBloc>().add(
-                        const BusinessEnrollmentBackPressed(),
-                      ),
-                    ),
-                  )
-                : null,
+            // A null `leading` does not mean "no way back": `AppBar` fills
+            // it in itself when the route can be popped, and what it fills it
+            // in with is Material's own back button. The chevron here was put
+            // on the second step only, so the first - the step a reader lands
+            // on - kept Material's arrow, and the screen drew two different
+            // marks for one thing.
+            //
+            // The fix is the `leading` below, which is now given on both
+            // steps; this line is the fence behind it, for the day somebody
+            // makes it conditional again.
+            automaticallyImplyLeading: false,
+            // What it means differs - the second step goes back a step, the
+            // first leaves the screen - and the mark does not.
+            leading: Center(
+              child: MerzoxBackChevronButton(
+                valueKey: const ValueKey<String>('businessEnrollment.back'),
+                semanticsLabel: 'common.back'.tr(),
+                onTap: () {
+                  if (state.step == 1) {
+                    context.read<BusinessEnrollmentBloc>().add(
+                      const BusinessEnrollmentBackPressed(),
+                    );
+                    return;
+                  }
+
+                  Navigator.of(context).maybePop();
+                },
+              ),
+            ),
           ),
           body: SafeArea(
             child: SingleChildScrollView(
@@ -203,9 +216,9 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
       Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _stepIcon(Icons.person_outline_rounded, selected == 0),
+          _stepIcon(MerzoxIcons.businessEnrollmentAccountStep, selected == 0),
           const SizedBox(width: 18),
-          _stepIcon(Icons.storefront_outlined, selected == 1),
+          _stepIcon(MerzoxIcons.businessEnrollmentStoreStep, selected == 1),
         ],
       ),
       const SizedBox(height: 28),
@@ -222,6 +235,9 @@ class _BusinessEnrollmentPageState extends State<BusinessEnrollmentPage> {
     ),
     child: Icon(
       icon,
+      // The size the bar's own places draw these at. Their ink fills the em
+      // box, so the number is the mark's height as well as its font size.
+      size: kMerzoxNavItemGlyphSize,
       color: selected ? Colors.white : MerzoxColors.kColor8D99AE,
     ),
   );

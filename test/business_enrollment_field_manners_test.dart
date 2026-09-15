@@ -14,17 +14,36 @@ import 'localization_test_harness.dart';
 /// How the first step of opening a shop treats the person filling it in.
 const String _accountNumber = '+970592029316';
 
+/// Pushed onto a route, because the screen is reached by being pushed.
+///
+/// Not decoration: `AppBar` supplies its own back button when - and only when
+/// - the route it sits on can be popped. Pumped as a bare `home:` there is
+/// nothing to pop, no button is implied, and a test asking whether Material's
+/// arrow is on screen would answer no for a reason that has nothing to do with
+/// the screen. That is exactly how the first step kept its Material arrow
+/// while a test said it did not.
 Future<void> _pump(WidgetTester tester) async {
   final BusinessEnrollmentBloc bloc = BusinessEnrollmentBloc();
   addTearDown(bloc.close);
 
   await pumpLocalized(
     tester,
-    BlocProvider<BusinessEnrollmentBloc>.value(
-      value: bloc,
-      child: BusinessEnrollmentPage(onCompleted: () {}),
+    Navigator(
+      onGenerateInitialRoutes: (NavigatorState navigator, String _) =>
+          <Route<void>>[
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('the screen before')),
+            ),
+            MaterialPageRoute<void>(
+              builder: (_) => BlocProvider<BusinessEnrollmentBloc>.value(
+                value: bloc,
+                child: BusinessEnrollmentPage(onCompleted: () {}),
+              ),
+            ),
+          ],
     ),
   );
+  await settleFrames(tester);
 }
 
 /// The field under [label], by the text of its own label.
@@ -150,9 +169,24 @@ void main() {
     expect(find.text('اسم المتجر'), findsNothing);
   });
 
-  // The second step is the one with a way back, and it is the artboard's
-  // chevron like every other board's.
-  testWidgets('the way back is the chevron, not Material\'s arrow', (
+  // Both steps, and the first one is the point. It had no `leading` of its own
+  // and `AppBar` filled one in - Material's back button - so the mark a reader
+  // meets on arriving was the wrong one while the second step had the right
+  // one. A test that only pressed on after filling the form never saw it.
+  testWidgets('the way back is the chevron on the step you arrive at', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+
+    expect(find.byType(MerzoxBackChevronButton), findsOneWidget);
+    expect(find.byType(BackButton), findsNothing);
+    expect(find.byIcon(Icons.arrow_back), findsNothing);
+    expect(find.byIcon(Icons.arrow_forward), findsNothing);
+    expect(find.byIcon(Icons.arrow_forward_ios_rounded), findsNothing);
+  });
+
+  testWidgets('the way back is the chevron on the second step too', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues(<String, Object>{});
@@ -172,5 +206,24 @@ void main() {
     await settleFrames(tester);
 
     expect(find.text('اسم المتجر'), findsNothing);
+  });
+
+  // The two marks the customer's bottom bar draws for the same two things -
+  // its profile place and its raised button - rather than a pair Material
+  // happened to have.
+  testWidgets("the two steps carry the app's own marks", (tester) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    await _pump(tester);
+
+    expect(
+      find.byIcon(MerzoxIcons.businessEnrollmentAccountStep),
+      findsOneWidget,
+    );
+    expect(
+      find.byIcon(MerzoxIcons.businessEnrollmentStoreStep),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.person_outline_rounded), findsNothing);
+    expect(find.byIcon(Icons.storefront_outlined), findsNothing);
   });
 }
