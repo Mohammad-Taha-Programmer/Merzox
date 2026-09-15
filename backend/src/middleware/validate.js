@@ -393,7 +393,12 @@ export function validateBusinessEnrollment(req, _res, next) {
   if (!/^\+?[0-9]{7,15}$/.test(String(req.body.phone ?? '').trim())) {
     throw new AppError('Phone number is invalid', 400, 'INVALID_PHONE');
   }
-  if (!validator.isEmail(String(req.body.email ?? '').trim())) {
+  // Optional at this step. Opening a shop needs a way to reach the merchant
+  // and the number above is one; an address can be added later from the shop's
+  // own settings. A half-typed address is still refused - that is a mistake
+  // rather than an omission.
+  const enrollmentEmail = String(req.body.email ?? '').trim();
+  if (enrollmentEmail !== '' && !validator.isEmail(enrollmentEmail)) {
     throw new AppError('Email is invalid', 400, 'INVALID_EMAIL');
   }
   if (String(req.body.currentPassword ?? '').length < 6) {

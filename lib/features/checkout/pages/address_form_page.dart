@@ -4,6 +4,7 @@ import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 import 'package:merzox/features/checkout/widgets/checkout_step_indicator.dart';
 import 'package:merzox/services/api_service.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 /// The address form of `تفاصيل المتجر – 25`, with the pickers of `– 27` and
 /// `– 28`.
@@ -199,7 +200,7 @@ class _AddressFormPageState extends State<AddressFormPage> {
                       label: 'address.phone'.tr(),
                       child: TextFormField(
                         controller: _phone,
-                        keyboardType: TextInputType.phone,
+                        keyboardType: kMerzoxPhoneKeyboard,
                         decoration: _decoration('address.phoneHint'.tr()),
                         validator: _phoneValidator,
                       ),
@@ -242,7 +243,7 @@ class _AddressFormPageState extends State<AddressFormPage> {
                       label: 'address.altPhone'.tr(),
                       child: TextFormField(
                         controller: _altPhone,
-                        keyboardType: TextInputType.phone,
+                        keyboardType: kMerzoxPhoneKeyboard,
                         decoration: _decoration('address.altPhoneHint'.tr()),
                         validator: (String? value) =>
                             (value ?? '').trim().isEmpty

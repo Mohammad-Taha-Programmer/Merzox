@@ -86,7 +86,7 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
       'ACCOUNT_PHONE_MISMATCH'
     );
   }
-  if (user.email && user.email !== email) {
+  if (email && user.email && user.email !== email) {
     throw new AppError(
       'Email must match the current account',
       409,
@@ -94,9 +94,15 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
     );
   }
 
+  // No address was given, so there is no address to look for. Left in, `email`
+  // would have been undefined and the clause would have matched every account
+  // that has none - refusing the second merchant to enroll without one.
   const conflictingUser = await User.findOne({
     _id: { $ne: user._id },
-    $or: [{ 'phones.value': phone }, { email }, { 'emails.value': email }]
+    $or: [
+      { 'phones.value': phone },
+      ...(email ? [{ email }, { 'emails.value': email }] : [])
+    ]
   });
   if (conflictingUser) {
     throw new AppError(
@@ -113,7 +119,7 @@ export const enrollBusiness = asyncHandler(async (req, res) => {
   if (accountPhones.length === 0) {
     user.phones = [{ value: phone, label: 'mobile', isPrimary: true }];
   }
-  if (!user.email) {
+  if (email && !user.email) {
     user.email = email;
     user.emailVerified = false;
     user.emails = [

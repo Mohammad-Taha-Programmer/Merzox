@@ -12,6 +12,7 @@ import 'package:merzox/features/business/shell/business_bloc.dart';
 import 'package:merzox/features/business/shell/business_navigation_bar.dart';
 import 'package:merzox/features/business/shell/merchant_browse_widgets.dart';
 import 'package:merzox/features/business/shell/merchant_product_images_page.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 /// `إضافة منتجات` — the merchant's product form, as its three artboards draw
 /// it.
@@ -417,7 +418,7 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                               : ProductField(
                                   controller: _stockQuantity,
                                   hint: 'merchantProduct.quantityHint'.tr(),
-                                  keyboardType: TextInputType.number,
+                                  keyboardType: kMerzoxWholeNumberKeyboard,
                                   validator: _stockValidator,
                                 ),
                         ),
@@ -441,7 +442,7 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                                 child: ProductField(
                                   controller: _price,
                                   hint: 'merchantProduct.priceHint'.tr(),
-                                  keyboardType: TextInputType.number,
+                                  keyboardType: kMerzoxMoneyKeyboard,
                                   suffix: 'common.currency'.tr(),
                                   validator: _positiveNumberValidator,
                                   onChanged: (_) => setState(() {}),
@@ -455,7 +456,7 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                                 child: ProductField(
                                   controller: _costPrice,
                                   hint: 'merchantProduct.costPriceHint'.tr(),
-                                  keyboardType: TextInputType.number,
+                                  keyboardType: kMerzoxMoneyKeyboard,
                                   validator: _optionalNumberValidator,
                                 ),
                               ),
@@ -474,7 +475,7 @@ class _MerchantProductEditorPageState extends State<MerchantProductEditorPage> {
                           ProductField(
                             controller: _priceAfterDiscount,
                             hint: 'merchantProduct.priceAfterDiscount'.tr(),
-                            keyboardType: TextInputType.number,
+                            keyboardType: kMerzoxMoneyKeyboard,
                             suffix: 'common.currency'.tr(),
                             validator: _priceAfterDiscountValidator,
                           ),

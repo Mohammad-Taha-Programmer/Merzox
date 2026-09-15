@@ -596,6 +596,20 @@ abstract final class MerzoxIcons {
     fontFamily: 'ShareAppWhatsapp',
   );
 
+  // -- Becoming a merchant -------------------------------------------------
+  //
+  // `business_enrollment/`
+
+  static const IconData businessEnrollmentHidePassword = IconData(
+    0xe802,
+    fontFamily: 'BusinessEnrollmentHidePassword',
+  );
+
+  static const IconData businessEnrollmentShowPassword = IconData(
+    0xe803,
+    fontFamily: 'BusinessEnrollmentShowPassword',
+  );
+
   // -- Registering ---------------------------------------------------------
   //
   // `signup/`

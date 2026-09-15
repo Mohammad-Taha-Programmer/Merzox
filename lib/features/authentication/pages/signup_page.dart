@@ -8,6 +8,7 @@ import 'package:merzox/features/authentication/bloc/auth_event.dart';
 import 'package:merzox/features/authentication/bloc/auth_state.dart';
 import 'package:merzox/features/authentication/widgets/dial_code_selector.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
+import 'package:merzox/core/widgets/merzox_keyboards.dart';
 
 /// The box every field on this page sits in.
 ///
@@ -174,7 +175,7 @@ class _SignupPageState extends State<SignupPage> {
                         label: 'auth.signupIdentifierLabel'.tr(),
                         child: TextFormField(
                           controller: _identifierController,
-                          keyboardType: TextInputType.emailAddress,
+                          keyboardType: kMerzoxEmailKeyboard,
                           textInputAction: TextInputAction.next,
                           textAlign: TextAlign.start,
                           onChanged: (_) => setState(() {}),
