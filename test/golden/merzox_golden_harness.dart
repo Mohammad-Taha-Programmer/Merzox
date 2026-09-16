@@ -295,6 +295,9 @@ const Map<String, List<String>> merzoxGoldenFontAssets = <String, List<String>>{
   'ProductDetailsChat': <String>[
     'assets/fonts/icons_fonts/product_details/ProductDetailsChat.ttf',
   ],
+  'ProductDetailsShare': <String>[
+    'assets/fonts/icons_fonts/product_details/ProductDetailsShare.ttf',
+  ],
   'ProductDetailsRatingBarStar': <String>[
     'assets/fonts/icons_fonts/product_details/ProductDetailsRatingBarStar.ttf',
   ],

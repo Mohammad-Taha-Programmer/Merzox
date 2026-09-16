@@ -425,6 +425,9 @@ flutter:
     - family: ProductDetailsChat
       fonts:
         - asset: assets/fonts/icons_fonts/product_details/ProductDetailsChat.ttf
+    - family: ProductDetailsShare
+      fonts:
+        - asset: assets/fonts/icons_fonts/product_details/ProductDetailsShare.ttf
     - family: ProductDetailsRatingBarStar
       fonts:
         - asset: assets/fonts/icons_fonts/product_details/ProductDetailsRatingBarStar.ttf

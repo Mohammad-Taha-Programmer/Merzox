@@ -9,7 +9,6 @@ import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../cart/cart_storage_keys.dart';
-import '../../cart/checkout_failure.dart';
 import 'product_details_event.dart';
 import 'product_details_state.dart';
 
@@ -439,6 +438,34 @@ class ProductDetailsBloc
     return false;
   }
 
+  /// One line of a basket, however it is going to be paid for.
+  ///
+  /// `Add to basket` writes it to storage and `Buy now` hands it straight to
+  /// checkout, and the two must describe the same purchase - one builder, so a
+  /// field added for one of them cannot go missing from the other.
+  String _purchaseLine(
+    BusinessProductApiModel product,
+    BusinessProductVariantApiModel? selectedVariant,
+  ) {
+    return jsonEncode({
+      'businessId': state.businessId,
+      'productId': product.id,
+      if (selectedVariant != null) 'variantId': selectedVariant.id,
+      if (selectedVariant != null) 'variantLabel': selectedVariant.label,
+      'name': product.name,
+
+      // Display snapshot only. The backend independently resolves this exact
+      // product/variant identity at checkout.
+      'price': selectedVariant?.finalPrice ?? product.displayPrice,
+
+      'imageUrl': product.imageUrl,
+      'quantity': state.orderQuantity,
+      // So the basket knows it may not raise this line.
+      if (product.isService) 'isService': true,
+      'addedAt': DateTime.now().toIso8601String(),
+    });
+  }
+
   Future<void> _onAddToCartPressed(
     ProductDetailsAddToCartPressed event,
     Emitter<ProductDetailsState> emit,
@@ -520,25 +547,7 @@ class ProductDetailsBloc
 
       await prefs.remove(CartStorageKeys.checkoutId);
 
-      items.add(
-        jsonEncode({
-          'businessId': state.businessId,
-          'productId': product.id,
-          if (selectedVariant != null) 'variantId': selectedVariant.id,
-          if (selectedVariant != null) 'variantLabel': selectedVariant.label,
-          'name': product.name,
-
-          // Display snapshot only. The backend independently resolves this
-          // exact product/variant identity at checkout.
-          'price': selectedVariant?.finalPrice ?? product.displayPrice,
-
-          'imageUrl': product.imageUrl,
-          'quantity': state.orderQuantity,
-          // So the basket knows it may not raise this line.
-          if (product.isService) 'isService': true,
-          'addedAt': DateTime.now().toIso8601String(),
-        }),
-      );
+      items.add(_purchaseLine(product, selectedVariant));
 
       await prefs.setStringList(cartKey, items);
 
@@ -616,56 +625,24 @@ class ProductDetailsBloc
       return;
     }
 
-    try {
-      final token = await _token();
-
-      // Buy-now used to read the profile's single address string. That field
-      // is gone - it could not hold a governorate, a city, or the name and
-      // number a driver needs - so the delivery address comes from the
-      // account's book, taking the one marked default.
-      final String address = await _defaultDeliveryAddress(token);
-
-      if (address.isEmpty) {
-        // Said here rather than left to the server's refusal, which would
-        // arrive as a failure the reader could do nothing with.
-        emit(
-          state.copyWith(
-            status: ProductDetailsStatus.failure,
-            errorMessage: 'checkout.noSavedAddress',
-          ),
-        );
-        return;
-      }
-
-      await _apiService.createOrder(
-        token: token,
-        businessId: state.businessId,
-        deliveryAddress: address,
-        clientOrderId:
-            'buy-${DateTime.now().microsecondsSinceEpoch}-${product.id}',
-        items: [
-          OrderItemRequest(
-            productId: product.id,
-            variantId: selectedVariant?.id,
-            quantity: state.orderQuantity,
-          ),
-        ],
-      );
-
-      emit(
-        state.copyWith(
-          status: ProductDetailsStatus.action,
-          message: 'orders.checkoutSuccess',
-        ),
-      );
-    } catch (error) {
-      emit(
-        state.copyWith(
-          status: ProductDetailsStatus.failure,
-          errorMessage: checkoutFailureMessage(error),
-        ),
-      );
-    }
+    // It used to place the order here and then say so: it read the account's
+    // address book, took whichever address was marked default, and posted the
+    // order. Two things were wrong with that. The buyer was never shown where
+    // their order was going or what the delivery would cost, and an account
+    // with an empty book was refused at the press of a button with nowhere to
+    // go and nothing to fix.
+    //
+    // It hands the purchase to checkout instead - the same three steps the
+    // basket goes through, where the address is chosen and the fee is shown
+    // before anything is ordered. Without touching the basket: the line goes
+    // with the reader rather than into storage, so a customer who buys one
+    // thing directly still has whatever they had put aside.
+    emit(
+      state.copyWith(
+        status: ProductDetailsStatus.action,
+        checkoutLine: _purchaseLine(product, selectedVariant),
+      ),
+    );
   }
 
   String? _selectionForProduct(BusinessProductApiModel product) {
@@ -685,25 +662,6 @@ class ProductDetailsBloc
   bool _hasRealCommerceIds(String productId) {
     return isMongoBackedEntityId(state.businessId) &&
         isMongoBackedEntityId(productId);
-  }
-
-  /// The address an order goes to when the reader was not asked.
-  ///
-  /// The one they marked default, or the first they saved. An empty book is
-  /// not an error here - it is a question the caller has to put to them - so
-  /// this answers with an empty string rather than throwing.
-  Future<String> _defaultDeliveryAddress(String token) async {
-    final List<SavedAddressApiModel> book = await _apiService.myAddresses(
-      token: token,
-    );
-
-    if (book.isEmpty) return '';
-
-    for (final SavedAddressApiModel entry in book) {
-      if (entry.isDefault) return entry.line;
-    }
-
-    return book.first.line;
   }
 
   Future<String> _token() async {

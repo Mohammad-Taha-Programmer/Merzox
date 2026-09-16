@@ -38,6 +38,15 @@ final class ProductDetailsState {
   final String? errorMessage;
   final ReviewEligibilityStatus reviewEligibilityStatus;
 
+  /// The one line a `Buy now` is about to be taken to checkout with.
+  ///
+  /// Set once, on the press, and gone from the next state - like `message`
+  /// and `errorMessage`, and for the same reason: it is something that
+  /// happened, not something that is true. The screen does the navigating,
+  /// because deciding whether a purchase may proceed and pushing a route are
+  /// two different jobs and only the first belongs here.
+  final String? checkoutLine;
+
   const ProductDetailsState({
     this.status = ProductDetailsStatus.initial,
     this.businessId = '',
@@ -54,6 +63,7 @@ final class ProductDetailsState {
     this.message,
     this.errorMessage,
     this.reviewEligibilityStatus = ReviewEligibilityStatus.unchecked,
+    this.checkoutLine,
   });
 
   /// Whether a number may be chosen at all.
@@ -123,6 +133,7 @@ final class ProductDetailsState {
     String? message,
     String? errorMessage,
     ReviewEligibilityStatus? reviewEligibilityStatus,
+    String? checkoutLine,
   }) {
     return ProductDetailsState(
       status: status ?? this.status,
@@ -143,6 +154,7 @@ final class ProductDetailsState {
       errorMessage: errorMessage,
       reviewEligibilityStatus:
           reviewEligibilityStatus ?? this.reviewEligibilityStatus,
+      checkoutLine: checkoutLine,
     );
   }
 }

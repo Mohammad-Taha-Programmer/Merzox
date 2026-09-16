@@ -534,6 +534,17 @@ abstract final class MerzoxIcons {
   //
   // `product_details/`
 
+  /// The designer's share mark: three rings joined by two bars.
+  ///
+  /// Drawn as a font here rather than borrowed from Material, which draws the
+  /// same idea with filled dots and a different weight. There was no share
+  /// glyph in these folders - `HomeScreenShareApp` is the other mark entirely,
+  /// a box with an arrow leaving it - so this one was built.
+  static const IconData productDetailsShare = IconData(
+    0xe80b,
+    fontFamily: 'ProductDetailsShare',
+  );
+
   static const IconData productDetailsChat = IconData(
     0xe805,
     fontFamily: 'ProductDetailsChat',
@@ -721,6 +732,13 @@ abstract final class MerzoxIcons {
   /// Against Material's `phone_outlined` too - the mark is different but the
   /// size it has to match is the same one.
   static const double contactUsSizeFactor = 0.750 / 1.0;
+
+  /// Against Material's `share_outlined`, which the product screen drew.
+  ///
+  /// Material's mark stands 0.830 of its em box tall and this one fills 0.980
+  /// of its, so a straight swap at the same `size` would have grown it by a
+  /// sixth. Both figures are read off the two font files.
+  static const double shareSizeFactor = 0.830 / 0.980;
 
   /// Against Material's `chat_bubble_outline_rounded`.
   static const double chatSizeFactor = 0.832 / 1.0;

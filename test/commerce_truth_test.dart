@@ -449,22 +449,74 @@ void main() {
       expect(entry['price'], isNot(100));
     });
 
-    test('F14 - a stock refusal from the server stays observable', () async {
+    test(
+      'F14 - buy now hands the purchase over, it does not place it',
+      () async {
+        // It used to post the order from this press, to whichever address the
+        // account had marked default - the buyer never saw where it was going
+        // or what delivery would cost. It goes to checkout now, and the claim
+        // worth pinning is that nothing has been ordered by the time it does.
+        final api = _CommerceApi()..product = catalogProduct();
+        final bloc = await _startedDetails(api);
+        addTearDown(bloc.close);
+
+        final ready = bloc.stream.firstWhere(
+          (state) => state.checkoutLine != null,
+        );
+        bloc.add(const ProductDetailsBuyNowPressed());
+        final state = await ready;
+
+        expect(api.createOrderCalls, 0);
+
+        final line = jsonDecode(state.checkoutLine!) as Map<String, dynamic>;
+        expect(line['productId'], catalogProduct().id);
+        expect(line['quantity'], 1);
+
+        // And the basket it was never put in is still empty.
+        final prefs = await SharedPreferences.getInstance();
+        expect(
+          prefs.getStringList(CartStorageKeys.items) ?? <String>[],
+          isEmpty,
+        );
+      },
+    );
+
+    test('F14 - a refusal of that purchase stays observable', () async {
+      // The refusal arrives at the checkout screen now, through the same bloc
+      // the basket submits with - so the reason survives the move.
+      SharedPreferences.setMockInitialValues({
+        AuthBloc.sessionKey: true,
+        AuthBloc.tokenKey: 'real-token',
+        // Something already put aside, which a direct purchase must not touch.
+        CartStorageKeys.items: [jsonEncode(_cartEntry(quantity: 2))],
+      });
       final api = _CommerceApi()
         ..product = catalogProduct()
         ..checkoutError = _serverRefusal('INSUFFICIENT_STOCK');
-      final bloc = await _startedDetails(api);
+      final bloc = CartBloc(
+        apiService: api,
+        directLines: <String>[jsonEncode(_cartEntry(quantity: 1))],
+      );
       addTearDown(bloc.close);
 
-      final failed = bloc.stream.firstWhere(
-        (state) => state.status == ProductDetailsStatus.failure,
+      final ready = bloc.stream.firstWhere(
+        (state) => state.status == CartStatus.ready,
       );
-      bloc.add(const ProductDetailsBuyNowPressed());
+      bloc.add(const CartStarted());
+      await ready;
+
+      final failed = bloc.stream.firstWhere(
+        (state) => state.status == CartStatus.failure,
+      );
+      bloc.add(const CartCheckoutRequested());
       final state = await failed;
 
-      // Not collapsed into a generic checkout error.
       expect(state.errorMessage, 'orders.checkoutInsufficientStock');
-      expect(api.createOrderCalls, 1);
+
+      // The stored basket is untouched by a purchase that went around it.
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList(CartStorageKeys.items), hasLength(1));
+      expect(prefs.getString(CartStorageKeys.checkoutId), isNull);
     });
   });
 
