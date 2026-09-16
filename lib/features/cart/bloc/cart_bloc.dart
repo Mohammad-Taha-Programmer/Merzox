@@ -21,9 +21,27 @@ class CartBloc extends Bloc<CartEvent, CartState> {
   final ApiService _apiService;
   final AuthSessionService _authSessionService;
 
+  /// A basket of exactly what is being bought right now, never stored.
+  ///
+  /// `Buy now` on a product page is a purchase of one thing that was never put
+  /// in the basket, and must not disturb what is in there: a customer with
+  /// three things put aside who buys a fourth directly still has their three
+  /// afterwards, whether the direct purchase succeeded or failed.
+  ///
+  /// Empty means the ordinary basket, read from and written to storage.
+  final List<String> directLines;
+
+  /// Kept for the life of this bloc so a retry after a refusal reuses it, the
+  /// way the stored checkout id does for the basket - any order that already
+  /// succeeded comes back as a duplicate instead of being placed twice.
+  String? _directCheckoutId;
+
+  bool get isDirectPurchase => directLines.isNotEmpty;
+
   CartBloc({
     ApiService? apiService,
     AuthSessionService authSessionService = const AuthSessionService(),
+    this.directLines = const <String>[],
   }) : _apiService = apiService ?? ApiService(),
        _authSessionService = authSessionService,
        super(const CartState()) {
@@ -35,6 +53,26 @@ class CartBloc extends Bloc<CartEvent, CartState> {
 
   Future<void> _onStarted(CartStarted event, Emitter<CartState> emit) async {
     emit(state.copyWith(status: CartStatus.loading));
+
+    if (isDirectPurchase) {
+      // Read from what was handed over, not from storage, and written back
+      // nowhere. Revalidated all the same: the price and the stock a product
+      // page was showing are a snapshot like any other.
+      final List<CartItem> lines = <CartItem>[];
+      for (final String raw in directLines) {
+        final CartItem? item = _tryParse(raw);
+        if (item != null) lines.add(item);
+      }
+
+      emit(
+        state.copyWith(
+          status: CartStatus.ready,
+          items: await _revalidate(lines),
+        ),
+      );
+      return;
+    }
+
     emit(state.copyWith(status: CartStatus.ready, items: await _loadItems()));
   }
 
@@ -42,6 +80,10 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     CartItemRemoved event,
     Emitter<CartState> emit,
   ) async {
+    // Nothing here belongs to the stored basket, and the screen that drives
+    // a direct purchase offers neither control.
+    if (isDirectPurchase) return;
+
     final prefs = await SharedPreferences.getInstance();
     final storedItems = prefs.getStringList(CartStorageKeys.items) ?? [];
     final nextRawItems = [...storedItems]..remove(event.raw);
@@ -55,6 +97,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
     CartItemQuantityChanged event,
     Emitter<CartState> emit,
   ) async {
+    if (isDirectPurchase) return;
     if (event.quantity < 1 || event.quantity > maxLineQuantity) return;
 
     final prefs = await SharedPreferences.getInstance();
@@ -134,9 +177,17 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         groups.putIfAbsent(item.businessId, () => []).add(item);
       }
 
-      var checkoutId = prefs.getString(CartStorageKeys.checkoutId);
-      checkoutId ??= 'cart-${DateTime.now().microsecondsSinceEpoch}';
-      await prefs.setString(CartStorageKeys.checkoutId, checkoutId);
+      final String checkoutId;
+
+      if (isDirectPurchase) {
+        checkoutId = _directCheckoutId ??=
+            'buy-${DateTime.now().microsecondsSinceEpoch}';
+      } else {
+        checkoutId =
+            prefs.getString(CartStorageKeys.checkoutId) ??
+            'cart-${DateTime.now().microsecondsSinceEpoch}';
+        await prefs.setString(CartStorageKeys.checkoutId, checkoutId);
+      }
 
       var index = 0;
       final placed = <String>[];
@@ -161,8 +212,11 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         index += 1;
       }
 
-      await prefs.remove(CartStorageKeys.items);
-      await prefs.remove(CartStorageKeys.checkoutId);
+      if (!isDirectPurchase) {
+        await prefs.remove(CartStorageKeys.items);
+        await prefs.remove(CartStorageKeys.checkoutId);
+      }
+
       emit(
         state.copyWith(
           status: CartStatus.ready,

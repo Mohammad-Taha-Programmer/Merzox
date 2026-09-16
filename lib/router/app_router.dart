@@ -272,16 +272,27 @@ class AppRouter {
       ),
       GoRoute(
         path: '/checkout',
-        builder: (context, _) => BlocProvider<CartBloc>(
-          // Its own cart instance: the flow reads the basket it is about to
-          // submit, and submits through the same event the cart tab used.
-          create: (_) => CartBloc()..add(const CartStarted()),
-          child: CheckoutPage(
-            onCompleted: () {
-              if (context.canPop()) context.pop();
-            },
-          ),
-        ),
+        builder: (context, state) {
+          // `Buy now` on a product page sends the one line it is buying, and
+          // that line was never put in the basket. Anything else is the
+          // basket itself, read from storage.
+          final Object? extra = state.extra;
+          final List<String> direct = extra is List<String>
+              ? extra
+              : const <String>[];
+
+          return BlocProvider<CartBloc>(
+            // Its own cart instance: the flow reads the basket it is about to
+            // submit, and submits through the same event the cart tab used.
+            create: (_) =>
+                CartBloc(directLines: direct)..add(const CartStarted()),
+            child: CheckoutPage(
+              onCompleted: () {
+                if (context.canPop()) context.pop();
+              },
+            ),
+          );
+        },
       ),
       GoRoute(
         path: '/orders',

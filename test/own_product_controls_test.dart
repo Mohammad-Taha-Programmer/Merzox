@@ -42,12 +42,16 @@ bool _live(WidgetTester tester, Finder finder) {
   if (widget is FilledButton) return widget.onPressed != null;
   if (widget is OutlinedButton) return widget.onPressed != null;
   if (widget is IconButton) return widget.onPressed != null;
+  // The quantity field is one rounded shape now, with its two ends pressed
+  // rather than two buttons drawn side by side, so each end is an ink well
+  // with no chrome of its own.
+  if (widget is InkWell) return widget.onTap != null;
 
   fail('not a button: $widget');
 }
 
 Finder _stepper(IconData icon) =>
-    find.ancestor(of: find.byIcon(icon), matching: find.byType(IconButton));
+    find.ancestor(of: find.byIcon(icon), matching: find.byType(InkWell)).first;
 
 Future<void> _pumpQuantity(WidgetTester tester, {required bool enabled}) {
   return pumpLocalized(

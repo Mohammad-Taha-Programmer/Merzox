@@ -4,6 +4,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:merzox/core/auth/auth_gate.dart';
 import 'package:merzox/core/constants/colors.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
+import 'package:merzox/core/widgets/merzox_expandable_text.dart';
 import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
@@ -79,8 +81,18 @@ class _ProductDetailsView extends StatelessWidget {
     return BlocConsumer<ProductDetailsBloc, ProductDetailsState>(
       listenWhen: (previous, current) =>
           previous.message != current.message ||
-          previous.errorMessage != current.errorMessage,
+          previous.errorMessage != current.errorMessage ||
+          current.checkoutLine != null,
       listener: (context, state) {
+        // A purchase the bloc has cleared to proceed. The navigating happens
+        // here rather than there: deciding whether it may proceed and pushing
+        // a route are two different jobs.
+        final String? line = state.checkoutLine;
+        if (line != null) {
+          context.push('/checkout', extra: <String>[line]);
+          return;
+        }
+
         final text = state.errorMessage ?? state.message;
         if (text == null || text.isEmpty) return;
         final localizedText = text.contains('.') ? text.tr() : text;
@@ -141,8 +153,19 @@ class _ProductDetailsView extends StatelessWidget {
                         end: 18,
                         top: MediaQuery.paddingOf(context).top + 58,
                         child: Builder(
-                          builder: (shareContext) => _IconCircle(
-                            icon: Icons.share_outlined,
+                          builder: (shareContext) => _ChromeCircle(
+                            key: const ValueKey<String>('productDetails.share'),
+                            semanticsLabel: 'productDetails.shareProduct'.tr(),
+                            mark: Icon(
+                              MerzoxIcons.productDetailsShare,
+                              // Read against the mark it replaced rather than
+                              // set by eye: `shareSizeFactor` is what makes a
+                              // number here mean the same apparent size as
+                              // Material's. The old one drew at 25, so this
+                              // is that mark half again as tall.
+                              size: 37 * MerzoxIcons.shareSizeFactor,
+                              color: kProductChromeMarkColour,
+                            ),
                             onPressed:
                                 state.status == ProductDetailsStatus.sharing ||
                                     state.status ==
@@ -161,17 +184,26 @@ class _ProductDetailsView extends StatelessWidget {
                                       ),
                                     );
                                   },
-                            filled: false,
                           ),
                         ),
                       ),
                       PositionedDirectional(
                         start: 18,
                         top: MediaQuery.paddingOf(context).top + 58,
-                        child: _IconCircle(
-                          icon: Icons.chevron_right_rounded,
+                        child: _ChromeCircle(
+                          key: const ValueKey<String>('productDetails.back'),
+                          semanticsLabel: 'common.back'.tr(),
+                          // The app's own chevron, which every other board
+                          // carries and which turns itself for the reading
+                          // direction. This screen drew Material's
+                          // `chevron_right_rounded` instead - a different mark,
+                          // and one Material mirrors in an Arabic page, so it
+                          // pointed away from the way back.
+                          mark: const MerzoxBackChevron(
+                            size: 30,
+                            color: kProductChromeMarkColour,
+                          ),
                           onPressed: () => Navigator.of(context).pop(),
-                          filled: false,
                         ),
                       ),
                     ],
@@ -360,10 +392,9 @@ class _ProductHeader extends StatelessWidget {
         children: [
           Flexible(
             flex: 2,
-            child: Text(
-              product.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            child: MerzoxExpandableText(
+              valueKey: const ValueKey<String>('productDetails.productName'),
+              text: product.name,
               textAlign: TextAlign.start,
               style: const TextStyle(fontSize: 20, color: Color(0xFF2B2B2B)),
             ),
@@ -496,10 +527,16 @@ class _DescriptionTab extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            product.description.isEmpty
+          MerzoxExpandableText(
+            valueKey: const ValueKey<String>('productDetails.description'),
+            text: product.description.isEmpty
                 ? 'catalog.noProductDescription'.tr()
                 : product.description,
+            // Four lines, then the rest on a press. A merchant who writes
+            // five paragraphs should not push the price, the options and the
+            // shop off the bottom of the screen for everyone who does not
+            // want to read them.
+            maxLines: 4,
             textAlign: TextAlign.start,
             style: TextStyle(
               color: MerzoxColors.kColor666666,
@@ -622,71 +659,92 @@ class ProductQuantityRow extends StatelessWidget {
           style: const TextStyle(fontSize: 15),
         ),
         const Spacer(),
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          textDirection: TextDirection.ltr,
-          children: [
-            _StepperButton(
-              icon: Icons.remove_rounded,
-              onPressed: enabled
-                  ? () => context.read<ProductDetailsBloc>().add(
-                      const ProductDetailsQuantityDecremented(),
-                    )
-                  : null,
-            ),
-            Container(
-              width: 58,
-              height: 32,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                border: Border.symmetric(
-                  horizontal: BorderSide(color: MerzoxColors.kColor3D5A80),
+        // One pill rather than two buttons with a box wedged between them.
+        // The artboard draws a single rounded field in the deep blue with the
+        // number sitting on a white card inside it, and what was here was
+        // three separate shapes that happened to be the same height: two
+        // rounded rectangles and a strip with a line above and below it.
+        Container(
+          height: kQuantityPillHeight,
+          decoration: BoxDecoration(
+            color: MerzoxColors.kColor3D5A80,
+            borderRadius: BorderRadius.circular(kQuantityPillHeight / 2),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            // A number and the two signs that change it read the same way in
+            // every language: minus on the left, plus on the right.
+            textDirection: TextDirection.ltr,
+            children: [
+              _StepperButton(
+                icon: Icons.remove_rounded,
+                onPressed: enabled
+                    ? () => context.read<ProductDetailsBloc>().add(
+                        const ProductDetailsQuantityDecremented(),
+                      )
+                    : null,
+              ),
+              Container(
+                width: kQuantityCardWidth,
+                height: kQuantityCardHeight,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '$quantity',
+                  style: TextStyle(
+                    color: MerzoxColors.kColor666666,
+                    fontSize: 15,
+                  ),
                 ),
               ),
-              child: Text(
-                '$quantity',
-                style: TextStyle(
-                  color: MerzoxColors.kColor666666,
-                  fontSize: 15,
-                ),
+              _StepperButton(
+                icon: Icons.add_rounded,
+                onPressed: enabled
+                    ? () => context.read<ProductDetailsBloc>().add(
+                        const ProductDetailsQuantityIncremented(),
+                      )
+                    : null,
               ),
-            ),
-            _StepperButton(
-              icon: Icons.add_rounded,
-              onPressed: enabled
-                  ? () => context.read<ProductDetailsBloc>().add(
-                      const ProductDetailsQuantityIncremented(),
-                    )
-                  : null,
-            ),
-          ],
+            ],
+          ),
         ),
       ],
     );
   }
 }
 
+/// The field the number sits in, and the white card inside it.
+const double kQuantityPillHeight = 40;
+const double kQuantityCardWidth = 53;
+const double kQuantityCardHeight = 31;
+
+/// Each end of that field. Wide enough to press, and with no shape of its own.
+const double kQuantityEndWidth = 58;
+
 class _StepperButton extends StatelessWidget {
   final IconData icon;
 
-  /// Null freezes it: `IconButton` greys itself out and stops answering.
+  /// Null freezes it: the sign greys and the press does nothing.
   final VoidCallback? onPressed;
 
   const _StepperButton({required this.icon, required this.onPressed});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 46,
-      height: 32,
-      child: IconButton.filled(
-        onPressed: onPressed,
-        style: IconButton.styleFrom(
-          backgroundColor: MerzoxColors.kColor3D5A80,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(kQuantityPillHeight / 2),
+      child: SizedBox(
+        width: kQuantityEndWidth,
+        height: kQuantityPillHeight,
+        child: Icon(
+          icon,
+          size: 22,
+          color: onPressed == null ? MerzoxColors.kColor8D99AE : Colors.white,
         ),
-        icon: Icon(icon, size: 20),
       ),
     );
   }
@@ -736,23 +794,19 @@ class _SellerDetails extends StatelessWidget {
                   // The name is the other way into the shop. A customer who
                   // wants the seller taps whichever of the two they read
                   // first, so both lead to the same place.
-                  InkWell(
-                    key: const Key('merzox.productDetails.sellerName'),
-                    onTap: () => _openStore(context),
-                    child: Text(
-                      business.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13),
-                    ),
+                  MerzoxExpandableText(
+                    valueKey: const Key('merzox.productDetails.sellerName'),
+                    text: business.name,
+                    style: const TextStyle(fontSize: 13),
+                    onTapWhenWhole: () => _openStore(context),
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    business.address.trim().isEmpty
+                  MerzoxExpandableText(
+                    valueKey: const Key('merzox.productDetails.sellerAddress'),
+                    text: business.address.trim().isEmpty
                         ? 'catalog.addressUnavailable'.tr()
                         : business.address,
                     maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
                       color: MerzoxColors.kColor767676,
@@ -1314,28 +1368,57 @@ Rect? _shareOriginFor(BuildContext context) {
   return renderObject.localToGlobal(Offset.zero) & renderObject.size;
 }
 
-class _IconCircle extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback? onPressed;
-  final bool filled;
+/// The two controls that float over a product's photographs.
+///
+/// They used to be bare marks on the picture itself, which put them at the
+/// mercy of whatever the merchant photographed: a dark mark on a dark photo is
+/// not there, and neither of them had a visible edge, so their tap targets
+/// were guesswork. Each sits on a disc now - the pale blue at half strength,
+/// so the photograph still reads through it and the control still reads
+/// against it.
+const double kProductChromeCircle = 44;
 
-  const _IconCircle({
-    required this.icon,
+/// Half strength, so the picture underneath is still a picture.
+final Color kProductChromeCircleColour = MerzoxColors.kColor98C1D9.withValues(
+  alpha: 0.5,
+);
+
+/// What the marks on those discs are drawn in.
+const Color kProductChromeMarkColour = MerzoxColors.kColor3B3B3B;
+
+class _ChromeCircle extends StatelessWidget {
+  /// The mark itself. A drawing rather than an `IconData`, because the way
+  /// back is a painter and the share is a glyph.
+  final Widget mark;
+
+  final VoidCallback? onPressed;
+  final String semanticsLabel;
+
+  const _ChromeCircle({
+    required this.mark,
     required this.onPressed,
-    required this.filled,
+    required this.semanticsLabel,
+    super.key,
   });
 
   @override
   Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onPressed,
-      style: IconButton.styleFrom(
-        backgroundColor: filled
-            ? MerzoxColors.kColor3D5A80
-            : Colors.transparent,
-        foregroundColor: filled ? Colors.white : MerzoxColors.kColor3B3B3B,
+    return Semantics(
+      button: true,
+      label: semanticsLabel,
+      child: Material(
+        color: kProductChromeCircleColour,
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPressed,
+          child: SizedBox(
+            width: kProductChromeCircle,
+            height: kProductChromeCircle,
+            child: Center(child: mark),
+          ),
+        ),
       ),
-      icon: Icon(icon, size: 25),
     );
   }
 }

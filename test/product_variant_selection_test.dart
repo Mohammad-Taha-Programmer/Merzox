@@ -262,22 +262,22 @@ void main() {
     await _start(bloc, product);
     await _select(bloc, _variantB);
 
-    final failed = bloc.stream.firstWhere(
-      (state) => state.status == ProductDetailsStatus.failure,
-    );
+    // Buy now hands the purchase to checkout rather than placing it, so what
+    // is checked is the line it hands over: the exact variant the reader
+    // chose, and no price or label the server did not derive.
+    final ready = bloc.stream.firstWhere((state) => state.checkoutLine != null);
 
     bloc.add(const ProductDetailsBuyNowPressed());
 
-    await failed;
+    final state = await ready;
 
-    expect(api.createOrderCalls, 1);
-    expect(api.submittedItems, hasLength(1));
+    expect(api.createOrderCalls, 0);
 
-    expect(api.submittedItems.single.toJson(), <String, dynamic>{
-      'productId': _productId,
-      'variantId': _variantB,
-      'quantity': 1,
-    });
+    final Map<String, dynamic> line =
+        jsonDecode(state.checkoutLine!) as Map<String, dynamic>;
+    expect(line['productId'], _productId);
+    expect(line['variantId'], _variantB);
+    expect(line['quantity'], 1);
   });
 
   test(

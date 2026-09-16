@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/product_details/bloc/product_details_bloc.dart';
 import 'package:merzox/features/product_details/bloc/product_details_event.dart';
@@ -102,9 +103,11 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.share_outlined), findsOneWidget);
+    // The designer's mark, drawn as a font in `product_details/`. It was
+    // Material's `share_outlined` - a different drawing of the same idea.
+    expect(find.byIcon(MerzoxIcons.productDetailsShare), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.share_outlined));
+    await tester.tap(find.byIcon(MerzoxIcons.productDetailsShare));
     await settleFrames(tester);
 
     expect(share.calls, 1);
