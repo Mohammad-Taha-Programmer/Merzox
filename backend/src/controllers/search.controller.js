@@ -1,9 +1,14 @@
 import { Business } from '../models/Business.js';
+import { User } from '../models/User.js';
 import {
   matchMode,
   searchPattern,
   textMatches
 } from '../policies/arabic-search.policy.js';
+import {
+  phoneSearchDigits,
+  phoneSearchPattern
+} from '../policies/phone-search.policy.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 
 function normalizeQuery(query) {
@@ -98,6 +103,57 @@ export const searchCatalog = asyncHandler(async (req, res) => {
       data: { query: '', products: [], businesses: [] }
     });
     return;
+  }
+
+  /**
+   * The shops whose owner answers on this number.
+   *
+   * A customer often has the merchant's number and not their shop's name - it
+   * was on a receipt, or a neighbour sent it - and a number is the one thing
+   * about a shop that is never spelled two ways.
+   *
+   * It reads the account rather than the shop because that is where a number
+   * lives: a shop publishes its owner's, it does not keep its own.
+   */
+  const phoneDigits = phoneSearchDigits(query);
+
+  if (phoneDigits && !productQuery) {
+    const pattern = phoneSearchPattern(phoneDigits);
+    const owners = await User.find({ 'phones.value': pattern })
+      .select('_id')
+      .limit(20);
+
+    if (owners.length > 0) {
+      const shops = await Business.find({
+        isActive: true,
+        owner: { $in: owners.map((owner) => owner._id) }
+      })
+        .sort({ ratingAverage: -1, subscribedAt: -1 })
+        .limit(limit);
+
+      if (shops.length > 0) {
+        // A number names a shop, not a thing on its shelves - so the shops tab
+        // is the answer, and the products tab shows what those shops sell.
+        const found = [];
+
+        for (const shop of shops) {
+          for (const item of shop.products) {
+            if (!item.isActive || found.length >= limit) continue;
+            found.push(publicProductSearchResult(shop, item));
+          }
+        }
+
+        res.json({
+          success: true,
+          data: {
+            query,
+            products: found,
+            businesses: shops.map((shop) => shop.toListJSON())
+          }
+        });
+        return;
+      }
+    }
   }
 
   const exactIdBusiness = await Business.findOne({

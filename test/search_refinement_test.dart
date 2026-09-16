@@ -241,4 +241,163 @@ void main() {
     expect(const SearchRefinement(product: 'جاكيت').isPlain, isFalse);
     expect(const SearchRefinement(product: '   ').isPlain, isTrue);
   });
+
+  // ---------------------------------------------------------------------------
+  // Which tab the answer opens on
+  // ---------------------------------------------------------------------------
+
+  test('the tab is chosen by what was found', () {
+    expect(
+      SearchState.tabFor(hasBusinesses: true, hasProducts: true),
+      SearchState.storesTab,
+    );
+    expect(
+      SearchState.tabFor(hasBusinesses: true, hasProducts: false),
+      SearchState.storesTab,
+    );
+    expect(
+      SearchState.tabFor(hasBusinesses: false, hasProducts: true),
+      SearchState.productsTab,
+      reason: 'goods and no shop: the goods are the answer',
+    );
+    expect(
+      SearchState.tabFor(hasBusinesses: false, hasProducts: false),
+      SearchState.storesTab,
+      reason: 'nothing found: there is nothing to choose between',
+    );
+  });
+
+  /// The tab a fresh answer settles on.
+  Future<int> tabAfter(String query, _TabApi api) async {
+    final SearchBloc bloc = SearchBloc(apiService: api);
+    addTearDown(bloc.close);
+
+    final Future<SearchState> answered = bloc.stream.firstWhere(
+      (SearchState state) => state.status == SearchStatus.success,
+    );
+    bloc.add(SearchSubmitted(query));
+
+    return (await answered).selectedTab;
+  }
+
+  test('an answer with shops in it opens on the shops', () async {
+    expect(
+      await tabAfter('ابو خالد', _TabApi(shopCount: 2, goodsCount: 3)),
+      SearchState.storesTab,
+    );
+  });
+
+  test('an answer with only goods opens on the goods', () async {
+    expect(
+      await tabAfter('جاكيت', _TabApi(shopCount: 0, goodsCount: 3)),
+      SearchState.productsTab,
+    );
+  });
+
+  test('an answer with nothing in it opens on the shops', () async {
+    expect(
+      await tabAfter('لا شيء', _TabApi(shopCount: 0, goodsCount: 0)),
+      SearchState.storesTab,
+    );
+  });
+
+  // A reader who disagrees with the guess keeps their choice until the next
+  // answer arrives - which is a new question, and a new guess.
+  test('a reader may overrule the guess, until the next answer', () async {
+    final SearchBloc bloc = SearchBloc(
+      apiService: _TabApi(shopCount: 2, goodsCount: 3),
+    );
+    addTearDown(bloc.close);
+
+    Future<SearchState> answered() => bloc.stream.firstWhere(
+      (SearchState state) => state.status == SearchStatus.success,
+    );
+
+    Future<SearchState> first = answered();
+    bloc.add(const SearchSubmitted('ابو خالد'));
+    expect((await first).selectedTab, SearchState.storesTab);
+
+    bloc.add(const SearchTabChanged(SearchState.productsTab));
+    await bloc.stream.firstWhere(
+      (SearchState state) => state.selectedTab == SearchState.productsTab,
+    );
+
+    final Future<SearchState> second = answered();
+    bloc.add(const SearchSubmitted('ابو سعيد'));
+    expect((await second).selectedTab, SearchState.storesTab);
+  });
 }
+
+/// Answers with a stated number of shops and goods in it.
+class _TabApi extends ApiService {
+  final int shopCount;
+  final int goodsCount;
+
+  _TabApi({required this.shopCount, required this.goodsCount});
+
+  @override
+  Future<SearchApiResponse> searchCatalog({
+    required String query,
+    String match = 'contains',
+    String product = '',
+    String productMatch = 'contains',
+    int limit = 30,
+  }) async {
+    return SearchApiResponse(
+      query: query,
+      products: <SearchProductApiModel>[
+        for (int i = 0; i < goodsCount; i += 1)
+          SearchProductApiModel.fromJson(_goods(i)),
+      ],
+      businesses: <SearchBusinessApiModel>[
+        for (int i = 0; i < shopCount; i += 1)
+          SearchBusinessApiModel.fromJson(<String, dynamic>{
+            'id': 'b$i',
+            'publicId': 'MXB-$i',
+            'name': 'متجر $i',
+          }),
+      ],
+    );
+  }
+}
+
+/// A product as the server sends one. Built in full rather than sketched,
+/// because a half-built one throws on the way in and the bloc reports a
+/// failure - which looks exactly like the search having found nothing.
+Map<String, dynamic> _goods(int index) => <String, dynamic>{
+  'id': 'product-$index',
+  'name': 'منتج $index',
+  'description': '',
+  'price': 20,
+  'discountPercent': 0,
+  'finalPrice': 20,
+  'inStock': true,
+  'imageUrl': '',
+  'imageUrls': <String>[],
+  'classification': 'new',
+  'rating': 4,
+  'ratingCount': 2,
+  'likeCount': 0,
+  'isService': false,
+  'hasVariants': false,
+  'variants': <Map<String, dynamic>>[],
+  'minPrice': 20,
+  'maxPrice': 20,
+  'minFinalPrice': 20,
+  'maxFinalPrice': 20,
+  'business': <String, dynamic>{
+    'id': 'b',
+    'publicId': 'MXB-1',
+    'name': 'متجر',
+    'category': '',
+    'logoUrl': '',
+    'products': <String>[],
+    'productCount': 0,
+    'rating': 4,
+    'ratingCount': 1,
+    'followerCount': 0,
+    'viewCount': 0,
+    'colorValue': 0xffdeeef8,
+    'address': '',
+  },
+};

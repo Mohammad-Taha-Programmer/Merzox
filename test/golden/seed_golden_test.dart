@@ -2452,7 +2452,11 @@ void main() {
         reason: 'search fixture rejected: ${settled.errorMessage}',
       );
 
-      if (tab != 0) {
+      // Whichever tab this capture wants, not whichever the screen chose. A
+      // result now opens on the tab that holds it - shops when any shop
+      // matched - so a capture of the products tab has to ask for it even
+      // though it used to be where a search landed.
+      if (settled.selectedTab != tab) {
         bloc.add(SearchTabChanged(tab));
         await bloc.stream.firstWhere(
           (SearchState state) => state.selectedTab == tab,

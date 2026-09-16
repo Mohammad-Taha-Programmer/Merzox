@@ -161,6 +161,13 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
           history: history,
           products: result.products,
           businesses: result.businesses,
+          // Each answer opens on the tab that holds it. A reader who then
+          // picks the other tab keeps it until the next answer arrives, which
+          // is a new question and a new best guess.
+          selectedTab: SearchState.tabFor(
+            hasBusinesses: result.businesses.isNotEmpty,
+            hasProducts: result.products.isNotEmpty,
+          ),
           errorMessage: null,
         ),
       );

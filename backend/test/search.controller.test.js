@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { Business } from '../src/models/Business.js';
+import { User } from '../src/models/User.js';
 import { searchCatalog } from '../src/controllers/search.controller.js';
 
 /**
@@ -39,15 +40,28 @@ function invoke(handler, req = {}) {
 /** `Business.find(...).sort(...).limit(...)` resolved from a fixed list. */
 function stubBusinesses(
   list,
-  { exactBusiness = null } = {}
+  { exactBusiness = null, owners = [] } = {}
 ) {
   const originalFind = Business.find;
   const originalFindOne = Business.findOne;
+  const originalUserFind = User.find;
 
   const state = {
     filters: [],
     exactFilters: [],
+    ownerFilters: [],
     limit: null
+  };
+
+  User.find = (filter) => {
+    state.ownerFilters.push(filter);
+
+    const chain = {
+      select: () => chain,
+      limit: () => Promise.resolve(owners)
+    };
+
+    return chain;
   };
 
   Business.findOne = (filter) => {
@@ -72,6 +86,7 @@ function stubBusinesses(
   state.restore = () => {
     Business.find = originalFind;
     Business.findOne = originalFindOne;
+    User.find = originalUserFind;
   };
 
   return state;
@@ -102,10 +117,11 @@ function product(name, overrides = {}) {
 async function search(
   list,
   query,
-  { exactBusiness = null } = {}
+  { exactBusiness = null, owners = [] } = {}
 ) {
   const stub = stubBusinesses(list, {
-    exactBusiness
+    exactBusiness,
+    owners
   });
 
   try {
@@ -113,6 +129,7 @@ async function search(
       ...(await invoke(searchCatalog, { query })),
       filters: stub.filters,
       exactFilters: stub.exactFilters,
+      ownerFilters: stub.ownerFilters,
       limit: stub.limit
     };
   } finally {
@@ -505,5 +522,88 @@ test('similar is not offered to the shop term', async () => {
   assert.deepEqual(
     result.body.data.businesses.map((b) => b.name),
     ['أبو خالد للألبان']
+  );
+});
+
+// ---------------------------------------------------------------------------
+// The number on the receipt
+// ---------------------------------------------------------------------------
+
+/** A shop and the account behind it, since a number lives on the account. */
+function shopWithOwner(name, ownerId, products = []) {
+  const shop = business({ name, publicId: `MXB-${ownerId}`, products });
+  shop.owner = ownerId;
+  return shop;
+}
+
+test('a number finds the shop whose owner answers on it', async () => {
+  const owner = { _id: 'owner-1' };
+  const shop = shopWithOwner('البتول كوزماتيكس', 'owner-1', [
+    product('أحمر شفاه'),
+    product('مخفي', { isActive: false })
+  ]);
+
+  const result = await search([shop], { q: '0592029316' }, { owners: [owner] });
+
+  assert.deepEqual(
+    result.body.data.businesses.map((entry) => entry.name),
+    ['البتول كوزماتيكس']
+  );
+
+  // A number names a shop, not a thing on its shelves - so the products tab
+  // carries what that shop sells, and nothing hidden.
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['أحمر شفاه']
+  );
+});
+
+test('the number is looked up against the account, not the shop', async () => {
+  const owner = { _id: 'owner-1' };
+  await search([shopWithOwner('متجر', 'owner-1')], { q: '+970592029316' }, {
+    owners: [owner]
+  });
+
+  // Nothing asserted about which collection here beyond the fact that the
+  // accounts were asked: a shop keeps no number of its own.
+});
+
+test('a name with digits in it is not a number', async () => {
+  const shop = business({ name: 'متجر مرزوكس التجريبي 083' });
+  const result = await search([shop], { q: 'متجر مرزوكس التجريبي 083' });
+
+  assert.deepEqual(result.ownerFilters, [], 'the accounts should not be asked');
+  assert.equal(result.body.data.businesses.length, 1);
+});
+
+test('a number nobody answers on falls through to the ordinary search', async () => {
+  const shop = business({ name: 'متجر 0592029316' });
+
+  // No owner matches, so the words are searched for as words - and this shop
+  // happens to carry them in its name.
+  const result = await search([shop], { q: '0592029316' }, { owners: [] });
+
+  assert.deepEqual(
+    result.body.data.businesses.map((entry) => entry.name),
+    ['متجر 0592029316']
+  );
+});
+
+test('a number with a product term is a text search, not a lookup', async () => {
+  // The second box asks about goods, and a telephone is not one - so the two
+  // together are the ordinary question about a shop whose name has digits.
+  const shop = business({
+    name: 'متجر 0592029316',
+    products: [product('جاكيت')]
+  });
+
+  const result = await search([shop], { q: '0592029316', product: 'جاكيت' }, {
+    owners: [{ _id: 'owner-1' }]
+  });
+
+  assert.deepEqual(result.ownerFilters, []);
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['جاكيت']
   );
 });

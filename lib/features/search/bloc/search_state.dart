@@ -32,6 +32,23 @@ final class SearchState {
   /// Whether the shop box itself has anything in it.
   bool get hasShopQuery => query.trim().isNotEmpty;
 
+  /// Which tab a fresh result should open on.
+  ///
+  /// The answer the reader is most likely to have been looking for. Shops when
+  /// any shop matched - including a search by telephone number, which names a
+  /// shop and never a thing on its shelves - and goods only when the words
+  /// found goods and no shop at all. With nothing found there is nothing to
+  /// choose between, and shops is where the screen has always started.
+  static const int productsTab = 0;
+  static const int storesTab = 1;
+
+  static int tabFor({required bool hasBusinesses, required bool hasProducts}) {
+    if (hasBusinesses) return storesTab;
+    if (hasProducts) return productsTab;
+
+    return storesTab;
+  }
+
   bool get hasExactBusinessMatch {
     final normalizedQuery = query.trim();
 
