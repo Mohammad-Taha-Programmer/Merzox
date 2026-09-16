@@ -28,6 +28,7 @@ export const MAX_ITEM_QUANTITY = 100;
 
 export const CHECKOUT_ERRORS = {
   duplicateQuantity: 'INVALID_QUANTITY',
+  serviceQuantity: 'SERVICE_QUANTITY',
   notAvailable: 'PRODUCT_NOT_AVAILABLE',
   variantRequired: 'PRODUCT_VARIANT_REQUIRED',
   variantNotAvailable: 'PRODUCT_VARIANT_NOT_AVAILABLE',
@@ -139,6 +140,20 @@ export function resolveOrderLines({ products, items }) {
 
     if (!product) {
       return { error: CHECKOUT_ERRORS.notAvailable, productId };
+    }
+
+    // A service is asked for, not counted out: a haircut or a delivery is
+    // requested once and performed, and "3 x haircut" is not a basket a shop
+    // can fill. The app freezes the number on the product page and in the
+    // basket, and refuses a second line for the same service - this is the
+    // same rule where a client cannot reach around it, and it is the only
+    // place it actually holds.
+    //
+    // Note where it sits: the lines above collapse repeated identities, so
+    // two lines of one for the same service arrive here as a quantity of two
+    // and are caught.
+    if (product.isService === true && quantity > 1) {
+      return { error: CHECKOUT_ERRORS.serviceQuantity, productId };
     }
 
     const variantMode = hasProductVariants(product);

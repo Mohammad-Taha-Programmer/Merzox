@@ -120,6 +120,7 @@ const Map<String, String> apiErrorMessageKeys = <String, String>{
   'UNSUPPORTED_PRODUCT_VARIANT': 'apiErrors.invalidProductVariant',
   'INVALID_PRODUCT_CLASSIFICATION': 'apiErrors.invalidProductClassification',
   'INVALID_QUANTITY': 'apiErrors.invalidQuantity',
+  'SERVICE_QUANTITY': 'apiErrors.serviceQuantity',
 
   // -- Orders --------------------------------------------------------------
   'ORDER_NOT_FOUND': 'apiErrors.orderNotFound',

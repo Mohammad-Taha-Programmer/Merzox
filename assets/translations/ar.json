@@ -124,7 +124,8 @@
     "noVariantsAvailable": "لا توجد خيارات متاحة للاختيار حالياً",
     "priceUnavailable": "السعر غير متوفر",
     "productShareOpened": "تم فتح خيار مشاركة المنتج",
-    "productShareError": "تعذر فتح مشاركة المنتج. حاول مرة أخرى."
+    "productShareError": "تعذر فتح مشاركة المنتج. حاول مرة أخرى.",
+    "serviceAlreadyInCart": "هذه الخدمة مطلوبة في سلّتك بالفعل."
   },
   "aboutUs": {
     "title": "من نحن",
@@ -850,7 +851,8 @@
     "cannotBlockSelf": "لا يمكن حظر حسابك.",
     "invalidReport": "اختر سبب البلاغ أولاً.",
     "cannotReportSelf": "لا يمكن الإبلاغ عن حسابك.",
-    "invalidOwnerContactPermission": "تعذر حفظ إظهار رقمك وبريدك. حاول مرة أخرى."
+    "invalidOwnerContactPermission": "تعذر حفظ إظهار رقمك وبريدك. حاول مرة أخرى.",
+    "serviceQuantity": "الخدمة تُطلَب مرّةً واحدة ولا تُشترى بالكمّيات."
   },
   "courierLocation": {
     "loginEntry": "مشاركة موقع المندوب",

@@ -147,6 +147,11 @@ class ProductDetailsBloc
     ProductDetailsQuantityIncremented event,
     Emitter<ProductDetailsState> emit,
   ) {
+    // The screen already freezes the two buttons for a service. This is the
+    // same rule where it cannot be walked around - the event is what the
+    // buttons send, and it is reachable from anywhere.
+    if (state.quantityIsFixed) return;
+
     emit(state.copyWith(quantity: state.quantity + 1));
   }
 
@@ -154,6 +159,8 @@ class ProductDetailsBloc
     ProductDetailsQuantityDecremented event,
     Emitter<ProductDetailsState> emit,
   ) {
+    if (state.quantityIsFixed) return;
+
     emit(
       state.copyWith(quantity: state.quantity <= 1 ? 1 : state.quantity - 1),
     );
@@ -412,6 +419,26 @@ class ProductDetailsBloc
     );
   }
 
+  /// Whether the basket already carries a line for [productId].
+  ///
+  /// Read off the stored lines rather than the cart bloc, because the product
+  /// page does not own one and the basket is the file on disk either way.
+  bool _cartHolds(List<String> items, String productId) {
+    for (final String raw in items) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map<String, dynamic> &&
+            decoded['productId'] == productId) {
+          return true;
+        }
+      } catch (_) {
+        // An unreadable line is dropped by the basket anyway.
+      }
+    }
+
+    return false;
+  }
+
   Future<void> _onAddToCartPressed(
     ProductDetailsAddToCartPressed event,
     Emitter<ProductDetailsState> emit,
@@ -477,6 +504,20 @@ class ProductDetailsBloc
       final prefs = await SharedPreferences.getInstance();
       final items = prefs.getStringList(cartKey) ?? [];
 
+      // A second line for the same service is a second request for one thing.
+      // The two would be summed at checkout into a quantity the server now
+      // refuses, and the shopper would have no way to see why - so it is
+      // stopped here, where it can be said plainly.
+      if (product.isService && _cartHolds(items, product.id)) {
+        emit(
+          state.copyWith(
+            status: ProductDetailsStatus.action,
+            message: 'catalog.serviceAlreadyInCart',
+          ),
+        );
+        return;
+      }
+
       await prefs.remove(CartStorageKeys.checkoutId);
 
       items.add(
@@ -492,7 +533,9 @@ class ProductDetailsBloc
           'price': selectedVariant?.finalPrice ?? product.displayPrice,
 
           'imageUrl': product.imageUrl,
-          'quantity': state.quantity,
+          'quantity': state.orderQuantity,
+          // So the basket knows it may not raise this line.
+          if (product.isService) 'isService': true,
           'addedAt': DateTime.now().toIso8601String(),
         }),
       );
@@ -604,7 +647,7 @@ class ProductDetailsBloc
           OrderItemRequest(
             productId: product.id,
             variantId: selectedVariant?.id,
-            quantity: state.quantity,
+            quantity: state.orderQuantity,
           ),
         ],
       );

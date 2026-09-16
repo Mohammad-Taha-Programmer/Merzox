@@ -164,7 +164,11 @@ class _BusinessProfileView extends StatelessWidget {
                     _MainTabs(selectedIndex: state.mainTabIndex),
                     const SizedBox(height: 22),
                     if (state.mainTabIndex == 0)
-                      _AboutTab(state: state, business: resolvedBusiness)
+                      _AboutTab(
+                        state: state,
+                        business: resolvedBusiness,
+                        viewMode: viewMode,
+                      )
                     else if (state.mainTabIndex == 1)
                       _ProductsTab(
                         state: state,
@@ -847,8 +851,13 @@ class _MainTabs extends StatelessWidget {
 class _AboutTab extends StatelessWidget {
   final BusinessProfileState state;
   final HomeBusiness business;
+  final BusinessProfileViewMode viewMode;
 
-  const _AboutTab({required this.state, required this.business});
+  const _AboutTab({
+    required this.state,
+    required this.business,
+    required this.viewMode,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -946,38 +955,10 @@ class _AboutTab extends StatelessWidget {
                       alignment: WrapAlignment.start,
                       children: services
                           .map(
-                            (service) => SizedBox(
-                              width: 92,
-                              child: Column(
-                                children: [
-                                  Container(
-                                    width: 58,
-                                    height: 58,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                      border: Border.all(
-                                        color: MerzoxColors.kColorEFEFEF,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Icons.miscellaneous_services_outlined,
-                                      color: MerzoxColors.kColor3D5A80,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 7),
-                                  Text(
-                                    service.name,
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: MerzoxColors.kColor767676,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            (service) => _ServiceTile(
+                              business: business,
+                              service: service,
+                              viewMode: viewMode,
                             ),
                           )
                           .toList(),
@@ -986,6 +967,123 @@ class _AboutTab extends StatelessWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+/// One of the things a shop does rather than sells.
+///
+/// It is the same record as a product - the merchant ticks "this item is a
+/// service" on the same form - so it has a picture, a price and a page, and
+/// the tile drew none of the three. It showed the same pair of cogs over every
+/// service in the app, and it was not tappable, so a shop could describe what
+/// it does and a customer had no way to ask for it.
+class _ServiceTile extends StatelessWidget {
+  final HomeBusiness business;
+  final BusinessProductApiModel service;
+  final BusinessProfileViewMode viewMode;
+
+  const _ServiceTile({
+    required this.business,
+    required this.service,
+    required this.viewMode,
+  });
+
+  static const double _side = 58;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 92,
+      child: InkWell(
+        key: ValueKey<String>('storefront.service.${service.id}'),
+        borderRadius: BorderRadius.circular(8),
+        // Inert in the merchant's own preview, for the reason the product
+        // card is: the page it opens carries cart, favourite and chat.
+        onTap: viewMode.allowsCustomerActions
+            ? () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      ProductDetailsPage(business: business, product: service),
+                ),
+              )
+            : null,
+        child: Column(
+          children: [
+            Container(
+              width: _side,
+              height: _side,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: MerzoxColors.kColorEFEFEF),
+              ),
+              child: ClipOval(child: _ServiceTilePicture(service: service)),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              service.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: MerzoxColors.kColor767676),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The picture a merchant attached to a service, or the mark that stands in.
+class _ServiceTilePicture extends StatelessWidget {
+  final BusinessProductApiModel service;
+
+  const _ServiceTilePicture({required this.service});
+
+  @override
+  Widget build(BuildContext context) {
+    final String url = service.imageUrl.trim();
+
+    if (url.isEmpty) return const _ServiceTileMark();
+
+    return Image.network(
+      url,
+      key: ValueKey<String>('storefront.service.picture.${service.id}'),
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.medium,
+      loadingBuilder:
+          (
+            BuildContext context,
+            Widget child,
+            ImageChunkEvent? loadingProgress,
+          ) {
+            if (loadingProgress == null) return child;
+
+            return const Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 1.6),
+              ),
+            );
+          },
+      errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
+          const _ServiceTileMark(),
+    );
+  }
+}
+
+class _ServiceTileMark extends StatelessWidget {
+  const _ServiceTileMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Icon(
+        Icons.miscellaneous_services_outlined,
+        color: MerzoxColors.kColor3D5A80,
+      ),
     );
   }
 }

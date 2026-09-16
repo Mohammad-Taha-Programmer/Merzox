@@ -124,7 +124,8 @@
     "noVariantsAvailable": "No selectable options are available right now",
     "priceUnavailable": "Price unavailable",
     "productShareOpened": "Sharing option opened",
-    "productShareError": "Could not open product sharing. Please try again."
+    "productShareError": "Could not open product sharing. Please try again.",
+    "serviceAlreadyInCart": "This service is already in your basket."
   },
   "aboutUs": {
     "title": "About us",
@@ -850,7 +851,8 @@
     "cannotBlockSelf": "An account cannot block itself.",
     "invalidReport": "Choose a reason for the report first.",
     "cannotReportSelf": "An account cannot report itself.",
-    "invalidOwnerContactPermission": "That permission could not be saved. Please try again."
+    "invalidOwnerContactPermission": "That permission could not be saved. Please try again.",
+    "serviceQuantity": "A service is requested once; it is not bought by quantity."
   },
   "courierLocation": {
     "loginEntry": "Share courier location",

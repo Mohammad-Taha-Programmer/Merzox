@@ -10,10 +10,12 @@ import 'package:merzox/features/business_profile/bloc/business_profile_event.dar
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
 import 'package:merzox/features/business_profile/pages/business_profile_page.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
+import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'catalog_test_fixtures.dart';
 import 'golden/merzox_golden_harness.dart';
 
 /// The head of a shop's own page: the badge, the face, and the picture.
@@ -30,8 +32,13 @@ const String _businessId = '64b000000000000000000001';
 class _ShopApi extends ApiService {
   final double rating;
   final String logoUrl;
+  final List<Map<String, dynamic>> products;
 
-  _ShopApi({required this.rating, this.logoUrl = ''});
+  _ShopApi({
+    required this.rating,
+    this.logoUrl = '',
+    this.products = const <Map<String, dynamic>>[],
+  });
 
   @override
   Future<BusinessDetailApiModel> business({required String businessId}) async =>
@@ -45,8 +52,8 @@ class _ShopApi extends ApiService {
         // So the third circle - the one that reaches the shop - is drawn at
         // all: it appears only for a shop that published a way to be reached.
         'socialLinks': <String, dynamic>{'instagram': 'yasmin.store'},
-        'products': <Map<String, dynamic>>[],
-        'productCount': 0,
+        'products': products,
+        'productCount': products.length,
         'rating': rating,
         'ratingCount': 12,
         'colorValue': 0xffdeeef8,
@@ -101,9 +108,14 @@ void main() {
   Future<BusinessProfileBloc> openShop({
     required double rating,
     String logoUrl = '',
+    List<Map<String, dynamic>> products = const <Map<String, dynamic>>[],
   }) async {
     final BusinessProfileBloc bloc = BusinessProfileBloc(
-      apiService: _ShopApi(rating: rating, logoUrl: logoUrl),
+      apiService: _ShopApi(
+        rating: rating,
+        logoUrl: logoUrl,
+        products: products,
+      ),
       reviewEligibilityGateway: _NoReviewEligibility(),
     );
     // Not awaited: `close` does not complete after a page has been pumped
@@ -266,5 +278,94 @@ void main() {
     );
 
     expect(heading.right, greaterThan(listed.right));
+  });
+
+  group('a service', () {
+    const String serviceId = '64c000000000000000000009';
+
+    Map<String, dynamic> service({List<String> imageUrls = const <String>[]}) =>
+        catalogProductJson(
+          id: serviceId,
+          name: 'قص شعر',
+          imageUrls: imageUrls,
+          isService: true,
+        );
+
+    testWidgets('shows the picture the merchant attached to it', (
+      WidgetTester tester,
+    ) async {
+      // It is the same record as a product and carries the same picture
+      // fields. The tile drew the same pair of cogs over every service in the
+      // app instead.
+      await pumpMerzoxGoldenPage(
+        tester,
+        page(
+          await openShop(
+            rating: 4.6,
+            products: <Map<String, dynamic>>[
+              service(imageUrls: <String>['https://example.test/haircut.png']),
+            ],
+          ),
+        ),
+      );
+
+      final Finder picture = find.byKey(
+        const ValueKey<String>('storefront.service.picture.$serviceId'),
+      );
+      expect(picture, findsOneWidget);
+      expect(
+        (tester.widget<Image>(picture).image as NetworkImage).url,
+        'https://example.test/haircut.png',
+      );
+    });
+
+    testWidgets('with no picture keeps the mark that stands in', (
+      WidgetTester tester,
+    ) async {
+      await pumpMerzoxGoldenPage(
+        tester,
+        page(
+          await openShop(
+            rating: 4.6,
+            products: <Map<String, dynamic>>[service()],
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(
+          const ValueKey<String>('storefront.service.picture.$serviceId'),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.byIcon(Icons.miscellaneous_services_outlined),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('opens when it is tapped', (WidgetTester tester) async {
+      // A shop could describe what it does and a customer had no way to ask
+      // for it: the tile was not tappable at all.
+      await pumpMerzoxGoldenPage(
+        tester,
+        page(
+          await openShop(
+            rating: 4.6,
+            products: <Map<String, dynamic>>[service()],
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('storefront.service.$serviceId')),
+      );
+      // Not `pumpAndSettle`: the page it opens starts a request that never
+      // completes under test.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.byType(ProductDetailsPage), findsOneWidget);
+    });
   });
 }

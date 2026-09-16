@@ -310,6 +310,7 @@ class _CartItemTile extends StatelessWidget {
                     const Spacer(),
                     _QuantityStepper(
                       quantity: item.quantity,
+                      enabled: !item.isService,
                       onChanged: (int next) => context.read<CartBloc>().add(
                         CartItemQuantityChanged(raw: item.raw, quantity: next),
                       ),
@@ -383,7 +384,18 @@ class _QuantityStepper extends StatelessWidget {
   final int quantity;
   final ValueChanged<int> onChanged;
 
-  const _QuantityStepper({required this.quantity, required this.onChanged});
+  /// False for a service: it is asked for, not counted out, and a basket
+  /// holding "3 x haircut" is not a basket a shop can fill.
+  ///
+  /// Still drawn, frozen at one, rather than removed - a line with no number
+  /// beside it reads as a line something went wrong with.
+  final bool enabled;
+
+  const _QuantityStepper({
+    required this.quantity,
+    required this.onChanged,
+    this.enabled = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -401,7 +413,9 @@ class _QuantityStepper extends StatelessWidget {
             icon: Icons.remove_rounded,
             // One is the floor: dropping a line is the ✕'s job, not a
             // decrement that empties it by accident.
-            onPressed: quantity > 1 ? () => onChanged(quantity - 1) : null,
+            onPressed: enabled && quantity > 1
+                ? () => onChanged(quantity - 1)
+                : null,
           ),
           Container(
             width: 30,
@@ -422,7 +436,7 @@ class _QuantityStepper extends StatelessWidget {
           ),
           _StepperButton(
             icon: Icons.add_rounded,
-            onPressed: quantity < CartBloc.maxLineQuantity
+            onPressed: enabled && quantity < CartBloc.maxLineQuantity
                 ? () => onChanged(quantity + 1)
                 : null,
           ),
