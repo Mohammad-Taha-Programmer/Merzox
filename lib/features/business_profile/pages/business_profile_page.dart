@@ -593,6 +593,13 @@ const double kShopMoodHeight = 38;
 /// The curve where that corner meets the banner it is cut out of.
 const double kShopMoodInnerRadius = 14;
 
+/// How much of that corner the face fills.
+///
+/// It went in at 22 and read as a mark in a large empty patch of blue rather
+/// than as a face. At 28 it carries the corner, and the 5px left above and
+/// below it is what keeps it from touching the two straight edges.
+const double kShopMoodFaceSide = 28;
+
 /// The face in the corner of a shop's banner.
 ///
 /// It was a literal smiling face written into the source, which is one face
@@ -633,8 +640,8 @@ class _RatingMoodBadge extends StatelessWidget {
       child: Image.asset(
         happy ? kShopMoodHappyAsset : kShopMoodSadAsset,
         key: ValueKey<String>('storefront.mood.${happy ? 'happy' : 'sad'}'),
-        width: 22,
-        height: 22,
+        width: kShopMoodFaceSide,
+        height: kShopMoodFaceSide,
         filterQuality: FilterQuality.medium,
       ),
     );
