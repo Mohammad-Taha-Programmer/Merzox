@@ -940,6 +940,7 @@
     "accountUnreadable": "Your numbers and email could not be read from your account, so this list may be incomplete. Reopen this screen to try again."
   },
   "storefront": {
-    "shareStore": "Share this store"
+    "shareStore": "Share this store",
+    "topBusiness": "Top business"
   }
 }
