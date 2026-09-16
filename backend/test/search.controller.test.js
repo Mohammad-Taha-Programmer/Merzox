@@ -32,6 +32,10 @@ function invoke(handler, req = {}) {
 
     handler({ body: {}, query: {}, params: {}, ...req }, res, (error) => {
       captured.error = error;
+      // Surfaced, not swallowed: a handler that threw used to arrive at the
+      // assertion as `result.body` being null, which reads as the search
+      // having answered with nothing.
+      if (error) console.error('HANDLER THREW:', error.stack ?? error);
       resolve(captured);
     });
   });
@@ -395,16 +399,76 @@ test('begins with, contains, ends with', async () => {
   assert.equal(contains.body.data.businesses.length, 2);
 });
 
-test('an anchored search reads the open shops and decides here', async () => {
-  // `starts` anchors the whole field, so a shop whose jacket begins with the
-  // words but whose name does not would be lost if the database narrowed
-  // first. The filter is therefore just `isActive`.
+test('an anchored search is narrowed in the database too', async () => {
+  // It used to read every open shop and decide here, which on a remote
+  // database is two megabytes over the wire to answer a question the database
+  // answers in a millisecond.
   const result = await search([business({ name: 'متجر' })], {
     q: 'متجر',
     match: 'starts'
   });
 
-  assert.deepEqual(result.filters, [{ isActive: true }]);
+  const [filter] = result.filters;
+  assert.equal(filter.isActive, true);
+  assert.ok(filter.$and, 'the anchored words should reach the database');
+  assert.ok(
+    filter.$and[0].$or.every((clause) =>
+      Object.values(clause).every((pattern) => pattern.source.startsWith('^'))
+    ),
+    'and reach it anchored'
+  );
+});
+
+test('the narrowing admits a shop whose goods answer, not only its name', async () => {
+  // The filter may be wider than the truth and never narrower: the loop is
+  // what decides, and a shop it would keep must not be excluded before it.
+  const shop = business({
+    name: 'متجر الياسمين',
+    products: [product('جاكيت جلد')]
+  });
+
+  const result = await search([shop], { q: 'جاكيت', match: 'starts' });
+
+  const [filter] = result.filters;
+  const fields = filter.$and[0].$or.flatMap((clause) => Object.keys(clause));
+
+  assert.ok(fields.includes('products.name'), fields.join(', '));
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['جاكيت جلد']
+  );
+});
+
+test('a product term is asked of the database, not filtered out here', async () => {
+  const shop = business({
+    name: 'أبو خالد للألبسة',
+    products: [product('جاكيت جلد')]
+  });
+
+  const result = await search([shop], { q: 'ابو خالد', product: 'جاكيت' });
+  const [filter] = result.filters;
+
+  assert.equal(filter.$and.length, 2, 'one clause per box');
+  assert.ok(
+    filter.$and[1].$or.every((clause) =>
+      Object.keys(clause).every((field) => field.startsWith('products.'))
+    ),
+    'the second box asks about goods'
+  );
+});
+
+test('a five-digit query is the only one that asks after a public id', async () => {
+  // Asking anyway cost a round trip on every search, and a round trip on this
+  // deployment is four hundred milliseconds whatever it carries.
+  const shop = business({ name: 'متجر' });
+
+  const words = await search([shop], { q: 'بتول' });
+  assert.deepEqual(words.exactFilters, []);
+
+  const digits = await search([shop], { q: '10042' });
+  assert.deepEqual(digits.exactFilters, [
+    { isActive: true, publicId: '10042' }
+  ]);
 });
 
 // ---------------------------------------------------------------------------

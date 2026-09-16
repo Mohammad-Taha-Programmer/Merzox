@@ -107,7 +107,7 @@ class _MessagesHeaderState extends State<MessagesHeader> {
             child: Icon(
               MerzoxIcons.messagesHeaderSearch,
               size: 24 * MerzoxIcons.searchSizeFactor,
-              color: MerzoxColors.kColor353535,
+              color: kMerzoxSearchGlassColour,
             ),
           ),
         ),
@@ -167,7 +167,7 @@ class _MessagesHeaderState extends State<MessagesHeader> {
           Icon(
             MerzoxIcons.messagesHeaderSearch,
             size: 20 * MerzoxIcons.searchSizeFactor,
-            color: MerzoxColors.kColor353535,
+            color: kMerzoxSearchGlassColour,
           ),
         ],
       ),

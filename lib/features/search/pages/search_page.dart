@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/core/localization/api_error_localizer.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/widgets/merzox_icons.dart';
@@ -221,8 +222,6 @@ class _SearchTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-
     return SizedBox(
       height: 48,
       child: Stack(
@@ -236,17 +235,18 @@ class _SearchTopBar extends StatelessWidget {
               color: Color(0xFF2B2B2B),
             ),
           ),
+          // The artboard's chevron, which decides its own direction. This drew
+          // Material's `chevron_right_rounded` behind a `isRtl ? ... : ...`,
+          // and Material mirrors that icon in a right-to-left page itself - so
+          // the two turns cancelled and the mark pointed away from the way
+          // back. It was also the wrong mark: a rounded Material chevron where
+          // every other board draws the artboard's.
           Align(
             alignment: AlignmentDirectional.centerStart,
-            child: IconButton(
-              tooltip: 'common.back'.tr(),
-              onPressed: onBack,
-              icon: Icon(
-                isRtl
-                    ? Icons.chevron_right_rounded
-                    : Icons.chevron_left_rounded,
-                size: 34,
-              ),
+            child: MerzoxBackChevronButton(
+              valueKey: const ValueKey<String>('search.back'),
+              semanticsLabel: 'common.back'.tr(),
+              onTap: onBack,
             ),
           ),
         ],
@@ -286,8 +286,19 @@ class _SearchField extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'search.hint'.tr(),
           hintStyle: TextStyle(color: MerzoxColors.kColorC7C7C7, fontSize: 13),
-          prefixIcon: hasText
+          // The magnifier leads and the clear follows, which puts the glass at
+          // the right of an Arabic box and at the left of an English one, and
+          // the cross opposite it. They were the other way round: the cross sat
+          // where the eye looks for the search.
+          prefixIcon: Icon(
+            MerzoxIcons.searchPageSearch,
+            color: kMerzoxSearchGlassColour,
+            // The size it drew at as a Material magnifier, converted.
+            size: 28 * MerzoxIcons.searchSizeFactor,
+          ),
+          suffixIcon: hasText
               ? IconButton(
+                  key: const ValueKey<String>('search.clear'),
                   tooltip: 'search.clear'.tr(),
                   onPressed: onClear,
                   icon: Icon(
@@ -297,12 +308,6 @@ class _SearchField extends StatelessWidget {
                   ),
                 )
               : null,
-          // The size it drew at as a Material magnifier, converted.
-          suffixIcon: Icon(
-            MerzoxIcons.searchPageSearch,
-            color: MerzoxColors.kColor707070,
-            size: 28 * MerzoxIcons.searchSizeFactor,
-          ),
           filled: true,
           fillColor: MerzoxColors.kColorF9F9F9,
           border: OutlineInputBorder(
@@ -363,23 +368,52 @@ class _SearchRefinementFields extends StatelessWidget {
                 color: MerzoxColors.kColorC7C7C7,
                 fontSize: 13,
               ),
+              // The same order as the box above it: the label and the glass
+              // lead, the cross follows - so in Arabic they read right to left
+              // as `يبيع`, the glass, the words, the cross.
               prefixIcon: Padding(
                 padding: const EdgeInsetsDirectional.only(start: 14, end: 8),
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  widthFactor: 1,
-                  child: Text(
-                    'search.productLabel'.tr(),
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: MerzoxColors.kColor707070,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      'search.productLabel'.tr(),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: MerzoxColors.kColor707070,
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      MerzoxIcons.searchPageSearch,
+                      color: kMerzoxSearchGlassColour,
+                      size: 22 * MerzoxIcons.searchSizeFactor,
+                    ),
+                  ],
                 ),
               ),
               prefixIconConstraints: const BoxConstraints(
                 minWidth: 0,
+                minHeight: 0,
+              ),
+              suffixIcon: refinement.hasProduct
+                  ? IconButton(
+                      key: const ValueKey<String>('search.clearProduct'),
+                      tooltip: 'search.clear'.tr(),
+                      onPressed: () {
+                        productController.clear();
+                        onProduct('');
+                      },
+                      icon: Icon(
+                        Icons.cancel_rounded,
+                        color: MerzoxColors.kColorD8D8D8,
+                        size: 18,
+                      ),
+                    )
+                  : null,
+              suffixIconConstraints: const BoxConstraints(
+                minWidth: 40,
                 minHeight: 0,
               ),
               filled: true,
@@ -521,13 +555,11 @@ class _SearchHistory extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final items = history.isEmpty
-        ? [
-            'search.defaultHistory.womensShoes'.tr(),
-            'search.defaultHistory.jumiaStore'.tr(),
-            'search.defaultHistory.womensBoots'.tr(),
-          ]
-        : history;
+    // Nothing until something has been searched for. This used to draw three
+    // invented rows - a pair of shoes and a shop nobody here has heard of -
+    // which could not be removed one by one or by `مسح الجميع`, because there
+    // was nothing behind them to remove.
+    if (history.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -535,7 +567,7 @@ class _SearchHistory extends StatelessWidget {
         Row(
           children: [
             TextButton(
-              onPressed: history.isEmpty ? null : onClear,
+              onPressed: onClear,
               child: Text(
                 'search.clearAll'.tr(),
                 style: TextStyle(
@@ -547,15 +579,19 @@ class _SearchHistory extends StatelessWidget {
             const Spacer(),
             Text(
               'search.previousSearches'.tr(),
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: MerzoxColors.kColor3D5A80,
+              ),
             ),
           ],
         ),
         const SizedBox(height: 12),
-        ...items.map(
+        ...history.map(
           (query) => _HistoryTile(
             query: query,
-            removable: history.isNotEmpty,
+            removable: true,
             onSelect: () => onSelect(query),
             onRemove: () => onRemove(query),
           ),
@@ -596,6 +632,7 @@ class _HistoryTile extends StatelessWidget {
             style: const TextStyle(fontSize: 14, color: Color(0xFF464646)),
           ),
           leading: IconButton(
+            key: ValueKey<String>('search.history.remove.$query'),
             tooltip: 'common.remove'.tr(),
             onPressed: removable ? onRemove : null,
             icon: Icon(

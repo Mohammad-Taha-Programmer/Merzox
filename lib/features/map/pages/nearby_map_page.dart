@@ -411,7 +411,7 @@ class _MapSearchField extends StatelessWidget {
               icon: Icon(
                 MerzoxIcons.nearbyMapSearch,
                 size: 24 * MerzoxIcons.searchSizeFactor,
-                color: MerzoxColors.kColor3D5A80,
+                color: kMerzoxSearchGlassColour,
               ),
             ),
             suffixIcon: ValueListenableBuilder<TextEditingValue>(

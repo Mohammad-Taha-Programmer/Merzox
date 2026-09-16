@@ -620,11 +620,6 @@
     "title": "البحث",
     "hint": "أي متجر أو منتج تريد البحث عنه",
     "clear": "مسح",
-    "defaultHistory": {
-      "womensShoes": "حذاء حريمي",
-      "jumiaStore": "متجر جوميا",
-      "womensBoots": "بوت حريمي"
-    },
     "clearAll": "مسح الجميع",
     "previousSearches": "تم البحث عنه سابقاً",
     "productFallback": "منتج",

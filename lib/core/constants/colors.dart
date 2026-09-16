@@ -49,3 +49,10 @@ class MerzoxColors {
   static const Color kColor393939 = Color(0xFF393939);
   static const Color kColor353535 = Color(0xFF353535);
 }
+
+/// The magnifier, wherever a search box draws one.
+///
+/// Five screens drew it in five colours - `2B2B2B`, `98C1D9`, `3D5A80`,
+/// `353535`, `707070` - which is what happens when each box picks its own. The
+/// home screen's is the one the app keeps.
+const Color kMerzoxSearchGlassColour = MerzoxColors.kColor98C1D9;

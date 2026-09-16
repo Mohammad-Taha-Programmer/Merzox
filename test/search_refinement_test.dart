@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
+import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/features/search/bloc/search_bloc.dart';
 import 'package:merzox/features/search/bloc/search_event.dart';
 import 'package:merzox/features/search/bloc/search_refinement.dart';
@@ -303,6 +305,208 @@ void main() {
     await settleFrames(tester);
 
     expect(find.byKey(const ValueKey<String>('search.failed')), findsNothing);
+  });
+
+  // ---------------------------------------------------------------------------
+  // Which side of the box each mark sits on
+  // ---------------------------------------------------------------------------
+
+  /// The marks in the search box, by where they are drawn.
+  Future<({Rect glass, Rect clear, Rect box})> boxMarks(
+    WidgetTester tester, {
+    required TextDirection direction,
+  }) async {
+    final SearchBloc bloc = SearchBloc(apiService: _FailingApi());
+    addTearDown(bloc.close);
+
+    await pumpLocalized(
+      tester,
+      BlocProvider<SearchBloc>.value(value: bloc, child: const SearchPage()),
+      textDirection: direction,
+    );
+
+    // The cross appears only once there is something to clear.
+    await tester.enterText(find.byType(TextField).first, 'بتول');
+    await settleFrames(tester);
+
+    // Scoped to the box being asked about: there are two magnifiers on this
+    // screen now, one per box.
+    final Finder box = find.byType(TextField).first;
+
+    return (
+      glass: tester.getRect(
+        find.descendant(
+          of: box,
+          matching: find.byIcon(MerzoxIcons.searchPageSearch),
+        ),
+      ),
+      clear: tester.getRect(find.byKey(const ValueKey<String>('search.clear'))),
+      box: tester.getRect(box),
+    );
+  }
+
+  testWidgets('in Arabic the glass leads and the cross follows', (
+    tester,
+  ) async {
+    final marks = await boxMarks(tester, direction: TextDirection.rtl);
+
+    expect(
+      marks.glass.center.dx,
+      greaterThan(marks.box.center.dx),
+      reason: 'the magnifier belongs at the right of an Arabic box',
+    );
+    expect(
+      marks.clear.center.dx,
+      lessThan(marks.box.center.dx),
+      reason: 'and the cross opposite it',
+    );
+  });
+
+  testWidgets('in English they change sides with the page', (tester) async {
+    final marks = await boxMarks(tester, direction: TextDirection.ltr);
+
+    expect(marks.glass.center.dx, lessThan(marks.box.center.dx));
+    expect(marks.clear.center.dx, greaterThan(marks.box.center.dx));
+  });
+
+  // It drew Material's `chevron_right_rounded` behind an `isRtl` test, and
+  // Material mirrors that icon in a right-to-left page itself - so the two
+  // turns cancelled and the mark pointed away from the way back.
+  testWidgets('the way back is the artboard chevron, pointing back', (
+    tester,
+  ) async {
+    final SearchBloc bloc = SearchBloc(apiService: _FailingApi());
+    addTearDown(bloc.close);
+
+    await pumpLocalized(
+      tester,
+      BlocProvider<SearchBloc>.value(value: bloc, child: const SearchPage()),
+    );
+
+    expect(find.byType(MerzoxBackChevron), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+    expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+
+    final MerzoxBackChevronPainter painter =
+        tester
+                .widget<CustomPaint>(
+                  find.descendant(
+                    of: find.byType(MerzoxBackChevron),
+                    matching: find.byType(CustomPaint),
+                  ),
+                )
+                .painter!
+            as MerzoxBackChevronPainter;
+
+    expect(
+      painter.rightward,
+      isTrue,
+      reason: 'in Arabic the way back is towards the right edge',
+    );
+  });
+
+  // ---------------------------------------------------------------------------
+  // The list of past searches
+  // ---------------------------------------------------------------------------
+
+  // It used to open on three invented rows - a pair of shoes and a shop nobody
+  // here has heard of - and they could be neither removed one by one nor
+  // cleared, because there was nothing behind them to remove.
+  testWidgets('there is no list of past searches until there is one', (
+    tester,
+  ) async {
+    final _TabApi api = _TabApi(shopCount: 1, goodsCount: 0);
+    final SearchBloc bloc = SearchBloc(apiService: api);
+    addTearDown(bloc.close);
+    bloc.add(const SearchStarted());
+
+    await pumpLocalized(
+      tester,
+      BlocProvider<SearchBloc>.value(value: bloc, child: const SearchPage()),
+    );
+
+    expect(find.text('تم البحث عنه سابقاً'), findsNothing);
+    expect(find.text('مسح الجميع'), findsNothing);
+
+    // Driven through the box, the way a reader does it: emptying a field that
+    // was never typed into fires nothing, and the screen would still think a
+    // search was in progress.
+    await tester.enterText(find.byType(TextField).first, 'بتول');
+    await settleFrames(tester, frames: 30);
+
+    // Back to the empty screen, which now has something to show.
+    await tester.enterText(find.byType(TextField).first, '');
+    await settleFrames(tester, frames: 30);
+
+    expect(find.text('تم البحث عنه سابقاً'), findsOneWidget);
+    expect(find.text('بتول'), findsOneWidget);
+  });
+
+  testWidgets('a past search can be removed, and all of them cleared', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(<String, Object>{
+      SearchBloc.historyKey: <String>['بتول', 'احمر'],
+    });
+
+    final SearchBloc bloc = SearchBloc(
+      apiService: _TabApi(shopCount: 1, goodsCount: 0),
+    );
+    addTearDown(bloc.close);
+    bloc.add(const SearchStarted());
+    await bloc.stream.firstWhere(
+      (SearchState state) => state.history.isNotEmpty,
+    );
+
+    await pumpLocalized(
+      tester,
+      BlocProvider<SearchBloc>.value(value: bloc, child: const SearchPage()),
+    );
+
+    expect(find.text('بتول'), findsOneWidget);
+    expect(find.text('احمر'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('search.history.remove.بتول')),
+    );
+    await settleFrames(tester);
+
+    expect(find.text('بتول'), findsNothing);
+    expect(find.text('احمر'), findsOneWidget);
+
+    await tester.tap(find.text('مسح الجميع'));
+    await settleFrames(tester);
+
+    expect(find.text('احمر'), findsNothing);
+    expect(find.text('تم البحث عنه سابقاً'), findsNothing);
+  });
+
+  // The goods box empties the same way the shop box does.
+  testWidgets('the cross on the goods box clears it', (tester) async {
+    final _RecordingSearchApi api = _RecordingSearchApi();
+    await _pumpSearch(tester, api);
+
+    const Key cross = ValueKey<String>('search.clearProduct');
+    expect(find.byKey(cross), findsNothing);
+
+    // Something in the shop box too, so that clearing the goods leaves a
+    // question standing and the server is asked it again. Clearing both would
+    // rightly ask nothing at all.
+    await tester.enterText(find.byType(TextField).first, 'ابو خالد');
+    await tester.enterText(
+      find.byKey(const ValueKey<String>('search.productField')),
+      'جاكيت',
+    );
+    await settleFrames(tester, frames: 30);
+
+    expect(find.byKey(cross), findsOneWidget);
+    expect(_lastCall(api)['product'], 'جاكيت');
+
+    await tester.tap(find.byKey(cross));
+    await settleFrames(tester, frames: 30);
+
+    expect(find.byKey(cross), findsNothing);
+    expect(_lastCall(api)['product'], '');
   });
 
   test('the tab is chosen by what was found', () {

@@ -3,6 +3,7 @@ import { User } from '../models/User.js';
 import {
   matchMode,
   searchPattern,
+  similarPatterns,
   textMatches
 } from '../policies/arabic-search.policy.js';
 import {
@@ -39,36 +40,7 @@ function productMatches(item, query, mode) {
   );
 }
 
-/**
- * The candidates to read, narrowed in the database where that is safe.
- *
- * Only an unanchored shop term on its own narrows anything: a `contains`
- * pattern is the one shape that can be asked of every field at once without
- * losing a shop whose match is in its goods. `starts` and `ends` anchor the
- * whole field - a shop called `حلويات أبو خالد` starts with `حلويات` while its
- * jacket does not - and a product term asks a second question the database
- * cannot combine field by field. Those read the active shops and decide here,
- * where one rule answers for every field.
- */
-function candidateFilter(query, mode, productQuery) {
-  const base = { isActive: true };
-  if (query === '' || mode !== 'contains' || productQuery !== '') return base;
-
-  const pattern = searchPattern(query, 'contains');
-  if (pattern === null) return base;
-
-  return {
-    ...base,
-    $or: [
-      { name: pattern },
-      { category: pattern },
-      { description: pattern },
-      { 'products.name': pattern },
-      { 'products.description': pattern }
-    ]
-  };
-}
-
+/** A product as a customer sees it, with the shop it belongs to attached. */
 function publicProductSearchResult(business, product) {
   return {
     ...business.productToJSON(product),
@@ -82,6 +54,84 @@ function publicProductSearchResult(business, product) {
       address: business.address
     }
   };
+}
+
+/** The shop's own fields - what it is called, what it sells, how it reads. */
+function shopClauses(pattern) {
+  return [
+    { name: pattern },
+    { category: pattern },
+    { description: pattern }
+  ];
+}
+
+function goodsClauses(patterns) {
+  return patterns.flatMap((pattern) => [
+    { 'products.name': pattern },
+    { 'products.description': pattern }
+  ]);
+}
+
+/** Every pattern a product term is satisfied by. */
+function productPatterns(productQuery, productMode) {
+  if (productMode === 'similar') return similarPatterns(productQuery);
+
+  const pattern = searchPattern(productQuery, productMode);
+  return pattern === null ? [] : [pattern];
+}
+
+/**
+ * The candidates to read, narrowed in the database.
+ *
+ * This used to give up whenever the search was anchored or carried a product
+ * term, and read every open shop instead. That is what made those searches
+ * slow: not the matching, which the database does in a millisecond, but
+ * hauling two megabytes of shop documents across the link to decide here what
+ * could have been decided there.
+ *
+ * The filter does not have to be exact - the loop below still decides, field by
+ * field, and it is the only thing that decides. It has to be no *narrower* than
+ * the truth, and each clause here is the same pattern the loop tests, asked of
+ * the same fields or of more of them: the database sees a shop's inactive goods
+ * where the loop does not, so it can only over-admit, never exclude.
+ */
+function candidateFilter(query, mode, productQuery, productMode) {
+  const clauses = [];
+
+  if (query !== '') {
+    const pattern = searchPattern(query, mode);
+
+    if (pattern !== null) {
+      // With no product term the words may be answered by the goods too, which
+      // is what the single box has always meant.
+      clauses.push({
+        $or:
+          productQuery === ''
+            ? [...shopClauses(pattern), ...goodsClauses([pattern])]
+            : shopClauses(pattern)
+      });
+    }
+  }
+
+  if (productQuery !== '') {
+    const patterns = productPatterns(productQuery, productMode);
+    if (patterns.length > 0) clauses.push({ $or: goodsClauses(patterns) });
+  }
+
+  if (clauses.length === 0) return { isActive: true };
+
+  return { isActive: true, $and: clauses };
+}
+
+/**
+ * Whether a search could be asking for a shop by its public identifier.
+ *
+ * Five digits, which is the whole of that identifier's shape. Asking the
+ * database anyway cost a round trip on every search - and on this deployment a
+ * round trip is four hundred milliseconds whatever it carries.
+ */
+function looksLikePublicId(query) {
+  return /^[0-9]{5}$/.test(query);
 }
 
 export const searchCatalog = asyncHandler(async (req, res) => {
@@ -163,10 +213,9 @@ export const searchCatalog = asyncHandler(async (req, res) => {
     }
   }
 
-  const exactIdBusiness = await Business.findOne({
-    isActive: true,
-    publicId: query
-  });
+  const exactIdBusiness = looksLikePublicId(query)
+    ? await Business.findOne({ isActive: true, publicId: query })
+    : null;
 
   if (exactIdBusiness) {
     const products = exactIdBusiness.products
@@ -193,10 +242,13 @@ export const searchCatalog = asyncHandler(async (req, res) => {
   }
 
   const businesses = await Business.find(
-    candidateFilter(query, mode, productQuery)
+    candidateFilter(query, mode, productQuery, productMode)
   )
     .sort({ ratingAverage: -1, subscribedAt: -1 })
-    .limit(80);
+    // Room above the cap for the shops the loop will drop - a shop whose only
+    // matching item is one it has stopped selling - and no more than that,
+    // because every extra candidate is eleven kilobytes over the wire.
+    .limit(Math.min(limit * 2, 80));
 
   // One box or two. With one, it has always meant "find me this, wherever it
   // is written", so it asks the shop and its goods alike. With two, the

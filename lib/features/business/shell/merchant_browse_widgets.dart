@@ -163,7 +163,7 @@ class MerchantSearchRow extends StatelessWidget {
                     prefixIcon: Icon(
                       MerzoxIcons.merchantBrowseSearch,
                       size: 20 * MerzoxIcons.searchSizeFactor,
-                      color: MerzoxColors.kColor2B2B2B,
+                      color: kMerzoxSearchGlassColour,
                     ),
                     prefixIconConstraints: const BoxConstraints(
                       minWidth: 38,

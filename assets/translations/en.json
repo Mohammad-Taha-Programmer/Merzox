@@ -620,11 +620,6 @@
     "title": "Search",
     "hint": "Search for any business or product",
     "clear": "Clear",
-    "defaultHistory": {
-      "womensShoes": "Women's shoes",
-      "jumiaStore": "Jumia store",
-      "womensBoots": "Women's boots"
-    },
     "clearAll": "Clear all",
     "previousSearches": "Previously searched",
     "productFallback": "Product",
