@@ -23,6 +23,15 @@ final class BusinessProfileState {
   final String errorMessage;
   final ReviewEligibilityStatus reviewEligibilityStatus;
 
+  /// Whether a pull-to-refresh is in flight.
+  ///
+  /// The screen keeps showing what it has while one runs - the indicator at
+  /// the top is the progress, and blanking three tabs under it would be a
+  /// worse answer than the stale one. It is on the state rather than in the
+  /// widget so the page can wait for the refresh to finish before it lets the
+  /// indicator go.
+  final bool isRefreshing;
+
   const BusinessProfileState({
     this.status = BusinessProfileStatus.initial,
     this.businessId = '',
@@ -40,6 +49,7 @@ final class BusinessProfileState {
     this.reviewsError = '',
     this.errorMessage = '',
     this.reviewEligibilityStatus = ReviewEligibilityStatus.unchecked,
+    this.isRefreshing = false,
   });
 
   BusinessProfileState copyWith({
@@ -59,6 +69,7 @@ final class BusinessProfileState {
     String? reviewsError,
     String? errorMessage,
     ReviewEligibilityStatus? reviewEligibilityStatus,
+    bool? isRefreshing,
   }) {
     return BusinessProfileState(
       status: status ?? this.status,
@@ -79,6 +90,7 @@ final class BusinessProfileState {
       errorMessage: errorMessage ?? this.errorMessage,
       reviewEligibilityStatus:
           reviewEligibilityStatus ?? this.reviewEligibilityStatus,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 }

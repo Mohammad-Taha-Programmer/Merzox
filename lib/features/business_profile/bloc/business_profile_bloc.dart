@@ -38,6 +38,7 @@ class BusinessProfileBloc
     on<BusinessProfileDetailsRetryRequested>(_onDetailsRetryRequested);
     on<BusinessProfileProductsRetryRequested>(_onProductsRetryRequested);
     on<BusinessProfileReviewsRetryRequested>(_onReviewsRetryRequested);
+    on<BusinessProfileRefreshRequested>(_onRefreshRequested);
   }
 
   Future<void> _onStarted(
@@ -85,6 +86,80 @@ class BusinessProfileBloc
     if (viewMode.allowsCustomerActions) {
       await _loadFavoriteStatus(emit, event.businessId);
     }
+  }
+
+  /// Everything the shop's page shows, fetched again at once.
+  ///
+  /// A reader who pulls down means the shop, not the tab in front of them, so
+  /// all three tabs are refetched: what the shop says about itself - which is
+  /// also where its services come from - the shelf under the filter they have
+  /// chosen, and the reviews. The other two filters are not cached at all;
+  /// choosing one always fetches, so the chosen one is the whole of what there
+  /// is to refresh.
+  ///
+  /// No section is put into its loading state. The indicator at the top is the
+  /// progress, and emptying three tabs underneath it would replace a page that
+  /// is merely a minute old with nothing at all. For the same reason a section
+  /// that fails keeps what it had - `copyWith` holds the old value against a
+  /// null - and only raises its own failure banner over it.
+  Future<void> _onRefreshRequested(
+    BusinessProfileRefreshRequested event,
+    Emitter<BusinessProfileState> emit,
+  ) async {
+    // A second pull while one is running would interleave two sets of emits.
+    // The one already running is what the puller gets.
+    if (state.isRefreshing || state.businessId.isEmpty) return;
+
+    emit(state.copyWith(isRefreshing: true));
+
+    final String businessId = state.businessId;
+    final String classification = state.productClassification;
+
+    // Started together: three requests over one link, and a storefront that
+    // waited for each in turn would take three times as long to say the same
+    // thing.
+    final detailsFuture = _capture(
+      () => _apiService.business(businessId: businessId),
+    );
+    final productsFuture = _capture(
+      () => _apiService.businessProducts(
+        businessId: businessId,
+        classification: classification,
+      ),
+    );
+    final reviewsFuture = _capture(
+      () => _apiService.businessReviews(businessId: businessId),
+    );
+
+    final details = await detailsFuture;
+    final products = await productsFuture;
+    final reviews = await reviewsFuture;
+
+    emit(
+      state.copyWith(
+        status: BusinessProfileStatus.ready,
+        business: details.value,
+        products: products.value,
+        reviews: reviews.value,
+        detailsStatus: details.status,
+        productsStatus: products.status,
+        reviewsStatus: reviews.status,
+        detailsError: details.errorMessage,
+        productsError: products.errorMessage,
+        reviewsError: reviews.errorMessage,
+      ),
+    );
+
+    if (viewMode.allowsCustomerActions) {
+      // The hearts on the shelf and whether this reader may write a review are
+      // part of what the page is showing, so they are part of what it refetches.
+      await _loadFavoriteStatus(emit, businessId);
+      await _loadReviewEligibility(emit);
+    }
+
+    // Last, and unconditionally: the page is waiting on this to let the
+    // indicator go.
+    emit(state.copyWith(isRefreshing: false));
   }
 
   Future<void> _onMainTabChanged(

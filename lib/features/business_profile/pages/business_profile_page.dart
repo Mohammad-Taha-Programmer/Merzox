@@ -109,75 +109,85 @@ class _BusinessProfileView extends StatelessWidget {
                 : HomeBusiness.fromDetail(state.business!);
             return Stack(
               children: [
-                ListView(
-                  // Customer mode clears the floating bottom navigation; the
-                  // preview has no bottom chrome, so it only needs a normal
-                  // content inset.
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    10,
-                    16,
-                    viewMode.isPreview ? 16 : 124,
-                  ),
-                  children: [
-                    _TopBar(onBack: () => Navigator.of(context).pop()),
-                    if (state.detailsStatus ==
-                        BusinessProfileSectionStatus.loading)
-                      const LinearProgressIndicator(minHeight: 2)
-                    else if (state.detailsStatus ==
-                        BusinessProfileSectionStatus.failure)
-                      _SectionFailure(
-                        message: state.detailsError,
-                        onRetry: () => context.read<BusinessProfileBloc>().add(
-                          const BusinessProfileDetailsRetryRequested(),
+                RefreshIndicator(
+                  color: MerzoxColors.kColor3D5A80,
+                  onRefresh: () =>
+                      refreshStorefront(context.read<BusinessProfileBloc>()),
+                  child: ListView(
+                    // Always scrollable, so a shop with an empty shelf can
+                    // still be pulled: without it the list is shorter than the
+                    // screen, does not scroll, and the gesture never starts.
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    // Customer mode clears the floating bottom navigation; the
+                    // preview has no bottom chrome, so it only needs a normal
+                    // content inset.
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      10,
+                      16,
+                      viewMode.isPreview ? 16 : 124,
+                    ),
+                    children: [
+                      _TopBar(onBack: () => Navigator.of(context).pop()),
+                      if (state.detailsStatus ==
+                          BusinessProfileSectionStatus.loading)
+                        const LinearProgressIndicator(minHeight: 2)
+                      else if (state.detailsStatus ==
+                          BusinessProfileSectionStatus.failure)
+                        _SectionFailure(
+                          message: state.detailsError,
+                          onRetry: () =>
+                              context.read<BusinessProfileBloc>().add(
+                                const BusinessProfileDetailsRetryRequested(),
+                              ),
+                          compact: true,
                         ),
-                        compact: true,
+                      const SizedBox(height: 20),
+                      _Hero(business: resolvedBusiness),
+                      const SizedBox(height: 12),
+                      Text(
+                        resolvedBusiness.name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF2B2B2B),
+                        ),
                       ),
-                    const SizedBox(height: 20),
-                    _Hero(business: resolvedBusiness),
-                    const SizedBox(height: 12),
-                    Text(
-                      resolvedBusiness.name,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF2B2B2B),
+                      const SizedBox(height: 9),
+                      Text(
+                        'ID: ${resolvedBusiness.displayId}',
+                        textAlign: TextAlign.center,
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 9),
-                    Text(
-                      'ID: ${resolvedBusiness.displayId}',
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.ltr,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(height: 15),
+                      _Stats(
+                        followerCount: resolvedBusiness.followerCount,
+                        productCount: resolvedBusiness.productCount,
                       ),
-                    ),
-                    const SizedBox(height: 15),
-                    _Stats(
-                      followerCount: resolvedBusiness.followerCount,
-                      productCount: resolvedBusiness.productCount,
-                    ),
-                    const SizedBox(height: 22),
-                    _MainTabs(selectedIndex: state.mainTabIndex),
-                    const SizedBox(height: 22),
-                    if (state.mainTabIndex == 0)
-                      _AboutTab(
-                        state: state,
-                        business: resolvedBusiness,
-                        viewMode: viewMode,
-                      )
-                    else if (state.mainTabIndex == 1)
-                      _ProductsTab(
-                        state: state,
-                        business: resolvedBusiness,
-                        viewMode: viewMode,
-                      )
-                    else
-                      _ReviewsTab(state: state, viewMode: viewMode),
-                  ],
+                      const SizedBox(height: 22),
+                      _MainTabs(selectedIndex: state.mainTabIndex),
+                      const SizedBox(height: 22),
+                      if (state.mainTabIndex == 0)
+                        _AboutTab(
+                          state: state,
+                          business: resolvedBusiness,
+                          viewMode: viewMode,
+                        )
+                      else if (state.mainTabIndex == 1)
+                        _ProductsTab(
+                          state: state,
+                          business: resolvedBusiness,
+                          viewMode: viewMode,
+                        )
+                      else
+                        _ReviewsTab(state: state, viewMode: viewMode),
+                    ],
+                  ),
                 ),
                 // A merchant must not open a customer chat with their own
                 // store, so the affordance is absent rather than disabled.
@@ -297,6 +307,24 @@ class _PreviewAwaitingPublicTruth extends StatelessWidget {
       ],
     );
   }
+}
+
+/// Pull down, and wait for the shop to have actually been fetched again.
+///
+/// The indicator only lets go when the future it was given completes, so a
+/// fire-and-forget `add` would spin for a moment and stop while the requests
+/// were still in the air - the reader would be told the page was fresh before
+/// it was. The bloc says when it is done; this waits for it to say so.
+///
+/// Public so it can be exercised without a drag gesture.
+Future<void> refreshStorefront(BusinessProfileBloc bloc) {
+  bloc.add(const BusinessProfileRefreshRequested());
+
+  // Subscribed before the bloc can have processed the event: `add` queues it
+  // and the queue is drained in a later microtask.
+  return bloc.stream.firstWhere(
+    (BusinessProfileState state) => !state.isRefreshing,
+  );
 }
 
 /// The side of the round controls that float over a storefront.
