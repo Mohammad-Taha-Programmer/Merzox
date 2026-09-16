@@ -246,6 +246,65 @@ void main() {
   // Which tab the answer opens on
   // ---------------------------------------------------------------------------
 
+  // ---------------------------------------------------------------------------
+  // A search that could not be run
+  // ---------------------------------------------------------------------------
+
+  // The screen had no failure state, so a network fault, a server error and an
+  // empty shelf were one screen saying "no results". A reader reporting "the
+  // search returns nothing" could have meant any of the three, and twice in one
+  // week it was not clear which.
+  testWidgets('a search that could not be run says so, and offers to retry', (
+    tester,
+  ) async {
+    final _FailingApi api = _FailingApi();
+    final SearchBloc bloc = SearchBloc(apiService: api);
+    addTearDown(bloc.close);
+
+    await pumpLocalized(
+      tester,
+      BlocProvider<SearchBloc>.value(value: bloc, child: const SearchPage()),
+    );
+
+    final Future<SearchState> settled = bloc.stream.firstWhere(
+      (SearchState state) => state.status == SearchStatus.failure,
+    );
+    bloc.add(const SearchSubmitted('بتول'));
+    await settled;
+    await settleFrames(tester);
+
+    expect(find.byKey(const ValueKey<String>('search.failed')), findsOneWidget);
+    expect(find.text('لا توجد نتائج'), findsNothing);
+
+    expect(api.calls, 1);
+    await tester.tap(find.text('إعادة المحاولة'));
+    await settleFrames(tester);
+    expect(api.calls, 2, reason: 'retry asks the same question again');
+  });
+
+  testWidgets('a search that found nothing is not a search that failed', (
+    tester,
+  ) async {
+    final SearchBloc bloc = SearchBloc(
+      apiService: _TabApi(shopCount: 0, goodsCount: 0, shopsMatched: false),
+    );
+    addTearDown(bloc.close);
+
+    await pumpLocalized(
+      tester,
+      BlocProvider<SearchBloc>.value(value: bloc, child: const SearchPage()),
+    );
+
+    final Future<SearchState> settled = bloc.stream.firstWhere(
+      (SearchState state) => state.status == SearchStatus.success,
+    );
+    bloc.add(const SearchSubmitted('لا شيء'));
+    await settled;
+    await settleFrames(tester);
+
+    expect(find.byKey(const ValueKey<String>('search.failed')), findsNothing);
+  });
+
   test('the tab is chosen by what was found', () {
     expect(
       SearchState.tabFor(shopsMatchedThemselves: true, hasProducts: true),
@@ -428,3 +487,20 @@ Map<String, dynamic> _goods(int index) => <String, dynamic>{
     'address': '',
   },
 };
+
+/// A server that cannot be reached.
+class _FailingApi extends ApiService {
+  int calls = 0;
+
+  @override
+  Future<SearchApiResponse> searchCatalog({
+    required String query,
+    String match = 'contains',
+    String product = '',
+    String productMatch = 'contains',
+    int limit = 30,
+  }) async {
+    calls += 1;
+    throw StateError('no server in this test');
+  }
+}

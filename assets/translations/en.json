@@ -616,6 +616,7 @@
   },
   "search": {
     "noResults": "No results",
+    "failed": "The search could not be run",
     "title": "Search",
     "hint": "Search for any business or product",
     "clear": "Clear",

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart' hide TextDirection;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import 'package:merzox/core/localization/api_error_localizer.dart';
 import 'package:merzox/core/constants/colors.dart';
 import 'package:merzox/core/widgets/merzox_icons.dart';
 import 'package:merzox/core/constants/money.dart';
@@ -170,6 +171,17 @@ class _SearchPageState extends State<SearchPage> {
                   else ...[
                     if (state.status == SearchStatus.loading)
                       const Center(child: CircularProgressIndicator())
+                    // A search that could not be run used to look exactly like
+                    // a search that found nothing: the screen had no failure
+                    // state at all, so the reader was told "no results" about a
+                    // question the server never answered.
+                    else if (state.status == SearchStatus.failure)
+                      _SearchFailed(
+                        message: state.errorMessage,
+                        onRetry: () => context.read<SearchBloc>().add(
+                          SearchSubmitted(state.query),
+                        ),
+                      )
                     else if (state.hasExactBusinessMatch)
                       _ExactPublicIdResults(
                         business: state.businesses.single,
@@ -1165,6 +1177,56 @@ class _ResultImage extends StatelessWidget {
                   child: Icon(fallbackIcon, color: MerzoxColors.kColor3D5A80),
                 ),
               ),
+      ),
+    );
+  }
+}
+
+/// A search that could not be run, said so.
+///
+/// Distinct from a search that found nothing, and the distinction is the whole
+/// point: they were the same screen, so a network fault, a server error and an
+/// empty shelf all read as "no results" - and a reader reporting "the search
+/// returns nothing" could have meant any of the three.
+class _SearchFailed extends StatelessWidget {
+  final String? message;
+  final VoidCallback onRetry;
+
+  const _SearchFailed({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      key: const ValueKey<String>('search.failed'),
+      padding: const EdgeInsets.only(top: 80),
+      child: Column(
+        children: <Widget>[
+          Icon(
+            Icons.cloud_off_rounded,
+            size: 42,
+            color: MerzoxColors.kColor98C1D9,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'search.failed'.tr(),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: MerzoxColors.kColor464646,
+            ),
+          ),
+          if (message != null && message!.trim().isNotEmpty) ...<Widget>[
+            const SizedBox(height: 8),
+            Text(
+              localizeApiErrorOrRaw(message!),
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: MerzoxColors.kColor767676),
+            ),
+          ],
+          const SizedBox(height: 16),
+          TextButton(onPressed: onRetry, child: Text('common.retry'.tr())),
+        ],
       ),
     );
   }
