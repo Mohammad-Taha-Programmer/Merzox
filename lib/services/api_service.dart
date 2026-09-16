@@ -712,11 +712,22 @@ class ApiService {
 
   Future<SearchApiResponse> searchCatalog({
     required String query,
+    String match = 'contains',
+    String product = '',
+    String productMatch = 'contains',
     int limit = 30,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/search',
-      queryParameters: {'query': query, 'limit': limit},
+      queryParameters: <String, dynamic>{
+        'query': query,
+        'match': match,
+        if (product.trim().isNotEmpty) ...<String, dynamic>{
+          'product': product.trim(),
+          'productMatch': productMatch,
+        },
+        'limit': limit,
+      },
     );
     final data = response.data?['data'] as Map<String, dynamic>? ?? {};
 
@@ -1970,10 +1981,19 @@ class SearchApiResponse {
   final List<SearchProductApiModel> products;
   final List<SearchBusinessApiModel> businesses;
 
+  /// Whether the words found a shop, as opposed to something a shop sells.
+  ///
+  /// A shop appears in [businesses] when its goods answered too - somebody
+  /// searching `احمر` wants to see who sells it - so the list being non-empty
+  /// says nothing about whether a *shop* was found. Only the server knows
+  /// which field matched, so it says.
+  final bool shopsMatchedThemselves;
+
   const SearchApiResponse({
     required this.query,
     required this.products,
     required this.businesses,
+    this.shopsMatchedThemselves = false,
   });
 
   factory SearchApiResponse.fromJson(Map<String, dynamic> json) {
@@ -1982,6 +2002,7 @@ class SearchApiResponse {
 
     return SearchApiResponse(
       query: json['query'] as String? ?? '',
+      shopsMatchedThemselves: json['shopsMatchedThemselves'] as bool? ?? false,
       products: productsJson
           .whereType<Map<String, dynamic>>()
           .map(SearchProductApiModel.fromJson)

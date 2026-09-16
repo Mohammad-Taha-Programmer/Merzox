@@ -616,18 +616,21 @@
   },
   "search": {
     "noResults": "لا توجد نتائج",
+    "failed": "تعذّر البحث",
     "title": "البحث",
     "hint": "أي متجر أو منتج تريد البحث عنه",
     "clear": "مسح",
-    "defaultHistory": {
-      "womensShoes": "حذاء حريمي",
-      "jumiaStore": "متجر جوميا",
-      "womensBoots": "بوت حريمي"
-    },
     "clearAll": "مسح الجميع",
     "previousSearches": "تم البحث عنه سابقاً",
     "productFallback": "منتج",
-    "businessFallback": "متجر"
+    "businessFallback": "متجر",
+    "matchStarts": "يبدأ بـ",
+    "matchContains": "يحتوي",
+    "matchEnds": "ينتهي بـ",
+    "matchSimilar": "مشابه",
+    "shopMatchLabel": "اسم المتجر",
+    "productLabel": "يبيع",
+    "productHint": "اسم المنتج"
   },
   "home": {
     "businessId": {

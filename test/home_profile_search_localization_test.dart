@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:merzox/core/widgets/merzox_back_chevron.dart';
 import 'package:merzox/features/home/home_screen.dart';
 import 'package:merzox/features/home/presentation/bloc/home_bloc.dart';
 import 'package:merzox/features/profile/bloc/profile_edit_bloc.dart';
@@ -145,28 +146,30 @@ void main() {
         final previous = isArabic
             ? 'تم البحث عنه سابقاً'
             : 'Previously searched';
-        final firstHistory = isArabic ? 'حذاء حريمي' : "Women's shoes";
 
         await _pumpSearch(tester, direction: direction);
 
         expect(find.text(title), findsOneWidget);
-        expect(find.text(previous), findsOneWidget);
-        expect(find.text(firstHistory), findsOneWidget);
-
         _expectDirection(tester, find.text(title), direction);
-        _expectDirection(tester, find.text(firstHistory), direction);
+
+        // Nothing has been searched for, so there is no list of past searches
+        // and no heading over one. There used to be three invented rows here -
+        // a pair of shoes and a shop nobody here has heard of - which could be
+        // neither removed one by one nor cleared, because nothing was behind
+        // them.
+        expect(find.text(previous), findsNothing);
 
         final searchField = tester.widget<TextField>(
           find.byType(TextField).first,
         );
         expect(searchField.textAlign, TextAlign.start);
 
-        expect(
-          find.byIcon(
-            isArabic ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
-          ),
-          findsOneWidget,
-        );
+        // The way back is the artboard's chevron, which turns itself. Asking
+        // for Material's `chevron_right` in a right-to-left page got a
+        // left-pointing one, because Material mirrors that icon itself.
+        expect(find.byType(MerzoxBackChevron), findsOneWidget);
+        expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+        expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
       });
     });
   }

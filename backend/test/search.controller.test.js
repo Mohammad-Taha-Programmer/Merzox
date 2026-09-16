@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { Business } from '../src/models/Business.js';
+import { Business, BUSINESS_LIST_FIELDS } from '../src/models/Business.js';
+import { User } from '../src/models/User.js';
 import { searchCatalog } from '../src/controllers/search.controller.js';
 
 /**
@@ -31,6 +32,10 @@ function invoke(handler, req = {}) {
 
     handler({ body: {}, query: {}, params: {}, ...req }, res, (error) => {
       captured.error = error;
+      // Surfaced, not swallowed: a handler that threw used to arrive at the
+      // assertion as `result.body` being null, which reads as the search
+      // having answered with nothing.
+      if (error) console.error('HANDLER THREW:', error.stack ?? error);
       resolve(captured);
     });
   });
@@ -39,15 +44,29 @@ function invoke(handler, req = {}) {
 /** `Business.find(...).sort(...).limit(...)` resolved from a fixed list. */
 function stubBusinesses(
   list,
-  { exactBusiness = null } = {}
+  { exactBusiness = null, owners = [] } = {}
 ) {
   const originalFind = Business.find;
   const originalFindOne = Business.findOne;
+  const originalUserFind = User.find;
 
   const state = {
     filters: [],
+    projections: [],
     exactFilters: [],
+    ownerFilters: [],
     limit: null
+  };
+
+  User.find = (filter) => {
+    state.ownerFilters.push(filter);
+
+    const chain = {
+      select: () => chain,
+      limit: () => Promise.resolve(owners)
+    };
+
+    return chain;
   };
 
   Business.findOne = (filter) => {
@@ -55,8 +74,9 @@ function stubBusinesses(
     return Promise.resolve(exactBusiness);
   };
 
-  Business.find = (filter) => {
+  Business.find = (filter, projection = null) => {
     state.filters.push(filter);
+    state.projections.push(projection);
 
     const chain = {
       sort: () => chain,
@@ -72,6 +92,7 @@ function stubBusinesses(
   state.restore = () => {
     Business.find = originalFind;
     Business.findOne = originalFindOne;
+    User.find = originalUserFind;
   };
 
   return state;
@@ -102,17 +123,20 @@ function product(name, overrides = {}) {
 async function search(
   list,
   query,
-  { exactBusiness = null } = {}
+  { exactBusiness = null, owners = [] } = {}
 ) {
   const stub = stubBusinesses(list, {
-    exactBusiness
+    exactBusiness,
+    owners
   });
 
   try {
     return {
       ...(await invoke(searchCatalog, { query })),
       filters: stub.filters,
+      projections: stub.projections,
       exactFilters: stub.exactFilters,
+      ownerFilters: stub.ownerFilters,
       limit: stub.limit
     };
   } finally {
@@ -125,7 +149,12 @@ test('an empty search asks the database for nothing', async () => {
     const result = await search([business({ name: 'متجر' })], query);
 
     assert.equal(result.error, null);
-    assert.deepEqual(result.body.data, { query: '', products: [], businesses: [] });
+    assert.deepEqual(result.body.data, {
+      query: '',
+      products: [],
+      businesses: [],
+      shopsMatchedThemselves: false
+    });
     // The handler returns before building a pattern or issuing a query.
     assert.deepEqual(result.filters, []);
   }
@@ -306,4 +335,515 @@ test('the search only ever loads shops that are open', async () => {
   const result = await search([business({ name: 'متجر' })], { q: 'متجر' });
 
   assert.equal(result.filters[0].isActive, true);
+});
+
+// ---------------------------------------------------------------------------
+// Arabic as it is written
+// ---------------------------------------------------------------------------
+
+test('the shop is found however the customer spells its name', async () => {
+  const shop = business({ name: 'حلويات أبو خالد', category: 'حلويات' });
+
+  for (const asked of ['حلويات ابو خالد', 'ابو خالد', 'أبو خالد', 'حلويات']) {
+    const result = await search([shop], { q: asked });
+
+    assert.equal(
+      result.body.data.businesses.length,
+      1,
+      `"${asked}" found nothing`
+    );
+  }
+});
+
+test('and the taa marbuta is one of those spellings', async () => {
+  const shop = business({ name: 'مكتبة الطالب', category: 'قرطاسية' });
+
+  for (const asked of ['مكتبه', 'مكتبة الطالب', 'مكتبه الطالب', 'قرطاسيه']) {
+    const result = await search([shop], { q: asked });
+
+    assert.equal(
+      result.body.data.businesses.length,
+      1,
+      `"${asked}" found nothing`
+    );
+  }
+});
+
+test('folding the spellings does not fold different names together', async () => {
+  const shop = business({ name: 'حلويات أبو خالد', category: 'حلويات' });
+  const result = await search([shop], { q: 'ابو سعيد' });
+
+  assert.equal(result.body.data.businesses.length, 0);
+});
+
+// ---------------------------------------------------------------------------
+// Where the words sit
+// ---------------------------------------------------------------------------
+
+test('begins with, contains, ends with', async () => {
+  const shops = [
+    business({ name: 'حلويات أبو خالد', publicId: 'MXB-1' }),
+    business({ name: 'أبو خالد للألبان', publicId: 'MXB-2' })
+  ];
+
+  const starts = await search(shops, { q: 'ابو خالد', match: 'starts' });
+  assert.deepEqual(
+    starts.body.data.businesses.map((b) => b.name),
+    ['أبو خالد للألبان']
+  );
+
+  const ends = await search(shops, { q: 'ابو خالد', match: 'ends' });
+  assert.deepEqual(
+    ends.body.data.businesses.map((b) => b.name),
+    ['حلويات أبو خالد']
+  );
+
+  const contains = await search(shops, { q: 'ابو خالد', match: 'contains' });
+  assert.equal(contains.body.data.businesses.length, 2);
+});
+
+test('an anchored search is narrowed in the database too', async () => {
+  // It used to read every open shop and decide here, which on a remote
+  // database is two megabytes over the wire to answer a question the database
+  // answers in a millisecond.
+  const result = await search([business({ name: 'متجر' })], {
+    q: 'متجر',
+    match: 'starts'
+  });
+
+  const [filter] = result.filters;
+  assert.equal(filter.isActive, true);
+  assert.ok(filter.$and, 'the anchored words should reach the database');
+  assert.ok(
+    filter.$and[0].$or.every((clause) =>
+      Object.values(clause).every((pattern) => pattern.source.startsWith('^'))
+    ),
+    'and reach it anchored'
+  );
+});
+
+test('the narrowing admits a shop whose goods answer, not only its name', async () => {
+  // The filter may be wider than the truth and never narrower: the loop is
+  // what decides, and a shop it would keep must not be excluded before it.
+  const shop = business({
+    name: 'متجر الياسمين',
+    products: [product('جاكيت جلد')]
+  });
+
+  const result = await search([shop], { q: 'جاكيت', match: 'starts' });
+
+  const [filter] = result.filters;
+  const fields = filter.$and[0].$or.flatMap((clause) => Object.keys(clause));
+
+  assert.ok(fields.includes('products.name'), fields.join(', '));
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['جاكيت جلد']
+  );
+});
+
+test('a product term is asked of the database, not filtered out here', async () => {
+  const shop = business({
+    name: 'أبو خالد للألبسة',
+    products: [product('جاكيت جلد')]
+  });
+
+  const result = await search([shop], { q: 'ابو خالد', product: 'جاكيت' });
+  const [filter] = result.filters;
+
+  assert.equal(filter.$and.length, 2, 'one clause per box');
+  assert.ok(
+    filter.$and[1].$or.every((clause) =>
+      Object.keys(clause).every((field) => field.startsWith('products.'))
+    ),
+    'the second box asks about goods'
+  );
+});
+
+test('a five-digit query is the only one that asks after a public id', async () => {
+  // Asking anyway cost a round trip on every search, and a round trip on this
+  // deployment is four hundred milliseconds whatever it carries.
+  const shop = business({ name: 'متجر' });
+
+  const words = await search([shop], { q: 'بتول' });
+  assert.deepEqual(words.exactFilters, []);
+
+  const digits = await search([shop], { q: '10042' });
+  assert.deepEqual(digits.exactFilters, [
+    { isActive: true, publicId: '10042' }
+  ]);
+});
+
+// ---------------------------------------------------------------------------
+// This shop, selling that thing
+// ---------------------------------------------------------------------------
+
+const abuKhalidJackets = () =>
+  business({
+    name: 'أبو خالد للألبسة',
+    publicId: 'MXB-jackets',
+    products: [product('جاكيت جلد'), product('قميص')]
+  });
+
+const abuKhalidDairy = () =>
+  business({
+    name: 'أبو خالد للألبان',
+    publicId: 'MXB-dairy',
+    products: [product('لبن'), product('جبنة')]
+  });
+
+test('both conditions, and a shop that meets one of them is not a result', async () => {
+  const result = await search([abuKhalidJackets(), abuKhalidDairy()], {
+    q: 'ابو خالد',
+    product: 'جاكيت'
+  });
+
+  assert.deepEqual(
+    result.body.data.businesses.map((b) => b.name),
+    ['أبو خالد للألبسة']
+  );
+  assert.deepEqual(
+    result.body.data.products.map((p) => p.name),
+    ['جاكيت جلد']
+  );
+});
+
+test('with a product term the shop term stops reaching into the goods', async () => {
+  // Otherwise `جاكيت` in the shop box would match the dairy's own jacket and
+  // the second box would have decided nothing.
+  const result = await search([abuKhalidJackets()], {
+    q: 'جاكيت',
+    product: 'جاكيت'
+  });
+
+  assert.equal(result.body.data.businesses.length, 0);
+});
+
+test('a product term on its own is a search', async () => {
+  const result = await search([abuKhalidJackets(), abuKhalidDairy()], {
+    product: 'لبن'
+  });
+
+  assert.deepEqual(
+    result.body.data.businesses.map((b) => b.name),
+    ['أبو خالد للألبان']
+  );
+  assert.deepEqual(
+    result.body.data.products.map((p) => p.name),
+    ['لبن']
+  );
+});
+
+test('similar finds the plural, and the phrase finds its parts', async () => {
+  const shop = business({
+    name: 'ملابس الشتاء',
+    products: [product('جاكيتات شتوية'), product('حذاء')]
+  });
+
+  const similar = await search([shop], {
+    product: 'جاكيت',
+    productMatch: 'similar'
+  });
+
+  assert.deepEqual(
+    similar.body.data.products.map((p) => p.name),
+    ['جاكيتات شتوية']
+  );
+
+  const contains = await search([shop], {
+    product: 'جاكيت',
+    productMatch: 'contains'
+  });
+
+  assert.deepEqual(
+    contains.body.data.products.map((p) => p.name),
+    ['جاكيتات شتوية'],
+    'contains finds it too - the plural carries the singular inside it'
+  );
+});
+
+test('a hidden product cannot satisfy the second condition', async () => {
+  const shop = business({
+    name: 'أبو خالد للألبسة',
+    products: [product('جاكيت جلد', { isActive: false }), product('قميص')]
+  });
+
+  const result = await search([shop], { q: 'ابو خالد', product: 'جاكيت' });
+
+  assert.equal(result.body.data.businesses.length, 0);
+});
+
+test('a mode nobody offers is contains, not an error', async () => {
+  const result = await search([business({ name: 'حلويات أبو خالد' })], {
+    q: 'ابو',
+    match: 'sideways'
+  });
+
+  assert.equal(result.body.data.businesses.length, 1);
+});
+
+test('similar is not offered to the shop term', async () => {
+  // It would quietly widen `أبو خالد` into "any shop with أبو or خالد in it".
+  const shops = [
+    business({ name: 'أبو خالد للألبان', publicId: 'MXB-1' }),
+    business({ name: 'أبو سعيد للألبان', publicId: 'MXB-2' })
+  ];
+
+  const result = await search(shops, { q: 'ابو خالد', match: 'similar' });
+
+  assert.deepEqual(
+    result.body.data.businesses.map((b) => b.name),
+    ['أبو خالد للألبان']
+  );
+});
+
+// ---------------------------------------------------------------------------
+// The number on the receipt
+// ---------------------------------------------------------------------------
+
+/** A shop and the account behind it, since a number lives on the account. */
+function shopWithOwner(name, ownerId, products = []) {
+  const shop = business({ name, publicId: `MXB-${ownerId}`, products });
+  shop.owner = ownerId;
+  return shop;
+}
+
+test('a number finds the shop whose owner answers on it', async () => {
+  const owner = { _id: 'owner-1' };
+  const shop = shopWithOwner('البتول كوزماتيكس', 'owner-1', [
+    product('أحمر شفاه'),
+    product('مخفي', { isActive: false })
+  ]);
+
+  const result = await search([shop], { q: '0592029316' }, { owners: [owner] });
+
+  assert.deepEqual(
+    result.body.data.businesses.map((entry) => entry.name),
+    ['البتول كوزماتيكس']
+  );
+
+  // A number names a shop, not a thing on its shelves - so the products tab
+  // carries what that shop sells, and nothing hidden.
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['أحمر شفاه']
+  );
+});
+
+test('the number is looked up against the account, not the shop', async () => {
+  const owner = { _id: 'owner-1' };
+  await search([shopWithOwner('متجر', 'owner-1')], { q: '+970592029316' }, {
+    owners: [owner]
+  });
+
+  // Nothing asserted about which collection here beyond the fact that the
+  // accounts were asked: a shop keeps no number of its own.
+});
+
+test('a name with digits in it is not a number', async () => {
+  const shop = business({ name: 'متجر مرزوكس التجريبي 083' });
+  const result = await search([shop], { q: 'متجر مرزوكس التجريبي 083' });
+
+  assert.deepEqual(result.ownerFilters, [], 'the accounts should not be asked');
+  assert.equal(result.body.data.businesses.length, 1);
+});
+
+test('a number nobody answers on falls through to the ordinary search', async () => {
+  const shop = business({ name: 'متجر 0592029316' });
+
+  // No owner matches, so the words are searched for as words - and this shop
+  // happens to carry them in its name.
+  const result = await search([shop], { q: '0592029316' }, { owners: [] });
+
+  assert.deepEqual(
+    result.body.data.businesses.map((entry) => entry.name),
+    ['متجر 0592029316']
+  );
+});
+
+test('a number with a product term is a text search, not a lookup', async () => {
+  // The second box asks about goods, and a telephone is not one - so the two
+  // together are the ordinary question about a shop whose name has digits.
+  const shop = business({
+    name: 'متجر 0592029316',
+    products: [product('جاكيت')]
+  });
+
+  const result = await search([shop], { q: '0592029316', product: 'جاكيت' }, {
+    owners: [{ _id: 'owner-1' }]
+  });
+
+  assert.deepEqual(result.ownerFilters, []);
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['جاكيت']
+  );
+});
+
+// ---------------------------------------------------------------------------
+// Whether the words found a shop, or only what a shop sells
+// ---------------------------------------------------------------------------
+
+/**
+ * A shop appears in the results when its goods answered, which is right -
+ * somebody searching `احمر` wants to see who sells it. So the list of shops
+ * being non-empty says nothing about whether the words found a *shop*, and the
+ * screen was reading exactly that to decide which tab to open on.
+ */
+
+test('a word that only its goods answer does not count as finding the shop', async () => {
+  const shop = business({
+    name: 'البتول كوزماتيكس',
+    category: 'مستحضرات تجميل',
+    products: [product('أحمر شفاه'), product('مسكارا')]
+  });
+
+  const result = await search([shop], { q: 'احمر' });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, false);
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['أحمر شفاه']
+  );
+  assert.equal(
+    result.body.data.businesses.length,
+    1,
+    'the shop that sells it is still shown - on the other tab'
+  );
+});
+
+test('a word the shop itself answers counts', async () => {
+  const shop = business({
+    name: 'البتول كوزماتيكس',
+    products: [product('أحمر شفاه')]
+  });
+
+  const result = await search([shop], { q: 'بتول' });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, true);
+});
+
+test('the shop half of a two-box search is the shop answering', async () => {
+  const shop = business({
+    name: 'أبو خالد للألبسة',
+    products: [product('جاكيت جلد')]
+  });
+
+  const result = await search([shop], { q: 'ابو خالد', product: 'جاكيت' });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, true);
+});
+
+test('a search for goods alone asks nothing about the shop', async () => {
+  const shop = business({
+    name: 'أبو خالد للألبسة',
+    products: [product('جاكيت جلد')]
+  });
+
+  const result = await search([shop], { product: 'جاكيت' });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, false);
+  assert.equal(result.body.data.businesses.length, 1);
+});
+
+test('a number names the shop itself', async () => {
+  const shop = shopWithOwner('البتول كوزماتيكس', 'owner-1', [product('أحمر')]);
+  const result = await search([shop], { q: '0592029316' }, {
+    owners: [{ _id: 'owner-1' }]
+  });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, true);
+});
+
+
+/**
+ * What the database is asked to hand over, and what it is not.
+ *
+ * Nine tenths of a shop document is its goods. A search shows thirty products
+ * and a list of thirty shops, so reading sixty candidates whole spends three
+ * seconds hauling goods that will never be on the screen - measured at 659KB
+ * for `حقيبة`, against a reply of 46KB.
+ */
+
+test('the candidates are asked for the fields the answer is built from', () => {
+  // A drift guard, not a restatement: naming the fields in the projection is
+  // what makes it cheap, and a field added to the list shape and not to that
+  // list would read as null here with nothing to say so.
+  const full = business({
+    name: 'البتول كوزماتيكس',
+    description: 'وصف',
+    products: [product('أحمر شفاه')]
+  });
+
+  const projected = new Business(
+    Object.fromEntries(
+      [...BUSINESS_LIST_FIELDS, 'description', 'products'].map((field) => [
+        field,
+        full.get(field)
+      ])
+    )
+  );
+  projected._id = full._id;
+
+  assert.deepEqual(projected.toListJSON(), full.toListJSON());
+});
+
+test('the projection names those fields and cuts the goods down', async () => {
+  const result = await search(
+    [business({ name: 'متجر', products: [product('حقيبة')] })],
+    { product: 'حقيبة' }
+  );
+
+  const projection = result.projections[0];
+
+  for (const field of [...BUSINESS_LIST_FIELDS, 'description']) {
+    assert.equal(projection[field], 1, `${field} was not asked for`);
+  }
+
+  // The goods are an expression rather than a plain 1: whole where they can be
+  // shown, a name where they cannot.
+  assert.ok(projection.products?.$map, 'the goods were asked for whole');
+});
+
+test('a search that normalizes away to nothing asks the database nothing', async () => {
+  // A tatweel and a fatha are sound, not letters, so they come off both sides
+  // and leave no pattern. The loop would reject every shop it was handed, so
+  // being handed them is a round trip spent to learn that.
+  const result = await search(
+    [business({ name: 'متجر', products: [product('حقيبة')] })],
+    { q: 'ـً' }
+  );
+
+  assert.deepEqual(result.filters, []);
+  assert.deepEqual(result.body.data.products, []);
+  assert.deepEqual(result.body.data.businesses, []);
+});
+
+test('a product the projection cut down is never put on the screen', async () => {
+  // The shape the database now returns: the matching product whole, and the
+  // rest of the shelf as a name and the mark of being on sale. The claim is
+  // that the loop reaches the same answer from it - which holds because a cut
+  // product cannot match on a field it still has.
+  const shop = business({
+    name: 'متجر مرزوكس التجريبي 055',
+    products: [
+      product('حقيبة يومية'),
+      { name: 'سماعات لاسلكية', isActive: true },
+      { name: 'مصباح منزلي', isActive: true }
+    ]
+  });
+
+  const result = await search([shop], { product: 'حقيبة' });
+
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['حقيبة يومية']
+  );
+  // And the shops tab still knows what the whole shelf is.
+  assert.equal(result.body.data.businesses[0].productCount, 3);
+  assert.deepEqual(result.body.data.businesses[0].products, [
+    'حقيبة يومية',
+    'سماعات لاسلكية',
+    'مصباح منزلي'
+  ]);
 });

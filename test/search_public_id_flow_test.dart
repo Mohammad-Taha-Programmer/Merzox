@@ -100,6 +100,9 @@ final class _ExactPublicIdApi extends ApiService {
   @override
   Future<SearchApiResponse> searchCatalog({
     required String query,
+    String match = 'contains',
+    String product = '',
+    String productMatch = 'contains',
     int limit = 30,
   }) async {
     queries.add(query);

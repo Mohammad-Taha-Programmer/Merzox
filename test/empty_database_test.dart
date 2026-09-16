@@ -158,6 +158,9 @@ class _EmptyApi extends ApiService {
   @override
   Future<SearchApiResponse> searchCatalog({
     required String query,
+    String match = 'contains',
+    String product = '',
+    String productMatch = 'contains',
     int limit = 30,
   }) async => SearchApiResponse.fromJson(const <String, dynamic>{
     'query': '',

@@ -1,10 +1,13 @@
 import 'package:merzox/services/api_service.dart';
 
+import 'search_refinement.dart';
+
 enum SearchStatus { initial, idle, loading, success, failure }
 
 final class SearchState {
   final SearchStatus status;
   final String query;
+  final SearchRefinement refinement;
   final int selectedTab;
   final List<String> history;
   final List<SearchProductApiModel> products;
@@ -14,6 +17,7 @@ final class SearchState {
   const SearchState({
     this.status = SearchStatus.initial,
     this.query = '',
+    this.refinement = const SearchRefinement(),
     this.selectedTab = 0,
     this.history = const [],
     this.products = const [],
@@ -21,7 +25,36 @@ final class SearchState {
     this.errorMessage,
   });
 
-  bool get hasQuery => query.trim().isNotEmpty;
+  /// Whether there is anything to search for. Either box will do: somebody who
+  /// only knows what they want to buy has said enough.
+  bool get hasQuery => query.trim().isNotEmpty || refinement.hasProduct;
+
+  /// Whether the shop box itself has anything in it.
+  bool get hasShopQuery => query.trim().isNotEmpty;
+
+  /// Which tab a fresh result should open on.
+  ///
+  /// The answer the reader is most likely to have been looking for. Shops when
+  /// the words found a shop - including a search by telephone number, which
+  /// names a shop and never a thing on its shelves - and goods when they found
+  /// goods and no shop. With nothing found there is nothing to choose between,
+  /// and shops is where the screen has always started.
+  ///
+  /// It asks whether a shop was *found*, not whether any shop is in the list.
+  /// A shop is listed when its goods answered, so counting the list opened
+  /// `احمر` - which finds lipstick - on a tab of shops.
+  static const int productsTab = 0;
+  static const int storesTab = 1;
+
+  static int tabFor({
+    required bool shopsMatchedThemselves,
+    required bool hasProducts,
+  }) {
+    if (shopsMatchedThemselves) return storesTab;
+    if (hasProducts) return productsTab;
+
+    return storesTab;
+  }
 
   bool get hasExactBusinessMatch {
     final normalizedQuery = query.trim();
@@ -44,6 +77,7 @@ final class SearchState {
   SearchState copyWith({
     SearchStatus? status,
     String? query,
+    SearchRefinement? refinement,
     int? selectedTab,
     List<String>? history,
     List<SearchProductApiModel>? products,
@@ -53,6 +87,7 @@ final class SearchState {
     return SearchState(
       status: status ?? this.status,
       query: query ?? this.query,
+      refinement: refinement ?? this.refinement,
       selectedTab: selectedTab ?? this.selectedTab,
       history: history ?? this.history,
       products: products ?? this.products,

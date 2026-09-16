@@ -1,3 +1,5 @@
+import 'search_refinement.dart';
+
 sealed class SearchEvent {
   const SearchEvent();
 }
@@ -32,6 +34,27 @@ final class SearchHistoryItemRemoved extends SearchEvent {
 
 final class SearchHistoryCleared extends SearchEvent {
   const SearchHistoryCleared();
+}
+
+/// The reader changed where the shop name has to sit.
+final class SearchMatchChanged extends SearchEvent {
+  final SearchMatch match;
+
+  const SearchMatchChanged(this.match);
+}
+
+/// The reader typed, or cleared, the goods they want the shop to sell.
+final class SearchProductChanged extends SearchEvent {
+  final String product;
+
+  const SearchProductChanged(this.product);
+}
+
+/// The reader changed how the goods are matched.
+final class SearchProductMatchChanged extends SearchEvent {
+  final SearchMatch productMatch;
+
+  const SearchProductMatchChanged(this.productMatch);
 }
 
 final class SearchTabChanged extends SearchEvent {
