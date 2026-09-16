@@ -165,7 +165,7 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
           // picks the other tab keeps it until the next answer arrives, which
           // is a new question and a new best guess.
           selectedTab: SearchState.tabFor(
-            hasBusinesses: result.businesses.isNotEmpty,
+            shopsMatchedThemselves: result.shopsMatchedThemselves,
             hasProducts: result.products.isNotEmpty,
           ),
           errorMessage: null,

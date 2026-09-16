@@ -248,20 +248,20 @@ void main() {
 
   test('the tab is chosen by what was found', () {
     expect(
-      SearchState.tabFor(hasBusinesses: true, hasProducts: true),
+      SearchState.tabFor(shopsMatchedThemselves: true, hasProducts: true),
       SearchState.storesTab,
     );
     expect(
-      SearchState.tabFor(hasBusinesses: true, hasProducts: false),
+      SearchState.tabFor(shopsMatchedThemselves: true, hasProducts: false),
       SearchState.storesTab,
     );
     expect(
-      SearchState.tabFor(hasBusinesses: false, hasProducts: true),
+      SearchState.tabFor(shopsMatchedThemselves: false, hasProducts: true),
       SearchState.productsTab,
       reason: 'goods and no shop: the goods are the answer',
     );
     expect(
-      SearchState.tabFor(hasBusinesses: false, hasProducts: false),
+      SearchState.tabFor(shopsMatchedThemselves: false, hasProducts: false),
       SearchState.storesTab,
       reason: 'nothing found: there is nothing to choose between',
     );
@@ -287,16 +287,37 @@ void main() {
     );
   });
 
+  // The case that was reported: `احمر` finds lipstick, and the shops that sell
+  // it are listed too - so counting the list opened on a tab of shops.
+  test(
+    'goods the words found, in shops the words did not, opens on goods',
+    () async {
+      expect(
+        await tabAfter(
+          'احمر',
+          _TabApi(shopCount: 2, goodsCount: 3, shopsMatched: false),
+        ),
+        SearchState.productsTab,
+      );
+    },
+  );
+
   test('an answer with only goods opens on the goods', () async {
     expect(
-      await tabAfter('جاكيت', _TabApi(shopCount: 0, goodsCount: 3)),
+      await tabAfter(
+        'جاكيت',
+        _TabApi(shopCount: 0, goodsCount: 3, shopsMatched: false),
+      ),
       SearchState.productsTab,
     );
   });
 
   test('an answer with nothing in it opens on the shops', () async {
     expect(
-      await tabAfter('لا شيء', _TabApi(shopCount: 0, goodsCount: 0)),
+      await tabAfter(
+        'لا شيء',
+        _TabApi(shopCount: 0, goodsCount: 0, shopsMatched: false),
+      ),
       SearchState.storesTab,
     );
   });
@@ -332,8 +353,13 @@ void main() {
 class _TabApi extends ApiService {
   final int shopCount;
   final int goodsCount;
+  final bool shopsMatched;
 
-  _TabApi({required this.shopCount, required this.goodsCount});
+  _TabApi({
+    required this.shopCount,
+    required this.goodsCount,
+    this.shopsMatched = true,
+  });
 
   @override
   Future<SearchApiResponse> searchCatalog({
@@ -345,6 +371,7 @@ class _TabApi extends ApiService {
   }) async {
     return SearchApiResponse(
       query: query,
+      shopsMatchedThemselves: shopsMatched,
       products: <SearchProductApiModel>[
         for (int i = 0; i < goodsCount; i += 1)
           SearchProductApiModel.fromJson(_goods(i)),

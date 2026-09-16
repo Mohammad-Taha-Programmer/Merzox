@@ -100,7 +100,12 @@ export const searchCatalog = asyncHandler(async (req, res) => {
   if (!query && !productQuery) {
     res.json({
       success: true,
-      data: { query: '', products: [], businesses: [] }
+      data: {
+        query: '',
+        products: [],
+        businesses: [],
+        shopsMatchedThemselves: false
+      }
     });
     return;
   }
@@ -148,7 +153,9 @@ export const searchCatalog = asyncHandler(async (req, res) => {
           data: {
             query,
             products: found,
-            businesses: shops.map((shop) => shop.toListJSON())
+            businesses: shops.map((shop) => shop.toListJSON()),
+            // A number names the shop itself.
+            shopsMatchedThemselves: true
           }
         });
         return;
@@ -199,9 +206,25 @@ export const searchCatalog = asyncHandler(async (req, res) => {
   const products = [];
   const matched = [];
 
+  /**
+   * Whether any shop in the results is there for its own sake.
+   *
+   * A shop appears in the list when its goods answered too, which is right -
+   * somebody searching `احمر` wants to see who sells it. But it means the list
+   * of shops being non-empty says nothing about whether the *words* found a
+   * shop, and the screen was using exactly that to decide which tab to open.
+   * `احمر` found lipstick and opened on a tab of shops.
+   *
+   * So the fact travels, and the screen reads it instead of counting.
+   */
+  let shopsMatchedThemselves = false;
+
   for (const business of businesses) {
+    // With no shop term at all - a search for goods alone - nothing has been
+    // asked about the shop, so nothing about it has been answered.
     const shopItself =
       query === '' || shopItselfMatches(business, query, mode);
+    if (query !== '' && shopItself) shopsMatchedThemselves = true;
     const onSale = business.products.filter((item) => item.isActive);
 
     let goods;
@@ -240,7 +263,8 @@ export const searchCatalog = asyncHandler(async (req, res) => {
     data: {
       query,
       products,
-      businesses: matchedBusinesses
+      businesses: matchedBusinesses,
+      shopsMatchedThemselves
     }
   });
 });

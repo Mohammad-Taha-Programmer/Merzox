@@ -142,7 +142,12 @@ test('an empty search asks the database for nothing', async () => {
     const result = await search([business({ name: 'متجر' })], query);
 
     assert.equal(result.error, null);
-    assert.deepEqual(result.body.data, { query: '', products: [], businesses: [] });
+    assert.deepEqual(result.body.data, {
+      query: '',
+      products: [],
+      businesses: [],
+      shopsMatchedThemselves: false
+    });
     // The handler returns before building a pattern or issuing a query.
     assert.deepEqual(result.filters, []);
   }
@@ -606,4 +611,79 @@ test('a number with a product term is a text search, not a lookup', async () => 
     result.body.data.products.map((entry) => entry.name),
     ['جاكيت']
   );
+});
+
+// ---------------------------------------------------------------------------
+// Whether the words found a shop, or only what a shop sells
+// ---------------------------------------------------------------------------
+
+/**
+ * A shop appears in the results when its goods answered, which is right -
+ * somebody searching `احمر` wants to see who sells it. So the list of shops
+ * being non-empty says nothing about whether the words found a *shop*, and the
+ * screen was reading exactly that to decide which tab to open on.
+ */
+
+test('a word that only its goods answer does not count as finding the shop', async () => {
+  const shop = business({
+    name: 'البتول كوزماتيكس',
+    category: 'مستحضرات تجميل',
+    products: [product('أحمر شفاه'), product('مسكارا')]
+  });
+
+  const result = await search([shop], { q: 'احمر' });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, false);
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['أحمر شفاه']
+  );
+  assert.equal(
+    result.body.data.businesses.length,
+    1,
+    'the shop that sells it is still shown - on the other tab'
+  );
+});
+
+test('a word the shop itself answers counts', async () => {
+  const shop = business({
+    name: 'البتول كوزماتيكس',
+    products: [product('أحمر شفاه')]
+  });
+
+  const result = await search([shop], { q: 'بتول' });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, true);
+});
+
+test('the shop half of a two-box search is the shop answering', async () => {
+  const shop = business({
+    name: 'أبو خالد للألبسة',
+    products: [product('جاكيت جلد')]
+  });
+
+  const result = await search([shop], { q: 'ابو خالد', product: 'جاكيت' });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, true);
+});
+
+test('a search for goods alone asks nothing about the shop', async () => {
+  const shop = business({
+    name: 'أبو خالد للألبسة',
+    products: [product('جاكيت جلد')]
+  });
+
+  const result = await search([shop], { product: 'جاكيت' });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, false);
+  assert.equal(result.body.data.businesses.length, 1);
+});
+
+test('a number names the shop itself', async () => {
+  const shop = shopWithOwner('البتول كوزماتيكس', 'owner-1', [product('أحمر')]);
+  const result = await search([shop], { q: '0592029316' }, {
+    owners: [{ _id: 'owner-1' }]
+  });
+
+  assert.equal(result.body.data.shopsMatchedThemselves, true);
 });
