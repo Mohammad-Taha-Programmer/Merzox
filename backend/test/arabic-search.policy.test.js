@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   matchMode,
+  patternIsPortable,
   normalizeArabic,
   searchPattern,
   similarPatterns,
@@ -175,4 +176,72 @@ test('the modes are taken as given, whatever the casing', () => {
 test('similar is offered to a product term and to nothing else', () => {
   assert.equal(matchMode('similar'), 'contains');
   assert.equal(matchMode('similar', { allowSimilar: true }), 'similar');
+});
+
+// ---------------------------------------------------------------------------
+// The patterns leave here and are read by something that is not JavaScript
+// ---------------------------------------------------------------------------
+
+/**
+ * These are handed to MongoDB, which reads them as PCRE.
+ *
+ * The two dialects agree on almost everything and disagree on the escapes, so
+ * a pattern can be correct in every test above - they all run in JavaScript -
+ * and invalid in the only place it is used. That is not hypothetical: the
+ * first version of this file spelled a character class with `\uXXXX`, which
+ * PCRE has no such escape for, and a shop called `البتول كوزماتيكس` could not
+ * be found by `بتول`. Every test above passed while it was broken.
+ *
+ * So this reads the source rather than the behaviour.
+ */
+
+test('no pattern this file builds carries a JavaScript-only escape', () => {
+  const queries = [
+    'بتول',
+    'البتول كوزماتيكس',
+    'حلويات أبو خالد',
+    'مكتبة الطالب',
+    'متجر ٢٤ ساعة',
+    'a.*b',
+    'Merzox STORE'
+  ];
+
+  for (const query of queries) {
+    for (const mode of ['starts', 'contains', 'ends']) {
+      const pattern = searchPattern(query, mode);
+      assert.ok(
+        patternIsPortable(pattern.source),
+        `"${query}" (${mode}) built ${pattern.source}`
+      );
+    }
+
+    for (const pattern of similarPatterns(query)) {
+      assert.ok(
+        patternIsPortable(pattern.source),
+        `"${query}" (similar) built ${pattern.source}`
+      );
+    }
+  }
+});
+
+test('the guard knows an unportable pattern when it sees one', () => {
+  // Otherwise the test above passes because it is looking for nothing.
+  // `String.raw` so these are the escape *text* a pattern source would carry,
+  // not the characters they stand for - which is the whole distinction.
+  assert.equal(patternIsPortable(String.raw`\u064B`), false);
+  assert.equal(patternIsPortable(String.raw`[\u064B-\u0652]`), false);
+  assert.equal(patternIsPortable(String.raw`\p{Arabic}`), false);
+  assert.equal(patternIsPortable('(?<word>x)'), false);
+  assert.equal(patternIsPortable('[ً-ْٰـ]*'), true);
+});
+
+test('the shop that was missed is found, in every spelling of it', () => {
+  const name = 'البتول كوزماتيكس';
+
+  for (const asked of ['بتول', 'البتول', 'كوزماتيكس', 'البتول كوزماتيكس']) {
+    assert.equal(textMatches(name, asked, 'contains'), true, asked);
+  }
+
+  assert.equal(textMatches(name, 'البتول', 'starts'), true);
+  assert.equal(textMatches(name, 'كوزماتيكس', 'ends'), true);
 });
