@@ -527,11 +527,11 @@ class _Hero extends StatelessWidget {
             ),
           // `start`, not `end`: in an RTL layout `end` resolves to the LEFT
           // edge, and the artboard puts this mark against the banner's right
-          // one. The bubble hangs over the banner's top edge, which is why it
-          // is drawn after it and before the logo.
+          // one. Flush with both of that corner's edges, because it is a
+          // corner of the banner rather than something resting on it.
           PositionedDirectional(
-            top: 3,
-            start: 7,
+            top: 0,
+            start: 0,
             child: _RatingMoodBadge(rating: business.rating),
           ),
           Positioned(
@@ -586,98 +586,59 @@ const String kShopMoodSadAsset =
 /// silence is not an achievement.
 bool isTopRatedShop(double rating) => rating >= kTopShopRating;
 
-/// How far the bubble's tail hangs below its body.
-const double kShopMoodTailHeight = 7;
+/// How wide the corner the face sits in is, and how tall.
+const double kShopMoodWidth = 52;
+const double kShopMoodHeight = 38;
 
-/// How wide it is where it leaves the body.
-const double kShopMoodTailWidth = 11;
+/// The curve where that corner meets the banner it is cut out of.
+const double kShopMoodInnerRadius = 14;
 
 /// The face in the corner of a shop's banner.
 ///
-/// It was a literal `🙂` in the source, which is one face for every shop and
-/// therefore said nothing about any of them; and being a text glyph it was
-/// drawn by whatever emoji font the phone happened to carry, so it was not the
-/// same face twice across devices. It is a drawing now, and it follows the
-/// rating.
+/// It was a literal smiling face written into the source, which is one face
+/// for every shop and therefore said nothing about any of them; and being a
+/// text glyph it was drawn by whatever emoji font the phone happened to
+/// carry, so it was not the same face twice across devices. It is a drawing
+/// now, and it follows the rating.
+///
+/// The shape is a corner of the banner in a deeper blue rather than a badge
+/// laid on top of one: it takes the banner's own outer corner and its two
+/// straight edges, and only the corner facing into the banner is rounded. So
+/// it reads as part of the banner, which is why it needs no shadow and no
+/// outline to sit there.
 class _RatingMoodBadge extends StatelessWidget {
   final double rating;
 
   const _RatingMoodBadge({required this.rating});
 
-  static const double _side = 40;
-
   @override
   Widget build(BuildContext context) {
     final bool happy = isTopRatedShop(rating);
 
-    return SizedBox(
-      width: _side,
-      height: _side + kShopMoodTailHeight,
-      child: CustomPaint(
-        painter: _MoodBubblePainter(textDirection: Directionality.of(context)),
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: kShopMoodTailHeight),
-          child: Center(
-            child: Image.asset(
-              happy ? kShopMoodHappyAsset : kShopMoodSadAsset,
-              key: ValueKey<String>(
-                'storefront.mood.${happy ? 'happy' : 'sad'}',
-              ),
-              width: 26,
-              height: 26,
-              filterQuality: FilterQuality.medium,
-            ),
-          ),
+    return Container(
+      width: kShopMoodWidth,
+      height: kShopMoodHeight,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: MerzoxColors.kColor98C1D9,
+        // Directional, and `start` is the banner's outer corner: in Arabic
+        // that is the right one, in English the left, and the shape turns
+        // over with the page rather than being drawn twice.
+        borderRadius: BorderRadiusDirectional.only(
+          // The banner's own corner, continued.
+          topStart: Radius.circular(6),
+          bottomEnd: Radius.circular(kShopMoodInnerRadius),
         ),
       ),
-    );
-  }
-}
-
-/// The bubble the face sits in: a rounded square with a tail under one corner.
-///
-/// The tail hangs from the corner nearer the frame, which is the left one in
-/// Arabic and the right one in English, so the bubble points at the banner
-/// rather than away from it.
-class _MoodBubblePainter extends CustomPainter {
-  final TextDirection textDirection;
-
-  const _MoodBubblePainter({required this.textDirection});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double bodyHeight = size.height - kShopMoodTailHeight;
-    final Paint paint = Paint()..color = MerzoxColors.kColor98C1D9;
-
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, 0, size.width, bodyHeight),
-        const Radius.circular(8),
+      child: Image.asset(
+        happy ? kShopMoodHappyAsset : kShopMoodSadAsset,
+        key: ValueKey<String>('storefront.mood.${happy ? 'happy' : 'sad'}'),
+        width: 22,
+        height: 22,
+        filterQuality: FilterQuality.medium,
       ),
-      paint,
-    );
-
-    // The tail continues one vertical edge of the body downwards, so the two
-    // read as one shape rather than a square with a mark under it.
-    final bool towardsLeft = textDirection == TextDirection.rtl;
-    final double edge = towardsLeft ? 6 : size.width - 6;
-    final double inner = towardsLeft
-        ? edge + kShopMoodTailWidth
-        : edge - kShopMoodTailWidth;
-
-    canvas.drawPath(
-      Path()
-        ..moveTo(edge, bodyHeight)
-        ..lineTo(inner, bodyHeight)
-        ..lineTo(edge, bodyHeight + kShopMoodTailHeight)
-        ..close(),
-      paint,
     );
   }
-
-  @override
-  bool shouldRepaint(_MoodBubblePainter oldDelegate) =>
-      oldDelegate.textDirection != textDirection;
 }
 
 /// The shop's own picture, where the storefront drew only a letter.
