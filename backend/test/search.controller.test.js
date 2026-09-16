@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { Business } from '../src/models/Business.js';
+import { Business, BUSINESS_LIST_FIELDS } from '../src/models/Business.js';
 import { User } from '../src/models/User.js';
 import { searchCatalog } from '../src/controllers/search.controller.js';
 
@@ -52,6 +52,7 @@ function stubBusinesses(
 
   const state = {
     filters: [],
+    projections: [],
     exactFilters: [],
     ownerFilters: [],
     limit: null
@@ -73,8 +74,9 @@ function stubBusinesses(
     return Promise.resolve(exactBusiness);
   };
 
-  Business.find = (filter) => {
+  Business.find = (filter, projection = null) => {
     state.filters.push(filter);
+    state.projections.push(projection);
 
     const chain = {
       sort: () => chain,
@@ -132,6 +134,7 @@ async function search(
     return {
       ...(await invoke(searchCatalog, { query })),
       filters: stub.filters,
+      projections: stub.projections,
       exactFilters: stub.exactFilters,
       ownerFilters: stub.ownerFilters,
       limit: stub.limit
@@ -750,4 +753,97 @@ test('a number names the shop itself', async () => {
   });
 
   assert.equal(result.body.data.shopsMatchedThemselves, true);
+});
+
+
+/**
+ * What the database is asked to hand over, and what it is not.
+ *
+ * Nine tenths of a shop document is its goods. A search shows thirty products
+ * and a list of thirty shops, so reading sixty candidates whole spends three
+ * seconds hauling goods that will never be on the screen - measured at 659KB
+ * for `حقيبة`, against a reply of 46KB.
+ */
+
+test('the candidates are asked for the fields the answer is built from', () => {
+  // A drift guard, not a restatement: naming the fields in the projection is
+  // what makes it cheap, and a field added to the list shape and not to that
+  // list would read as null here with nothing to say so.
+  const full = business({
+    name: 'البتول كوزماتيكس',
+    description: 'وصف',
+    products: [product('أحمر شفاه')]
+  });
+
+  const projected = new Business(
+    Object.fromEntries(
+      [...BUSINESS_LIST_FIELDS, 'description', 'products'].map((field) => [
+        field,
+        full.get(field)
+      ])
+    )
+  );
+  projected._id = full._id;
+
+  assert.deepEqual(projected.toListJSON(), full.toListJSON());
+});
+
+test('the projection names those fields and cuts the goods down', async () => {
+  const result = await search(
+    [business({ name: 'متجر', products: [product('حقيبة')] })],
+    { product: 'حقيبة' }
+  );
+
+  const projection = result.projections[0];
+
+  for (const field of [...BUSINESS_LIST_FIELDS, 'description']) {
+    assert.equal(projection[field], 1, `${field} was not asked for`);
+  }
+
+  // The goods are an expression rather than a plain 1: whole where they can be
+  // shown, a name where they cannot.
+  assert.ok(projection.products?.$map, 'the goods were asked for whole');
+});
+
+test('a search that normalizes away to nothing asks the database nothing', async () => {
+  // A tatweel and a fatha are sound, not letters, so they come off both sides
+  // and leave no pattern. The loop would reject every shop it was handed, so
+  // being handed them is a round trip spent to learn that.
+  const result = await search(
+    [business({ name: 'متجر', products: [product('حقيبة')] })],
+    { q: 'ـً' }
+  );
+
+  assert.deepEqual(result.filters, []);
+  assert.deepEqual(result.body.data.products, []);
+  assert.deepEqual(result.body.data.businesses, []);
+});
+
+test('a product the projection cut down is never put on the screen', async () => {
+  // The shape the database now returns: the matching product whole, and the
+  // rest of the shelf as a name and the mark of being on sale. The claim is
+  // that the loop reaches the same answer from it - which holds because a cut
+  // product cannot match on a field it still has.
+  const shop = business({
+    name: 'متجر مرزوكس التجريبي 055',
+    products: [
+      product('حقيبة يومية'),
+      { name: 'سماعات لاسلكية', isActive: true },
+      { name: 'مصباح منزلي', isActive: true }
+    ]
+  });
+
+  const result = await search([shop], { product: 'حقيبة' });
+
+  assert.deepEqual(
+    result.body.data.products.map((entry) => entry.name),
+    ['حقيبة يومية']
+  );
+  // And the shops tab still knows what the whole shelf is.
+  assert.equal(result.body.data.businesses[0].productCount, 3);
+  assert.deepEqual(result.body.data.businesses[0].products, [
+    'حقيبة يومية',
+    'سماعات لاسلكية',
+    'مصباح منزلي'
+  ]);
 });

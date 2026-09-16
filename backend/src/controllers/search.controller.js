@@ -1,4 +1,4 @@
-import { Business } from '../models/Business.js';
+import { Business, BUSINESS_LIST_FIELDS } from '../models/Business.js';
 import { User } from '../models/User.js';
 import {
   matchMode,
@@ -118,9 +118,119 @@ function candidateFilter(query, mode, productQuery, productMode) {
     if (patterns.length > 0) clauses.push({ $or: goodsClauses(patterns) });
   }
 
-  if (clauses.length === 0) return { isActive: true };
+  // Nothing that could be matched on. A query of tatweels and marks normalizes
+  // away to nothing, and reading every open shop to discover that the loop
+  // rejects all of them is the one round trip nobody asked for.
+  if (clauses.length === 0) return null;
 
   return { isActive: true, $and: clauses };
+}
+
+/**
+ * One field of a candidate, tested where the candidate is.
+ *
+ * The source and a bare `i` rather than the expression itself: this policy
+ * builds its patterns with `u`, BSON carries that flag, and `$regexMatch`
+ * refuses it. `$ifNull` because a shop may have no description and
+ * `$regexMatch` errs on anything that is not a string.
+ */
+function regexMatches(field, pattern) {
+  return {
+    $regexMatch: {
+      input: { $ifNull: [field, ''] },
+      regex: pattern.source,
+      options: 'i'
+    }
+  };
+}
+
+/**
+ * Whether a product is one this search could put on the screen.
+ *
+ * Nine tenths of a shop document is its goods, and a search shows thirty of
+ * them. `حقيبة` matched sixty shops selling twelve products each, so seven
+ * hundred products crossed the link to put thirty on the screen - three
+ * seconds for a reply of forty-six kilobytes.
+ *
+ * So the ones that cannot be shown are cut down where they are, to the name
+ * and the mark of being on sale, which is all the shops tab reads of them.
+ *
+ * The condition is the loop's own, stated as an expression: a product is
+ * emittable when it answers the search, or when the shop answered for itself
+ * and is therefore offering everything on its shelves. Which means a product
+ * that is cut down is one the loop would not have emitted - it cannot match on
+ * a field it still has, because matching on it is what would have kept it
+ * whole. The cut fields can turn no decision, only save the carriage.
+ */
+function emittableProduct(query, mode, productQuery, productMode) {
+  if (productQuery !== '') {
+    // With a goods box the loop asks only about the goods, whatever the shop
+    // box did.
+    const patterns = productPatterns(productQuery, productMode);
+    if (patterns.length === 0) return false;
+
+    return {
+      $or: patterns.flatMap((pattern) => [
+        regexMatches('$$item.name', pattern),
+        regexMatches('$$item.description', pattern)
+      ])
+    };
+  }
+
+  const pattern = searchPattern(query, mode);
+  if (pattern === null) return true;
+
+  return {
+    $or: [
+      // A shop found by its own name is offering all of its shelves.
+      regexMatches('$name', pattern),
+      regexMatches('$category', pattern),
+      regexMatches('$description', pattern),
+      regexMatches('$$item.name', pattern),
+      regexMatches('$$item.description', pattern)
+    ]
+  };
+}
+
+/**
+ * How much of a candidate has to travel.
+ *
+ * The fields the list shape reads, named in the model beside it so the two
+ * move together; `description`, which only the matching here reads; and the
+ * goods, whole where they can be shown and a name where they cannot.
+ *
+ * Products that are not on sale are dropped outright - every reader of this
+ * array filters them out first.
+ */
+function candidateProjection(query, mode, productQuery, productMode) {
+  const projection = {
+    description: 1,
+    products: {
+      $map: {
+        input: {
+          $filter: {
+            input: '$products',
+            as: 'item',
+            // Not `$eq: true`: a product stored before the field existed has
+            // none, and the reader here treats that as on sale.
+            cond: { $ne: ['$$item.isActive', false] }
+          }
+        },
+        as: 'item',
+        in: {
+          $cond: [
+            emittableProduct(query, mode, productQuery, productMode),
+            '$$item',
+            { _id: '$$item._id', name: '$$item.name', isActive: true }
+          ]
+        }
+      }
+    }
+  };
+
+  for (const field of BUSINESS_LIST_FIELDS) projection[field] = 1;
+
+  return projection;
 }
 
 /**
@@ -241,8 +351,19 @@ export const searchCatalog = asyncHandler(async (req, res) => {
     return;
   }
 
+  const filter = candidateFilter(query, mode, productQuery, productMode);
+
+  if (filter === null) {
+    res.json({
+      success: true,
+      data: { query, products: [], businesses: [], shopsMatchedThemselves: false }
+    });
+    return;
+  }
+
   const businesses = await Business.find(
-    candidateFilter(query, mode, productQuery, productMode)
+    filter,
+    candidateProjection(query, mode, productQuery, productMode)
   )
     .sort({ ratingAverage: -1, subscribedAt: -1 })
     // Room above the cap for the shops the loop will drop - a shop whose only

@@ -315,6 +315,35 @@ businessSchema.index({
   description: 'text'
 });
 
+/**
+ * Every field of a shop that `toListJSON` below reads, `products` aside.
+ *
+ * It lives here rather than at the caller so that the two move together: a
+ * field added to the shape below and not to this list would be read as null by
+ * anything that loads a shop through this projection, and silently.
+ *
+ * The reason it exists at all is the search. A shop document is eleven
+ * kilobytes and nine tenths of that is its goods, so a search that loads sixty
+ * candidates whole in order to show thirty products spends three seconds
+ * hauling goods it will not show. Naming the fields lets it ask for the rest.
+ */
+export const BUSINESS_LIST_FIELDS = Object.freeze([
+  'publicId',
+  'name',
+  'englishName',
+  'logoUrl',
+  'category',
+  'ratingAverage',
+  'ratingCount',
+  'followerCount',
+  'viewCount',
+  'discountLabel',
+  'colorValue',
+  'address',
+  'location',
+  'subscribedAt'
+]);
+
 businessSchema.methods.toListJSON = function toListJSON() {
   const activeProducts = this.products.filter((product) => product.isActive);
 
