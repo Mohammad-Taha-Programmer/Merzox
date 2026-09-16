@@ -1220,6 +1220,9 @@ final class _SeedSearchApi extends ApiService {
   @override
   Future<SearchApiResponse> searchCatalog({
     required String query,
+    String match = 'contains',
+    String product = '',
+    String productMatch = 'contains',
     int limit = 30,
   }) async {
     return SearchApiResponse.fromJson(<String, dynamic>{

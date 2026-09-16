@@ -627,7 +627,14 @@
     "clearAll": "مسح الجميع",
     "previousSearches": "تم البحث عنه سابقاً",
     "productFallback": "منتج",
-    "businessFallback": "متجر"
+    "businessFallback": "متجر",
+    "matchStarts": "يبدأ بـ",
+    "matchContains": "يحتوي",
+    "matchEnds": "ينتهي بـ",
+    "matchSimilar": "مشابه",
+    "shopMatchLabel": "اسم المتجر",
+    "productLabel": "يبيع",
+    "productHint": "اسم المنتج"
   },
   "home": {
     "businessId": {

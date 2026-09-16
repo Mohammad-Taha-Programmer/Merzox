@@ -12,6 +12,7 @@ import 'package:merzox/features/home/widgets/business_rating_stars.dart';
 import 'package:merzox/features/product_details/pages/product_details_page.dart';
 import 'package:merzox/features/search/bloc/search_bloc.dart';
 import 'package:merzox/features/search/bloc/search_event.dart';
+import 'package:merzox/features/search/bloc/search_refinement.dart';
 import 'package:merzox/features/search/bloc/search_state.dart';
 import 'package:merzox/services/api_service.dart';
 
@@ -33,12 +34,14 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   late final TextEditingController _controller;
+  late final TextEditingController _productController;
   late final FocusNode _focusNode;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController();
+    _productController = TextEditingController();
     _focusNode = FocusNode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
@@ -48,6 +51,7 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void dispose() {
     _controller.dispose();
+    _productController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
@@ -129,6 +133,23 @@ class _SearchPageState extends State<SearchPage> {
                     },
                     onClear: () => _setQuery(''),
                     hasText: state.hasQuery,
+                  ),
+                  // Always, not only once a shop name is typed. Gating them
+                  // on that made the goods box unreachable - it is half the
+                  // search, and it was sitting behind the other half.
+                  const SizedBox(height: 16),
+                  _SearchRefinementFields(
+                    refinement: state.refinement,
+                    productController: _productController,
+                    onMatch: (SearchMatch match) => context
+                        .read<SearchBloc>()
+                        .add(SearchMatchChanged(match)),
+                    onProduct: (String value) => context.read<SearchBloc>().add(
+                      SearchProductChanged(value),
+                    ),
+                    onProductMatch: (SearchMatch match) => context
+                        .read<SearchBloc>()
+                        .add(SearchProductMatchChanged(match)),
                   ),
                   const SizedBox(height: 26),
                   if (!state.hasQuery)
@@ -277,6 +298,196 @@ class _SearchField extends StatelessWidget {
             borderSide: BorderSide.none,
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+        ),
+      ),
+    );
+  }
+}
+
+/// The two questions under the search box: where the words sit, and what the
+/// shop has to sell.
+///
+/// Shown once there is something to search for, so the empty screen stays the
+/// list of past searches it has always been.
+class _SearchRefinementFields extends StatelessWidget {
+  final SearchRefinement refinement;
+  final TextEditingController productController;
+  final ValueChanged<SearchMatch> onMatch;
+  final ValueChanged<String> onProduct;
+  final ValueChanged<SearchMatch> onProductMatch;
+
+  const _SearchRefinementFields({
+    required this.refinement,
+    required this.productController,
+    required this.onMatch,
+    required this.onProduct,
+    required this.onProductMatch,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        _RefinementRow(
+          key: const ValueKey<String>('search.shopMatch'),
+          label: 'search.shopMatchLabel'.tr(),
+          options: SearchMatch.forShops,
+          selected: refinement.match,
+          onChanged: onMatch,
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 44,
+          child: TextField(
+            key: const ValueKey<String>('search.productField'),
+            controller: productController,
+            onChanged: onProduct,
+            textInputAction: TextInputAction.search,
+            style: const TextStyle(fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'search.productHint'.tr(),
+              hintStyle: TextStyle(
+                color: MerzoxColors.kColorC7C7C7,
+                fontSize: 13,
+              ),
+              prefixIcon: Padding(
+                padding: const EdgeInsetsDirectional.only(start: 14, end: 8),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  widthFactor: 1,
+                  child: Text(
+                    'search.productLabel'.tr(),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: MerzoxColors.kColor707070,
+                    ),
+                  ),
+                ),
+              ),
+              prefixIconConstraints: const BoxConstraints(
+                minWidth: 0,
+                minHeight: 0,
+              ),
+              filled: true,
+              fillColor: MerzoxColors.kColorF9F9F9,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(5),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        // No label: it sits directly under the box it governs, and that box
+        // already says `يبيع`. Saying it twice reads as two questions.
+        _RefinementRow(
+          key: const ValueKey<String>('search.productMatch'),
+          label: '',
+          options: SearchMatch.forProducts,
+          selected: refinement.productMatch,
+          onChanged: onProductMatch,
+        ),
+      ],
+    );
+  }
+}
+
+/// One question, as a row of answers with the current one filled in.
+class _RefinementRow extends StatelessWidget {
+  final String label;
+  final List<SearchMatch> options;
+  final SearchMatch selected;
+  final ValueChanged<SearchMatch> onChanged;
+
+  const _RefinementRow({
+    super.key,
+    required this.label,
+    required this.options,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  static String labelFor(SearchMatch match) => switch (match) {
+    SearchMatch.starts => 'search.matchStarts'.tr(),
+    SearchMatch.contains => 'search.matchContains'.tr(),
+    SearchMatch.ends => 'search.matchEnds'.tr(),
+    SearchMatch.similar => 'search.matchSimilar'.tr(),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        SizedBox(
+          width: 62,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: MerzoxColors.kColor707070,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              for (final SearchMatch option in options)
+                _RefinementChip(
+                  label: labelFor(option),
+                  isSelected: option == selected,
+                  onTap: () => onChanged(option),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _RefinementChip extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _RefinementChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? MerzoxColors.kColor3D5A80
+                : MerzoxColors.kColorF9F9F9,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: isSelected ? Colors.white : MerzoxColors.kColor707070,
+            ),
+          ),
         ),
       ),
     );

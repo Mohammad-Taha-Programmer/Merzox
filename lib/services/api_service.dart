@@ -712,11 +712,22 @@ class ApiService {
 
   Future<SearchApiResponse> searchCatalog({
     required String query,
+    String match = 'contains',
+    String product = '',
+    String productMatch = 'contains',
     int limit = 30,
   }) async {
     final response = await _dio.get<Map<String, dynamic>>(
       '/search',
-      queryParameters: {'query': query, 'limit': limit},
+      queryParameters: <String, dynamic>{
+        'query': query,
+        'match': match,
+        if (product.trim().isNotEmpty) ...<String, dynamic>{
+          'product': product.trim(),
+          'productMatch': productMatch,
+        },
+        'limit': limit,
+      },
     );
     final data = response.data?['data'] as Map<String, dynamic>? ?? {};
 

@@ -5,6 +5,7 @@ import 'package:merzox/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'search_event.dart';
+import 'search_refinement.dart';
 import 'search_state.dart';
 
 class SearchBloc extends Bloc<SearchEvent, SearchState> {
@@ -21,6 +22,9 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     on<SearchHistoryItemSelected>(_onHistorySelected);
     on<SearchHistoryItemRemoved>(_onHistoryRemoved);
     on<SearchHistoryCleared>(_onHistoryCleared);
+    on<SearchMatchChanged>(_onMatchChanged);
+    on<SearchProductChanged>(_onProductChanged);
+    on<SearchProductMatchChanged>(_onProductMatchChanged);
     on<SearchTabChanged>(_onTabChanged);
   }
 
@@ -40,14 +44,57 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
   }
 
   void _onQueryChanged(SearchQueryChanged event, Emitter<SearchState> emit) {
-    final query = event.query.trim();
+    emit(state.copyWith(query: event.query.trim()));
+    _searchOrRest(emit);
+  }
+
+  void _onMatchChanged(SearchMatchChanged event, Emitter<SearchState> emit) {
+    emit(
+      state.copyWith(refinement: state.refinement.copyWith(match: event.match)),
+    );
+    // Straight away, not after the usual pause: a press is a decision, where
+    // a keystroke is somebody still deciding.
+    _searchOrRest(emit, immediately: true);
+  }
+
+  void _onProductChanged(
+    SearchProductChanged event,
+    Emitter<SearchState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        refinement: state.refinement.copyWith(product: event.product.trim()),
+      ),
+    );
+    _searchOrRest(emit);
+  }
+
+  void _onProductMatchChanged(
+    SearchProductMatchChanged event,
+    Emitter<SearchState> emit,
+  ) {
+    emit(
+      state.copyWith(
+        refinement: state.refinement.copyWith(productMatch: event.productMatch),
+      ),
+    );
+
+    // Nothing to re-ask when the box it governs is empty.
+    if (state.refinement.hasProduct) _searchOrRest(emit, immediately: true);
+  }
+
+  /// Ask again, or go quiet when there is nothing left to ask.
+  ///
+  /// Both boxes feed this. Emptying one of them is not emptying the search -
+  /// a reader who clears the shop name and leaves `جاكيت` is still asking a
+  /// question, and answering it with a blank screen would look like a fault.
+  void _searchOrRest(Emitter<SearchState> emit, {bool immediately = false}) {
     _debounce?.cancel();
 
-    if (query.isEmpty) {
+    if (!state.hasQuery) {
       emit(
         state.copyWith(
           status: SearchStatus.idle,
-          query: '',
           products: const [],
           businesses: const [],
           errorMessage: null,
@@ -56,9 +103,15 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
       return;
     }
 
-    emit(state.copyWith(query: query, status: SearchStatus.loading));
+    emit(state.copyWith(status: SearchStatus.loading));
+
+    if (immediately) {
+      add(SearchSubmitted(state.query));
+      return;
+    }
+
     _debounce = Timer(const Duration(milliseconds: 260), () {
-      add(SearchSubmitted(query));
+      add(SearchSubmitted(state.query));
     });
   }
 
@@ -67,13 +120,21 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     Emitter<SearchState> emit,
   ) async {
     final query = event.query.trim();
-    if (query.isEmpty) return;
+    final SearchRefinement refinement = state.refinement;
+    if (query.isEmpty && !refinement.hasProduct) return;
 
     emit(state.copyWith(status: SearchStatus.loading, query: query));
 
     try {
-      final result = await _apiService.searchCatalog(query: query);
-      final history = await _saveHistory(query);
+      final result = await _apiService.searchCatalog(
+        query: query,
+        match: refinement.match.wire,
+        product: refinement.product,
+        productMatch: refinement.productMatch.wire,
+      );
+      // What goes in the list is what the reader typed in the shop box. A
+      // search for goods alone has no name to remember.
+      final history = query.isEmpty ? state.history : await _saveHistory(query);
       emit(
         state.copyWith(
           status: SearchStatus.success,

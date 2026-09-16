@@ -627,7 +627,14 @@
     "clearAll": "Clear all",
     "previousSearches": "Previously searched",
     "productFallback": "Product",
-    "businessFallback": "Business"
+    "businessFallback": "Business",
+    "matchStarts": "Starts with",
+    "matchContains": "Contains",
+    "matchEnds": "Ends with",
+    "matchSimilar": "Similar to",
+    "shopMatchLabel": "Shop name",
+    "productLabel": "Sells",
+    "productHint": "Product name"
   },
   "home": {
     "businessId": {
