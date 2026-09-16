@@ -38,9 +38,15 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
     SearchStarted event,
     Emitter<SearchState> emit,
   ) async {
-    emit(
-      state.copyWith(status: SearchStatus.idle, history: await _loadHistory()),
-    );
+    // Read first, then emit. Written the other way round - `state.copyWith(...,
+    // history: await _loadHistory())` - Dart evaluates `state` before it
+    // evaluates the argument, so what is emitted is built on a snapshot taken
+    // before the await and everything written during it is lost. A reader who
+    // typed while the list of past searches was loading had their words wiped
+    // by the arrival of that list.
+    final List<String> history = await _loadHistory();
+
+    emit(state.copyWith(status: SearchStatus.idle, history: history));
   }
 
   void _onQueryChanged(SearchQueryChanged event, Emitter<SearchState> emit) {
@@ -132,9 +138,22 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         product: refinement.product,
         productMatch: refinement.productMatch.wire,
       );
+      // The answer to a question nobody is asking any more is thrown away.
+      //
+      // Typing `بتول` a letter at a time sends more than one search, because
+      // each pause longer than the debounce sends one. `ب` is the broad
+      // search and therefore the slow one, so it comes back last - and
+      // without this it overwrote the narrow answer already on the screen
+      // with forty shops that had nothing to do with what was typed.
+      if (_isStale(query, refinement)) return;
+
       // What goes in the list is what the reader typed in the shop box. A
       // search for goods alone has no name to remember.
       final history = query.isEmpty ? state.history : await _saveHistory(query);
+
+      // Saving touches storage, which is another await and another chance for
+      // the question to have changed under it.
+      if (_isStale(query, refinement)) return;
       emit(
         state.copyWith(
           status: SearchStatus.success,
@@ -146,6 +165,10 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         ),
       );
     } catch (error) {
+      // A failure is as stale as a success: one search failing says nothing
+      // about the one that replaced it.
+      if (_isStale(query, refinement)) return;
+
       emit(
         state.copyWith(
           status: SearchStatus.failure,
@@ -153,6 +176,17 @@ class SearchBloc extends Bloc<SearchEvent, SearchState> {
         ),
       );
     }
+  }
+
+  /// Whether what came back answers what is being asked now.
+  ///
+  /// Both halves matter: the words, and how they were to be matched. Changing
+  /// `contains` to `starts` asks a different question of the same words, and
+  /// the old answer to it is just as wrong.
+  bool _isStale(String query, SearchRefinement refinement) {
+    if (isClosed) return true;
+
+    return query != state.query || refinement != state.refinement;
   }
 
   void _onHistorySelected(
