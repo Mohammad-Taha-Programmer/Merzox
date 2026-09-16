@@ -24,6 +24,13 @@ final class CartItem {
   /// Availability of this exact sellable identity after revalidation.
   final bool inStock;
 
+  /// Whether this line is a service rather than a thing.
+  ///
+  /// It travels with the line because the basket is the one place a number
+  /// could still be raised after the product page refused to raise it: the
+  /// stepper here has no product to ask.
+  final bool isService;
+
   const CartItem({
     required this.raw,
     required this.productId,
@@ -35,6 +42,7 @@ final class CartItem {
     this.variantId,
     this.variantLabel = '',
     this.inStock = true,
+    this.isService = false,
   });
 
   bool get hasVariant => variantId != null;
@@ -60,6 +68,7 @@ final class CartItem {
       imageUrl: imageUrl ?? this.imageUrl,
       quantity: quantity,
       inStock: inStock ?? this.inStock,
+      isService: isService,
     );
   }
 }

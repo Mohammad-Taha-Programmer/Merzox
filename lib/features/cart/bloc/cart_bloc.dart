@@ -71,6 +71,10 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       return;
     }
 
+    // A service is asked for, not counted out. The stepper is frozen for such
+    // a line, and this is the same rule where it cannot be walked around.
+    if (decoded['isService'] == true) return;
+
     if (decoded['quantity'] == event.quantity) return;
     decoded['quantity'] = event.quantity;
 
@@ -345,6 +349,9 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       'price': price,
       'imageUrl': imageUrl,
       'quantity': item.quantity,
+      // Only when true, so a line for an ordinary product is byte for byte
+      // the line it was before this flag existed.
+      if (item.isService) 'isService': true,
     });
   }
 
@@ -386,6 +393,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
       }
 
       final imageUrl = (decoded['imageUrl'] as String? ?? '').trim();
+      final isService = decoded['isService'] == true;
 
       final variantLabel = variantId == null
           ? ''
@@ -400,6 +408,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         'price': price,
         'imageUrl': imageUrl,
         'quantity': quantity,
+        if (isService) 'isService': true,
       });
 
       return CartItem(
@@ -412,6 +421,7 @@ class CartBloc extends Bloc<CartEvent, CartState> {
         price: price,
         imageUrl: imageUrl,
         quantity: quantity,
+        isService: isService,
       );
     } catch (_) {
       return null;

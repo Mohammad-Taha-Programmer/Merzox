@@ -516,8 +516,8 @@ class _DescriptionTab extends StatelessWidget {
             const SizedBox(height: 24),
           ],
           ProductQuantityRow(
-            quantity: state.quantity,
-            enabled: !viewerOwnsProduct,
+            quantity: state.orderQuantity,
+            enabled: !viewerOwnsProduct && !state.quantityIsFixed,
           ),
           const SizedBox(height: 28),
           _SellerDetails(business: business),
@@ -599,8 +599,12 @@ class _VariantSelector extends StatelessWidget {
 class ProductQuantityRow extends StatelessWidget {
   final int quantity;
 
-  /// False for the shop's own owner: there is no quantity of their own stock
-  /// for them to choose here.
+  /// False for the shop's own owner - there is no quantity of their own stock
+  /// for them to choose here - and false for a service, which is asked for
+  /// rather than counted out.
+  ///
+  /// The row is still drawn either way. Removing it would leave the reader
+  /// wondering where the number went; frozen at one, it says what it is.
   final bool enabled;
 
   const ProductQuantityRow({

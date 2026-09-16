@@ -1085,3 +1085,81 @@ test('B19/B20/B21 - the public serializer still omits merchant-private fields', 
   assert.equal(ownerJson.stockQuantity, 7);
   assert.deepEqual(ownerJson.keywords, ['private-merchant-keyword']);
 });
+
+// ------------------------------------------------------- a service is one
+
+/**
+ * A service is asked for, not counted out.
+ *
+ * A haircut or a delivery is requested once and performed; "3 x haircut" is
+ * not a basket a shop can fill. The app freezes the number on the product
+ * page and in the basket and refuses a second line for the same service, but
+ * the app is the client, and this is the only place the rule holds.
+ */
+
+function serviceProduct({ price = 60 } = {}) {
+  return { ...unlimitedProduct({ price }), isService: true };
+}
+
+test('a service may be ordered once', () => {
+  const service = serviceProduct();
+  const business = businessWith([service]);
+  const normalized = normalizeRequestedItems([request(service, 1)]);
+
+  const resolved = resolveOrderLines({
+    products: business.products,
+    items: normalized.items
+  });
+
+  assert.equal(resolved.error, undefined);
+  assert.equal(resolved.lines[0].quantity, 1);
+});
+
+test('a service may not be ordered several times over', () => {
+  const service = serviceProduct();
+  const business = businessWith([service]);
+  const normalized = normalizeRequestedItems([request(service, 3)]);
+
+  const resolved = resolveOrderLines({
+    products: business.products,
+    items: normalized.items
+  });
+
+  assert.equal(resolved.error, CHECKOUT_ERRORS.serviceQuantity);
+  assert.equal(resolved.productId, service._id.toString());
+});
+
+test('two lines of one for the same service are still two', () => {
+  // The lines above collapse repeated identities before this rule sees them,
+  // which is exactly why the rule sits after the collapse: a basket carrying
+  // the same service twice arrives here as a quantity of two.
+  const service = serviceProduct();
+  const business = businessWith([service]);
+  const normalized = normalizeRequestedItems([
+    request(service, 1),
+    request(service, 1)
+  ]);
+
+  const resolved = resolveOrderLines({
+    products: business.products,
+    items: normalized.items
+  });
+
+  assert.equal(resolved.error, CHECKOUT_ERRORS.serviceQuantity);
+});
+
+test('an ordinary product is still counted out', () => {
+  // The rule reads the flag, not the absence of stock: an unlimited product
+  // that is not a service may be bought by the dozen.
+  const product = unlimitedProduct({});
+  const business = businessWith([product]);
+  const normalized = normalizeRequestedItems([request(product, 12)]);
+
+  const resolved = resolveOrderLines({
+    products: business.products,
+    items: normalized.items
+  });
+
+  assert.equal(resolved.error, undefined);
+  assert.equal(resolved.lines[0].quantity, 12);
+});

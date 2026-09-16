@@ -109,71 +109,85 @@ class _BusinessProfileView extends StatelessWidget {
                 : HomeBusiness.fromDetail(state.business!);
             return Stack(
               children: [
-                ListView(
-                  // Customer mode clears the floating bottom navigation; the
-                  // preview has no bottom chrome, so it only needs a normal
-                  // content inset.
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    10,
-                    16,
-                    viewMode.isPreview ? 16 : 124,
-                  ),
-                  children: [
-                    _TopBar(onBack: () => Navigator.of(context).pop()),
-                    if (state.detailsStatus ==
-                        BusinessProfileSectionStatus.loading)
-                      const LinearProgressIndicator(minHeight: 2)
-                    else if (state.detailsStatus ==
-                        BusinessProfileSectionStatus.failure)
-                      _SectionFailure(
-                        message: state.detailsError,
-                        onRetry: () => context.read<BusinessProfileBloc>().add(
-                          const BusinessProfileDetailsRetryRequested(),
+                RefreshIndicator(
+                  color: MerzoxColors.kColor3D5A80,
+                  onRefresh: () =>
+                      refreshStorefront(context.read<BusinessProfileBloc>()),
+                  child: ListView(
+                    // Always scrollable, so a shop with an empty shelf can
+                    // still be pulled: without it the list is shorter than the
+                    // screen, does not scroll, and the gesture never starts.
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    // Customer mode clears the floating bottom navigation; the
+                    // preview has no bottom chrome, so it only needs a normal
+                    // content inset.
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      10,
+                      16,
+                      viewMode.isPreview ? 16 : 124,
+                    ),
+                    children: [
+                      _TopBar(onBack: () => Navigator.of(context).pop()),
+                      if (state.detailsStatus ==
+                          BusinessProfileSectionStatus.loading)
+                        const LinearProgressIndicator(minHeight: 2)
+                      else if (state.detailsStatus ==
+                          BusinessProfileSectionStatus.failure)
+                        _SectionFailure(
+                          message: state.detailsError,
+                          onRetry: () =>
+                              context.read<BusinessProfileBloc>().add(
+                                const BusinessProfileDetailsRetryRequested(),
+                              ),
+                          compact: true,
                         ),
-                        compact: true,
+                      const SizedBox(height: 20),
+                      _Hero(business: resolvedBusiness),
+                      const SizedBox(height: 12),
+                      Text(
+                        resolvedBusiness.name,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF2B2B2B),
+                        ),
                       ),
-                    const SizedBox(height: 20),
-                    _Hero(business: resolvedBusiness),
-                    const SizedBox(height: 12),
-                    Text(
-                      resolvedBusiness.name,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF2B2B2B),
+                      const SizedBox(height: 9),
+                      Text(
+                        'ID: ${resolvedBusiness.displayId}',
+                        textAlign: TextAlign.center,
+                        textDirection: TextDirection.ltr,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 9),
-                    Text(
-                      'ID: ${resolvedBusiness.displayId}',
-                      textAlign: TextAlign.center,
-                      textDirection: TextDirection.ltr,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(height: 15),
+                      _Stats(
+                        followerCount: resolvedBusiness.followerCount,
+                        productCount: resolvedBusiness.productCount,
                       ),
-                    ),
-                    const SizedBox(height: 15),
-                    _Stats(
-                      followerCount: resolvedBusiness.followerCount,
-                      productCount: resolvedBusiness.productCount,
-                    ),
-                    const SizedBox(height: 22),
-                    _MainTabs(selectedIndex: state.mainTabIndex),
-                    const SizedBox(height: 22),
-                    if (state.mainTabIndex == 0)
-                      _AboutTab(state: state, business: resolvedBusiness)
-                    else if (state.mainTabIndex == 1)
-                      _ProductsTab(
-                        state: state,
-                        business: resolvedBusiness,
-                        viewMode: viewMode,
-                      )
-                    else
-                      _ReviewsTab(state: state, viewMode: viewMode),
-                  ],
+                      const SizedBox(height: 22),
+                      _MainTabs(selectedIndex: state.mainTabIndex),
+                      const SizedBox(height: 22),
+                      if (state.mainTabIndex == 0)
+                        _AboutTab(
+                          state: state,
+                          business: resolvedBusiness,
+                          viewMode: viewMode,
+                        )
+                      else if (state.mainTabIndex == 1)
+                        _ProductsTab(
+                          state: state,
+                          business: resolvedBusiness,
+                          viewMode: viewMode,
+                        )
+                      else
+                        _ReviewsTab(state: state, viewMode: viewMode),
+                    ],
+                  ),
                 ),
                 // A merchant must not open a customer chat with their own
                 // store, so the affordance is absent rather than disabled.
@@ -295,8 +309,34 @@ class _PreviewAwaitingPublicTruth extends StatelessWidget {
   }
 }
 
+/// Pull down, and wait for the shop to have actually been fetched again.
+///
+/// The indicator only lets go when the future it was given completes, so a
+/// fire-and-forget `add` would spin for a moment and stop while the requests
+/// were still in the air - the reader would be told the page was fresh before
+/// it was. The bloc says when it is done; this waits for it to say so.
+///
+/// Public so it can be exercised without a drag gesture.
+Future<void> refreshStorefront(BusinessProfileBloc bloc) {
+  bloc.add(const BusinessProfileRefreshRequested());
+
+  // Subscribed before the bloc can have processed the event: `add` queues it
+  // and the queue is drained in a later microtask.
+  return bloc.stream.firstWhere(
+    (BusinessProfileState state) => !state.isRefreshing,
+  );
+}
+
 /// The side of the round controls that float over a storefront.
 const double kStoreActionDiameter = 39;
+
+/// The one colour those controls are drawn in.
+///
+/// They are three ways of doing the same kind of thing - reaching a shop from
+/// outside it - and two of them were the pale blue while the middle one was
+/// the deep one, which read as the middle one being the real button and the
+/// other two its neighbours. Named once so a fourth cannot pick its own.
+const Color kStoreActionColour = MerzoxColors.kColor3D5A80;
 
 /// Hands the shop to whatever the phone shares with.
 ///
@@ -383,7 +423,7 @@ class StoreContactButton extends StatelessWidget {
       onPressed: onPressed,
       tooltip: 'businessShell.contactUs'.tr(),
       style: IconButton.styleFrom(
-        backgroundColor: MerzoxColors.kColor98C1D9,
+        backgroundColor: kStoreActionColour,
         foregroundColor: Colors.white,
         fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
       ),
@@ -418,7 +458,7 @@ class StoreShareButton extends StatelessWidget {
       onPressed: onPressed,
       tooltip: 'storefront.shareStore'.tr(),
       style: IconButton.styleFrom(
-        backgroundColor: MerzoxColors.kColor98C1D9,
+        backgroundColor: kStoreActionColour,
         foregroundColor: Colors.white,
         fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
       ),
@@ -453,32 +493,11 @@ class _TopBar extends StatelessWidget {
               icon: const Icon(Icons.chevron_left_rounded, size: 34),
             ),
           ),
-          Align(
-            alignment: AlignmentDirectional.centerEnd,
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // The size it drew at as a Material bell, converted.
-                Icon(
-                  MerzoxIcons.businessProfileNotifications,
-                  size: 22 * MerzoxIcons.notificationsSizeFactor,
-                  color: MerzoxColors.kColor98C1D9,
-                ),
-                PositionedDirectional(
-                  top: 1,
-                  end: -1,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: MerzoxColors.kColorEE6C4D,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // There was a second bell here: an `Icon` with a hard-coded unread
+          // dot, no tap and nothing behind the dot. It sat at the trailing
+          // edge of the top of the page, which is exactly where the app's one
+          // real bell floats above every screen - so the storefront drew two,
+          // one of them painted permanently unread and dead to the touch.
         ],
       ),
     );
@@ -512,7 +531,10 @@ class _Hero extends StatelessWidget {
               ),
             ),
           ),
-          if (business.category.trim().isNotEmpty)
+          // Said only of a shop that earned it. The badge used to carry the
+          // shop's category, which every shop has, so it said nothing about
+          // this one.
+          if (isTopRatedShop(business.rating))
             Positioned(
               top: 15,
               child: Container(
@@ -526,7 +548,7 @@ class _Hero extends StatelessWidget {
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
-                  business.category,
+                  'storefront.topBusiness'.tr(),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 11,
@@ -537,11 +559,12 @@ class _Hero extends StatelessWidget {
             ),
           // `start`, not `end`: in an RTL layout `end` resolves to the LEFT
           // edge, and the artboard puts this mark against the banner's right
-          // one (measured at x=325).
-          const PositionedDirectional(
-            top: 3,
-            start: 7,
-            child: Text('🙂', style: TextStyle(fontSize: 18)),
+          // one. Flush with both of that corner's edges, because it is a
+          // corner of the banner rather than something resting on it.
+          PositionedDirectional(
+            top: 0,
+            start: 0,
+            child: _RatingMoodBadge(rating: business.rating),
           ),
           Positioned(
             top: 50,
@@ -562,27 +585,176 @@ class _Hero extends StatelessWidget {
                   ),
                 ],
               ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: MerzoxColors.kColor98C1D9,
-                  borderRadius: BorderRadius.circular(5),
-                ),
-                child: Center(
-                  child: Text(
-                    business.name.trim().isEmpty
-                        ? ''
-                        : business.name.trim().characters.first,
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
-                      color: MerzoxColors.kColor3D5A80,
-                    ),
-                  ),
-                ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: _HeroLogo(business: business),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Where "one of the best" begins, in stars.
+///
+/// A single number, because the badge above the shop's logo and the face in
+/// the corner of its banner are two statements of the same fact and must not
+/// be able to disagree - a happy face over a shop not called a top shop would
+/// read as a bug in one of them.
+const double kTopShopRating = 4;
+
+/// The face the corner of the banner wears, drawn from the same fact.
+const String kShopMoodHappyAsset =
+    'assets/images/follow_business_emoji_pics/happy.png';
+const String kShopMoodSadAsset =
+    'assets/images/follow_business_emoji_pics/sad.png';
+
+/// Whether this shop's rating has reached the mark.
+///
+/// A shop nobody has rated yet scores zero and is therefore not top-rated,
+/// which is the honest reading: the badge says the shop earned something, and
+/// silence is not an achievement.
+bool isTopRatedShop(double rating) => rating >= kTopShopRating;
+
+/// How wide the corner the face sits in is, and how tall.
+const double kShopMoodWidth = 52;
+const double kShopMoodHeight = 38;
+
+/// The curve where that corner meets the banner it is cut out of.
+const double kShopMoodInnerRadius = 14;
+
+/// How much of that corner the face fills.
+///
+/// It went in at 22 and read as a mark in a large empty patch of blue rather
+/// than as a face. At 28 it carries the corner, and the 5px left above and
+/// below it is what keeps it from touching the two straight edges.
+const double kShopMoodFaceSide = 28;
+
+/// The face in the corner of a shop's banner.
+///
+/// It was a literal smiling face written into the source, which is one face
+/// for every shop and therefore said nothing about any of them; and being a
+/// text glyph it was drawn by whatever emoji font the phone happened to
+/// carry, so it was not the same face twice across devices. It is a drawing
+/// now, and it follows the rating.
+///
+/// The shape is a corner of the banner in a deeper blue rather than a badge
+/// laid on top of one: it takes the banner's own outer corner and its two
+/// straight edges, and only the corner facing into the banner is rounded. So
+/// it reads as part of the banner, which is why it needs no shadow and no
+/// outline to sit there.
+class _RatingMoodBadge extends StatelessWidget {
+  final double rating;
+
+  const _RatingMoodBadge({required this.rating});
+
+  @override
+  Widget build(BuildContext context) {
+    final bool happy = isTopRatedShop(rating);
+
+    return Container(
+      width: kShopMoodWidth,
+      height: kShopMoodHeight,
+      alignment: Alignment.center,
+      decoration: const BoxDecoration(
+        color: MerzoxColors.kColor98C1D9,
+        // Directional, and `start` is the banner's outer corner: in Arabic
+        // that is the right one, in English the left, and the shape turns
+        // over with the page rather than being drawn twice.
+        borderRadius: BorderRadiusDirectional.only(
+          // The banner's own corner, continued.
+          topStart: Radius.circular(6),
+          bottomEnd: Radius.circular(kShopMoodInnerRadius),
+        ),
+      ),
+      child: Image.asset(
+        happy ? kShopMoodHappyAsset : kShopMoodSadAsset,
+        key: ValueKey<String>('storefront.mood.${happy ? 'happy' : 'sad'}'),
+        width: kShopMoodFaceSide,
+        height: kShopMoodFaceSide,
+        filterQuality: FilterQuality.medium,
+      ),
+    );
+  }
+}
+
+/// The shop's own picture, where the storefront drew only a letter.
+///
+/// The letter was not a fallback here - it was the whole of it. `logoUrl`
+/// reaches this widget through `HomeBusiness.fromDetail` and was simply never
+/// read, so a merchant who had set a picture saw it on their settings screen,
+/// in the home list and on a product page, and not on their own storefront.
+class _HeroLogo extends StatelessWidget {
+  final HomeBusiness business;
+
+  const _HeroLogo({required this.business});
+
+  @override
+  Widget build(BuildContext context) {
+    final String url = business.logoUrl.trim();
+
+    if (url.isEmpty) return _HeroLogoLetter(name: business.name);
+
+    // White behind it, not the blue the letter sits on: a logo is usually
+    // drawn for a white ground and most carry transparency.
+    return ColoredBox(
+      color: Colors.white,
+      child: SizedBox.expand(
+        child: Image.network(
+          url,
+          key: ValueKey<String>('storefront.logo.${business.id}'),
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
+          loadingBuilder:
+              (
+                BuildContext context,
+                Widget child,
+                ImageChunkEvent? loadingProgress,
+              ) {
+                if (loadingProgress == null) return child;
+
+                return const Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 1.6),
+                  ),
+                );
+              },
+          // A shop that set no picture and a picture that will not load are
+          // the same thing to a reader: there is nothing to look at, so the
+          // mark that stands in for one stands in for both.
+          errorBuilder:
+              (BuildContext context, Object error, StackTrace? stack) =>
+                  _HeroLogoLetter(name: business.name),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroLogoLetter extends StatelessWidget {
+  final String name;
+
+  const _HeroLogoLetter({required this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final String trimmed = name.trim();
+
+    return ColoredBox(
+      color: MerzoxColors.kColor98C1D9,
+      child: Center(
+        child: Text(
+          trimmed.isEmpty ? '' : trimmed.characters.first,
+          style: TextStyle(
+            fontSize: 34,
+            fontWeight: FontWeight.w800,
+            color: MerzoxColors.kColor3D5A80,
+          ),
+        ),
       ),
     );
   }
@@ -707,8 +879,13 @@ class _MainTabs extends StatelessWidget {
 class _AboutTab extends StatelessWidget {
   final BusinessProfileState state;
   final HomeBusiness business;
+  final BusinessProfileViewMode viewMode;
 
-  const _AboutTab({required this.state, required this.business});
+  const _AboutTab({
+    required this.state,
+    required this.business,
+    required this.viewMode,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -775,67 +952,166 @@ class _AboutTab extends StatelessWidget {
           ),
         ],
         const SizedBox(height: 34),
-        Align(
-          alignment: AlignmentDirectional.centerEnd,
-          child: Text(
-            'catalog.services'.tr(),
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: MerzoxColors.kColor2B2B2B,
+        // The heading and what it heads, on one line. It used to be a heading
+        // above a list, and the two chose opposite edges: the heading asked
+        // for `centerEnd`, which in Arabic is the LEFT edge, while the tiles
+        // below started at the right. Side by side they cannot drift apart -
+        // in Arabic the heading takes the outer right and the services run
+        // leftwards from it, and in English the whole row turns over.
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'catalog.services'.tr(),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+                color: MerzoxColors.kColor2B2B2B,
+              ),
             ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        if (services.isEmpty)
-          _SectionEmpty(message: 'catalog.noServices'.tr())
-        else
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            // `start`, not `end`: Wrap's main axis follows the ambient
-            // Directionality, so in RTL `end` pushes the tiles to the LEFT
-            // edge - away from the heading they belong under.
-            alignment: WrapAlignment.start,
-            children: services
-                .map(
-                  (service) => SizedBox(
-                    width: 92,
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 58,
-                          height: 58,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: MerzoxColors.kColorEFEFEF,
+            const SizedBox(width: 12),
+            Expanded(
+              child: services.isEmpty
+                  ? _SectionEmpty(message: 'catalog.noServices'.tr())
+                  : Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      // `start`, not `end`: Wrap's main axis follows the
+                      // ambient Directionality, so in RTL `end` pushes the
+                      // tiles to the LEFT edge - away from the heading they
+                      // belong beside.
+                      alignment: WrapAlignment.start,
+                      children: services
+                          .map(
+                            (service) => _ServiceTile(
+                              business: business,
+                              service: service,
+                              viewMode: viewMode,
                             ),
-                          ),
-                          child: Icon(
-                            Icons.miscellaneous_services_outlined,
-                            color: MerzoxColors.kColor3D5A80,
-                          ),
-                        ),
-                        const SizedBox(height: 7),
-                        Text(
-                          service.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: MerzoxColors.kColor767676,
-                          ),
-                        ),
-                      ],
+                          )
+                          .toList(),
                     ),
-                  ),
-                )
-                .toList(),
-          ),
+            ),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+/// One of the things a shop does rather than sells.
+///
+/// It is the same record as a product - the merchant ticks "this item is a
+/// service" on the same form - so it has a picture, a price and a page, and
+/// the tile drew none of the three. It showed the same pair of cogs over every
+/// service in the app, and it was not tappable, so a shop could describe what
+/// it does and a customer had no way to ask for it.
+class _ServiceTile extends StatelessWidget {
+  final HomeBusiness business;
+  final BusinessProductApiModel service;
+  final BusinessProfileViewMode viewMode;
+
+  const _ServiceTile({
+    required this.business,
+    required this.service,
+    required this.viewMode,
+  });
+
+  static const double _side = 58;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 92,
+      child: InkWell(
+        key: ValueKey<String>('storefront.service.${service.id}'),
+        borderRadius: BorderRadius.circular(8),
+        // Inert in the merchant's own preview, for the reason the product
+        // card is: the page it opens carries cart, favourite and chat.
+        onTap: viewMode.allowsCustomerActions
+            ? () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      ProductDetailsPage(business: business, product: service),
+                ),
+              )
+            : null,
+        child: Column(
+          children: [
+            Container(
+              width: _side,
+              height: _side,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: MerzoxColors.kColorEFEFEF),
+              ),
+              child: ClipOval(child: _ServiceTilePicture(service: service)),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              service.name,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: MerzoxColors.kColor767676),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The picture a merchant attached to a service, or the mark that stands in.
+class _ServiceTilePicture extends StatelessWidget {
+  final BusinessProductApiModel service;
+
+  const _ServiceTilePicture({required this.service});
+
+  @override
+  Widget build(BuildContext context) {
+    final String url = service.imageUrl.trim();
+
+    if (url.isEmpty) return const _ServiceTileMark();
+
+    return Image.network(
+      url,
+      key: ValueKey<String>('storefront.service.picture.${service.id}'),
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.medium,
+      loadingBuilder:
+          (
+            BuildContext context,
+            Widget child,
+            ImageChunkEvent? loadingProgress,
+          ) {
+            if (loadingProgress == null) return child;
+
+            return const Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 1.6),
+              ),
+            );
+          },
+      errorBuilder: (BuildContext context, Object error, StackTrace? stack) =>
+          const _ServiceTileMark(),
+    );
+  }
+}
+
+class _ServiceTileMark extends StatelessWidget {
+  const _ServiceTileMark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Icon(
+        Icons.miscellaneous_services_outlined,
+        color: MerzoxColors.kColor3D5A80,
+      ),
     );
   }
 }
@@ -1464,9 +1740,10 @@ class _ChatButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton.filled(
+      key: const ValueKey<String>('storefront.chat'),
       onPressed: onPressed,
       style: IconButton.styleFrom(
-        backgroundColor: MerzoxColors.kColor3D5A80,
+        backgroundColor: kStoreActionColour,
         foregroundColor: Colors.white,
         fixedSize: const Size(kStoreActionDiameter, kStoreActionDiameter),
       ),

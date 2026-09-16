@@ -56,6 +56,21 @@ final class ProductDetailsState {
     this.reviewEligibilityStatus = ReviewEligibilityStatus.unchecked,
   });
 
+  /// Whether a number may be chosen at all.
+  ///
+  /// A service is asked for, not counted out: a haircut or a delivery is
+  /// requested once and performed, and "3 x haircut" is not a thing a shop
+  /// can put in a basket. The merchant says which of their items is a service
+  /// on the same form they add a product with.
+  bool get quantityIsFixed => product?.isService ?? false;
+
+  /// How many are actually being ordered.
+  ///
+  /// The one answer to that question, so the number on the screen, the line
+  /// written into the basket and the line sent to the server cannot differ.
+  /// `quantity` is the stepper's own memory and means nothing for a service.
+  int get orderQuantity => quantityIsFixed ? 1 : quantity;
+
   BusinessProductVariantApiModel? get selectedVariant {
     final currentProduct = product;
     final id = selectedVariantId;

@@ -95,6 +95,7 @@ BusinessProductApiModel catalogProduct({
   double? maxFinalPrice,
   List<String> imageUrls = const <String>[],
   DateTime? createdAt,
+  bool isService = false,
 }) {
   final payable = finalPrice ?? price;
 
@@ -120,6 +121,7 @@ BusinessProductApiModel catalogProduct({
     rating: 0,
     ratingCount: 0,
     likeCount: 0,
+    isService: isService,
   );
 }
 
@@ -137,6 +139,8 @@ Map<String, dynamic> catalogProductJson({
   double? maxPrice,
   double? minFinalPrice,
   double? maxFinalPrice,
+  List<String> imageUrls = const <String>[],
+  bool isService = false,
 }) {
   final payable = finalPrice ?? price;
 
@@ -154,13 +158,13 @@ Map<String, dynamic> catalogProductJson({
     'maxPrice': hasVariants ? maxPrice : (maxPrice ?? price),
     'minFinalPrice': hasVariants ? minFinalPrice : (minFinalPrice ?? payable),
     'maxFinalPrice': hasVariants ? maxFinalPrice : (maxFinalPrice ?? payable),
-    'imageUrl': '',
-    'imageUrls': const <String>[],
+    'imageUrl': imageUrls.isEmpty ? '' : imageUrls.first,
+    'imageUrls': imageUrls,
     'classification': 'new',
     'rating': 0,
     'ratingCount': 0,
     'likeCount': 0,
-    'isService': false,
+    'isService': isService,
   };
 }
 

@@ -52,3 +52,11 @@ final class BusinessProfileReviewEligibilityRetryRequested
     extends BusinessProfileEvent {
   const BusinessProfileReviewEligibilityRetryRequested();
 }
+
+/// Pull to refresh: fetch the whole shop again, not the tab in front of you.
+///
+/// The three tabs are three requests and a reader who pulls has no way to say
+/// which one they meant. They mean the shop.
+final class BusinessProfileRefreshRequested extends BusinessProfileEvent {
+  const BusinessProfileRefreshRequested();
+}
