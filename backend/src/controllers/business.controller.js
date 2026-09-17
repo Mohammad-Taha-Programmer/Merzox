@@ -614,6 +614,11 @@ export const listBusinessReviews = asyncHandler(async (req, res) => {
     BusinessReview.find({ business: business._id })
       .sort({ createdAt: -1, _id: -1 })
       .skip(skip)
+      // The picture, and only the picture: a review carries its own copy of
+      // the name, and everything else on an account is nobody else's
+      // business. The projection is what keeps this from being a way to read
+      // strangers' e-mail addresses out of the review list.
+      .populate('user', 'avatarUrl')
       .limit(limit),
     BusinessReview.countDocuments({ business: business._id })
   ]);
@@ -710,7 +715,7 @@ export const createBusinessReview = asyncHandler(async (req, res) => {
   res.status(201).json({
     success: true,
     data: {
-      review: review.toJSONView(),
+      review: review.toJSONView({ avatarUrl: req.user.avatarUrl ?? '' }),
       business: business.toListJSON()
     }
   });

@@ -9,6 +9,7 @@ import 'package:merzox/features/business_profile/bloc/business_profile_bloc.dart
 import 'package:merzox/features/business_profile/bloc/business_profile_event.dart';
 import 'package:merzox/features/business_profile/bloc/business_profile_state.dart';
 import 'package:merzox/features/reviews/widgets/review_eligibility_notice.dart';
+import 'package:merzox/features/reviews/widgets/reviewer_badge.dart';
 import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:merzox/features/home/presentation/bloc/home_state_.dart';
 import 'package:merzox/features/home/widgets/feature_bottom_navigation_bar.dart';
@@ -1452,6 +1453,15 @@ class _ReviewsTabState extends State<_ReviewsTab> {
         // own store is a customer mutation, not a presentation detail. The
         // published reviews below remain visible, because that is exactly what
         // a customer sees.
+        // Who is about to write. Only where writing is possible at all: a
+        // merchant previewing their own shop has no composer under this, and
+        // naming the account above one that is not there would say nothing.
+        if (widget.viewMode.allowsCustomerActions) ...[
+          const CurrentAccountBadge(
+            nameKey: ValueKey<String>('storefront.reviewerIdentity'),
+          ),
+          const SizedBox(height: 14),
+        ],
         if (widget.viewMode.allowsCustomerActions &&
             widget.state.reviewEligibilityStatus ==
                 ReviewEligibilityStatus.eligible) ...[
@@ -1541,9 +1551,27 @@ class _ReviewsTabState extends State<_ReviewsTab> {
             ),
           ),
         const SizedBox(height: 18),
-        Text(
-          'reviews.allReviews'.tr(),
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+        // The heading leads and the tally trails, which in Arabic puts the
+        // words at the right margin and the number at the left - the same row
+        // a product's reviews carry, because it is the same claim about the
+        // same kind of list. The shop's list had the heading and no count at
+        // all, so nothing on the page said how many opinions it was showing.
+        Row(
+          children: [
+            Text(
+              'reviews.allReviews'.tr(),
+              key: const ValueKey<String>('storefront.allReviews'),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+            ),
+            const Spacer(),
+            Text(
+              'reviews.count'.tr(
+                args: [widget.state.reviews.length.toString()],
+              ),
+              key: const ValueKey<String>('storefront.reviewCount'),
+              style: TextStyle(color: MerzoxColors.kColor9F9F9F, fontSize: 12),
+            ),
+          ],
         ),
         const SizedBox(height: 12),
         if (widget.state.reviewsStatus == BusinessProfileSectionStatus.loading)
@@ -1589,35 +1617,55 @@ class _ReviewTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CircleAvatar(radius: 15, backgroundColor: MerzoxColors.kColor98C1D9),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (review.userName.trim().isNotEmpty)
-                  Text(
-                    review.userName,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
+          // Who, and what they gave the shop - one line, opposite ends of it.
+          // The disc beside the name was blank on every review ever drawn:
+          // the review carries the name it was written under and nothing
+          // else, so every reviewer looked like the same anonymous person.
+          Row(
+            children: [
+              // Expanded rather than a `Spacer` beside it: the pair keeps the
+              // whole of the line the stars do not need, so a long name is cut
+              // only when it actually runs into them.
+              Expanded(
+                child: ReviewerBadge(
+                  name: review.userName,
+                  avatarUrl: review.userAvatarUrl,
+                  radius: 15,
+                  nameStyle: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
                   ),
-                const SizedBox(height: 5),
-                _StarRating(value: review.rating, size: 13),
-                if (review.comment.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    review.comment,
-                    style: const TextStyle(fontSize: 12, height: 1.5),
-                  ),
-                ],
-              ],
-            ),
+                  nameKey: ValueKey<String>('storefront.reviewer.${review.id}'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              _StarRating(value: review.rating, size: 13),
+              const SizedBox(width: 8),
+              Text(
+                '(${review.rating.toStringAsFixed(1)})',
+                textDirection: TextDirection.ltr,
+                style: TextStyle(
+                  color: MerzoxColors.kColor9F9F9F,
+                  fontSize: 11,
+                ),
+              ),
+            ],
           ),
+          if (review.comment.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            // The full width of the entry rather than the part left over
+            // beside the picture: a paragraph is the reason anyone reads a
+            // review, and it was written into the narrowest column here.
+            Text(
+              review.comment,
+              key: ValueKey<String>('storefront.reviewComment.${review.id}'),
+              textAlign: TextAlign.start,
+              style: const TextStyle(fontSize: 12, height: 1.5),
+            ),
+          ],
         ],
       ),
     );
