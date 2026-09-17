@@ -15,6 +15,7 @@ import 'package:merzox/features/product_details/bloc/product_details_state.dart'
 import 'package:merzox/features/product_details/new_product_window.dart';
 import 'package:merzox/features/product_details/widgets/new_product_ribbon.dart';
 import 'package:merzox/features/reviews/widgets/review_eligibility_notice.dart';
+import 'package:merzox/features/reviews/widgets/reviewer_badge.dart';
 import 'package:merzox/services/review_eligibility_service.dart';
 import 'package:merzox/services/api_service.dart';
 import 'package:merzox/core/constants/money.dart';
@@ -940,6 +941,14 @@ class _ReviewsTabState extends State<_ReviewsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Who is about to write. It sits above both branches below, not
+          // inside the eligible one: a reader told they may not review yet
+          // still has an account, and the first thing they check on being
+          // refused is which account they are signed in as.
+          const CurrentAccountBadge(
+            nameKey: ValueKey<String>('productDetails.reviewerIdentity'),
+          ),
+          const SizedBox(height: 16),
           if (widget.state.reviewEligibilityStatus ==
               ReviewEligibilityStatus.eligible) ...[
             Center(
@@ -1028,23 +1037,31 @@ class _ReviewsTabState extends State<_ReviewsTab> {
               ),
             ),
           const SizedBox(height: 22),
+          // The heading leads and the tally trails, which in Arabic puts
+          // `كل التقييمات` at the right margin and the number at the left. The
+          // two were the other way round, so the section announced itself with
+          // a figure in brackets and left the heading floating at the far end
+          // of the line. Written in terms of the reading direction rather than
+          // of left and right, so an English build reverses on its own.
           Row(
             children: [
               Text(
-                'reviews.count'.tr(
-                  args: [widget.state.reviews.length.toString()],
-                ),
-                style: TextStyle(
-                  color: MerzoxColors.kColor9F9F9F,
-                  fontSize: 12,
+                'reviews.allReviews'.tr(),
+                key: const ValueKey<String>('productDetails.allReviews'),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
               const Spacer(),
               Text(
-                'reviews.allReviews'.tr(),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w800,
+                'reviews.count'.tr(
+                  args: [widget.state.reviews.length.toString()],
+                ),
+                key: const ValueKey<String>('productDetails.reviewCount'),
+                style: TextStyle(
+                  color: MerzoxColors.kColor9F9F9F,
+                  fontSize: 12,
                 ),
               ),
             ],
@@ -1100,53 +1117,59 @@ class _ReviewTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Column(
+          // Who, and what they gave it - on one line, at opposite ends of it.
+          // The name used to sit under the picture in a narrow column, which
+          // set the stars and the paragraph beside a stack two lines tall and
+          // left the whole entry ragged.
+          Row(
             children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: MerzoxColors.kColor98C1D9,
-              ),
-              const SizedBox(height: 5),
-              if (review.userName.trim().isNotEmpty)
-                Text(review.userName, style: const TextStyle(fontSize: 12)),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    _StarRating(value: review.rating, size: 16),
-                    const SizedBox(width: 8),
-                    Text(
-                      '(${review.rating.toStringAsFixed(1)})',
-                      textDirection: TextDirection.ltr,
-                      style: TextStyle(
-                        color: MerzoxColors.kColor9F9F9F,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 7),
-                Text(
-                  review.comment,
-                  textAlign: TextAlign.start,
-                  style: TextStyle(
-                    color: MerzoxColors.kColor5E5E5E,
-                    fontSize: 12,
-                    height: 1.55,
+              // Expanded rather than a `Spacer` beside it: the pair keeps the
+              // whole of the line the stars do not need, so a long name is cut
+              // only when it actually runs into them.
+              Expanded(
+                child: ReviewerBadge(
+                  name: review.userName,
+                  avatarUrl: review.userAvatarUrl,
+                  nameKey: ValueKey<String>(
+                    'productDetails.reviewer.${review.id}',
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 10),
+              _StarRating(value: review.rating, size: 16),
+              const SizedBox(width: 8),
+              Text(
+                '(${review.rating.toStringAsFixed(1)})',
+                textDirection: TextDirection.ltr,
+                style: TextStyle(
+                  color: MerzoxColors.kColor9F9F9F,
+                  fontSize: 11,
+                ),
+              ),
+            ],
           ),
+          if (review.comment.trim().isNotEmpty) ...[
+            const SizedBox(height: 9),
+            // The full width of the entry rather than the part of it left over
+            // beside the picture: a paragraph is the reason anyone reads a
+            // review, and it was being written into the narrowest column on
+            // the page.
+            Text(
+              review.comment,
+              key: ValueKey<String>(
+                'productDetails.reviewComment.${review.id}',
+              ),
+              textAlign: TextAlign.start,
+              style: TextStyle(
+                color: MerzoxColors.kColor5E5E5E,
+                fontSize: 12,
+                height: 1.55,
+              ),
+            ),
+          ],
         ],
       ),
     );

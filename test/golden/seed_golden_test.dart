@@ -818,11 +818,15 @@ final class _SeedOrderTrackingApi extends ApiService {
 }
 
 /// Installs the authenticated customer session the tracking bloc reads.
-void _useAuthenticatedCustomerSession() {
+/// [name] is what the account is called, for the boards that draw the reader
+/// rather than only act as them. Empty by default, so a board that never drew
+/// a name is not given one.
+void _useAuthenticatedCustomerSession({String name = ''}) {
   SharedPreferences.setMockInitialValues(<String, Object>{
     AuthBloc.sessionKey: true,
     AuthBloc.tokenKey: 'seed-golden-token',
     AuthBloc.userTypeKey: 'customer',
+    if (name.isNotEmpty) AuthBloc.nameKey: name,
   });
 }
 
@@ -3534,8 +3538,8 @@ void main() {
       WidgetTester tester,
     ) async {
       // The board draws the composer, which only a signed-in eligible
-      // customer sees.
-      _useAuthenticatedCustomerSession();
+      // customer sees - and, above it, the account that is about to write.
+      _useAuthenticatedCustomerSession(name: 'محمد أمين');
 
       final ProductDetailsBloc bloc = ProductDetailsBloc(
         apiService: _SeedProductApi(withReviews: true),
