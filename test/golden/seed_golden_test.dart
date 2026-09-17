@@ -2161,8 +2161,8 @@ void main() {
       WidgetTester tester,
     ) async {
       // The artboard draws the composer, which only a signed-in eligible
-      // customer sees.
-      _useAuthenticatedCustomerSession();
+      // customer sees - and, above it, the account that is about to write.
+      _useAuthenticatedCustomerSession(name: 'محمد أمين');
 
       final BusinessProfileBloc bloc = await openStorefrontTab(2);
       expect(bloc.state.reviews, hasLength(3));
