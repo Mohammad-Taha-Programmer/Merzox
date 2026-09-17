@@ -41,6 +41,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
        super(const HomeState()) {
     on<HomeStarted>(_onStarted);
     on<HomeRecommendationsRefreshRequested>(_onRecommendationsRefreshRequested);
+    on<HomeRefreshRequested>(_onRefreshRequested);
     on<HomeSearchChanged>(_onSearchChanged);
     on<HomeTabChanged>(_onTabChanged);
     on<HomeLocationPromptShown>(_onLocationPromptShown);
@@ -165,6 +166,99 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) async {
     await _loadRecommendations(emit);
+  }
+
+  /// Everything the home screen shows, fetched again at once.
+  ///
+  /// A reader who pulls down has no way to name a section, so the gesture
+  /// means the screen: the suggestions band, the three catalogue rows, the
+  /// shops near them, and the hearts on all of it - which are as much a part
+  /// of what the screen is showing as the shops themselves.
+  ///
+  /// `المتاجر` is not among them. It is a paged list behind its own tab with
+  /// its own search field, and refetching page one of it would throw away
+  /// however far a reader had scrolled in a list this gesture never touched.
+  ///
+  /// Nothing is put into its loading state. The indicator at the top is the
+  /// progress; blanking five bands underneath it would replace a screen that
+  /// is a minute old with nothing at all. For the same reason a section whose
+  /// request fails keeps what it had: `copyWith` holds the old value against a
+  /// null, so only that section's own failure message is raised, over content
+  /// that is still standing.
+  Future<void> _onRefreshRequested(
+    HomeRefreshRequested event,
+    Emitter<HomeState> emit,
+  ) async {
+    // A second pull while one is running would interleave two sets of emits.
+    // The one already running is what the puller gets.
+    if (state.isRefreshing) return;
+
+    emit(state.copyWith(isRefreshing: true));
+
+    // Started together: three requests over one link, and a screen that waited
+    // for each in turn would take three times as long to say the same thing.
+    final newestFuture = _captureBusinesses(
+      () => _apiService.businesses(
+        page: 1,
+        limit: _homeSectionLimit,
+        sort: 'newest',
+      ),
+    );
+    final bestFuture = _captureBusinesses(
+      () => _apiService.businesses(
+        page: 1,
+        limit: _homeSectionLimit,
+        sort: 'rating',
+      ),
+    );
+    final offersFuture = _captureBusinesses(
+      () => _apiService.businesses(
+        page: 1,
+        limit: _homeSectionLimit,
+        sort: 'newest',
+        discounted: true,
+      ),
+    );
+
+    final newest = await newestFuture;
+    final best = await bestFuture;
+    final offers = await offersFuture;
+
+    emit(
+      state.copyWith(
+        newBusinesses: _refreshedBusinesses(newest),
+        bestBusinesses: _refreshedBusinesses(best),
+        discountedBusinesses: _refreshedBusinesses(offers),
+        newBusinessesStatus: newest.status,
+        bestBusinessesStatus: best.status,
+        discountedBusinessesStatus: offers.status,
+        newBusinessesError: newest.errorMessage,
+        bestBusinessesError: best.errorMessage,
+        discountedBusinessesError: offers.errorMessage,
+      ),
+    );
+
+    await _loadNearby(emit, quiet: true);
+
+    final session = await _authSessionService.read();
+    await _loadFavoriteBusinesses(emit, session);
+    await _loadRecommendations(emit, knownSession: session, quiet: true);
+
+    // Last, and unconditionally: the screen is waiting on this to let the
+    // indicator go.
+    emit(state.copyWith(isRefreshing: false));
+  }
+
+  /// What a refreshed section becomes: the shops that arrived, or null.
+  ///
+  /// Null is the whole point. `_mappedBusinesses` answers an empty list for a
+  /// request that failed, which is the right answer on a first load and the
+  /// wrong one here - it would clear a band the reader was looking at because
+  /// one request out of five did not come back.
+  List<HomeBusiness>? _refreshedBusinesses(_BusinessLoadResult result) {
+    if (result.response == null) return null;
+
+    return _mappedBusinesses(result.response);
   }
 
   void _onSearchChanged(HomeSearchChanged event, Emitter<HomeState> emit) {
@@ -485,7 +579,14 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     );
   }
 
-  Future<void> _loadNearby(Emitter<HomeState> emit) async {
+  /// [quiet] is a refresh rather than a first load: the band keeps what it is
+  /// showing while the request is in the air, and keeps it if the request
+  /// fails. A reader who pulled the screen down should not be punished with an
+  /// empty row for a location fix that took a moment too long.
+  Future<void> _loadNearby(
+    Emitter<HomeState> emit, {
+    bool quiet = false,
+  }) async {
     if (!await _isLocationPermissionGranted()) {
       emit(
         state.copyWith(
@@ -501,7 +602,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     emit(
       state.copyWith(
         locationPermissionGranted: true,
-        nearbyBusinessesStatus: HomeSectionStatus.loading,
+        nearbyBusinessesStatus: quiet ? null : HomeSectionStatus.loading,
         nearbyBusinessesError: '',
       ),
     );
@@ -510,7 +611,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       if (!await _deviceLocationService.isServiceEnabled()) {
         emit(
           state.copyWith(
-            nearbyBusinesses: const [],
+            nearbyBusinesses: quiet ? null : const [],
             nearbyBusinessesStatus: HomeSectionStatus.failure,
             nearbyBusinessesError: 'catalog.locationUnavailable',
           ),
@@ -536,7 +637,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     } catch (error) {
       emit(
         state.copyWith(
-          nearbyBusinesses: const [],
+          nearbyBusinesses: quiet ? null : const [],
           nearbyBusinessesStatus: HomeSectionStatus.failure,
           nearbyBusinessesError: ApiService.messageFromError(error),
         ),
@@ -567,24 +668,42 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     }
   }
 
+  /// [quiet] is a refresh rather than a first load: the band is not cleared
+  /// before the request, so the suggestions the reader is looking at stay on
+  /// the screen until there are new ones to put there.
+  ///
+  /// It is cleared the moment the answer says it should be - a reader who
+  /// withdrew consent, or signed out, still sees the band emptied by the two
+  /// paths below.
   Future<void> _loadRecommendations(
     Emitter<HomeState> emit, {
     AuthSessionSnapshot? knownSession,
+    bool quiet = false,
   }) async {
-    emit(
-      state.copyWith(
-        recommendedBusinesses: const [],
-        recommendationConsentEnabled: false,
-        recommendationsPersonalized: false,
-        recommendationPreferenceCategories: const [],
-      ),
-    );
+    if (!quiet) {
+      emit(
+        state.copyWith(
+          recommendedBusinesses: const [],
+          recommendationConsentEnabled: false,
+          recommendationsPersonalized: false,
+          recommendationPreferenceCategories: const [],
+        ),
+      );
+    }
 
     final session = knownSession ?? await _recommendationSessionReader();
 
     final token = session.token?.trim();
 
     if (!session.isAuthenticated || token == null || token.isEmpty) {
+      emit(
+        state.copyWith(
+          recommendedBusinesses: const [],
+          recommendationConsentEnabled: false,
+          recommendationsPersonalized: false,
+          recommendationPreferenceCategories: const [],
+        ),
+      );
       return;
     }
 
@@ -592,6 +711,17 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       final snapshot = await _recommendationGateway.load(token: token);
 
       if (!snapshot.consentEnabled) {
+        // Cleared here rather than only before the request: a reader who
+        // withdrew consent between two pulls would otherwise keep the band
+        // they asked to stop seeing.
+        emit(
+          state.copyWith(
+            recommendedBusinesses: const [],
+            recommendationConsentEnabled: false,
+            recommendationsPersonalized: false,
+            recommendationPreferenceCategories: const [],
+          ),
+        );
         return;
       }
 

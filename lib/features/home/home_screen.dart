@@ -363,131 +363,155 @@ class _HomeTab extends StatelessWidget {
       state.searchQuery,
     );
 
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _HomeTopBar(
-                  isGuest: isGuest,
-                  onLogout: onLogout,
-                  onProtectedAction: onProtectedAction,
-                  onSignIn: onSignIn,
-                ),
-              ],
-            ),
-          ),
-        ),
-        // The advertising space, and there is no advertising.
-        //
-        // The board draws a promotional card here and the carousel was fed
-        // the shops the catalogue marks as discounted, because that was the
-        // nearest real list to hand. It is not the same thing: a shop having
-        // a sale is not a shop that paid to be shown, and the band was
-        // presenting one as the other. This place waits for the staff
-        // dashboard to say what is advertised and by whom.
-        //
-        // The padding goes with it. An empty carousel already shrank to
-        // nothing, but the 29 above it did not, so hiding the card alone
-        // would have left a gap nothing explains.
-        if (kHomePromoSpaceHasSource)
+    return RefreshIndicator(
+      color: MerzoxColors.kColor3D5A80,
+      onRefresh: () => refreshHome(context.read<HomeBloc>()),
+      child: CustomScrollView(
+        // Always scrollable, so the screen can be pulled even before its
+        // bands have filled: without it a short first frame does not scroll,
+        // and the gesture never starts at all.
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
           SliverToBoxAdapter(
             child: Padding(
-              // The carousel bleeds past the gutter on the leading side, so
-              // the next card can peek the way the artboard shows it.
-              padding: const EdgeInsets.fromLTRB(0, 29, 17, 0),
-              child: HomePromoCarousel(
-                businesses: discountedBusinesses,
-                onOpen: (HomeBusiness business) =>
-                    _openBusinessProfile(context, business),
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _HomeTopBar(
+                    isGuest: isGuest,
+                    onLogout: onLogout,
+                    onProtectedAction: onProtectedAction,
+                    onSignIn: onSignIn,
+                  ),
+                ],
               ),
             ),
           ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 25, 16, 25),
-            child: _SearchBox(onTap: () => context.push('/search')),
+          // The advertising space, and there is no advertising.
+          //
+          // The board draws a promotional card here and the carousel was fed
+          // the shops the catalogue marks as discounted, because that was the
+          // nearest real list to hand. It is not the same thing: a shop having
+          // a sale is not a shop that paid to be shown, and the band was
+          // presenting one as the other. This place waits for the staff
+          // dashboard to say what is advertised and by whom.
+          //
+          // The padding goes with it. An empty carousel already shrank to
+          // nothing, but the 29 above it did not, so hiding the card alone
+          // would have left a gap nothing explains.
+          if (kHomePromoSpaceHasSource)
+            SliverToBoxAdapter(
+              child: Padding(
+                // The carousel bleeds past the gutter on the leading side, so
+                // the next card can peek the way the artboard shows it.
+                padding: const EdgeInsets.fromLTRB(0, 29, 17, 0),
+                child: HomePromoCarousel(
+                  businesses: discountedBusinesses,
+                  onOpen: (HomeBusiness business) =>
+                      _openBusinessProfile(context, business),
+                ),
+              ),
+            ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 25, 16, 25),
+              child: _SearchBox(onTap: () => context.push('/search')),
+            ),
           ),
-        ),
-        if (state.recommendationConsentEnabled)
+          if (state.recommendationConsentEnabled)
+            _BusinessSection(
+              title:
+                  (state.recommendationsPersonalized
+                          ? 'recommendationHome.personalizedTitle'
+                          : 'recommendationHome.suggestionsTitle')
+                      .tr(),
+              businesses: recommendedBusinesses,
+              status: HomeSectionStatus.ready,
+              errorMessage: '',
+              onRetry: () => context.read<HomeBloc>().add(
+                const HomeRecommendationsRefreshRequested(),
+              ),
+              followedBusinessIds: state.followedBusinessIds,
+            ),
           _BusinessSection(
-            title:
-                (state.recommendationsPersonalized
-                        ? 'recommendationHome.personalizedTitle'
-                        : 'recommendationHome.suggestionsTitle')
-                    .tr(),
-            businesses: recommendedBusinesses,
-            status: HomeSectionStatus.ready,
-            errorMessage: '',
+            title: 'home.sections.newBusinesses'.tr(),
+            businesses: newBusinesses,
+            status: state.newBusinessesStatus,
+            errorMessage: state.newBusinessesError,
             onRetry: () => context.read<HomeBloc>().add(
-              const HomeRecommendationsRefreshRequested(),
+              const HomeCatalogSectionRetryRequested(HomeCatalogSection.newest),
             ),
             followedBusinessIds: state.followedBusinessIds,
           ),
-        _BusinessSection(
-          title: 'home.sections.newBusinesses'.tr(),
-          businesses: newBusinesses,
-          status: state.newBusinessesStatus,
-          errorMessage: state.newBusinessesError,
-          onRetry: () => context.read<HomeBloc>().add(
-            const HomeCatalogSectionRetryRequested(HomeCatalogSection.newest),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
+              child: _MerchantEnrollmentCard(onPressed: onBusinessEnrollment),
+            ),
           ),
-          followedBusinessIds: state.followedBusinessIds,
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 32),
-            child: _MerchantEnrollmentCard(onPressed: onBusinessEnrollment),
+          _BusinessSection(
+            title: 'home.sections.bestBusinesses'.tr(),
+            businesses: bestBusinesses,
+            status: state.bestBusinessesStatus,
+            errorMessage: state.bestBusinessesError,
+            onRetry: () => context.read<HomeBloc>().add(
+              const HomeCatalogSectionRetryRequested(HomeCatalogSection.best),
+            ),
+            followedBusinessIds: state.followedBusinessIds,
           ),
-        ),
-        _BusinessSection(
-          title: 'home.sections.bestBusinesses'.tr(),
-          businesses: bestBusinesses,
-          status: state.bestBusinessesStatus,
-          errorMessage: state.bestBusinessesError,
-          onRetry: () => context.read<HomeBloc>().add(
-            const HomeCatalogSectionRetryRequested(HomeCatalogSection.best),
+          _BusinessSection(
+            title: 'home.sections.offers'.tr(),
+            businesses: discountedBusinesses,
+            status: state.discountedBusinessesStatus,
+            errorMessage: state.discountedBusinessesError,
+            onRetry: () => context.read<HomeBloc>().add(
+              const HomeCatalogSectionRetryRequested(HomeCatalogSection.offers),
+            ),
+            followedBusinessIds: state.followedBusinessIds,
           ),
-          followedBusinessIds: state.followedBusinessIds,
-        ),
-        _BusinessSection(
-          title: 'home.sections.offers'.tr(),
-          businesses: discountedBusinesses,
-          status: state.discountedBusinessesStatus,
-          errorMessage: state.discountedBusinessesError,
-          onRetry: () => context.read<HomeBloc>().add(
-            const HomeCatalogSectionRetryRequested(HomeCatalogSection.offers),
+          SliverToBoxAdapter(
+            child: _LocationStatusCard(
+              granted: state.locationPermissionGranted,
+              handled: state.locationPermissionHandled,
+              onRequest: onLocationRequested,
+            ),
           ),
-          followedBusinessIds: state.followedBusinessIds,
-        ),
-        SliverToBoxAdapter(
-          child: _LocationStatusCard(
-            granted: state.locationPermissionGranted,
-            handled: state.locationPermissionHandled,
-            onRequest: onLocationRequested,
+          _BusinessSection(
+            title: 'home.sections.nearbyBusinesses'.tr(),
+            businesses: nearbyBusinesses,
+            status: state.nearbyBusinessesStatus,
+            errorMessage: state.nearbyBusinessesError,
+            onRetry: () => context.read<HomeBloc>().add(
+              const HomeCatalogSectionRetryRequested(HomeCatalogSection.nearby),
+            ),
+            followedBusinessIds: state.followedBusinessIds,
           ),
-        ),
-        _BusinessSection(
-          title: 'home.sections.nearbyBusinesses'.tr(),
-          businesses: nearbyBusinesses,
-          status: state.nearbyBusinessesStatus,
-          errorMessage: state.nearbyBusinessesError,
-          onRetry: () => context.read<HomeBloc>().add(
-            const HomeCatalogSectionRetryRequested(HomeCatalogSection.nearby),
-          ),
-          followedBusinessIds: state.followedBusinessIds,
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-      ],
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
+      ),
     );
   }
 
   List<HomeBusiness> _filtered(List<HomeBusiness> source, String query) {
     return source.where((business) => business.matches(query)).toList();
   }
+}
+
+/// Pull down, and wait for the screen to have actually been fetched again.
+///
+/// The indicator only lets go when the future it was given completes, so a
+/// fire-and-forget `add` would spin for a moment and stop while the requests
+/// were still in the air - the reader would be told the screen was fresh
+/// before it was. The bloc says when it is done; this waits for it to say so.
+///
+/// Public so it can be exercised without a drag gesture.
+Future<void> refreshHome(HomeBloc bloc) {
+  bloc.add(const HomeRefreshRequested());
+
+  // Subscribed before the bloc can have processed the event: `add` queues it
+  // and the queue is drained in a later microtask.
+  return bloc.stream.firstWhere((HomeState state) => !state.isRefreshing);
 }
 
 /// The account at the reading edge of the top bar: a picture if there is one,

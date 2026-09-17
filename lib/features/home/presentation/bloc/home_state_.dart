@@ -38,6 +38,14 @@ final class HomeState {
   final bool hasMoreAllBusinesses;
   final Set<String> followedBusinessIds;
 
+  /// Whether a pull-to-refresh is in the air.
+  ///
+  /// The indicator at the top of the screen only lets go when the future it
+  /// was given completes, so the screen has to be able to ask the bloc whether
+  /// the requests have actually come back. It is also the guard that keeps a
+  /// second pull from interleaving a second set of emits with the first.
+  final bool isRefreshing;
+
   const HomeState({
     this.searchQuery = '',
     this.selectedTab = 0,
@@ -70,6 +78,7 @@ final class HomeState {
     this.isLoadingAllBusinesses = false,
     this.hasMoreAllBusinesses = false,
     this.followedBusinessIds = const {},
+    this.isRefreshing = false,
   });
 
   HomeState copyWith({
@@ -104,6 +113,7 @@ final class HomeState {
     bool? isLoadingAllBusinesses,
     bool? hasMoreAllBusinesses,
     Set<String>? followedBusinessIds,
+    bool? isRefreshing,
   }) {
     return HomeState(
       searchQuery: searchQuery ?? this.searchQuery,
@@ -153,6 +163,7 @@ final class HomeState {
           isLoadingAllBusinesses ?? this.isLoadingAllBusinesses,
       hasMoreAllBusinesses: hasMoreAllBusinesses ?? this.hasMoreAllBusinesses,
       followedBusinessIds: followedBusinessIds ?? this.followedBusinessIds,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
     );
   }
 }

@@ -15,6 +15,14 @@ final class HomeRecommendationsRefreshRequested extends HomeEvent {
   const HomeRecommendationsRefreshRequested();
 }
 
+/// The reader pulled the home screen down.
+///
+/// Everything that screen is showing, fetched again - not the tab they happen
+/// to be on, because the gesture has no way to name a tab.
+final class HomeRefreshRequested extends HomeEvent {
+  const HomeRefreshRequested();
+}
+
 final class HomeSearchChanged extends HomeEvent {
   final String query;
 
