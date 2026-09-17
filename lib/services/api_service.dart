@@ -3007,6 +3007,14 @@ class OrderStatusHistoryApiModel {
 class BusinessReviewApiModel {
   final String id;
   final String userName;
+
+  /// The reviewer's picture, or empty where the account has none.
+  ///
+  /// Only the product's reviews carry one today; a shop's reviews answer with
+  /// nothing here and draw the figure, which is what they drew before this
+  /// field existed.
+  final String userAvatarUrl;
+
   final double rating;
   final String comment;
   final DateTime? createdAt;
@@ -3017,12 +3025,14 @@ class BusinessReviewApiModel {
     required this.rating,
     required this.comment,
     required this.createdAt,
+    this.userAvatarUrl = '',
   });
 
   factory BusinessReviewApiModel.fromJson(Map<String, dynamic> json) {
     return BusinessReviewApiModel(
       id: json['id'] as String? ?? '',
       userName: json['userName'] as String? ?? '',
+      userAvatarUrl: (json['userAvatarUrl'] as String? ?? '').trim(),
       rating: (json['rating'] as num?)?.toDouble() ?? 0,
       comment: json['comment'] as String? ?? '',
       createdAt: DateTime.tryParse(json['createdAt'] as String? ?? ''),
