@@ -344,28 +344,60 @@ export const BUSINESS_LIST_FIELDS = Object.freeze([
   'subscribedAt'
 ]);
 
-businessSchema.methods.toListJSON = function toListJSON() {
-  const activeProducts = this.products.filter((product) => product.isActive);
+/**
+ * What to ask the database for when a shop is only going to be listed.
+ *
+ * `BUSINESS_LIST_FIELDS` plus the two fields of a product that the shape below
+ * actually reads. Everything else a product carries - its description, its
+ * price, its pictures, its variants, its stock - is nine tenths of the
+ * document and none of it survives as far as the response.
+ *
+ * Built from the list above rather than written out again, so a field added
+ * there is asked for here without anybody remembering to.
+ */
+export const BUSINESS_LIST_PROJECTION = Object.freeze({
+  ...Object.fromEntries(BUSINESS_LIST_FIELDS.map((field) => [field, 1])),
+  'products.name': 1,
+  'products.isActive': 1
+});
+
+/**
+ * The listed shape of a shop, from a document or from a plain object.
+ *
+ * A pure function rather than only a method because the fast way to read a
+ * shop for a list is `lean()`, which hands back plain objects - and the point
+ * of not hydrating them is lost if the view then hydrates each one to call a
+ * method on it. Every field it touches reads the same on both, so one piece of
+ * code serves both and the two cannot drift apart.
+ */
+export function businessListJSON(business) {
+  const activeProducts = (business.products ?? []).filter(
+    (product) => product.isActive
+  );
 
   return {
-    id: this._id.toString(),
-    publicId: this.publicId,
-    name: this.name,
-    englishName: this.englishName,
-    logoUrl: this.logoUrl,
-    category: this.category,
+    id: business._id.toString(),
+    publicId: business.publicId,
+    name: business.name,
+    englishName: business.englishName,
+    logoUrl: business.logoUrl,
+    category: business.category,
     products: activeProducts.slice(0, 6).map((product) => product.name),
     productCount: activeProducts.length,
-    rating: this.ratingAverage,
-    ratingCount: this.ratingCount,
-    followerCount: this.followerCount,
-    viewCount: this.viewCount,
-    discount: this.discountLabel ?? null,
-    colorValue: this.colorValue,
-    address: this.address,
-    location: this.location ?? null,
-    subscribedAt: this.subscribedAt
+    rating: business.ratingAverage,
+    ratingCount: business.ratingCount,
+    followerCount: business.followerCount,
+    viewCount: business.viewCount,
+    discount: business.discountLabel ?? null,
+    colorValue: business.colorValue,
+    address: business.address,
+    location: business.location ?? null,
+    subscribedAt: business.subscribedAt
   };
+}
+
+businessSchema.methods.toListJSON = function toListJSON() {
+  return businessListJSON(this);
 };
 
 /**

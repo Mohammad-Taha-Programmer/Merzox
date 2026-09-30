@@ -1,4 +1,4 @@
-import { Business } from '../models/Business.js';
+import { Business, BUSINESS_LIST_PROJECTION } from '../models/Business.js';
 import { Favorite } from '../models/Favorite.js';
 import { Order } from '../models/Order.js';
 import {
@@ -288,12 +288,17 @@ async function hydrateRankedBusinesses({
 
   // Re-assert activity because a business could be disabled between
   // aggregation and hydration.
-  const businesses = await BusinessModel.find({
-    _id: {
-      $in: ids
+  const businesses = await BusinessModel.find(
+    {
+      _id: {
+        $in: ids
+      },
+      isActive: true
     },
-    isActive: true
-  }).exec();
+    // Listed, not opened: the band draws a name, a logo and six product
+    // names, and the rest of each document is goods nobody will see here.
+    BUSINESS_LIST_PROJECTION
+  ).exec();
 
   const byId = new Map(
     businesses.map((business) => [

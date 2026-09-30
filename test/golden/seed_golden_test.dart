@@ -2948,10 +2948,15 @@ void main() {
       );
       _closeOnTearDown(bloc);
 
+      // `المتاجر` is waited for as well, and it is the last thing to land:
+      // the home bands no longer wait for it, so a board that wanted the
+      // whole screen settled has to say so. A board draws a screen that has
+      // stopped arriving.
       final Future<HomeState> ready = bloc.stream.firstWhere(
         (HomeState state) =>
             state.newBusinessesStatus == HomeSectionStatus.ready &&
-            state.discountedBusinessesStatus == HomeSectionStatus.ready,
+            state.discountedBusinessesStatus == HomeSectionStatus.ready &&
+            state.allBusinessesStatus == HomeSectionStatus.ready,
       );
       bloc.add(HomeStarted(isGuest: isGuest));
       await ready;

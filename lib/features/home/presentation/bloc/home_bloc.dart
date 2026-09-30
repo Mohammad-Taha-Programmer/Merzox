@@ -96,6 +96,20 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       ),
     );
 
+    // `المتاجر` is fifty shops for a tab the reader is not looking at, and it
+    // is the slowest request on the screen. It starts here with the others so
+    // that tab is ready when it is opened, but the home bands are no longer
+    // made to wait for it: they were, and it cost them the difference between
+    // its time and theirs on every single start.
+    final storesFuture = _captureBusinesses(
+      () => _apiService.businesses(
+        page: 1,
+        limit: _allBusinessesPageSize,
+        search: state.allBusinessesSearch,
+        sort: 'newest',
+      ),
+    );
+
     final results = await Future.wait([
       _captureBusinesses(
         () => _apiService.businesses(
@@ -119,46 +133,49 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
           discounted: true,
         ),
       ),
-      _captureBusinesses(
-        () => _apiService.businesses(
-          page: 1,
-          limit: _allBusinessesPageSize,
-          search: state.allBusinessesSearch,
-          sort: 'newest',
-        ),
-      ),
     ]);
 
     final newest = results[0];
     final best = results[1];
     final offers = results[2];
-    final all = results[3];
 
     emit(
       state.copyWith(
         newBusinesses: _mappedBusinesses(newest.response),
         bestBusinesses: _mappedBusinesses(best.response),
         discountedBusinesses: _mappedBusinesses(offers.response),
-        allBusinesses: _mappedBusinesses(all.response),
         newBusinessesStatus: newest.status,
         bestBusinessesStatus: best.status,
         discountedBusinessesStatus: offers.status,
-        allBusinessesStatus: all.status,
         newBusinessesError: newest.errorMessage,
         bestBusinessesError: best.errorMessage,
         discountedBusinessesError: offers.errorMessage,
+      ),
+    );
+
+    // Three independent reads that used to run one after another, so the
+    // suggestions band - which sits at the top of the screen - arrived after
+    // a location fix and a favourites request it has nothing to do with.
+    // Nothing here writes a field another one writes.
+    final trailingFuture = Future.wait(<Future<void>>[
+      if (permissionGranted) _loadNearby(emit),
+      _loadFavoriteBusinesses(emit, session),
+      _loadRecommendations(emit, knownSession: session),
+    ]);
+
+    final all = await storesFuture;
+
+    emit(
+      state.copyWith(
+        allBusinesses: _mappedBusinesses(all.response),
+        allBusinessesStatus: all.status,
         allBusinessesError: all.errorMessage,
         allBusinessesPage: all.response?.page ?? 0,
         hasMoreAllBusinesses: all.response?.hasMore ?? false,
       ),
     );
 
-    if (permissionGranted) {
-      await _loadNearby(emit);
-    }
-
-    await _loadFavoriteBusinesses(emit, session);
-    await _loadRecommendations(emit, knownSession: session);
+    await trailingFuture;
   }
 
   Future<void> _onRecommendationsRefreshRequested(

@@ -1,12 +1,11 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/date_symbol_data_local.dart';
-
-import '../core/startup/startup_service.dart';
-import '../injection/injector.dart';
-import '../services/push_service.dart';
-import '../services/realtime_service.dart';
-import 'app.dart';
+import 'package:merzox/core/startup/startup_service.dart';
+import 'package:merzox/injection/injector.dart';
+import 'package:merzox/services/push_service.dart';
+import 'package:merzox/services/realtime_service.dart';
+import 'package:merzox/app/app.dart';
 import 'package:merzox/features/authentication/account_avatar.dart';
 
 Future<void> bootstrap() async {

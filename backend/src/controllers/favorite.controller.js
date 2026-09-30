@@ -1,4 +1,4 @@
-import { Business } from '../models/Business.js';
+import { Business, BUSINESS_LIST_PROJECTION } from '../models/Business.js';
 import { Favorite } from '../models/Favorite.js';
 import { AppError } from '../utils/AppError.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -48,7 +48,14 @@ export const listFavoriteBusinesses = asyncHandler(async (req, res) => {
       .sort({ createdAt: -1, _id: -1 })
       .skip(skip)
       .limit(limit)
-      .populate({ path: 'business', match: { isActive: true } }),
+      // Only what a listed shop shows. The home screen asks for a hundred of
+      // these to know which hearts are filled in, and each whole shop document
+      // is eleven kilobytes of goods it never looks at.
+      .populate({
+        path: 'business',
+        match: { isActive: true },
+        select: BUSINESS_LIST_PROJECTION
+      }),
     Favorite.countDocuments(filter)
   ]);
 
