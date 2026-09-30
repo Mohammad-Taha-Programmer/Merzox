@@ -255,11 +255,13 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       ),
     );
 
-    await _loadNearby(emit, quiet: true);
-
+    final nearbyFuture = _loadNearby(emit, quiet: true);
     final session = await _authSessionService.read();
-    await _loadFavoriteBusinesses(emit, session);
-    await _loadRecommendations(emit, knownSession: session, quiet: true);
+    await Future.wait(<Future<void>>[
+      nearbyFuture,
+      _loadFavoriteBusinesses(emit, session),
+      _loadRecommendations(emit, knownSession: session, quiet: true),
+    ]);
 
     // Last, and unconditionally: the screen is waiting on this to let the
     // indicator go.

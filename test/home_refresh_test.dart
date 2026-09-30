@@ -41,6 +41,8 @@ class _CountingApi extends ApiService {
 
   /// Held open to keep a refresh in flight.
   Completer<void>? gate;
+  Completer<void>? favoriteGate;
+  Completer<void>? favoriteStarted;
 
   String newestName = 'متجر الياسمين';
 
@@ -97,6 +99,10 @@ class _CountingApi extends ApiService {
     int limit = 20,
   }) async {
     favoriteCalls += 1;
+    if (favoriteStarted case final started? when !started.isCompleted) {
+      started.complete();
+    }
+    await favoriteGate?.future;
 
     return const FavoriteBusinessListApiResponse(
       businesses: <SearchBusinessApiModel>[],
@@ -117,22 +123,36 @@ class _NoLocation extends LocationPermissionService {
 }
 
 class _FixedLocation extends DeviceLocationService {
+  Completer<void>? gate;
+  Completer<void>? started;
+
   @override
   Future<bool> isServiceEnabled() async => true;
 
   @override
-  Future<DeviceLocation> currentLocation() async =>
-      const DeviceLocation(latitude: 31.9, longitude: 35.2);
+  Future<DeviceLocation> currentLocation() async {
+    if (started case final entered? when !entered.isCompleted) {
+      entered.complete();
+    }
+    await gate?.future;
+    return const DeviceLocation(latitude: 31.9, longitude: 35.2);
+  }
 }
 
 final class _CountingRecommendations implements HomeRecommendationGateway {
   int calls = 0;
   bool consentEnabled = true;
   String name = 'مقترح';
+  Completer<void>? gate;
+  Completer<void>? started;
 
   @override
   Future<HomeRecommendationSnapshot> load({required String token}) async {
     calls += 1;
+    if (started case final entered? when !entered.isCompleted) {
+      entered.complete();
+    }
+    await gate?.future;
 
     if (!consentEnabled) {
       return const HomeRecommendationSnapshot.disabled();
@@ -172,12 +192,13 @@ void main() {
   Future<HomeBloc> openHome(
     _CountingApi api, {
     _CountingRecommendations? recommendations,
+    _FixedLocation? location,
     bool locationGranted = false,
   }) async {
     final HomeBloc bloc = HomeBloc(
       apiService: api,
       locationPermissionService: _NoLocation(granted: locationGranted),
-      deviceLocationService: _FixedLocation(),
+      deviceLocationService: location ?? _FixedLocation(),
       authSessionService: const _SignedIn(),
       recommendationGateway: recommendations ?? _CountingRecommendations(),
     );
@@ -319,6 +340,45 @@ void main() {
     // One set of requests, not two.
     expect(api.newestCalls, 2);
     expect(api.bestCalls, 2);
+  });
+
+  test('nearby, favorites, and recommendations refresh concurrently', () async {
+    final _CountingApi api = _CountingApi();
+    final _CountingRecommendations recommendations = _CountingRecommendations();
+    final _FixedLocation location = _FixedLocation();
+    final HomeBloc bloc = await openHome(
+      api,
+      recommendations: recommendations,
+      location: location,
+      locationGranted: true,
+    );
+
+    location.gate = Completer<void>();
+    location.started = Completer<void>();
+    api.favoriteGate = Completer<void>();
+    api.favoriteStarted = Completer<void>();
+    recommendations.gate = Completer<void>();
+    recommendations.started = Completer<void>();
+
+    final Future<void> refresh = refreshHome(bloc);
+    await Future.wait(<Future<void>>[
+      location.started!.future,
+      api.favoriteStarted!.future,
+      recommendations.started!.future,
+    ]).timeout(const Duration(seconds: 2));
+
+    // Each independent task has started and is held open at its own boundary.
+    expect(api.favoriteCalls, 2);
+    expect(recommendations.calls, 2);
+    expect(bloc.state.isRefreshing, isTrue);
+
+    location.gate!.complete();
+    api.favoriteGate!.complete();
+    recommendations.gate!.complete();
+    await refresh;
+
+    expect(api.nearbyCalls, 2);
+    expect(bloc.state.isRefreshing, isFalse);
   });
 
   testWidgets('and the gesture is wired to it', (WidgetTester tester) async {
